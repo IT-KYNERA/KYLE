@@ -69,6 +69,7 @@ pub enum TokenKind {
     ErrKw,      // error (keyword alias)
     Extern,     // extern
     Import,     // import
+    From,       // from
     As,         // as
     Get,        // get
     Set,        // set

@@ -8,7 +8,7 @@ The KL programming language is developed in 5 phases. Each phase builds on the p
 
 ---
 
-## Phase 0: Language Design (Current)
+## Phase 0: Language Design
 
 ### Status: Complete
 
@@ -66,56 +66,69 @@ Project structure plan
 
 ## Phase 1: Compiler Frontend
 
-### Status: Not Started
+### Status: Mostly Complete (Q3 2026)
 
 ### Goal
 
 Build the compiler frontend: lexer, parser, and AST construction.
 
+**Milestone achieved**: `kl parse main.kl` produces AST dump.
+
 ### Tasks
 
 ```text
-[ ] Set up Rust workspace (klc_core, klc_frontend)
-[ ] Implement lexer
-    - Token types
-    - Identifier handling
-    - Literal parsing
-    - Operator tokens
-    - INDENT/DEDENT handling
-[ ] Implement parser
-    - Recursive descent
-    - Expression parsing
-    - Statement parsing
-    - Declaration parsing
-    - Error recovery
-[ ] Build AST nodes
+[x] Set up Rust workspace (klc_core, klc_frontend, +7 crates)
+[x] Implement lexer
+    - Token types (all 50+ token kinds)
+    - Identifier and keyword handling
+    - Literal parsing (int, hex, bin, float, string, char, boolean)
+    - Operator tokens (single + multi-char: ==, !=, <=, ->, +=, <<=, etc.)
+    - INDENT/DEDENT handling (indentation-based blocks)
+[x] Implement parser
+    - Recursive descent (812 lines)
+    - Expression parsing (12 precedence levels)
+    - Statement parsing (if, while, for, match, return, break, defer, guard, unsafe, loop, binding-if)
+    - Declaration parsing (import, fn, class, abs class, struct, enum, contract, type alias, var/const)
+    - Error recovery (pending — basic error messages work, needs span-based reporting)
+[x] Build AST nodes
     - Program node
-    - All declaration nodes
-    - All expression nodes
-    - All statement nodes
+    - All declaration nodes (Import, Variable, Constant, Function, Class, AbsClass, Struct, Enum, Contract, TypeAlias)
+    - All expression nodes (Binary, Unary, Call, PropAccess, Closure, Async, Await, Spread, etc.)
+    - All statement nodes (If, While, For, Match, Return, Break, Defer, Guard, Unsafe, BindingIf)
+    - All type nodes (Primitive, User, Generic, Optional, Error)
 [ ] Write parser tests
-    - Valid programs
-    - Invalid programs
-    - Edge cases
-[ ] CLI integration (klc_cli)
+    - Lexer unit tests (pending)
+    - Parser unit tests (pending)
+    - Integration tests (pending)
+    - Golden file tests (future)
+[x] CLI integration (klc_cli)
     - File reading
     - Parse command
-    - AST dump
+    - AST dump (pretty-printed tree)
 ```
 
 ### Tests
 
 ```text
-Lexer unit tests
-Parser unit tests
-Integration tests
-Golden file tests
+Lexer unit tests     ← PENDING
+Parser unit tests    ← PENDING
+Integration tests    ← PENDING
 ```
 
 ### Milestone
 
 ```text
-kl parse main.kl  # produces AST dump
+kl parse main.kl  # produces AST dump  ← ACHIEVED
+```
+
+### What remains to finish Phase 1
+
+```text
+1. Write comprehensive unit tests for lexer
+2. Write comprehensive unit tests for parser
+3. Write integration tests with example files
+4. Improve error messages (include span, error code, suggestions)
+5. Add error recovery to parser
 ```
 
 ---

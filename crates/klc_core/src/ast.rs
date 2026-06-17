@@ -321,7 +321,7 @@ pub enum Stmt {
     TypedVariable(VariableDecl),
     Constant(ConstantDecl),
     Expression(Expr),
-    Return(Box<Expr>),
+    Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
     If(IfStmt),
     BindingIf(BindingIf),
@@ -783,8 +783,12 @@ impl DisplayDepth for Stmt {
             }
             Stmt::Return(e) => {
                 write_indent(f, d)?;
-                writeln!(f, "Return")?;
-                e.fmt_depth(f, d + 1)
+                if let Some(val) = e {
+                    writeln!(f, "Return")?;
+                    val.fmt_depth(f, d + 1)
+                } else {
+                    writeln!(f, "Return (void)")
+                }
             }
             Stmt::Break(v) => {
                 write_indent(f, d)?;

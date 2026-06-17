@@ -84,15 +84,36 @@ impl Lexer {
 
         // Single-character tokens.
         if let Some(kind) = match c {
-            '+' => { self.advance(); Some(TokenKind::Plus) }
+            '+' => {
+                self.advance();
+                if self.current() == '=' { self.advance(); Some(TokenKind::PlusEquals) }
+                else if self.current() == '%' { self.advance(); Some(TokenKind::PlusPercent) }
+                else { Some(TokenKind::Plus) }
+            }
             '-' => {
                 self.advance();
                 if self.current() == '>' { self.advance(); Some(TokenKind::Arrow) }
+                else if self.current() == '=' { self.advance(); Some(TokenKind::MinusEquals) }
+                else if self.current() == '%' { self.advance(); Some(TokenKind::MinusPercent) }
                 else { Some(TokenKind::Minus) }
             }
-            '*' => { self.advance(); Some(TokenKind::Star) }
-            '/' => { self.advance(); Some(TokenKind::Slash) }
-            '%' => { self.advance(); Some(TokenKind::Percent) }
+            '*' => {
+                self.advance();
+                if self.current() == '*' { self.advance(); Some(TokenKind::StarStar) }
+                else if self.current() == '=' { self.advance(); Some(TokenKind::StarEquals) }
+                else if self.current() == '%' { self.advance(); Some(TokenKind::StarPercent) }
+                else { Some(TokenKind::Star) }
+            }
+            '/' => {
+                self.advance();
+                if self.current() == '=' { self.advance(); Some(TokenKind::SlashEquals) }
+                else { Some(TokenKind::Slash) }
+            }
+            '%' => {
+                self.advance();
+                if self.current() == '=' { self.advance(); Some(TokenKind::PercentEquals) }
+                else { Some(TokenKind::Percent) }
+            }
             '=' => {
                 self.advance();
                 if self.current() == '=' { self.advance(); Some(TokenKind::EqualsEquals) }
@@ -225,6 +246,11 @@ impl Lexer {
             "ok" => TokenKind::OkKw,
             "error" => TokenKind::ErrKw,
             "extern" => TokenKind::Extern,
+            "import" => TokenKind::Import,
+            "from" => TokenKind::From,
+            "as" => TokenKind::As,
+            "get" => TokenKind::Get,
+            "set" => TokenKind::Set,
             _ => TokenKind::Identifier(word.to_string()),
         }
     }
@@ -265,7 +291,7 @@ impl Lexer {
         }
 
         // Float: dot followed by digit.
-        if self.peek() == '.' {
+        if self.pos < self.chars.len() && self.chars[self.pos] == '.' {
             let next = self.chars.get(self.pos + 1).copied();
             if next.is_some_and(|c| c.is_ascii_digit()) {
                 is_float = true;
@@ -423,5 +449,343 @@ impl Lexer {
 
     fn make_token(&self, kind: TokenKind) -> Token {
         Token::new(kind, Span::dummy())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tokenize(source: &str) -> Vec<TokenKind> {
+        let mut lexer = Lexer::new(source);
+        lexer.tokenize().into_iter().map(|t| t.kind).collect()
+    }
+
+    // -----------------------------------------------------------------------
+    // Literals
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_integer() {
+        let kinds = tokenize("42");
+        assert_eq!(kinds, vec![TokenKind::Integer("42".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_hex_integer() {
+        let kinds = tokenize("0xFF");
+        assert_eq!(kinds, vec![TokenKind::Integer("0xFF".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_binary_integer() {
+        let kinds = tokenize("0b1010");
+        assert_eq!(kinds, vec![TokenKind::Integer("0b1010".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_float() {
+        let kinds = tokenize("3.14");
+        assert_eq!(kinds, vec![TokenKind::Float("3.14".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_string() {
+        let kinds = tokenize(r#""hello""#);
+        assert_eq!(kinds, vec![TokenKind::String("hello".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_string_with_escape() {
+        let kinds = tokenize(r#""hello\nworld""#);
+        assert_eq!(kinds, vec![TokenKind::String("hello\\nworld".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_char() {
+        let kinds = tokenize("'x'");
+        assert_eq!(kinds, vec![TokenKind::Char("x".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_boolean() {
+        let kinds = tokenize("true false");
+        assert_eq!(kinds, vec![TokenKind::True, TokenKind::False, TokenKind::Eof]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Keywords
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_keywords() {
+        let kinds = tokenize("fn class abs struct enum contract if elif else while for in match return break defer guard unsafe async await const loop type None ok error extern");
+        assert_eq!(kinds, vec![
+            TokenKind::Fn, TokenKind::Class, TokenKind::Abs, TokenKind::Struct,
+            TokenKind::Enum, TokenKind::Contract, TokenKind::If, TokenKind::Elif,
+            TokenKind::Else, TokenKind::While, TokenKind::For, TokenKind::In,
+            TokenKind::Match, TokenKind::Return, TokenKind::Break, TokenKind::Defer,
+            TokenKind::Guard, TokenKind::Unsafe, TokenKind::Async, TokenKind::Await,
+            TokenKind::Const, TokenKind::Loop, TokenKind::Type, TokenKind::None,
+            TokenKind::OkKw, TokenKind::ErrKw, TokenKind::Extern,
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_import_as_keywords() {
+        let kinds = tokenize("import as");
+        assert_eq!(kinds, vec![
+            TokenKind::Import, TokenKind::As, TokenKind::Eof,
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Identifiers
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_identifier() {
+        let kinds = tokenize("hello world");
+        assert_eq!(kinds, vec![
+            TokenKind::Identifier("hello".into()),
+            TokenKind::Identifier("world".into()),
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_underscore_identifier() {
+        let kinds = tokenize("_private __private");
+        assert_eq!(kinds, vec![
+            TokenKind::Identifier("_private".into()),
+            TokenKind::Identifier("__private".into()),
+            TokenKind::Eof,
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Single-char operators
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_arithmetic_operators() {
+        let kinds = tokenize("+ - * / %");
+        assert_eq!(kinds, vec![
+            TokenKind::Plus, TokenKind::Minus, TokenKind::Star,
+            TokenKind::Slash, TokenKind::Percent, TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_comparison_operators() {
+        let kinds = tokenize("< >");
+        assert_eq!(kinds, vec![
+            TokenKind::Less, TokenKind::Greater, TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_bitwise_operators() {
+        let kinds = tokenize("& | ^ ~");
+        assert_eq!(kinds, vec![
+            TokenKind::Ampersand, TokenKind::Pipe,
+            TokenKind::Caret, TokenKind::Tilde,
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_delimiters() {
+        let kinds = tokenize("( ) [ ] { } , . :");
+        assert_eq!(kinds, vec![
+            TokenKind::LParen, TokenKind::RParen,
+            TokenKind::LBracket, TokenKind::RBracket,
+            TokenKind::LBrace, TokenKind::RBrace,
+            TokenKind::Comma, TokenKind::Dot, TokenKind::Colon,
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_bang() {
+        let kinds = tokenize("!");
+        assert_eq!(kinds, vec![TokenKind::Bang, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_question() {
+        let kinds = tokenize("?");
+        assert_eq!(kinds, vec![TokenKind::Question, TokenKind::Eof]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Multi-char operators
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_arrow() {
+        let kinds = tokenize("->");
+        assert_eq!(kinds, vec![TokenKind::Arrow, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_fat_arrow() {
+        let kinds = tokenize("=>");
+        assert_eq!(kinds, vec![TokenKind::FatArrow, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_equals_equals() {
+        let kinds = tokenize("==");
+        assert_eq!(kinds, vec![TokenKind::EqualsEquals, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_not_equals() {
+        let kinds = tokenize("!=");
+        assert_eq!(kinds, vec![TokenKind::BangEquals, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_less_equals() {
+        let kinds = tokenize("<=");
+        assert_eq!(kinds, vec![TokenKind::LessEquals, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_greater_equals() {
+        let kinds = tokenize(">=");
+        assert_eq!(kinds, vec![TokenKind::GreaterEquals, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_logical_and_or() {
+        let kinds = tokenize("&& ||");
+        assert_eq!(kinds, vec![TokenKind::And, TokenKind::Or, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_shift() {
+        let kinds = tokenize("<< >>");
+        assert_eq!(kinds, vec![TokenKind::LessLess, TokenKind::GreaterGreater, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_shift_assign() {
+        let kinds = tokenize("<<= >>=");
+        assert_eq!(kinds, vec![TokenKind::LessLessEquals, TokenKind::GreaterGreaterEquals, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_compound_assign() {
+        let kinds = tokenize("+= -= *= /= %= &= |= ^=");
+        assert_eq!(kinds, vec![
+            TokenKind::PlusEquals, TokenKind::MinusEquals, TokenKind::StarEquals,
+            TokenKind::SlashEquals, TokenKind::PercentEquals,
+            TokenKind::AmpersandEquals, TokenKind::PipeEquals, TokenKind::CaretEquals,
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_wrapping_arithmetic() {
+        let kinds = tokenize("+% -% *%");
+        assert_eq!(kinds, vec![
+            TokenKind::PlusPercent, TokenKind::MinusPercent, TokenKind::StarPercent,
+            TokenKind::Eof,
+        ]);
+    }
+
+    #[test]
+    fn test_question_dot() {
+        let kinds = tokenize("?.");
+        assert_eq!(kinds, vec![TokenKind::QuestionDot, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_equals_assign() {
+        let kinds = tokenize("=");
+        assert_eq!(kinds, vec![TokenKind::Equals, TokenKind::Eof]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Comments
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_line_comment() {
+        let kinds = tokenize("42 # this is a comment\n43");
+        // No leading space on the next line so no Indent/Dedent
+        assert_eq!(kinds, vec![
+            TokenKind::Integer("42".into()),
+            TokenKind::Newline,
+            TokenKind::Integer("43".into()),
+            TokenKind::Eof,
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Indentation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_indent_dedent() {
+        let kinds = tokenize("fn main():\n    42\n");
+        assert!(kinds.contains(&TokenKind::Indent), "should contain Indent: {:?}", kinds);
+        assert!(kinds.contains(&TokenKind::Dedent), "should contain Dedent: {:?}", kinds);
+    }
+
+    #[test]
+    fn test_newline() {
+        let kinds = tokenize("a\nb");
+        assert!(kinds.contains(&TokenKind::Newline));
+    }
+
+    // -----------------------------------------------------------------------
+    // Mixed
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_function_declaration_tokens() {
+        let source = "fn add(x: i32, y: i32) -> i32:\n    x + y\n";
+        let kinds = tokenize(source);
+        let expected = vec![
+            TokenKind::Fn,
+            TokenKind::Identifier("add".into()),
+            TokenKind::LParen,
+            TokenKind::Identifier("x".into()),
+            TokenKind::Colon,
+            TokenKind::Identifier("i32".into()),
+            TokenKind::Comma,
+            TokenKind::Identifier("y".into()),
+            TokenKind::Colon,
+            TokenKind::Identifier("i32".into()),
+            TokenKind::RParen,
+            TokenKind::Arrow,
+            TokenKind::Identifier("i32".into()),
+            TokenKind::Colon,
+            TokenKind::Newline,
+            TokenKind::Indent,
+            TokenKind::Identifier("x".into()),
+            TokenKind::Plus,
+            TokenKind::Identifier("y".into()),
+            TokenKind::Newline,
+            TokenKind::Dedent,
+            TokenKind::Eof,
+        ];
+        assert_eq!(kinds, expected);
+    }
+
+    // -----------------------------------------------------------------------
+    // Error handling
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_unexpected_character() {
+        let kinds = tokenize("@");
+        assert_eq!(kinds.len(), 2);
+        assert!(matches!(&kinds[0], TokenKind::LexError(_)));
+        assert_eq!(kinds[1], TokenKind::Eof);
     }
 }

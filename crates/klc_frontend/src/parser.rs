@@ -42,6 +42,9 @@ impl Parser {
     // -----------------------------------------------------------------------
 
     fn parse_decl(&mut self) -> Result<Decl, String> {
+        if self.at(TokenKind::From) {
+            return self.parse_from_import();
+        }
         if self.at(TokenKind::Import) {
             return self.parse_import();
         }
@@ -96,7 +99,8 @@ impl Parser {
             }
             return Err(format!("expected '=' after identifier '{}'", name));
         }
-        Err(format!("unexpected token at declaration start"))
+        let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
+        Err(format!("unexpected token at declaration start: {}", found))
     }
 
     fn parse_import(&mut self) -> Result<Decl, String> {
@@ -109,6 +113,14 @@ impl Parser {
             None
         };
         Ok(Decl::Import(Import { module_name, alias, span: Span::dummy() }))
+    }
+
+    fn parse_from_import(&mut self) -> Result<Decl, String> {
+        self.advance(); // from
+        let module_name = self.eat_identifier();
+        self.expect_keyword("import")?;
+        let imported_name = self.eat_identifier();
+        Ok(Decl::FromImport(FromImport { module_name, imported_name, span: Span::dummy() }))
     }
 
     fn parse_type_alias(&mut self) -> Result<Decl, String> {
@@ -343,6 +355,10 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<AstType, String> {
         let name = self.eat_identifier();
+        if name.is_empty() {
+            let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
+            return Err(format!("expected type name, found {}", found));
+        }
         if self.at(TokenKind::Less) {
             self.advance();
             let mut args = Vec::new();
@@ -463,7 +479,7 @@ impl Parser {
                 self.expect(TokenKind::RBrace)?;
                 Expr::Dictionary { entries, span: Span::dummy() }
             }
-            _ => return Err(format!("unexpected token in expression")),
+            _ => return Err(format!("unexpected token in expression: {:?}", tok.kind)),
         };
         self.parse_postfix(expr)
     }
@@ -526,8 +542,10 @@ impl Parser {
         }
         if self.at(TokenKind::Return) {
             self.advance();
-            let expr = self.parse_expr()?;
-            return Ok(Stmt::Return(Box::new(expr)));
+            let expr = if self.current_is_expr_start() {
+                Some(Box::new(self.parse_expr()?))
+            } else { None };
+            return Ok(Stmt::Return(expr));
         }
         if self.at(TokenKind::Break) {
             self.advance();
@@ -592,16 +610,20 @@ impl Parser {
         let body = self.parse_block()?;
         let mut elif_branches = Vec::new();
         let mut else_branch = None;
-        if self.at(TokenKind::Elif) {
+        while self.at(TokenKind::Elif) {
             self.advance();
+            let cond = self.parse_expr()?;
+            self.expect(TokenKind::Colon)?;
+            let body = self.parse_block()?;
             elif_branches.push(ElifBranch {
-                condition: Box::new(self.parse_expr()?),
-                body: self.parse_block()?,
+                condition: Box::new(cond),
+                body,
                 span: Span::dummy(),
             });
         }
         if self.at(TokenKind::Else) {
             self.advance();
+            self.expect(TokenKind::Colon)?;
             else_branch = Some(self.parse_block()?);
         }
         Ok(Stmt::If(IfStmt { condition: Box::new(condition), body, elif_branches, else_branch, span: Span::dummy() }))
@@ -652,9 +674,14 @@ impl Parser {
         self.advance();
         let expression = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
+        // Consume Newline and Indent that precede the match body
+        if self.at(TokenKind::Newline) { self.advance(); }
+        if self.at(TokenKind::Indent) { self.advance(); }
         let mut arms = Vec::new();
         loop {
-            if self.at(TokenKind::Dedent) || self.at(TokenKind::Eof) { break; }
+            if self.at(TokenKind::Newline) { self.advance(); continue; }
+            if self.at(TokenKind::Dedent) { self.advance(); break; }
+            if self.at(TokenKind::Eof) { break; }
             let pattern = self.parse_pattern()?;
             let guard = if self.at(TokenKind::If) {
                 self.advance();
@@ -670,10 +697,30 @@ impl Parser {
     fn parse_pattern(&mut self) -> Result<Pattern, String> {
         if self.at_identifier() {
             let name = self.eat_identifier();
-            Ok(Pattern::Identifier { name, span: Span::dummy() })
-        } else {
-            Err("expected pattern".to_string())
+            return Ok(Pattern::Identifier { name, span: Span::dummy() });
         }
+        let lit = match &self.current()?.kind {
+            TokenKind::Integer(s) => {
+                let n: i64 = s.parse().unwrap_or(0);
+                Literal::Integer(n)
+            }
+            TokenKind::Float(s) => {
+                let n: f64 = s.parse().unwrap_or(0.0);
+                Literal::Float(n)
+            }
+            TokenKind::String(s) => Literal::String(s.clone()),
+            TokenKind::True => Literal::Boolean(true),
+            TokenKind::False => Literal::Boolean(false),
+            _ => {
+                let found = format!("{:?}", self.current()?.kind);
+                return Err(format!("expected pattern, found {}", found));
+            }
+        };
+        self.advance();
+        Ok(Pattern::Literal {
+            value: lit,
+            span: Span::dummy(),
+        })
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt, String> {
@@ -725,20 +772,32 @@ impl Parser {
 
     /// Expect a specific token kind; return error if not found.
     fn expect(&mut self, kind: TokenKind) -> Result<(), String> {
-        if self.at(kind) {
+        if self.at(kind.clone()) {
             self.advance();
             Ok(())
         } else {
-            Err(format!("expected token, got something else"))
+            let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
+            Err(format!("expected {:?}, found {}", kind, found))
         }
     }
 
-    /// Expect a keyword by its string representation.
-    fn expect_keyword(&mut self, _word: &str) -> Result<(), String> {
-        // Since keywords are unit variants, by the time we call this
-        // we've already checked `self.at(TokenKind::Else)` etc.
-        // This is a placeholder for more robust error messages.
-        Ok(())
+    /// Expect a keyword by its string representation and consume the token.
+    fn expect_keyword(&mut self, word: &str) -> Result<(), String> {
+        let tok = self.current()?;
+        // Map keyword strings to their token kinds.
+        let expected = match word {
+            "else" => TokenKind::Else,
+            "in" => TokenKind::In,
+            "as" => TokenKind::As,
+            "import" => TokenKind::Import,
+            _ => return Err(format!("unknown expected keyword '{}'", word)),
+        };
+        if tok.is(&expected) {
+            self.advance();
+            Ok(())
+        } else {
+            Err(format!("expected keyword '{}', found {:?}", word, tok.kind))
+        }
     }
 
     fn current_operator(&self) -> Option<BinaryOp> {
@@ -808,5 +867,311 @@ impl Parser {
             | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => true,
             _ => false,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::Lexer;
+
+    fn parse(source: &str) -> Result<Program, String> {
+        let mut lexer = Lexer::new(source);
+        let tokens = lexer.tokenize();
+        let mut parser = Parser::new(tokens);
+        parser.parse()
+    }
+
+    // -----------------------------------------------------------------------
+    // Declarations
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_empty_program() {
+        let p = parse("").unwrap();
+        assert!(p.declarations.is_empty());
+    }
+
+    #[test]
+    fn test_function_no_args_no_return() {
+        let p = parse("fn main():\n    pass\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_function_with_args_and_return() {
+        let p = parse("fn add(x: i32, y: i32) -> i32:\n    x + y\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_import_decl() {
+        let p = parse("import math\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_from_import() {
+        let source = "from math import sqrt\n";
+        match parse(source) {
+            Ok(p) => assert_eq!(p.declarations.len(), 1),
+            Err(e) => panic!("from_import parse failed: {}", e),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Variables and constants
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_variable_declaration() {
+        let p = parse("name = 42\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_constant_declaration() {
+        let p = parse("MAX_SIZE = 1024\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Classes and structs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_class_with_fields() {
+        let source = "\
+class User:
+    name: str
+    age: i32
+";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_abstract_class() {
+        let source = "\
+abs class Animal:
+    fn speak() -> str
+";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_struct() {
+        let source = "\
+struct Point:
+    x: f64
+    y: f64
+";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_enum() {
+        let source = "\
+enum Color:
+    Red
+    Green
+    Blue
+";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_contract() {
+        let source = "\
+contract Drawable:
+    fn draw()
+";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    #[test]
+    fn test_type_alias() {
+        let p = parse("type Age = i32\n").unwrap();
+        assert_eq!(p.declarations.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Statements
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_if_statement() {
+        let source = "\
+fn test():\n\
+    if x > 0:\n\
+        print(\"pos\")\n";
+        let p = parse(source).unwrap();
+        assert_eq!(p.declarations.len(), 1);
+        // Verify the function body exists
+        if let Decl::Function(f) = &p.declarations[0] {
+            assert!(f.body.is_some());
+        } else {
+            panic!("expected function declaration");
+        }
+    }
+
+    #[test]
+    fn test_if_elif_else() {
+        let source = "fn test():\n    if x > 0:\n        print(\"pos\")\n    elif x < 0:\n        print(\"neg\")\n    else:\n        print(\"zero\")\n";
+        match parse(source) {
+            Ok(_) => {},
+            Err(e) => panic!("if_elif_else parse failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_while_loop() {
+        let source = "\
+fn test():\n\
+    while running:\n\
+        process()\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_for_loop() {
+        let source = "\
+fn test():\n\
+    for item in items:\n\
+        print(item)\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_match_statement() {
+        let source = "fn test():\n    match value:\n        1:\n            print(\"one\")\n        2:\n            print(\"two\")\n";
+        match parse(source) {
+            Ok(_) => {},
+            Err(e) => panic!("match parse failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_return_with_value() {
+        let source = "fn add(a: i32, b: i32) -> i32:\n    a + b\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_defer_statement() {
+        let source = "\
+fn test():\n\
+    defer cleanup()\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_guard_statement() {
+        let source = "fn test():\n    guard valid else:\n        return\n";
+        match parse(source) {
+            Ok(_) => {},
+            Err(e) => panic!("guard parse failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_unsafe_block() {
+        let source = "\
+fn test():\n\
+    unsafe:\n\
+        ptr = addr\n";
+        assert!(parse(source).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Expressions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_binary_expression() {
+        let source = "\
+fn test():\n\
+    x = 1 + 2 * 3\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_function_call() {
+        let source = "\
+fn test():\n\
+    print(\"hello\")\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_property_access() {
+        let source = "\
+fn test():\n\
+    name = user.name\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_list_literal() {
+        let source = "\
+fn test():\n\
+    items = [1, 2, 3]\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_dict_literal() {
+        let source = "\
+fn test():\n\
+    config = {key: \"value\"}\n";
+        assert!(parse(source).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Error cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_error_bad_expression() {
+        let result = parse("fn test():\n    +\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_error_missing_type() {
+        let result = parse("fn f() -> :\n    x\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_error_unexpected_declaration() {
+        let result = parse("if x:\n    y\n");
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Integration — example files
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_hello_example() {
+        let source = include_str!("../../../examples/hello.kl");
+        assert!(parse(source).is_ok(), "hello.kl should parse");
+    }
+
+    #[test]
+    fn test_fibonacci_example() {
+        let source = include_str!("../../../examples/fibonacci.kl");
+        assert!(parse(source).is_ok(), "fibonacci.kl should parse");
+    }
+
+    #[test]
+    fn test_user_example() {
+        let source = include_str!("../../../examples/user.kl");
+        assert!(parse(source).is_ok(), "user.kl should parse");
     }
 }
