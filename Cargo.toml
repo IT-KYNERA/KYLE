@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/klc_core",
+    "crates/klc_frontend",
+    "crates/klc_semantic",
+    "crates/klc_mir",
+    "crates/klc_backend",
+    "crates/klc_driver",
+    "crates/klc_cli",
+    "crates/klc_runtime",
+    "crates/klc_tools",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Kynera"]
+license = "MIT"
+
+[workspace.dependencies]
+# LLVM bindings — enabled when Phase 3 begins
+# inkwell = { version = "0.11", features = ["llvm22-0"] }
+# llvm-sys = "220"

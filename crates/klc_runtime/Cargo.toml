@@ -1,0 +1,9 @@
+[package]
+name = "klc_runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+libc = "0.2"

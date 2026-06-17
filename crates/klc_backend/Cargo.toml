@@ -1,0 +1,11 @@
+[package]
+name = "klc_backend"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+klc_core = { path = "../klc_core" }
+# LLVM backend — enabled when Phase 3 begins
+# inkwell = { version = "0.11", features = ["llvm22-0"] }

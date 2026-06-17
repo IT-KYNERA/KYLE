@@ -1,0 +1,14 @@
+[package]
+name = "klc_cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "klc"
+path = "src/main.rs"
+
+[dependencies]
+klc_driver = { path = "../klc_driver" }
+clap = "4"

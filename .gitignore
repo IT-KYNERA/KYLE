@@ -1,0 +1,22 @@
+# Rust / Cargo
+target/
+Cargo.lock
+
+# KL build artifacts
+*.o
+*.ll
+*.bc
+*.klc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Temporary
+tmp/
+*.log

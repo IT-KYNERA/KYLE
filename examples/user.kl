@@ -1,0 +1,16 @@
+class User:
+
+    name: str
+    age: i32
+
+    User(name: str, age: i32):
+
+        this.name = name
+        this.age = age
+
+
+fn main():
+
+    user = User("Juan", 25)
+    print(user.name)
+    print(str(user.age))

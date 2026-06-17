@@ -1,0 +1,13 @@
+[package]
+name = "klc_driver"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+klc_core = { path = "../klc_core" }
+klc_frontend = { path = "../klc_frontend" }
+klc_semantic = { path = "../klc_semantic" }
+klc_mir = { path = "../klc_mir" }
+klc_backend = { path = "../klc_backend" }

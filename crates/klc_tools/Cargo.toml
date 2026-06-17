@@ -1,0 +1,10 @@
+[package]
+name = "klc_tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+klc_core = { path = "../klc_core" }
+klc_frontend = { path = "../klc_frontend" }

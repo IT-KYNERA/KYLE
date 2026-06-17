@@ -1,0 +1,230 @@
+# KL Vision Document v1.0
+
+## Introduction
+
+KL (Kynera Language) is a compiled programming language designed for the modern software era. It combines the readability of Python with the type safety of Rust and the performance of native compilation via LLVM.
+
+---
+
+## Why KL?
+
+Existing languages force trade-offs:
+
+- Python: readable but slow, runtime errors
+- Rust: safe and fast but complex, steep learning curve
+- Go: simple but limited type system, no generics
+- TypeScript: typed but transpiled, runtime types
+- C#/Java: verbose, heavy runtime, legacy baggage
+
+KL aims to eliminate these trade-offs.
+
+---
+
+## Core Philosophy
+
+```text
+Readable like Python
+Typed like Rust
+Fast like C
+Simple like Go
+```
+
+---
+
+## Design Principles
+
+### 1. Readability First
+
+```text
+No self
+No let
+No var
+No mut
+No semicolons
+No braces
+No exceptions
+```
+
+### 2. Explicit Over Implicit
+
+```text
+Errors are values
+Types are checked at compile time
+Null is explicit
+Async is explicit
+Imports are explicit
+```
+
+### 3. Predictable Performance
+
+```text
+Compiled to native code
+LLVM backend
+No hidden allocations
+Predictable GC
+Zero-cost abstractions
+```
+
+### 4. Modern Tooling
+
+```text
+Built-in package manager
+Built-in formatter
+Built-in test runner
+Built-in language server
+Built-in build system
+```
+
+---
+
+## Target Audience
+
+```text
+Backend developers
+Systems programmers
+Enterprise teams
+Startups building products
+Developers tired of complexity
+```
+
+---
+
+## Target Platforms
+
+```text
+macOS
+Linux
+Windows
+```
+
+Future:
+
+```text
+WebAssembly
+iOS
+Android
+Embedded systems
+```
+
+---
+
+## Language Highlights
+
+- Indentation-based syntax (4 spaces)
+- Strong static type system with inference
+- Optional types (`Option<T>`) and error types (`T!`)
+- Generics with monomorphization
+- Classes, structs, enums, contracts
+- Async/await with work-stealing scheduler
+- Package manager with registry
+- Compiles to native machine code via LLVM
+- No exceptions — errors are values
+- Garbage collected memory model
+- Constants by UPPERCASE convention (`PI = 3.14`)
+- Object literals (`{ name: "Juan" }`) with dot access
+
+---
+
+## What KL Eliminates
+
+```text
+self
+let / var / mut
+public / private / protected keywords
+virtual / override
+try / catch / finally
+semicolons
+braces for blocks
+pass keyword
+continue keyword
+spawn keyword
+exceptions
+hidden control flow
+NULL pointers
+wildcard imports
+circular dependencies
+```
+
+---
+
+## KL in One Example
+
+```kl
+import io
+import json
+
+contract Serializable:
+    fn serialize() -> str
+
+class User : Serializable:
+    name: str
+    age: i32
+
+    User(name: str, age: i32):
+        name = name
+        age = age
+
+    fn serialize() -> str:
+        return json.stringify(this)
+
+fn main():
+    user = User("Anna", 30)
+    io.println(user.serialize())
+```
+
+---
+
+## Comparison Table
+
+| Feature | KL | Python | Rust | Go | TypeScript |
+|---------|----|--------|------|-----|------------|
+| Compiled | Yes | No | Yes | Yes | No |
+| Type Safety | Strong | Weak | Strong | Weak | Weak |
+| Type Inference | Yes | N/A | Yes | No | Yes |
+| Generics | Yes | No | Yes | No | Yes |
+| No Exceptions | Yes | No | Yes | No | Yes |
+| GC | Yes | Yes | No | Yes | Yes |
+| Async Built-in | Yes | No | No | Yes | No |
+| Package Manager | Built-in | Third-party | Built-in | Built-in | Third-party |
+| Object Literals | Yes | No | No | No | Yes |
+| Indentation Syntax | Yes | Yes | No | No | No |
+| LLVM Backend | Yes | No | Yes | No | No |
+
+---
+
+## Market Position
+
+KL occupies the space between:
+
+```text
+Python (readability)
+    ↓
+KL
+    ↓
+Rust (safety, performance)
+```
+
+It is designed for teams that want:
+
+```text
+Productivity of Python
+Safety of Rust
+Simplicity of Go
+Performance of C
+```
+
+---
+
+## Project Status
+
+Current phase: Language Design & Specification
+
+Next phase: Compiler Implementation (Frontend)
+
+---
+
+## Version
+
+```text
+KL Vision Document v1.0
+```

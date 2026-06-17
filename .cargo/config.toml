@@ -1,0 +1,14 @@
+# KL Compiler — LLVM Configuration
+#
+# This project uses Homebrew LLVM (NOT Apple's default) to avoid
+# breaking other projects that depend on the system LLVM/clang.
+#
+# Homebrew LLVM path: /opt/homebrew/opt/llvm
+# LLVM version:       22.1.7
+#
+# All LLVM-related tools and libraries are accessed exclusively
+# through the Homebrew installation.
+
+[env]
+LLVM_SYS_220_PREFIX = "/opt/homebrew/opt/llvm"
+LLVM_SYS_191_PREFIX = "/opt/homebrew/Cellar/llvm/22.1.7_1"
