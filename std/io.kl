@@ -1,0 +1,17 @@
+fn print_str(s: str):
+    print(s)
+
+fn println_str(s: str):
+    println(s)
+
+fn print_int(n: i32):
+    print(n)
+
+fn println_int(n: i32):
+    println(n)
+
+fn dump(label: str, value: i32):
+    print(label + str(value))
+
+fn dump_line(label: str, value: i32):
+    println(label + str(value))

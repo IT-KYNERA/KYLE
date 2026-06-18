@@ -7,3 +7,4 @@ license.workspace = true
 
 [dependencies]
 klc_core = { path = "../klc_core" }
+klc_frontend = { path = "../klc_frontend" }

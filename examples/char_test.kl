@@ -1,0 +1,11 @@
+fn main():
+    # KL strings don't process escape sequences, so we need ord for comparison.
+    # ASCII: 10 = newline, 32 = space, 35 = #
+    # char classification works on single chars
+    println(str(ord(char_at("A", 0))))
+    println(str(ord(char_at(" ", 0))))
+    println(str(is_whitespace(char_at(" ", 0))))
+    println(str(is_alpha(char_at("Z", 0))))
+    println(str(is_digit(char_at("5", 0))))
+    println(str(is_alnum(char_at("_", 0))))
+    println(str(is_alnum(char_at("a", 0))))

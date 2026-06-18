@@ -18,7 +18,7 @@ KL is a compiled programming language designed around:
 - No self
 - No let
 - No var
-- No mut
+
 - No semicolons
 - No braces for blocks
 - No exceptions
@@ -198,7 +198,12 @@ Any name in UPPERCASE (ALL_CAPS) is treated as a constant.
 
 Constants cannot be reassigned after declaration.
 
-Variables in lowercase or camelCase are mutable by default.
+Variables in lowercase or camelCase are immutable by default. Use the `mut` keyword to make a variable mutable.
+
+```kl
+mut total = 0       # mutable variable
+nombre = "Ana"      # immutable variable
+```
 ```
 
 ---
@@ -1383,7 +1388,6 @@ self
 
 let
 var
-mut
 
 public
 private

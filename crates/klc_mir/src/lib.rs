@@ -11,3 +11,4 @@
 pub mod mir;
 pub mod lower;
 pub mod optimize;
+pub mod ownership;

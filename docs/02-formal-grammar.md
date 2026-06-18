@@ -296,6 +296,7 @@ attribute =
 
 ```ebnf
 variable_declaration =
+    [ "mut" ]
     identifier
     "="
     expression
@@ -305,7 +306,8 @@ variable_declaration =
 Example:
 
 ```kl
-age = 25
+age = 25        # immutable (default)
+mut score = 10  # mutable
 ```
 
 ---
@@ -314,6 +316,7 @@ age = 25
 
 ```ebnf
 typed_variable =
+    [ "mut" ]
     identifier
     ":"
     type
@@ -333,7 +336,7 @@ age: i32 = 25
 # Constants
 
 Constants use UPPERCASE naming convention.
-Syntactically identical to variable declarations.
+Syntactically identical to variable declarations (without `mut`).
 
 ```ebnf
 constant_declaration =
@@ -344,6 +347,7 @@ constant_declaration =
 ```
 
 The compiler enforces immutability based on the ALL_CAPS naming.
+`mut` is NOT allowed with UPPERCASE constants (compile error).
 
 Example:
 

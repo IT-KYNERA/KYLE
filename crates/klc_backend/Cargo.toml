@@ -7,5 +7,5 @@ license.workspace = true
 
 [dependencies]
 klc_core = { path = "../klc_core" }
-# LLVM backend — enabled when Phase 3 begins
-# inkwell = { version = "0.11", features = ["llvm22-0"] }
+klc_mir = { path = "../klc_mir" }
+inkwell = { version = "0.9", features = ["llvm18-1"] }

@@ -21,7 +21,7 @@ kl/
 │   ├── klc_backend/        # LLVM codegen, linker
 │   ├── klc_driver/         # Pipeline orchestration
 │   ├── klc_cli/            # CLI binary
-│   ├── klc_runtime/        # GC, async, panic handling
+│   ├── klc_runtime/        # RAII runtime, async, panic handling
 │   └── klc_tools/          # LSP, formatter, debugger
 │
 ├── runtime/                # KL runtime source (Rust)
@@ -156,10 +156,11 @@ Contents:
 
 ```text
 Purpose: Runtime support for compiled KL programs
-Depends on: libc, Boehm GC
+Depends on: libc
 
 Contents:
-- Garbage collector wrapper
+- RAII runtime (destructors, refcount retain/release)
+- Heap allocation wrappers (malloc/free for RAII)
 - Async executor (work-stealing scheduler)
 - Task system
 - Channel implementation
@@ -225,7 +226,7 @@ std/
 
 ```text
 runtime/
-├── gc.rs           # Garbage collector wrapper
+├── memory.rs       # RAII memory (alloc, free, retain, release)
 ├── async.rs        # Async executor, scheduler
 ├── task.rs         # Task type, state machine
 ├── channel.rs      # Channel implementation

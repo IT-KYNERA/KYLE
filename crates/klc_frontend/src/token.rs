@@ -73,6 +73,8 @@ pub enum TokenKind {
     As,         // as
     Get,        // get
     Set,        // set
+    Mut,        // mut
+    Implements, // implements
 
     // Logical
     And,        // &&

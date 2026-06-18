@@ -12,3 +12,4 @@
 pub mod lsp;
 pub mod formatter;
 pub mod completion;
+pub mod package;

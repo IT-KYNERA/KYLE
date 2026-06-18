@@ -4,7 +4,7 @@
 // Handles indentation-based block detection (INDENT/DEDENT tokens).
 // Reference: docs/02-formal-grammar.md
 
-use klc_core::span::Span;
+use klc_core::span::{Position, Span};
 use crate::token::{Token, TokenKind};
 
 /// The KL lexer.
@@ -64,20 +64,22 @@ impl Lexer {
 
         if self.pos >= self.chars.len() {
             // Emit DEDENTs for remaining indentation levels.
+            let start_pos = Position { line: self.line, column: self.column, offset: self.pos };
             let remaining = self.indent_stack.len() - 1;
             if remaining > 0 {
                 self.indent_stack.truncate(1);
-                return Some(self.make_token(TokenKind::Dedent));
+                return Some(self.make_token(TokenKind::Dedent, &start_pos));
             }
-            return Some(self.make_token(TokenKind::Eof));
+            return Some(self.make_token(TokenKind::Eof, &start_pos));
         }
 
         let c = self.chars[self.pos];
+        let start_pos = Position { line: self.line, column: self.column, offset: self.pos };
         // Detect newline.
         if c == '\n' {
             self.advance();
             self.handle_newline();
-            return Some(self.make_token(TokenKind::Newline));
+            return Some(self.make_token(TokenKind::Newline, &start_pos));
         }
 
         self.at_bol = false;
@@ -177,7 +179,7 @@ impl Lexer {
             '}' => { self.advance(); Some(TokenKind::RBrace) }
             _ => None,
         } {
-            return Some(self.make_token(kind));
+            return Some(self.make_token(kind, &start_pos));
         }
 
         // Identifiers, keywords, types.
@@ -190,7 +192,7 @@ impl Lexer {
             }
             let word: String = self.chars[start..self.pos].iter().collect();
             let kind = self.keyword_or_identifier(&word);
-            return Some(self.make_token(kind));
+            return Some(self.make_token(kind, &start_pos));
         }
 
         // Numbers.
@@ -211,7 +213,7 @@ impl Lexer {
         // Unknown character.
         let ch = c;
         self.advance();
-        Some(self.make_token(TokenKind::LexError(format!("unexpected character: '{}'", ch))))
+        Some(self.make_token(TokenKind::LexError(format!("unexpected character: '{}'", ch)), &start_pos))
     }
 
     /// Determine if a word is a keyword, type name, or plain identifier.
@@ -251,12 +253,15 @@ impl Lexer {
             "as" => TokenKind::As,
             "get" => TokenKind::Get,
             "set" => TokenKind::Set,
+            "mut" => TokenKind::Mut,
+            "implements" => TokenKind::Implements,
             _ => TokenKind::Identifier(word.to_string()),
         }
     }
 
     fn lex_number(&mut self) -> Token {
         let start = self.pos;
+        let start_pos = Position { line: self.line, column: self.column, offset: self.pos };
         let mut is_float = false;
 
         // Handle hex: 0x...
@@ -269,7 +274,7 @@ impl Lexer {
                 self.advance();
             }
             let value: String = self.chars[start..self.pos].iter().collect();
-            return self.make_token(TokenKind::Integer(value));
+            return self.make_token(TokenKind::Integer(value), &start_pos);
         }
 
         // Handle binary: 0b...
@@ -282,7 +287,7 @@ impl Lexer {
                 self.advance();
             }
             let value: String = self.chars[start..self.pos].iter().collect();
-            return self.make_token(TokenKind::Integer(value));
+            return self.make_token(TokenKind::Integer(value), &start_pos);
         }
 
         // Decimal digits.
@@ -304,27 +309,44 @@ impl Lexer {
 
         let value: String = self.chars[start..self.pos].iter().collect();
         if is_float {
-            self.make_token(TokenKind::Float(value))
+            self.make_token(TokenKind::Float(value), &start_pos)
         } else {
-            self.make_token(TokenKind::Integer(value))
+            self.make_token(TokenKind::Integer(value), &start_pos)
         }
     }
 
     fn lex_string(&mut self) -> Token {
+        let start_pos = Position { line: self.line, column: self.column, offset: self.pos };
         self.advance(); // consume opening "
-        let start = self.pos;
+        let mut value = String::new();
         while self.pos < self.chars.len() && self.chars[self.pos] != '"' {
             if self.chars[self.pos] == '\\' {
-                self.advance(); // skip escape
+                self.advance();
+                if self.pos < self.chars.len() {
+                    let ch = self.chars[self.pos];
+                    self.advance();
+                    match ch {
+                        'n' => value.push('\n'),
+                        't' => value.push('\t'),
+                        'r' => value.push('\r'),
+                        '\\' => value.push('\\'),
+                        '"' => value.push('"'),
+                        _ => { value.push('\\'); value.push(ch); }
+                    }
+                }
+            } else {
+                value.push(self.chars[self.pos]);
+                self.advance();
             }
-            self.advance();
         }
-        let value: String = self.chars[start..self.pos].iter().collect();
-        self.advance(); // consume closing "
-        self.make_token(TokenKind::String(value))
+        if self.pos < self.chars.len() {
+            self.advance(); // consume closing "
+        }
+        self.make_token(TokenKind::String(value), &start_pos)
     }
 
     fn lex_char(&mut self) -> Token {
+        let start_pos = Position { line: self.line, column: self.column, offset: self.pos };
         self.advance(); // consume opening '
         let value = if self.chars[self.pos] == '\\' {
             self.advance();
@@ -345,7 +367,7 @@ impl Lexer {
         if self.pos < self.chars.len() && self.chars[self.pos] == '\'' {
             self.advance(); // consume closing '
         }
-        self.make_token(TokenKind::Char(value.to_string()))
+        self.make_token(TokenKind::Char(value.to_string()), &start_pos)
     }
 
     // -----------------------------------------------------------------------
@@ -356,17 +378,18 @@ impl Lexer {
         self.at_bol = true;
         let indent = self.measure_indent();
         let last = *self.indent_stack.last().unwrap_or(&0);
+        let pos = Position { line: self.line, column: self.column, offset: self.pos };
 
         if indent > last {
             self.indent_stack.push(indent);
-            self.pending_tokens.push(self.make_token(TokenKind::Indent));
+            self.pending_tokens.push(self.make_token(TokenKind::Indent, &pos));
         } else if indent < last {
             while let Some(&level) = self.indent_stack.last() {
                 if level <= indent {
                     break;
                 }
                 self.indent_stack.pop();
-                self.pending_tokens.push(self.make_token(TokenKind::Dedent));
+                self.pending_tokens.push(self.make_token(TokenKind::Dedent, &pos));
             }
         }
     }
@@ -447,8 +470,18 @@ impl Lexer {
         self.chars.get(self.pos).copied().unwrap_or('\0')
     }
 
-    fn make_token(&self, kind: TokenKind) -> Token {
-        Token::new(kind, Span::dummy())
+    fn make_token(&self, kind: TokenKind, start_pos: &Position) -> Token {
+        let end = Position {
+            line: self.line,
+            column: self.column,
+            offset: self.pos,
+        };
+        let span = Span {
+            start: *start_pos,
+            end,
+            file_id: 0,
+        };
+        Token::new(kind, span)
     }
 }
 
@@ -498,7 +531,7 @@ mod tests {
     #[test]
     fn test_string_with_escape() {
         let kinds = tokenize(r#""hello\nworld""#);
-        assert_eq!(kinds, vec![TokenKind::String("hello\\nworld".into()), TokenKind::Eof]);
+        assert_eq!(kinds, vec![TokenKind::String("hello\nworld".into()), TokenKind::Eof]);
     }
 
     #[test]

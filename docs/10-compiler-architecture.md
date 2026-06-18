@@ -133,7 +133,7 @@ Output: LLVM IR
 
 ```text
 Translate MIR to LLVM instructions
-Handle GC integration
+Handle RAII runtime integration (destructors, refcount)
 Handle async state machines
 Generate debug info
 ```

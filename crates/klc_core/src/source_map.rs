@@ -19,7 +19,9 @@ impl SourceFile {
     }
 
     /// Returns the line at the given 1-indexed line number.
+    /// Returns None for line 0 (dummy/unset spans).
     pub fn line(&self, line: usize) -> Option<&str> {
+        if line == 0 { return None; }
         self.source.lines().nth(line - 1)
     }
 

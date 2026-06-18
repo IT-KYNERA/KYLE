@@ -1,47 +1,83 @@
-// klc_runtime::async_ — Work-stealing async executor
-//
-// Reference: docs/08-async-runtime.md
-// Manages a pool of worker threads that execute async tasks.
-
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
+use std::thread::{self, JoinHandle};
 
-/// A work-stealing executor for KL async tasks.
+type TaskFn = Box<dyn FnOnce() + Send>;
+
 pub struct Executor {
     running: Arc<AtomicBool>,
     worker_count: usize,
+    task_sender: mpsc::Sender<TaskFn>,
+    workers: Vec<JoinHandle<()>>,
 }
 
 impl Executor {
-    /// Create a new executor with the given number of worker threads.
     pub fn new(worker_count: usize) -> Self {
+        let (tx, rx) = mpsc::channel::<TaskFn>();
+        let rx = Arc::new(std::sync::Mutex::new(rx));
+        let running = Arc::new(AtomicBool::new(true));
+        let mut workers = Vec::with_capacity(worker_count);
+
+        for _id in 0..worker_count {
+            let rx = Arc::clone(&rx);
+            let running = Arc::clone(&running);
+            let handle = thread::spawn(move || {
+                loop {
+                    if !running.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let task = {
+                        let rx = rx.lock().expect("executor rx lock");
+                        rx.recv()
+                    };
+                    match task {
+                        Ok(f) => f(),
+                        Err(_) => break,
+                    }
+                }
+            });
+            workers.push(handle);
+        }
+
         Self {
-            running: Arc::new(AtomicBool::new(false)),
+            running,
             worker_count,
+            task_sender: tx,
+            workers,
         }
     }
 
-    /// Start the executor. Spawns worker threads.
     pub fn start(&self) {
         self.running.store(true, Ordering::SeqCst);
-        // In the real implementation:
-        // Spawn worker_count threads, each with a local task queue
-        // and a shared global queue for work-stealing.
     }
 
-    /// Spawn a new task on the executor.
-    pub fn spawn<T>(&self, _task: super::task::Task<T>) {
-        // In the real implementation:
-        // Push the task to a worker queue or global queue.
+    pub fn spawn<F>(&self, f: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let _ = self.task_sender.send(Box::new(f));
     }
 
-    /// Stop the executor. Signals workers to shut down.
     pub fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
+        drop(self.task_sender.clone());
     }
 
-    /// Returns the number of worker threads.
+    pub fn wait_for_completion(&mut self) {
+        self.stop();
+        while let Some(handle) = self.workers.pop() {
+            let _ = handle.join();
+        }
+    }
+
     pub fn worker_count(&self) -> usize {
         self.worker_count
+    }
+}
+
+impl Drop for Executor {
+    fn drop(&mut self) {
+        self.stop();
     }
 }

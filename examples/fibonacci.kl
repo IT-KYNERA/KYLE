@@ -7,3 +7,4 @@ fn main() -> i32:
     result = fibonacci(10)
     print("fibonacci(10) = " + str(result))
     return 0
+

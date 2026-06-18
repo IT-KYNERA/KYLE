@@ -1,0 +1,8 @@
+node_modules/**
+out/test/**
+src/**
+.gitignore
+tsconfig.json
+.vscode-test/**
+yarn.lock
+package-lock.json

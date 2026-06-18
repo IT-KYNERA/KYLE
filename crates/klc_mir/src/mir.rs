@@ -1,5 +1,312 @@
-// klc_mir::mir — MIR instruction definitions
+use std::fmt;
 
-pub enum MirNode {
-    // mid-level IR instructions
+/// A value in MIR — represents SSA-like values, locals, and constants.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirValue {
+    Local(usize),
+    Param(usize),
+    Constant(MirConstant),
+}
+
+/// Constants in MIR.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirConstant {
+    I32(i32),
+    I64(i64),
+    F64(f64),
+    Bool(bool),
+    String(String),
+    Void,
+}
+
+/// MIR types — simplified subset for codegen.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirType {
+    I1,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    Bool,
+    Char,
+    Str,
+    Void,
+    Ptr(Box<MirType>),
+    Array(Box<MirType>),
+    Struct(Vec<MirType>),
+}
+
+/// Binary operators in MIR.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirBinaryOp {
+    Add, Sub, Mul, Div, Rem,
+    And, Or, Xor,
+    Shl, Shr,
+    Eq, Neq, Lt, Gt, Le, Ge,
+}
+
+/// Unary operators in MIR.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirUnaryOp {
+    Neg, Not, BitNot,
+}
+
+/// A single MIR instruction.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirInst {
+    /// Allocate stack space for a local variable.
+    Alloca { dest: usize, type_: MirType, name: String },
+    /// Store a value into a local.
+    Store { dest: usize, value: MirValue },
+    /// Load a value from a local.
+    Load { dest: usize, src: usize },
+    /// Binary operation: dest = left op right.
+    BinaryOp { dest: usize, op: MirBinaryOp, left: MirValue, right: MirValue },
+    /// Unary operation: dest = op operand.
+    UnaryOp { dest: usize, op: MirUnaryOp, operand: MirValue },
+    /// Call a function: dest = func(args...).
+    Call { dest: Option<usize>, name: String, args: Vec<MirValue> },
+    /// Get pointer to array/struct element.
+    PtrOffset { dest: usize, ptr: usize, index: MirValue },
+    /// Cast between types.
+    Cast { dest: usize, value: MirValue, to_type: MirType },
+}
+
+/// How a basic block ends.
+#[derive(Clone, Debug, PartialEq)]
+pub enum MirTerminator {
+    /// Return a value (or void).
+    Return(MirValue),
+    /// Unconditional branch to another block.
+    Br(String),
+    /// Conditional branch: if cond, go to true_block, else false_block.
+    CondBr { cond: MirValue, true_block: String, false_block: String },
+    /// Unreachable terminator.
+    Unreachable,
+}
+
+/// A basic block: label, instructions, terminator.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MirBasicBlock {
+    pub label: String,
+    pub insts: Vec<MirInst>,
+    pub terminator: MirTerminator,
+}
+
+impl MirBasicBlock {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            insts: Vec::new(),
+            terminator: MirTerminator::Unreachable,
+        }
+    }
+}
+
+/// An MIR function.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MirFunction {
+    pub name: String,
+    pub params: Vec<MirType>,
+    pub return_type: MirType,
+    pub is_fallible: bool,
+    pub basic_blocks: Vec<MirBasicBlock>,
+    pub local_count: usize,
+}
+
+impl MirFunction {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            params: Vec::new(),
+            return_type: MirType::Void,
+            is_fallible: false,
+            basic_blocks: Vec::new(),
+            local_count: 0,
+        }
+    }
+}
+
+/// Top-level MIR module.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MirModule {
+    pub functions: Vec<MirFunction>,
+    pub globals: Vec<(String, MirType, MirConstant)>,
+}
+
+impl MirModule {
+    pub fn new() -> Self {
+        Self {
+            functions: Vec::new(),
+            globals: Vec::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for MirType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirType::I1 => write!(f, "i1"),
+            MirType::I8 => write!(f, "i8"),
+            MirType::I16 => write!(f, "i16"),
+            MirType::I32 => write!(f, "i32"),
+            MirType::I64 => write!(f, "i64"),
+            MirType::F32 => write!(f, "f32"),
+            MirType::F64 => write!(f, "f64"),
+            MirType::Bool => write!(f, "bool"),
+            MirType::Char => write!(f, "char"),
+            MirType::Str => write!(f, "str"),
+            MirType::Void => write!(f, "void"),
+            MirType::Ptr(inner) => write!(f, "{}*", inner),
+            MirType::Array(inner) => write!(f, "[{}]", inner),
+            MirType::Struct(fields) => {
+                write!(f, "{{")?;
+                for (i, t) in fields.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", t)?;
+                }
+                write!(f, "}}")
+            }
+        }
+    }
+}
+
+impl fmt::Display for MirValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirValue::Local(id) => write!(f, "%{}", id),
+            MirValue::Param(id) => write!(f, "param{}", id),
+            MirValue::Constant(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+impl fmt::Display for MirConstant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirConstant::I32(n) => write!(f, "{}", n),
+            MirConstant::I64(n) => write!(f, "{}", n),
+            MirConstant::F64(n) => write!(f, "{}", n),
+            MirConstant::Bool(b) => write!(f, "{}", b),
+            MirConstant::String(s) => write!(f, "\"{}\"", s),
+            MirConstant::Void => write!(f, "void"),
+        }
+    }
+}
+
+impl fmt::Display for MirBinaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirBinaryOp::Add => write!(f, "add"),
+            MirBinaryOp::Sub => write!(f, "sub"),
+            MirBinaryOp::Mul => write!(f, "mul"),
+            MirBinaryOp::Div => write!(f, "div"),
+            MirBinaryOp::Rem => write!(f, "rem"),
+            MirBinaryOp::And => write!(f, "and"),
+            MirBinaryOp::Or => write!(f, "or"),
+            MirBinaryOp::Xor => write!(f, "xor"),
+            MirBinaryOp::Shl => write!(f, "shl"),
+            MirBinaryOp::Shr => write!(f, "shr"),
+            MirBinaryOp::Eq => write!(f, "eq"),
+            MirBinaryOp::Neq => write!(f, "neq"),
+            MirBinaryOp::Lt => write!(f, "lt"),
+            MirBinaryOp::Gt => write!(f, "gt"),
+            MirBinaryOp::Le => write!(f, "le"),
+            MirBinaryOp::Ge => write!(f, "ge"),
+        }
+    }
+}
+
+impl fmt::Display for MirUnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirUnaryOp::Neg => write!(f, "neg"),
+            MirUnaryOp::Not => write!(f, "not"),
+            MirUnaryOp::BitNot => write!(f, "bitnot"),
+        }
+    }
+}
+
+impl fmt::Display for MirInst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirInst::Alloca { dest, type_, name } => {
+                write!(f, "  %{} = alloca {}, \"{}\"", dest, type_, name)
+            }
+            MirInst::Store { dest, value } => {
+                write!(f, "  store %{} <- {}", dest, value)
+            }
+            MirInst::Load { dest, src } => {
+                write!(f, "  %{} = load %{}", dest, src)
+            }
+            MirInst::BinaryOp { dest, op, left, right } => {
+                write!(f, "  %{} = {} {}, {}", dest, op, left, right)
+            }
+            MirInst::UnaryOp { dest, op, operand } => {
+                write!(f, "  %{} = {} {}", dest, op, operand)
+            }
+            MirInst::Call { dest, name, args } => {
+                if let Some(d) = dest {
+                    write!(f, "  %{} = call {}({})", d, name, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+                } else {
+                    write!(f, "  call {}({})", name, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+                }
+            }
+            MirInst::PtrOffset { dest, ptr, index } => {
+                write!(f, "  %{} = ptr_offset %{}, {}", dest, ptr, index)
+            }
+            MirInst::Cast { dest, value, to_type } => {
+                write!(f, "  %{} = cast {} to {}", dest, value, to_type)
+            }
+        }
+    }
+}
+
+impl fmt::Display for MirTerminator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MirTerminator::Return(v) => write!(f, "  ret {}", v),
+            MirTerminator::Br(label) => write!(f, "  br {}", label),
+            MirTerminator::CondBr { cond, true_block, false_block } => {
+                write!(f, "  br {}, {}, {}", cond, true_block, false_block)
+            }
+            MirTerminator::Unreachable => write!(f, "  unreachable"),
+        }
+    }
+}
+
+impl fmt::Display for MirFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "fn {}({}) -> {}", self.name,
+            self.params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "),
+            self.return_type)?;
+        if self.is_fallible { write!(f, "!")?; }
+        writeln!(f, ":")?;
+        for bb in &self.basic_blocks {
+            writeln!(f, "{}:", bb.label)?;
+            for inst in &bb.insts {
+                writeln!(f, "{}", inst)?;
+            }
+            writeln!(f, "{}", bb.terminator)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for MirModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (name, type_, init) in &self.globals {
+            writeln!(f, "global {}: {} = {}", name, type_, init)?;
+        }
+        for func in &self.functions {
+            writeln!(f, "{}", func)?;
+        }
+        Ok(())
+    }
 }

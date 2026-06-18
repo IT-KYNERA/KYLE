@@ -1,0 +1,24 @@
+fn main() -> i32:
+    s = "Hello, KL World!"
+    len_s = len(s)
+    println("length: " + str(len_s))
+
+    has_hello = contains(s, "Hello")
+    println("contains Hello: " + str(has_hello))
+
+    has_xyz = contains(s, "XYZ")
+    println("contains XYZ: " + str(has_xyz))
+
+    upper = to_upper(s)
+    println("upper: " + upper)
+
+    lower = to_lower(s)
+    println("lower: " + lower)
+
+    trimmed = trim("  spaces  ")
+    println("trimmed: '" + trimmed + "'")
+
+    replaced = replace(s, "World", "Kynera")
+    println("replaced: " + replaced)
+
+    return 0

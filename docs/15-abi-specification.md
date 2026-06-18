@@ -6,7 +6,7 @@ The KL ABI defines how compiled code interacts with:
 - The operating system
 - C libraries (FFI)
 - Other KL modules
-- The garbage collector
+- The RAII runtime (memory allocator, destructors)
 - The async runtime
 
 ---
@@ -78,23 +78,38 @@ Internal KL-to-KL calls may use a faster convention determined by the compiler.
 
 ---
 
-## Garbage Collector ABI
+## RAII Runtime ABI
 
-The Boehm GC is linked as a shared library. The GC API:
-
-```text
-KL runtime calls GC_init() at program startup.
-All heap allocations go through GC_malloc(n).
-GC is conservative (does not require precise root scanning).
-GC automatically reclaims unreachable memory.
-```
+KL uses RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. No garbage collector.
+Memory is managed at compile time: values are either moved (zero-cost memcpy) or reference-counted (automatic retain/release).
 
 The runtime exposes:
 
 ```kl
-extern fn gc_malloc(size: i64) -> *void
-extern fn gc_free(ptr: *void)
-extern fn gc_collect()
+extern fn kl_alloc(size: i64) -> *void    # heap allocation for shared values
+extern fn kl_free(ptr: *void)              # deallocation when refcount reaches 0
+extern fn kl_retain(ptr: *void)            # increment reference count
+extern fn kl_release(ptr: *void)           # decrement reference count, free if 0
+```
+
+### Stack vs Heap
+
+```text
+Stack allocation: default for values that don't escape their scope.
+  - Compiler inserts alloca + memcpy for moves.
+  - Destructor called at scope exit (LLVM lifetime.end).
+
+Heap allocation: for values that escape or are shared.
+  - Compiler inserts kl_alloc + kl_retain/kl_release.
+  - Refcount determined by ownership inference pass.
+```
+
+### Destructors
+
+```text
+Classes can define a destructor. The compiler inserts destructor calls:
+  - At scope exit for stack-allocated values
+  - In kl_release when refcount reaches 0
 ```
 
 ---

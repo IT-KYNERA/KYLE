@@ -16,6 +16,7 @@ pub enum Literal {
     Float(f64),
     String(String),
     Boolean(bool),
+    None,
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +68,7 @@ pub struct VariableDecl {
     pub name: String,
     pub type_: Option<AstType>,
     pub value: Box<Expr>,
+    pub is_mutable: bool,
     pub span: Span,
 }
 
@@ -87,8 +89,16 @@ pub struct Parameter {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct TypeParam {
+    pub name: String,
+    pub constraint: Option<AstType>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionDecl {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub params: Vec<Parameter>,
     pub return_type: Option<AstType>,
     pub is_async: bool,
@@ -116,6 +126,7 @@ pub enum Visibility {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClassDecl {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub parent: Option<String>,
     pub contracts: Vec<String>,
     pub members: Vec<ClassMember>,
@@ -125,6 +136,7 @@ pub struct ClassDecl {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AbstractClassDecl {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub parent: Option<String>,
     pub contracts: Vec<String>,
     pub members: Vec<ClassMember>,
@@ -173,6 +185,7 @@ pub struct ContractMethod {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructDecl {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub fields: Vec<Field>,
     pub span: Span,
 }
@@ -187,6 +200,7 @@ pub struct EnumVariant {
 #[derive(Clone, Debug, PartialEq)]
 pub struct EnumDecl {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub variants: Vec<EnumVariant>,
     pub span: Span,
 }
@@ -194,6 +208,7 @@ pub struct EnumDecl {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeAlias {
     pub name: String,
+    pub type_params: Vec<TypeParam>,
     pub type_: AstType,
     pub span: Span,
 }
@@ -558,6 +573,9 @@ impl DisplayDepth for VariableDecl {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         write_indent(f, d)?;
         write!(f, "Var name=\"{}\"", self.name)?;
+        if self.is_mutable {
+            write!(f, " mut")?;
+        }
         if let Some(t) = &self.type_ {
             write!(f, " type=\"{}\"", t)?;
         }
@@ -1056,6 +1074,7 @@ impl fmt::Display for Literal {
             Literal::Float(n) => write!(f, "{}", n),
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Boolean(b) => write!(f, "{}", b),
+            Literal::None => write!(f, "None"),
         }
     }
 }

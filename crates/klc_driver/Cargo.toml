@@ -11,3 +11,4 @@ klc_frontend = { path = "../klc_frontend" }
 klc_semantic = { path = "../klc_semantic" }
 klc_mir = { path = "../klc_mir" }
 klc_backend = { path = "../klc_backend" }
+inkwell = { version = "0.9", features = ["llvm18-1"] }

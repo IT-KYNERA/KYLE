@@ -11,4 +11,5 @@ path = "src/main.rs"
 
 [dependencies]
 klc_driver = { path = "../klc_driver" }
+klc_tools = { path = "../klc_tools" }
 clap = "4"

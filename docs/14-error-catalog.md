@@ -128,6 +128,18 @@ KL-E0007: Cannot modify constant
   Use a lowercase variable name if reassignment is needed.
 ```
 
+This error also occurs when attempting to reassign an immutable variable:
+
+```text
+KL-E0007: Cannot modify constant
+
+  cannot assign to immutable variable 'x'
+
+  --> file.kl:10:5
+
+  Declare with 'mut' to make it mutable
+```
+
 ---
 
 ### E0008 - Optional Not Checked

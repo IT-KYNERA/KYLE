@@ -1,17 +1,19 @@
-# KL Memory Model Specification v1.0
+# KL Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
 
 ---
 
 ## Philosophy
 
-KL manages memory automatically. The developer never manually allocates or frees memory.
+KL manages memory automatically using RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. The developer never manually allocates or frees memory. The compiler determines at compile time whether a value can be moved (zero-cost) or needs reference counting.
 
 ```text
 No malloc
 No free
+No GC pauses
 No manual memory management
 No pointer arithmetic
 Default memory safety
+Deterministic destruction
 ```
 
 ---
@@ -20,12 +22,13 @@ Default memory safety
 
 ```text
 Safe by default
-Predictable performance
+Zero-cost moves (like Rust)
+Deterministic destruction on scope exit
 No dangling pointers
 No use-after-free
 No double-free
 No buffer overflows
-Minimal runtime overhead
+No garbage collector pauses
 ```
 
 ---
@@ -46,19 +49,20 @@ Heap
 Stack is used for:
 
 ```text
-Local variables
+Local variables (primitives)
 Function parameters
 Return addresses
-Small fixed-size values
+Small fixed-size values (structs, tuples)
+Arrays proven not to escape the function
 ```
 
 Stack allocation is:
 
 ```text
-Fast (increment pointer)
+Fast (increment / decrement pointer)
 Deterministic (LIFO order)
 No fragmentation
-No garbage collection needed
+Zero overhead — no reference counting needed
 ```
 
 ### Stack-Allocated Types
@@ -69,6 +73,8 @@ u8, u16, u32, u64
 f32, f64
 bool
 char
+struct (by default)
+tuple (by default)
 ```
 
 ### Example
@@ -80,7 +86,7 @@ fn compute():
     result = x + y
 ```
 
-All variables live on the stack.
+All variables live on the stack. Freed instantly when the function returns.
 
 ---
 
@@ -89,12 +95,12 @@ All variables live on the stack.
 Heap is used for:
 
 ```text
-Dynamic objects
-Lists
-Dictionaries
+Dynamic objects (class instances)
+Lists (arrays)
+Dictionaries / maps
 Strings longer than 16 bytes
 Closures capturing variables
-Class instances
+Values that escape the current function
 ```
 
 ### Example
@@ -105,101 +111,131 @@ fn create_user() -> User:
     return user
 ```
 
-`User` is allocated on the heap.
+`User` is allocated on the heap. Ownership is transferred to the caller (zero-cost move).
 
 ---
 
-## Garbage Collector
+## Ownership Model — Compiler-Inferred
 
-KL uses a **generational garbage collector**.
+KL does NOT require the programmer to write ownership annotations. The compiler infers the ownership model automatically.
 
-### Generation 0 (Young)
+### Move Inference (Zero-Cost)
 
-```text
-Recently allocated objects
-Collected frequently
-Small pause times
+When a value is used only once, the compiler treats it as a **move** — the reference is passed directly with zero overhead:
+
+```kl
+fn main():
+    datos = [1, 2, 3, 4, 5]     # heap allocation
+    resultado = procesar(datos)  # COMPILER: "datos" used only once
+    # → MOVE: passes reference, zero refcount overhead
+    print(resultado)
+    # FIN → datos and resultado freed instantly
 ```
 
-### Generation 1 (Old)
+### Shared Reference Counting (Automatic)
 
-```text
-Objects surviving Gen 0
-Collected infrequently
-Larger pause times
+When a value is used multiple times, the compiler automatically inserts retain/release:
+
+```kl
+fn main():
+    config = LoadConfig()
+    process(config)              # first use
+    print_summary(config)        # second use
+    # COMPILER: cannot be move, needs refcounting
+    # → inserts retain/release automatically
+    # FIN → refcount = 0 → freed
 ```
 
-### Collection Trigger
+The programmer never writes `Rc::new()`, `Arc::new()`, `Box::new()`, `&`, `&mut`, or lifetime annotations. The compiler handles everything.
 
-```text
-Allocation threshold exceeded
-Manual request (gc.collect())
-Memory pressure detected
-```
+### Stack Optimization (Escape Analysis)
 
-### GC Algorithm
+If an object does not escape the function scope, the compiler allocates it on the stack:
 
-```text
-Phase 1: Mark
-    Traverse from roots (stack, registers, globals)
-    Mark all reachable objects
-
-Phase 2: Sweep
-    Scan heap
-    Free unmarked objects
-    Compact if needed
-```
-
-### GC Safety
-
-```text
-Objects are never moved while referenced
-Pause times are bounded
-GC is thread-safe
+```kl
+fn calcular() -> i32:
+    items = [1, 2, 3]           # COMPILER: does not escape
+    mut total = 0
+    for n in items:
+        total += n
+    return total
+    # → COMPILER: items goes on the STACK, not heap. Zero overhead.
 ```
 
 ---
 
-## Escape Analysis
+## RAII — Deterministic Destruction
 
-The compiler performs escape analysis.
+When a variable goes out of scope, its destructor runs immediately. This is the core of RAII.
 
-### Stack Allocation Optimization
-
-If an object does not escape the function scope:
+### Scope Exit
 
 ```kl
-fn compute():
-    buffer = [1, 2, 3]
-    # buffer never leaves this function
-    return len(buffer)
+fn ejemplo():
+    archivo = File.Open("data.txt")     # resource acquired
+    datos = archivo.read()
+    # FIN → archivo goes out of scope
+    # → File's destructor runs: closes the file, flushes buffers
+    # → datos freed
+    # All deterministic, all immediate. No GC pause.
 ```
 
-Compiler allocates `buffer` on the stack.
+### Defer Not Needed
 
-### Heap Allocation Required
-
-If an object escapes:
+Because RAII handles cleanup automatically, `defer` statements are rarely needed:
 
 ```kl
-fn create_list() -> list<i32>:
-    buffer = [1, 2, 3]
-    return buffer  # escapes! heap allocated
+# With RAII, this is handled automatically:
+fn escribir():
+    archivo = File.Open("out.txt")
+    archivo.write("Hello")
+    # ← File closes automatically at the end of the function
+```
+
+### Compound Assignment
+
+Compound assignments like `x += 1`, `x *= 2` require `mut`:
+
+```kl
+fn ejemplo():
+    total = 0       # immutable
+    total += 5      # ERROR: cannot modify immutable variable
+
+fn ejemplo():
+    mut total = 0   # mutable
+    total += 5      # OK
 ```
 
 ---
 
 ## Reference Counting
 
-Future optimization:
+Reference counting is used automatically when the compiler detects that a value is shared (used more than once). The programmer never interacts with it directly.
+
+### Thread Safety
 
 ```text
-Selective reference counting
-For small objects with clear ownership
-Avoids GC pause for short-lived objects
+Single-thread: lightweight (non-atomic) reference counting
+Multi-thread: automatic atomic reference counting when needed
 ```
 
-Not in v1.0.
+### Cycle Detection
+
+The compiler detects reference cycles automatically and inserts weak references as needed:
+
+```kl
+class Nodo:
+    valor: i32
+    siguiente: Nodo?
+
+fn main():
+    a = Nodo(1)
+    b = Nodo(2)
+    a.siguiente = b
+    b.siguiente = a     # cycle → compiler inserts weak ref automatically
+
+    # Both freed correctly when scope exits
+```
 
 ---
 
@@ -216,8 +252,8 @@ Strings > 15 bytes: heap allocated
 
 ```kl
 name = "Hello"
-greeting = name + " World"   # concatenation
-first = greeting[0]          # indexing
+greeting = name + " World"   # concatenation (new allocation)
+first = greeting[0]          # indexing (bounds-checked)
 length = len(greeting)       # length
 ```
 
@@ -227,7 +263,7 @@ All operations are bounds-checked at runtime (debug mode).
 
 ## Value Types vs Reference Types
 
-### Value Types (Stack)
+### Value Types (Stack — Copy Semantics)
 
 ```kl
 i8, i16, i32, i64
@@ -239,36 +275,28 @@ struct (by default)
 tuple (by default)
 ```
 
-### Reference Types (Heap)
+Value types are copied on assignment:
+
+```kl
+a: i32 = 10
+b = a       # a is copied (two independent values)
+```
+
+### Reference Types (Heap — Move/Share Semantics)
 
 ```kl
 class
 list
 dict
-str (heap path)
+str (heap path, > 15 bytes)
 ```
 
----
-
-## Copy Semantics
-
-### Implicit Copy
-
-Value types are copied on assignment:
-
-```kl
-a: i32 = 10
-b = a  # a is copied
-```
-
-### Reference Copy
-
-Reference types share the reference:
+Reference types share the reference on assignment:
 
 ```kl
 a: list<i32> = [1, 2, 3]
-b = a  # both point to same list
-b.add(4)  # a is also modified
+b = a       # both point to the same list
+b.add(4)    # a is also modified
 ```
 
 ### Explicit Clone
@@ -281,45 +309,98 @@ b = a.clone()  # deep copy
 
 ## Immutability
 
-### Variables Are Mutable By Default
+### Variables Are Immutable By Default
 
 ```kl
 name = "John"
-name = "Jane"  # allowed, variable is mutable
+name = "Jane"  # ERROR: cannot modify immutable variable
 ```
 
-All lowercase or camelCase variables are mutable by default.
+### Mutable Variables (mut keyword)
 
-### Constants (UPPERCASE)
+```kl
+mut name = "John"
+name = "Jane"  # OK: variable is mutable
+```
 
-Names in ALL_CAPS are constants and cannot be reassigned:
+### Constants (UPPERCASE — Always Immutable)
+
+Names in ALL_CAPS are compile-time constants. They cannot be modified and cannot be declared with `mut`:
 
 ```kl
 PI = 3.141592
-PI = 10  # Error: cannot modify constant
+PI = 10          # Error: cannot modify constant
+
+mut PI = 3.14    # Error: constants cannot be mutable
+```
+
+### Struct Field Mutability
+
+```kl
+class Punto:
+    x: i32
+    y: i32
+
+fn main():
+    p = Punto(10, 20)
+    p.x = 5     # ERROR: p is immutable (default)
+
+    mut p = Punto(10, 20)
+    p.x = 5     # OK: mut p means all fields are mutable
+```
+
+Struct fields do not have individual mutability annotations. If the variable is `mut`, all fields are mutable. If not, all fields are immutable.
+
+---
+
+## Resource Management (RAII)
+
+### File Example
+
+```kl
+fn leer_config() -> str:
+    archivo = File.Open("config.kl")
+    contenido = archivo.read()
+    return contenido
+    # ← archivo closes automatically (RAII destructor)
+    # ← contenido is moved to caller (zero-cost)
+```
+
+### Lock Example
+
+```kl
+mut datos = [1, 2, 3]
+bloqueo = Mutex.lock(datos)
+bloqueo.add(4)
+# ← bloqueo releases automatically when scope exits
+```
+
+### Network Connection Example
+
+```kl
+fn fetch_url(url: str) -> str:
+    conn = TcpConnection(url)
+    respuesta = conn.request()
+    return respuesta
+    # ← conn closes automatically (RAII destructor)
 ```
 
 ---
 
-## Ownership Model
+## Comparison: KL vs Rust
 
-KL does not have a Rust-style ownership system in v1.0.
-
-```text
-No borrow checker
-No lifetimes
-No move semantics
-```
-
-The Garbage Collector handles all memory safety.
-
-### Future: Optional Ownership
-
-```text
-Phase 2: Opt-in ownership annotations
-Phase 3: Borrow checker for performance-critical code
-Phase 4: Full ownership integration
-```
+| Concept | Rust | KL |
+|---------|------|----|
+| Default mutability | Immutable (`let`) | Immutable |
+| Mutable syntax | `let mut x` | `mut x` |
+| Ownership annotations | Required (`&`, `&mut`, `Box`, `Rc`) | None (compiler infers) |
+| Borrow checker | Yes (strict rules) | No (refcounting for shared) |
+| Lifetimes | `'a`, `'b` | Not needed |
+| Move semantics | Explicit (`x` vs `&x`) | Automatic (single-use = move) |
+| Shared ownership | `Rc::new()`, `Arc::new()` | Automatic refcounting |
+| Destructors | `Drop` trait | Automatic RAII |
+| Thread safety | Borrow checker + `Send`/`Sync` | Automatic atomic refcounting |
+| Learning curve | Months | Days |
 
 ---
 
@@ -331,14 +412,14 @@ Phase 4: Full ownership integration
 Type safety
 Bounds checking (static where possible)
 Null safety via Option<T>
-Use-after-move detection (future)
+Immutability enforcement
 ```
 
 ### Runtime
 
 ```text
 Bounds checking (debug mode)
-Garbage collection
+Reference counting safety
 Type-safe downcasting
 ```
 
@@ -370,36 +451,8 @@ Compiler inserts padding as needed for alignment.
 
 ---
 
-## Thread Safety
-
-### Default
-
-```text
-Immutable by default
-Thread-safe GC
-Atomic operations for primitives
-```
-
-### Shared State
-
-```kl
-counter = AtomicI32(0)
-counter.add(1)
-value = counter.load()
-```
-
-### Mutex
-
-```kl
-data = Mutex<list<i32>>()
-lock = data.lock()
-lock.add(10)
-```
-
----
-
 ## Memory Model Version
 
 ```text
-KL Memory Model Specification v1.0
+KL Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
 ```

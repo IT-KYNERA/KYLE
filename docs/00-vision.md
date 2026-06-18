@@ -39,7 +39,7 @@ Simple like Go
 No self
 No let
 No var
-No mut
+
 No semicolons
 No braces
 No exceptions
@@ -61,7 +61,7 @@ Imports are explicit
 Compiled to native code
 LLVM backend
 No hidden allocations
-Predictable GC
+Deterministic RAII
 Zero-cost abstractions
 ```
 
@@ -119,7 +119,7 @@ Embedded systems
 - Package manager with registry
 - Compiles to native machine code via LLVM
 - No exceptions — errors are values
-- Garbage collected memory model
+- RAII memory model with compiler-inferred ownership (no GC)
 - Constants by UPPERCASE convention (`PI = 3.14`)
 - Object literals (`{ name: "Juan" }`) with dot access
 
@@ -129,7 +129,7 @@ Embedded systems
 
 ```text
 self
-let / var / mut
+let / var
 public / private / protected keywords
 virtual / override
 try / catch / finally
@@ -183,7 +183,7 @@ fn main():
 | Type Inference | Yes | N/A | Yes | No | Yes |
 | Generics | Yes | No | Yes | No | Yes |
 | No Exceptions | Yes | No | Yes | No | Yes |
-| GC | Yes | Yes | No | Yes | Yes |
+| GC | No (RAII) | Yes | No | Yes | Yes |
 | Async Built-in | Yes | No | No | Yes | No |
 | Package Manager | Built-in | Third-party | Built-in | Built-in | Third-party |
 | Object Literals | Yes | No | No | No | Yes |

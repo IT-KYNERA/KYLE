@@ -1,0 +1,276 @@
+use core::ptr;
+use std::alloc::Layout;
+
+/// Convert an i64 to its string representation.
+/// Returns a pointer to a null-terminated C string in a static buffer.
+/// Note: uses a fixed static buffer — not thread-safe but simple for single-threaded use.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_i64_to_str(val: i64) -> *const u8 {
+    static mut BUF: [u8; 32] = [0u8; 32];
+    let buf = &raw mut BUF as *mut u8;
+    let len = 32usize;
+    let mut n = if val < 0 { -val } else { val };
+    let mut i = len;
+    loop {
+        i -= 1;
+        unsafe { *buf.add(i) = (n % 10) as u8 + b'0'; }
+        n /= 10;
+        if n == 0 {
+            break;
+        }
+    }
+    if val < 0 {
+        i -= 1;
+        unsafe { *buf.add(i) = b'-'; }
+    }
+    unsafe { buf.add(i) as *const u8 }
+}
+
+/// Get the length of a null-terminated C string (strlen).
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_strlen(ptr: *const u8) -> i32 {
+    if ptr.is_null() {
+        return 0;
+    }
+    let mut len: i32 = 0;
+    unsafe {
+        while *ptr.add(len as usize) != 0 {
+            len += 1;
+        }
+    }
+    len
+}
+
+/// Concatenate two strings into a newly allocated buffer.
+/// Returns a pointer to the concatenated null-terminated string.
+/// The caller must free the result with kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_concat(a: *const u8, a_len: i32, b: *const u8, b_len: i32) -> *mut u8 {
+    if a.is_null() && b.is_null() {
+        return core::ptr::null_mut();
+    }
+    let len = a_len + b_len;
+    let total = (len + 1) as usize;
+    let layout = Layout::array::<u8>(total).expect("invalid layout");
+    let result = unsafe { std::alloc::alloc(layout) };
+    if result.is_null() {
+        return core::ptr::null_mut();
+    }
+    if !a.is_null() && a_len > 0 {
+        unsafe {
+            ptr::copy_nonoverlapping(a, result, a_len as usize);
+        }
+    }
+    if !b.is_null() && b_len > 0 {
+        unsafe {
+            ptr::copy_nonoverlapping(b, result.add(a_len as usize), b_len as usize);
+        }
+    }
+    unsafe {
+        *result.add(len as usize) = 0;
+    }
+    result
+}
+
+/// Check if haystack contains needle.
+/// Returns 1 if found, 0 otherwise.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_contains(haystack: *const u8, needle: *const u8) -> i32 {
+    if haystack.is_null() || needle.is_null() {
+        return 0i32;
+    }
+    let hl = kl_strlen(haystack) as usize;
+    let nl = kl_strlen(needle) as usize;
+    if nl == 0 { return 1i32; }
+    if nl > hl { return 0i32; }
+    unsafe {
+        for i in 0..=hl - nl {
+            if core::ptr::read_unaligned(haystack.add(i) as *const [u8; 1]) == core::ptr::read_unaligned(needle as *const [u8; 1]) {
+                let mut found = true;
+                for j in 0..nl {
+                    if *haystack.add(i + j) != *needle.add(j) {
+                        found = false;
+                        break;
+                    }
+                }
+                if found { return 1i32; }
+            }
+        }
+    }
+    0i32
+}
+
+/// Convert string to uppercase. Returns heap-allocated string, caller must kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_to_upper(ptr: *const u8) -> *mut u8 {
+    let len = kl_strlen(ptr) as usize;
+    let layout = std::alloc::Layout::array::<u8>(len + 1).expect("invalid layout");
+    let result = unsafe { std::alloc::alloc(layout) };
+    if result.is_null() { return result; }
+    unsafe {
+        for i in 0..len {
+            let c = *ptr.add(i);
+            *result.add(i) = if c >= b'a' && c <= b'z' { c - 32 } else { c };
+        }
+        *result.add(len) = 0;
+    }
+    result
+}
+
+/// Convert string to lowercase. Returns heap-allocated string, caller must kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_to_lower(ptr: *const u8) -> *mut u8 {
+    let len = kl_strlen(ptr) as usize;
+    let layout = std::alloc::Layout::array::<u8>(len + 1).expect("invalid layout");
+    let result = unsafe { std::alloc::alloc(layout) };
+    if result.is_null() { return result; }
+    unsafe {
+        for i in 0..len {
+            let c = *ptr.add(i);
+            *result.add(i) = if c >= b'A' && c <= b'Z' { c + 32 } else { c };
+        }
+        *result.add(len) = 0;
+    }
+    result
+}
+
+/// Trim whitespace from both ends. Returns heap-allocated string, caller must kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_trim(ptr: *const u8) -> *mut u8 {
+    let len = kl_strlen(ptr) as usize;
+    if len == 0 { return core::ptr::null_mut(); }
+    unsafe {
+        let mut start = 0;
+        while start < len && *ptr.add(start) <= b' ' { start += 1; }
+        let mut end = len;
+        while end > start && *ptr.add(end - 1) <= b' ' { end -= 1; }
+        let new_len = end - start;
+        let layout = std::alloc::Layout::array::<u8>(new_len + 1).expect("invalid layout");
+        let result = std::alloc::alloc(layout);
+        if result.is_null() { return result; }
+        core::ptr::copy_nonoverlapping(ptr.add(start), result, new_len);
+        *result.add(new_len) = 0;
+        result
+    }
+}
+
+/// Replace all occurrences of `from` with `to`. Returns heap-allocated string, caller must kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_replace(ptr: *const u8, from: *const u8, to: *const u8) -> *mut u8 {
+    if ptr.is_null() { return core::ptr::null_mut(); }
+    let slen = kl_strlen(ptr) as usize;
+    let flen = kl_strlen(from) as usize;
+    let tlen = kl_strlen(to) as usize;
+    if flen == 0 || flen > slen {
+        // no replacement possible, return copy
+        let layout = std::alloc::Layout::array::<u8>(slen + 1).expect("invalid layout");
+        let result = unsafe { std::alloc::alloc(layout) };
+        if result.is_null() { return result; }
+        unsafe {
+            core::ptr::copy_nonoverlapping(ptr, result, slen);
+            *result.add(slen) = 0;
+        }
+        return result;
+    }
+    unsafe {
+        // count occurrences
+        let mut count = 0i64;
+        let mut i = 0;
+        while i + flen <= slen {
+            let mut match_ = true;
+            for j in 0..flen {
+                if *ptr.add(i + j) != *from.add(j) { match_ = false; break; }
+            }
+            if match_ { count += 1; i += flen; }
+            else { i += 1; }
+        }
+        let new_len = slen + (tlen.saturating_sub(flen)) * (count as usize);
+        let layout = std::alloc::Layout::array::<u8>(new_len + 1).expect("invalid layout");
+        let result = std::alloc::alloc(layout);
+        if result.is_null() { return result; }
+        let mut wp = result;
+        let mut rp = ptr;
+        let mut remaining = slen;
+        while remaining >= flen {
+            let mut match_ = true;
+            for j in 0..flen {
+                if *rp.add(j) != *from.add(j) { match_ = false; break; }
+            }
+            if match_ {
+                core::ptr::copy_nonoverlapping(to, wp, tlen);
+                wp = wp.add(tlen);
+                rp = rp.add(flen);
+                remaining -= flen;
+            } else {
+                *wp = *rp;
+                wp = wp.add(1);
+                rp = rp.add(1);
+                remaining -= 1;
+            }
+        }
+        while remaining > 0 {
+            *wp = *rp;
+            wp = wp.add(1);
+            rp = rp.add(1);
+            remaining -= 1;
+        }
+        *wp = 0;
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Character operations
+// ---------------------------------------------------------------------------
+
+/// Return the byte at position `index` in string `ptr`, or 0 if out of bounds.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_char_at(ptr: *const u8, index: i32) -> i8 {
+    if ptr.is_null() { return 0; }
+    let len = kl_strlen(ptr);
+    if index < 0 || index >= len { return 0; }
+    unsafe { *ptr.add(index as usize) as i8 }
+}
+
+/// Returns 1 if the byte is an ASCII digit ('0'..'9').
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_digit(c: i8) -> i32 {
+    if c >= b'0' as i8 && c <= b'9' as i8 { 1 } else { 0 }
+}
+
+/// Returns 1 if the byte is an ASCII letter ('a'..'z' or 'A'..'Z').
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_alpha(c: i8) -> i32 {
+    if (c >= b'a' as i8 && c <= b'z' as i8) || (c >= b'A' as i8 && c <= b'Z' as i8) { 1 } else { 0 }
+}
+
+/// Returns 1 if the byte is an ASCII letter or digit.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_alnum(c: i8) -> i32 {
+    kl_is_digit(c) | kl_is_alpha(c)
+}
+
+/// Returns 1 if the byte is whitespace (space, tab, newline, carriage return).
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_whitespace(c: i8) -> i32 {
+    let u = c as u8;
+    if u == b' ' || u == b'\t' || u == b'\n' || u == b'\r' { 1 } else { 0 }
+}
+
+/// Returns 1 if the byte is an uppercase ASCII letter.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_upper(c: i8) -> i32 {
+    if c >= b'A' as i8 && c <= b'Z' as i8 { 1 } else { 0 }
+}
+
+/// Returns 1 if the byte is a lowercase ASCII letter.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_is_lower(c: i8) -> i32 {
+    if c >= b'a' as i8 && c <= b'z' as i8 { 1 } else { 0 }
+}
+
+/// Convert a char (i8) to its i32 representation.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_ord(c: i8) -> i32 {
+    c as i32
+}

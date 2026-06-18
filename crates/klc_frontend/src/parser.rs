@@ -18,8 +18,23 @@ impl Parser {
         Self { tokens, pos: 0 }
     }
 
+    /// Build a span covering from `start_pos` (token index at start) to the
+    /// last consumed token (self.pos - 1). If no tokens consumed, returns a
+    /// span around the current token or a dummy span.
+    fn span_from(&self, start_pos: usize) -> Span {
+        let start = &self.tokens[start_pos].span.start;
+        let end_pos = self.pos.saturating_sub(1).max(start_pos);
+        let end = &self.tokens[end_pos].span.end;
+        Span {
+            start: *start,
+            end: *end,
+            file_id: 0,
+        }
+    }
+
     /// Parse the full token stream into a Program AST node.
     pub fn parse(&mut self) -> Result<Program, String> {
+        let start = self.pos;
         let mut declarations = Vec::new();
         loop {
             if self.at(TokenKind::Eof) {
@@ -33,7 +48,7 @@ impl Parser {
         }
         Ok(Program {
             declarations,
-            span: Span::dummy(),
+            span: self.span_from(start),
         })
     }
 
@@ -77,8 +92,27 @@ impl Parser {
         if self.at(TokenKind::Contract) {
             return self.parse_contract().map(Decl::Contract);
         }
+        // Mutable variable declaration: `mut name = expr`
+        if self.at(TokenKind::Mut) {
+            let start = self.pos;
+            self.advance();
+            let name = self.eat_identifier();
+            if name.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) {
+                return Err("constants (UPPERCASE) cannot be mutable. Use lowercase for mutable variables.".to_string());
+            }
+            self.expect(TokenKind::Equals)?;
+            let value = self.parse_expr()?;
+            return Ok(Decl::Variable(VariableDecl {
+                name,
+                type_: None,
+                value: Box::new(value),
+                is_mutable: true,
+                span: self.span_from(start),
+            }));
+        }
         // Variable/constant declaration: `name = expr`
         if self.at_identifier() {
+            let start = self.pos;
             let name = self.eat_identifier();
             if self.at(TokenKind::Equals) {
                 self.advance();
@@ -87,14 +121,15 @@ impl Parser {
                     return Ok(Decl::Constant(ConstantDecl {
                         name,
                         value: Box::new(value),
-                        span: Span::dummy(),
+                        span: self.span_from(start),
                     }));
                 }
                 return Ok(Decl::Variable(VariableDecl {
                     name,
                     type_: None,
                     value: Box::new(value),
-                    span: Span::dummy(),
+                    is_mutable: false,
+                    span: self.span_from(start),
                 }));
             }
             return Err(format!("expected '=' after identifier '{}'", name));
@@ -104,6 +139,7 @@ impl Parser {
     }
 
     fn parse_import(&mut self) -> Result<Decl, String> {
+        let start = self.pos;
         self.advance(); // import
         let module_name = self.eat_identifier();
         let alias = if self.at(TokenKind::As) {
@@ -112,29 +148,37 @@ impl Parser {
         } else {
             None
         };
-        Ok(Decl::Import(Import { module_name, alias, span: Span::dummy() }))
+        Ok(Decl::Import(Import { module_name, alias, span: self.span_from(start) }))
     }
 
     fn parse_from_import(&mut self) -> Result<Decl, String> {
+        let start = self.pos;
         self.advance(); // from
         let module_name = self.eat_identifier();
         self.expect_keyword("import")?;
         let imported_name = self.eat_identifier();
-        Ok(Decl::FromImport(FromImport { module_name, imported_name, span: Span::dummy() }))
+        Ok(Decl::FromImport(FromImport { module_name, imported_name, span: self.span_from(start) }))
     }
 
     fn parse_type_alias(&mut self) -> Result<Decl, String> {
+        let start = self.pos;
         self.advance(); // type
         let name = self.eat_identifier();
+        let type_params = if self.at(TokenKind::Less) {
+            self.parse_type_params()?
+        } else {
+            vec![]
+        };
         if !self.at(TokenKind::Equals) {
             return Err("expected '=' in type alias".to_string());
         }
         self.advance();
         let type_ = self.parse_type()?;
-        Ok(Decl::TypeAlias(TypeAlias { name, type_, span: Span::dummy() }))
+        Ok(Decl::TypeAlias(TypeAlias { name, type_params, type_, span: self.span_from(start) }))
     }
 
     fn parse_function(&mut self) -> Result<FunctionDecl, String> {
+        let start = self.pos;
         let is_const = if self.at(TokenKind::Const) { self.advance(); true } else { false };
         let is_async = if self.at(TokenKind::Async) { self.advance(); true } else { false };
         if !self.at(TokenKind::Fn) {
@@ -142,12 +186,25 @@ impl Parser {
         }
         self.advance();
         let name = self.eat_identifier();
+        // Parse optional type params: `<T, U>`
+        let type_params = if self.at(TokenKind::Less) {
+            self.parse_type_params()?
+        } else {
+            vec![]
+        };
         self.expect(TokenKind::LParen)?;
         let params = self.parse_params()?;
         self.expect(TokenKind::RParen)?;
         let return_type = if self.at(TokenKind::Arrow) {
             self.advance();
-            Some(self.parse_type()?)
+            let type_start = self.pos;
+            let base = self.parse_type()?;
+            if self.at(TokenKind::Bang) {
+                self.advance();
+                Some(AstType::Error { inner: Box::new(base), span: self.span_from(type_start) })
+            } else {
+                Some(base)
+            }
         } else {
             None
         };
@@ -159,24 +216,52 @@ impl Parser {
             Some(self.parse_block()?)
         };
         Ok(FunctionDecl {
-            name, params, return_type, is_async, is_const, is_abstract, body,
-            span: Span::dummy(),
+            name, type_params, params, return_type, is_async, is_const, is_abstract, body,
+            span: self.span_from(start),
         })
     }
 
     fn parse_class(&mut self, is_abstract: bool) -> Result<Decl, String> {
+        let start = self.pos;
         self.advance(); // class
         let name = self.eat_identifier();
+        // Parse optional type params: `<T, U>`
+        let type_params = if self.at(TokenKind::Less) {
+            self.parse_type_params()?
+        } else {
+            vec![]
+        };
+        let mut contracts = Vec::new();
+
+        // `implements Contract1, Contract2`
+        if self.at(TokenKind::Implements) {
+            self.advance();
+            contracts.push(self.eat_identifier());
+            while self.at(TokenKind::Comma) {
+                self.advance();
+                contracts.push(self.eat_identifier());
+            }
+        }
+
         // Check for inheritance: `class Dog : Animal:`
         let parent = if self.at(TokenKind::Colon) {
             let saved = self.pos;
             self.advance();
             if self.at_identifier() {
                 let parent_name = self.eat_identifier();
+                // `implements` after parent
+                if self.at(TokenKind::Implements) {
+                    self.advance();
+                    contracts.push(self.eat_identifier());
+                    while self.at(TokenKind::Comma) {
+                        self.advance();
+                        contracts.push(self.eat_identifier());
+                    }
+                }
                 if self.at(TokenKind::Colon) {
                     self.advance();
                     let members = self.parse_class_members()?;
-                    return self.make_class_decl(name, Some(parent_name), members, is_abstract);
+                    return self.make_class_decl(start, name, type_params.clone(), Some(parent_name), contracts, members, is_abstract);
                 }
             }
             self.pos = saved;
@@ -186,23 +271,26 @@ impl Parser {
         };
         self.expect(TokenKind::Colon)?;
         let members = self.parse_class_members()?;
-        self.make_class_decl(name, parent, members, is_abstract)
+        self.make_class_decl(start, name, type_params, parent, contracts, members, is_abstract)
     }
 
     fn make_class_decl(
         &self,
+        start_pos: usize,
         name: String,
+        type_params: Vec<TypeParam>,
         parent: Option<String>,
+        contracts: Vec<String>,
         members: Vec<ClassMember>,
         is_abstract: bool,
     ) -> Result<Decl, String> {
         if is_abstract {
             Ok(Decl::AbstractClass(AbstractClassDecl {
-                name, parent, contracts: vec![], members, span: Span::dummy(),
+                name, type_params, parent, contracts, members, span: self.span_from(start_pos),
             }))
         } else {
             Ok(Decl::Class(ClassDecl {
-                name, parent, contracts: vec![], members, span: Span::dummy(),
+                name, type_params, parent, contracts, members, span: self.span_from(start_pos),
             }))
         }
     }
@@ -221,24 +309,26 @@ impl Parser {
                 let name = self.eat_identifier();
                 // Check for constructor: identifier followed by '('
                 if self.at(TokenKind::LParen) {
+                    let constructor_start = self.pos;
                     self.advance();
                     let params = self.parse_params()?;
                     self.expect(TokenKind::RParen)?;
                     self.expect(TokenKind::Colon)?;
                     let body = self.parse_block()?;
                     members.push(ClassMember::Constructor(Constructor {
-                        params, body, span: Span::dummy(),
+                        params, body, span: self.span_from(constructor_start),
                     }));
                     continue;
                 }
                 // Check for field or property: identifier followed by ':'
                 if self.at(TokenKind::Colon) {
+                    let member_start = self.pos;
                     self.advance();
                     if self.at(TokenKind::Get) || self.at(TokenKind::Set) {
                         // Property — stub, will expand in Phase 2
                         members.push(ClassMember::Property(Property {
-                            name, type_: AstType::Primitive { name: "str".into(), span: Span::dummy() },
-                            getter: None, setter: None, span: Span::dummy(),
+                            name, type_: AstType::Primitive { name: "str".into(), span: self.span_from(member_start) },
+                            getter: None, setter: None, span: self.span_from(member_start),
                         }));
                     } else {
                         // Field: `name: Type`
@@ -251,7 +341,7 @@ impl Parser {
                             Visibility::Public
                         };
                         members.push(ClassMember::Field(Field {
-                            name, type_, visibility, span: Span::dummy(),
+                            name, type_, visibility, span: self.span_from(member_start),
                         }));
                     }
                     continue;
@@ -271,8 +361,14 @@ impl Parser {
     }
 
     fn parse_struct(&mut self) -> Result<StructDecl, String> {
+        let start = self.pos;
         self.advance(); // struct
         let name = self.eat_identifier();
+        let type_params = if self.at(TokenKind::Less) {
+            self.parse_type_params()?
+        } else {
+            vec![]
+        };
         self.expect(TokenKind::Colon)?;
         if self.at(TokenKind::Newline) { self.advance(); }
         if self.at(TokenKind::Indent) { self.advance(); }
@@ -281,17 +377,24 @@ impl Parser {
             if self.at(TokenKind::Dedent) { self.advance(); break; }
             if self.at(TokenKind::Eof) { break; }
             if self.at(TokenKind::Newline) { self.advance(); continue; }
+            let field_start = self.pos;
             let field_name = self.eat_identifier();
             self.expect(TokenKind::Colon)?;
             let type_ = self.parse_type()?;
-            fields.push(Field { name: field_name, type_, visibility: Visibility::Public, span: Span::dummy() });
+            fields.push(Field { name: field_name, type_, visibility: Visibility::Public, span: self.span_from(field_start) });
         }
-        Ok(StructDecl { name, fields, span: Span::dummy() })
+        Ok(StructDecl { name, type_params, fields, span: self.span_from(start) })
     }
 
     fn parse_enum(&mut self) -> Result<EnumDecl, String> {
+        let start = self.pos;
         self.advance(); // enum
         let name = self.eat_identifier();
+        let type_params = if self.at(TokenKind::Less) {
+            self.parse_type_params()?
+        } else {
+            vec![]
+        };
         self.expect(TokenKind::Colon)?;
         if self.at(TokenKind::Newline) { self.advance(); }
         if self.at(TokenKind::Indent) { self.advance(); }
@@ -300,13 +403,15 @@ impl Parser {
             if self.at(TokenKind::Dedent) { self.advance(); break; }
             if self.at(TokenKind::Eof) { break; }
             if self.at(TokenKind::Newline) { self.advance(); continue; }
+            let variant_start = self.pos;
             let variant_name = self.eat_identifier();
-            variants.push(EnumVariant { name: variant_name, payload: vec![], span: Span::dummy() });
+            variants.push(EnumVariant { name: variant_name, payload: vec![], span: self.span_from(variant_start) });
         }
-        Ok(EnumDecl { name, variants, span: Span::dummy() })
+        Ok(EnumDecl { name, type_params, variants, span: self.span_from(start) })
     }
 
     fn parse_contract(&mut self) -> Result<ContractDecl, String> {
+        let start = self.pos;
         self.advance(); // contract
         let name = self.eat_identifier();
         self.expect(TokenKind::Colon)?;
@@ -318,6 +423,7 @@ impl Parser {
             if self.at(TokenKind::Eof) { break; }
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             if !self.at(TokenKind::Fn) { break; }
+            let method_start = self.pos;
             self.advance();
             let method_name = self.eat_identifier();
             self.expect(TokenKind::LParen)?;
@@ -327,15 +433,16 @@ impl Parser {
                 self.advance();
                 Some(self.parse_type()?)
             } else { None };
-            methods.push(ContractMethod { name: method_name, params, return_type, span: Span::dummy() });
+            methods.push(ContractMethod { name: method_name, params, return_type, span: self.span_from(method_start) });
         }
-        Ok(ContractDecl { name, methods, span: Span::dummy() })
+        Ok(ContractDecl { name, methods, span: self.span_from(start) })
     }
 
     fn parse_params(&mut self) -> Result<Vec<Parameter>, String> {
         let mut params = Vec::new();
         loop {
             if self.at(TokenKind::RParen) { break; }
+            let param_start = self.pos;
             let name = self.eat_identifier();
             self.expect(TokenKind::Colon)?;
             let type_ = self.parse_type()?;
@@ -343,9 +450,29 @@ impl Parser {
                 self.advance();
                 Some(Box::new(self.parse_expr()?))
             } else { None };
-            params.push(Parameter { name, type_, default, variadic: false, span: Span::dummy() });
+            params.push(Parameter { name, type_, default, variadic: false, span: self.span_from(param_start) });
             if self.at(TokenKind::Comma) { self.advance(); } else { break; }
         }
+        Ok(params)
+    }
+
+    fn parse_type_params(&mut self) -> Result<Vec<TypeParam>, String> {
+        self.advance(); // '<'
+        let mut params = Vec::new();
+        loop {
+            if self.at(TokenKind::Greater) { break; }
+            let param_start = self.pos;
+            let name = self.eat_identifier();
+            let constraint = if self.at(TokenKind::Colon) {
+                self.advance();
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+            params.push(TypeParam { name, constraint, span: self.span_from(param_start) });
+            if self.at(TokenKind::Comma) { self.advance(); } else { break; }
+        }
+        self.expect(TokenKind::Greater)?;
         Ok(params)
     }
 
@@ -354,6 +481,7 @@ impl Parser {
     // -----------------------------------------------------------------------
 
     fn parse_type(&mut self) -> Result<AstType, String> {
+        let start = self.pos;
         let name = self.eat_identifier();
         if name.is_empty() {
             let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
@@ -368,9 +496,9 @@ impl Parser {
                 args.push(self.parse_type()?);
             }
             self.expect(TokenKind::Greater)?;
-            Ok(AstType::Generic { name, args, span: Span::dummy() })
+            Ok(AstType::Generic { name, args, span: self.span_from(start) })
         } else {
-            Ok(AstType::User { name, span: Span::dummy() })
+            Ok(AstType::User { name, span: self.span_from(start) })
         }
     }
 
@@ -383,6 +511,7 @@ impl Parser {
     }
 
     fn parse_binary(&mut self, min_prec: u8) -> Result<Expr, String> {
+        let start = self.pos;
         let mut left = self.parse_unary()?;
         loop {
             let op = match self.current_operator() {
@@ -397,7 +526,7 @@ impl Parser {
                 left: Box::new(left),
                 operator: op,
                 right: Box::new(right),
-                span: Span::dummy(),
+                span: self.span_from(start),
             };
         }
         Ok(left)
@@ -405,50 +534,58 @@ impl Parser {
 
     fn parse_unary(&mut self) -> Result<Expr, String> {
         if self.at(TokenKind::Minus) {
+            let start = self.pos;
             self.advance();
-            return Ok(Expr::Unary { operator: UnaryOp::Neg, operand: Box::new(self.parse_primary()?), span: Span::dummy() });
+            return Ok(Expr::Unary { operator: UnaryOp::Neg, operand: Box::new(self.parse_primary()?), span: self.span_from(start) });
         }
         if self.at(TokenKind::Bang) {
+            let start = self.pos;
             self.advance();
-            return Ok(Expr::Unary { operator: UnaryOp::Not, operand: Box::new(self.parse_primary()?), span: Span::dummy() });
+            return Ok(Expr::Unary { operator: UnaryOp::Not, operand: Box::new(self.parse_primary()?), span: self.span_from(start) });
         }
         if self.at(TokenKind::Tilde) {
+            let start = self.pos;
             self.advance();
-            return Ok(Expr::Unary { operator: UnaryOp::BitNot, operand: Box::new(self.parse_primary()?), span: Span::dummy() });
+            return Ok(Expr::Unary { operator: UnaryOp::BitNot, operand: Box::new(self.parse_primary()?), span: self.span_from(start) });
         }
         self.parse_primary()
     }
 
     fn parse_primary(&mut self) -> Result<Expr, String> {
+        let start = self.pos;
         let tok = self.current()?;
         let expr = match &tok.kind {
             TokenKind::Integer(s) => {
                 let val = s.parse::<i64>().unwrap_or(0);
                 self.advance();
-                Expr::Literal { value: Literal::Integer(val), span: Span::dummy() }
+                Expr::Literal { value: Literal::Integer(val), span: self.span_from(start) }
             }
             TokenKind::Float(s) => {
                 let val = s.parse::<f64>().unwrap_or(0.0);
                 self.advance();
-                Expr::Literal { value: Literal::Float(val), span: Span::dummy() }
+                Expr::Literal { value: Literal::Float(val), span: self.span_from(start) }
             }
             TokenKind::String(s) => {
                 let val = s.clone();
                 self.advance();
-                Expr::Literal { value: Literal::String(val), span: Span::dummy() }
+                Expr::Literal { value: Literal::String(val), span: self.span_from(start) }
             }
             TokenKind::True => {
                 self.advance();
-                Expr::Literal { value: Literal::Boolean(true), span: Span::dummy() }
+                Expr::Literal { value: Literal::Boolean(true), span: self.span_from(start) }
             }
             TokenKind::False => {
                 self.advance();
-                Expr::Literal { value: Literal::Boolean(false), span: Span::dummy() }
+                Expr::Literal { value: Literal::Boolean(false), span: self.span_from(start) }
+            }
+            TokenKind::None => {
+                self.advance();
+                Expr::Literal { value: Literal::None, span: self.span_from(start) }
             }
             TokenKind::Identifier(name) => {
                 let val = name.clone();
                 self.advance();
-                Expr::Identifier { name: val, span: Span::dummy() }
+                Expr::Identifier { name: val, span: self.span_from(start) }
             }
             TokenKind::LParen => {
                 self.advance();
@@ -464,7 +601,7 @@ impl Parser {
                     if self.at(TokenKind::Comma) { self.advance(); }
                 }
                 self.expect(TokenKind::RBracket)?;
-                Expr::List { elements, span: Span::dummy() }
+                Expr::List { elements, span: self.span_from(start) }
             }
             TokenKind::LBrace => {
                 self.advance();
@@ -477,7 +614,7 @@ impl Parser {
                     if self.at(TokenKind::Comma) { self.advance(); }
                 }
                 self.expect(TokenKind::RBrace)?;
-                Expr::Dictionary { entries, span: Span::dummy() }
+                Expr::Dictionary { entries, span: self.span_from(start) }
             }
             _ => return Err(format!("unexpected token in expression: {:?}", tok.kind)),
         };
@@ -487,6 +624,7 @@ impl Parser {
     fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, String> {
         loop {
             if self.at(TokenKind::LParen) {
+                let start = self.pos;
                 self.advance();
                 let mut arguments = Vec::new();
                 while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
@@ -494,15 +632,21 @@ impl Parser {
                     if self.at(TokenKind::Comma) { self.advance(); }
                 }
                 self.expect(TokenKind::RParen)?;
-                expr = Expr::FunctionCall { target: Box::new(expr), arguments, span: Span::dummy() };
+                expr = Expr::FunctionCall { target: Box::new(expr), arguments, span: self.span_from(start) };
             } else if self.at(TokenKind::Dot) {
+                let start = self.pos;
                 self.advance();
                 let property = self.eat_identifier();
-                expr = Expr::PropertyAccess { object: Box::new(expr), property, span: Span::dummy() };
+                expr = Expr::PropertyAccess { object: Box::new(expr), property, span: self.span_from(start) };
             } else if self.at(TokenKind::QuestionDot) {
+                let start = self.pos;
                 self.advance();
                 let property = self.eat_identifier();
-                expr = Expr::OptionalChain { target: Box::new(expr), property, span: Span::dummy() };
+                expr = Expr::OptionalChain { target: Box::new(expr), property, span: self.span_from(start) };
+            } else if self.at(TokenKind::Question) {
+                let start = self.pos;
+                self.advance();
+                expr = Expr::ErrorProp { expression: Box::new(expr), span: self.span_from(start) };
             } else {
                 break;
             }
@@ -515,6 +659,7 @@ impl Parser {
     // -----------------------------------------------------------------------
 
     fn parse_block(&mut self) -> Result<Block, String> {
+        let start = self.pos;
         // Consume the Newline and Indent that precede every indented block.
         if self.at(TokenKind::Newline) { self.advance(); }
         if self.at(TokenKind::Indent) { self.advance(); }
@@ -526,7 +671,7 @@ impl Parser {
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             statements.push(self.parse_stmt()?);
         }
-        Ok(Block { statements, span: Span::dummy() })
+        Ok(Block { statements, span: self.span_from(start) })
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, String> {
@@ -535,10 +680,11 @@ impl Parser {
         if self.at(TokenKind::For) { return self.parse_for(); }
         if self.at(TokenKind::Match) { return self.parse_match(); }
         if self.at(TokenKind::Loop) {
+            let start = self.pos;
             self.advance();
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
-            return Ok(Stmt::Expression(Expr::Loop { body, span: Span::dummy() }));
+            return Ok(Stmt::Expression(Expr::Loop { body, span: self.span_from(start) }));
         }
         if self.at(TokenKind::Return) {
             self.advance();
@@ -555,28 +701,47 @@ impl Parser {
             return Ok(Stmt::Break(value));
         }
         if self.at(TokenKind::Defer) {
+            let start = self.pos;
             self.advance();
             let call = self.parse_expr()?;
-            return Ok(Stmt::Defer(DeferStmt { call: Box::new(call), span: Span::dummy() }));
+            return Ok(Stmt::Defer(DeferStmt { call: Box::new(call), span: self.span_from(start) }));
         }
         if self.at(TokenKind::Guard) {
+            let start = self.pos;
             self.advance();
             let condition = self.parse_expr()?;
             self.expect_keyword("else")?;
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
-            return Ok(Stmt::Guard(GuardStmt { condition: Box::new(condition), body, span: Span::dummy() }));
+            return Ok(Stmt::Guard(GuardStmt { condition: Box::new(condition), body, span: self.span_from(start) }));
         }
         if self.at(TokenKind::Unsafe) {
+            let start = self.pos;
             self.advance();
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
-            return Ok(Stmt::Unsafe(UnsafeBlock { body, span: Span::dummy() }));
+            return Ok(Stmt::Unsafe(UnsafeBlock { body, span: self.span_from(start) }));
+        }
+        // Mutable variable declaration: `mut ident = expr`
+        if self.at(TokenKind::Mut) {
+            let start = self.pos;
+            self.advance();
+            let name = self.eat_identifier();
+            self.expect(TokenKind::Equals)?;
+            let value = self.parse_expr()?;
+            return Ok(Stmt::Variable(VariableDecl {
+                name,
+                type_: None,
+                value: Box::new(value),
+                is_mutable: true,
+                span: self.span_from(start),
+            }));
         }
         // Variable declaration or binding-if: `ident = expr`
         // Disambiguate by checking if the next token after the expr is ':'
         // (binding-if) or something else (expression statement).
         if self.at_identifier() && self.peek_equals() {
+            let start = self.pos;
             let name = self.eat_identifier();
             self.advance(); // '='
             let value = self.parse_expr()?;
@@ -588,14 +753,14 @@ impl Parser {
                     Some(self.parse_block()?)
                 } else { None };
                 Ok(Stmt::BindingIf(BindingIf {
-                    name, value: Box::new(value), body, else_branch, span: Span::dummy(),
+                    name, value: Box::new(value), body, else_branch, span: self.span_from(start),
                 }))
             } else {
                 Ok(Stmt::Expression(Expr::Assignment {
-                    target: Box::new(Expr::Identifier { name, span: Span::dummy() }),
+                    target: Box::new(Expr::Identifier { name, span: self.span_from(start) }),
                     operator: None,
                     value: Box::new(value),
-                    span: Span::dummy(),
+                    span: self.span_from(start),
                 }))
             }
         } else {
@@ -604,6 +769,7 @@ impl Parser {
     }
 
     fn parse_if(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
         self.advance();
         let condition = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
@@ -611,6 +777,7 @@ impl Parser {
         let mut elif_branches = Vec::new();
         let mut else_branch = None;
         while self.at(TokenKind::Elif) {
+            let elif_start = self.pos;
             self.advance();
             let cond = self.parse_expr()?;
             self.expect(TokenKind::Colon)?;
@@ -618,7 +785,7 @@ impl Parser {
             elif_branches.push(ElifBranch {
                 condition: Box::new(cond),
                 body,
-                span: Span::dummy(),
+                span: self.span_from(elif_start),
             });
         }
         if self.at(TokenKind::Else) {
@@ -626,10 +793,11 @@ impl Parser {
             self.expect(TokenKind::Colon)?;
             else_branch = Some(self.parse_block()?);
         }
-        Ok(Stmt::If(IfStmt { condition: Box::new(condition), body, elif_branches, else_branch, span: Span::dummy() }))
+        Ok(Stmt::If(IfStmt { condition: Box::new(condition), body, elif_branches, else_branch, span: self.span_from(start) }))
     }
 
     fn parse_binding_if(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
         let name = self.eat_identifier();
         self.expect(TokenKind::Equals)?;
         let value = self.parse_expr()?;
@@ -640,11 +808,12 @@ impl Parser {
             Some(self.parse_block()?)
         } else { None };
         Ok(Stmt::BindingIf(BindingIf {
-            name, value: Box::new(value), body, else_branch, span: Span::dummy(),
+            name, value: Box::new(value), body, else_branch, span: self.span_from(start),
         }))
     }
 
     fn parse_while(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
         self.advance();
         let condition = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
@@ -653,10 +822,11 @@ impl Parser {
             self.advance();
             Some(self.parse_block()?)
         } else { None };
-        Ok(Stmt::While(WhileStmt { condition: Box::new(condition), body, else_branch, span: Span::dummy() }))
+        Ok(Stmt::While(WhileStmt { condition: Box::new(condition), body, else_branch, span: self.span_from(start) }))
     }
 
     fn parse_for(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
         self.advance();
         let variable = self.eat_identifier();
         self.expect_keyword("in")?;
@@ -667,10 +837,11 @@ impl Parser {
             self.advance();
             Some(self.parse_block()?)
         } else { None };
-        Ok(Stmt::For(ForStmt { variable, iterable: Box::new(iterable), body, else_branch, span: Span::dummy() }))
+        Ok(Stmt::For(ForStmt { variable, iterable: Box::new(iterable), body, else_branch, span: self.span_from(start) }))
     }
 
     fn parse_match(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
         self.advance();
         let expression = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
@@ -682,6 +853,7 @@ impl Parser {
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             if self.at(TokenKind::Dedent) { self.advance(); break; }
             if self.at(TokenKind::Eof) { break; }
+            let arm_start = self.pos;
             let pattern = self.parse_pattern()?;
             let guard = if self.at(TokenKind::If) {
                 self.advance();
@@ -689,15 +861,16 @@ impl Parser {
             } else { None };
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
-            arms.push(MatchArm { pattern, guard, body, span: Span::dummy() });
+            arms.push(MatchArm { pattern, guard, body, span: self.span_from(arm_start) });
         }
-        Ok(Stmt::Match(MatchStmt { expression: Box::new(expression), arms, span: Span::dummy() }))
+        Ok(Stmt::Match(MatchStmt { expression: Box::new(expression), arms, span: self.span_from(start) }))
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern, String> {
+        let start = self.pos;
         if self.at_identifier() {
             let name = self.eat_identifier();
-            return Ok(Pattern::Identifier { name, span: Span::dummy() });
+            return Ok(Pattern::Identifier { name, span: self.span_from(start) });
         }
         let lit = match &self.current()?.kind {
             TokenKind::Integer(s) => {
@@ -711,6 +884,7 @@ impl Parser {
             TokenKind::String(s) => Literal::String(s.clone()),
             TokenKind::True => Literal::Boolean(true),
             TokenKind::False => Literal::Boolean(false),
+            TokenKind::None => Literal::None,
             _ => {
                 let found = format!("{:?}", self.current()?.kind);
                 return Err(format!("expected pattern, found {}", found));
@@ -719,7 +893,7 @@ impl Parser {
         self.advance();
         Ok(Pattern::Literal {
             value: lit,
-            span: Span::dummy(),
+            span: self.span_from(start),
         })
     }
 
@@ -834,6 +1008,8 @@ impl Parser {
             TokenKind::CaretEquals => Some(BinaryOp::BitXorAssign),
             TokenKind::LessLessEquals => Some(BinaryOp::ShlAssign),
             TokenKind::GreaterGreaterEquals => Some(BinaryOp::ShrAssign),
+            TokenKind::And => Some(BinaryOp::And),
+            TokenKind::Or => Some(BinaryOp::Or),
             _ => Option::None,
         }
     }

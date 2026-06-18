@@ -1,8 +1,77 @@
-# KL Programming Language — Project Context v2.0
+# KL Programming Language — Project Context v3.0
 
 ## Overview
 
 KL (Kynera Language) — compiled, statically-typed language combining Python readability (indentation blocks), Rust type safety (strong typing, generics, pattern matching), Go simplicity (fast compilation, built-in tooling), and LLVM performance.
+
+## State — Resumen Ejecutivo
+
+```
+Pipeline completo: Lexer → Parser → Semantic → MIR → Backend → Linker ✅
+Runtime:        RAII, async, file I/O, string ops, time, testing lib ✅
+Std Library:    core, math, io en KL ✅
+Package Mgr:    manifest, lock, add, remove, info, build, run, test ✅
+LSP:            document symbols, workspace symbols, signature help,
+                find references, code actions ✅
+Formatter:      pretty-printer + comment preservation ✅
+VS Code:        extension with syntax highlighting, LSP client, commands ✅
+Tests:          118 tests, 0 failures ✅
+```
+
+## Session Log
+
+### Sesión 1 — Fase 4: Runtime string ops + File I/O + Time
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Runtime string ops | `klc_runtime/src/string.rs` | ✅ `kl_str_contains`, `to_upper`, `to_lower`, `trim`, `replace`, `concat`, `input` |
+| Compiler string op support | `codegen.rs`, `lower.rs`, `symbol_table.rs` | ✅ extern decls, name remapping, builtins |
+| `str()` builtin | `lower.rs` | ✅ Cast i32→i64 antes de `kl_i64_to_str` |
+| `len()` builtin | `lower.rs` | ✅ retorna I32 |
+| Variable type inference | `lower.rs` | ✅ `Expr::Assignment` usa `local_types` map |
+| `kl_print`/`kl_println`/etc. | `codegen.rs`, runtime | ✅ len params cambiados a i32 |
+| `kl_now()` fix | `klc_runtime/src/io.rs` | ✅ clock_gettime → `SystemTime::now()` (aarch64) |
+| File I/O runtime | `klc_runtime/src/io.rs` | ✅ `open`, `read_str`, `write_str`, `close` |
+| Time runtime | `klc_runtime/src/io.rs` | ✅ `sleep(ms)`, `now() -> i64` |
+| `std/testing.kl` | `std/testing.kl` | ✅ `assert`, `assert_eq`, `assert_str` |
+| String test | `string_test.kl` | ✅ Verificado con `kl run` |
+
+### Sesión 2 — Fase 5: Package Manager
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Manifest struct | `klc_tools/src/package/manifest.rs` | ✅ serde + read/write |
+| Lock file | `klc_tools/src/package/lock.rs` | ✅ serde + read/write |
+| Project helper | `klc_tools/src/package/project.rs` | ✅ `find_project_root()`, source paths |
+| CLI: add/remove/info | `klc_cli/src/main.rs` | ✅ `kl add dep@ver`, `kl remove dep`, `kl info` |
+| CLI: build/run/test (project) | `klc_cli/src/main.rs` | ✅ busca kl.toml, compila src/main.kl |
+| CLI: new | `klc_cli/src/main.rs` | ✅ crea src/ + tests/ |
+| CLI: init | `klc_cli/src/main.rs` | ✅ alias de new |
+
+### Sesión 3 — Fase 5: LSP improvements
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| documentSymbol | `klc_tools/src/lsp.rs` | ✅ SymbolInformation flat |
+| workspace/symbol | `klc_tools/src/lsp.rs` | ✅ cross-document query |
+| signatureHelp | `klc_tools/src/lsp.rs` | ✅ function signature display |
+
+### Sesión 4 — Fase 5: Formatter comment preservation + Span fixes
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Lexer token spans | `klc_frontend/src/lexer.rs` | ✅ `make_token()` usa Position real |
+| Parser AST spans | `klc_frontend/src/parser.rs` | ✅ 60+ nodos propagan spans desde tokens |
+| Formatter comments | `klc_tools/src/formatter.rs` | ✅ `#` antes de decls/stmts via `last_comment_line` |
+| fmt CLI command | `klc_cli/src/main.rs` | ✅ `kl fmt <file.kl>` |
+
+### Sesión 5 — Fase 5: LSP findReferences + codeActions + VS Code extension
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| LSP findReferences | `klc_tools/src/lsp.rs` | ✅ `handle_references` + `find_references_in_source` |
+| LSP code actions | `klc_tools/src/lsp.rs` | ✅ `handle_code_action` (E0009 → create var / import) |
+| Server capabilities | `klc_tools/src/lsp.rs` | ✅ references_provider + code_action_provider |
+| VS Code extension manifest | `vscode-kl/package.json` | ✅ language activation, commands, grammar |
+| Syntax highlighting | `vscode-kl/syntaxes/kl.tmLanguage.json` | ✅ keywords, types, builtins, strings, numbers, operators |
+| Language config | `vscode-kl/language-configuration.json` | ✅ comments, brackets, auto-closing, indentation |
+| LSP client | `vscode-kl/src/extension.ts` | ✅ launches `klc lsp`, commands `kl.run/build/check` |
+| CLI lsp command | `klc_cli/src/main.rs` | ✅ `klc lsp` (ya existía) |
 
 ## Glossary — Abreviaciones Técnicas
 
@@ -14,7 +83,8 @@ KL (Kynera Language) — compiled, statically-typed language combining Python re
 | **LLVM** | Low Level Virtual Machine | Framework de compilación que genera código máquina optimizado |
 | **LSP** | Language Server Protocol | Protocolo de Servidor de Lenguaje — comunicación editor ↔ herramienta de lenguaje |
 | **ABI** | Application Binary Interface | Interfaz Binaria — cómo se llaman funciones y se organizan datos en binario |
-| **GC** | Garbage Collector | Recolector de Basura — gestión automática de memoria |
+| **RAII** | Resource Acquisition Is Initialization | Adquisición de Recursos es Inicialización — memoria se libera al salir del scope |
+| **RC** | Reference Counting | Conteo de Referencias — gestión automática de memoria compartida |
 | **CFG** | Control Flow Graph | Grafo de Flujo de Control — representación de caminos de ejecución |
 | **DCE** | Dead Code Elimination | Eliminación de Código Muerto — optimización que remueve código no ejecutado |
 | **FFI** | Foreign Function Interface | Interfaz de Funciones Externas — llamar código C desde KL |
@@ -26,56 +96,57 @@ KL (Kynera Language) — compiled, statically-typed language combining Python re
 ```
 Source (.kl)               ← tú escribes esto
     ↓
-[Lexer]  (klc_frontend)    ← convierte texto → tokens (palabras, números, operadores)
+[Lexer]  (klc_frontend)    ← convierte texto → tokens (palabras, números, operadores)  ✅
     ↓
-[Parser] (klc_frontend)    ← convierte tokens → AST (árbol de sintaxis)
+[Parser] (klc_frontend)    ← convierte tokens → AST (árbol de sintaxis)                 ✅
     ↓
-[Semantic] (klc_semantic)  ← resuelve símbolos, chequea tipos, valida contracts  ← FASE 2
+[Semantic] (klc_semantic)  ← resuelve símbolos, chequea tipos, valida contracts         ✅
     ↓
-[MIR] (klc_mir)            ← baja AST a IR intermedia, optimiza                   ← FASE 3
+[MIR] (klc_mir)            ← baja AST a IR intermedia, optimiza                         ✅
     ↓
-[Backend] (klc_backend)    ← genera LLVM IR, LLVM optimiza, genera .o             ← FASE 3
+[Backend] (klc_backend)    ← genera LLVM IR, LLVM optimiza, genera .o                   ✅
     ↓
-[Linker] (klc_backend)     ← linkea con runtime + libc → binario nativo           ← FASE 3
+[Linker] (klc_backend)     ← linkea con libc → binario nativo                           ✅
 ```
 
-## Estado de Implementación (Fase 1: Mostly Complete)
+## Estado de Implementación — Archivos Activos
 
-### Fully implemented (9 files, ~3000+ lines)
-| Archivo | Líneas | Qué hace |
-|---------|--------|----------|
-| `klc_core/src/ast.rs` | 1076 | Todos los nodos AST (Program, Decl, Stmt, Expr, Pattern, Type) + pretty-print Display |
-| `klc_core/src/span.rs` | 38 | Posición y Span (línea, columna) para errores |
-| `klc_core/src/types.rs` | 71 | Sistema de tipos semánticos |
-| `klc_core/src/source_map.rs` | 61 | Mapa de código fuente con snippet resolution |
-| `klc_frontend/src/token.rs` | 147 | ~50 tipos de token (operadores, keywords, delimitadores) |
-| `klc_frontend/src/lexer.rs` | 427 | Tokenizador completo con indentación, números hex/bin, strings, chars |
-| `klc_frontend/src/parser.rs` | 812 | Parser recursive descent: decls, stmts, expresiones, 12 niveles de precedencia |
-| `klc_driver/src/pipeline.rs` | 23 | Orchestrador lexer→parser→output |
-| `klc_runtime/src/panic.rs` | 6 | Manejador de pánico |
-
-### Partially implemented (7 files)
-| Archivo | Estado | Lo que falta |
-|---------|--------|-------------|
-| `klc_cli/src/main.rs` | build/run/check/test son stubs, solo parse funciona | Implementar build, run, check, test reales |
-| `klc_core/src/diagnostic.rs` | Diagnostic definido | No hay reporter, ni códigos de error, ni span formatting |
-| `klc_runtime/src/gc.rs` | init/alloc/collect definidos | Sin integración Boehm GC real |
-| `klc_runtime/src/async_.rs` | Executor struct, worker_count | Sin thread pool, sin work-stealing |
-| `klc_runtime/src/task.rs` | Task<T> con id | Sin poll, sin Future impl |
-| `klc_runtime/src/channel.rs` | Channel<T> con id/capacity | Sin send/recv |
-| `klc_runtime/src/error.rs` | KlError struct | Sin Display, sin métodos |
-
-### Stubs (18 files — todo por hacer en fases futuras)
-| Crate | Archivos | Se implementa en |
-|-------|----------|------------------|
-| `klc_semantic/` | type_checker, scope, symbol_table, contracts | **Fase 2** |
-| `klc_mir/` | mir, lower, optimize | **Fase 3** |
-| `klc_backend/` | codegen, linker | **Fase 3** |
-| `klc_tools/` | lsp, formatter, completion | **Fase 5** |
-| `klc_driver/` | build (BuildSystem), config | **Fase 3-4** |
-| `klc_core/` | symbol (SymbolTable) | **Fase 2** |
-| `runtime/` | memory/, async/, collections/, io/ | **Fase 4** |
-| `std/` | core/, math/, json/, io/, net/, time/... | **Fase 4** |
+| Crate | Archivo | Líneas | Estado |
+|-------|---------|--------|--------|
+| `klc_core` | `ast.rs` | 1076 | ✅ completo |
+| `klc_core` | `span.rs` | 38 | ✅ completo |
+| `klc_core` | `types.rs` | 71 | ✅ completo |
+| `klc_core` | `source_map.rs` | 61 | ✅ completo |
+| `klc_core` | `diagnostic.rs` | ~200 | 🔶 le faltan códigos de error |
+| `klc_frontend` | `token.rs` | 147 | ✅ completo |
+| `klc_frontend` | `lexer.rs` | 427 → ~810 | ✅ span tracking, Position real |
+| `klc_frontend` | `parser.rs` | 812 → ~1353 | ✅ span tracking agregado (60+ nodos) |
+| `klc_semantic` | `type_checker.rs` | 1380 | ✅ 47 tests |
+| `klc_semantic` | `symbol_table.rs` | - | ✅ builtins completos |
+| `klc_mir` | `mir.rs` | 312 | ✅ completo |
+| `klc_mir` | `lower.rs` | 814 | ✅ string ops, type inference |
+| `klc_mir` | `optimize.rs` | 180 | ✅ 2 tests |
+| `klc_mir` | `ownership.rs` | - | ✅ RAII inference pass |
+| `klc_backend` | `codegen.rs` | 479 | ✅ LLVM 18.1, inkwell |
+| `klc_backend` | `linker.rs` | - | 🔶 no linkea runtime library |
+| `klc_driver` | `pipeline.rs` | - | 🔶 module resolver no soporta rutas anidadas |
+| `klc_cli` | `main.rs` | - | ✅ build/run/parse/check/mir/fmt |
+| `klc_runtime` | `string.rs` | - | ✅ contains, to_upper, to_lower, trim, replace, concat, input |
+| `klc_runtime` | `io.rs` | - | ✅ open, read_str, write_str, close, sleep, now |
+| `klc_runtime` | `async_.rs` | - | ✅ async runtime |
+| `klc_runtime` | `task.rs` | - | ✅ tasks |
+| `klc_runtime` | `channel.rs` | - | ✅ channels |
+| `klc_runtime` | `error.rs` | - | ✅ error handling |
+| `klc_runtime` | `gc.rs` | - | ❌ obsoleto (reemplazar por RAII) |
+| `klc_tools` | `lsp.rs` | - | ✅ documentSymbol, workspace/symbol, signatureHelp |
+| `klc_tools` | `formatter.rs` | - | ✅ pretty-printer + comment preservation |
+| `klc_tools` | `package/manifest.rs` | - | ✅ serde + read/write |
+| `klc_tools` | `package/lock.rs` | - | ✅ serde + read/write |
+| `klc_tools` | `package/project.rs` | - | ✅ find_project_root, source paths |
+| `std` | `core.kl` | - | ✅ util functions |
+| `std` | `math.kl` | - | ✅ abs, pow, sqrt, gcd |
+| `std` | `io.kl` | - | ✅ I/O wrappers |
+| `std` | `testing.kl` | - | ✅ assert, assert_eq, assert_str |
 
 ## Project Structure
 
@@ -83,95 +154,106 @@ Source (.kl)               ← tú escribes esto
 kl/
 ├── AGENTS.md               ← este archivo
 ├── Cargo.toml              ← workspace Rust raíz
-├── .cargo/config.toml      ← config LLVM (Homebrew)
+├── .cargo/config.toml      ← config LLVM (Linux)
 ├── kl.toml                 ← manifest KL
 │
 ├── crates/                 ← 9 crates del compilador
 │   ├── klc_core/           ← AST, Span, Types, SourceMap, Diagnostics
-│   ├── klc_frontend/       ← Lexer + Parser ← ✅ FASE 1 COMPLETA
-│   ├── klc_semantic/       ← Type checker, symbol resolver ← ⏳ FASE 2
-│   ├── klc_mir/            ← Mid-level IR, optimizaciones ← ⏳ FASE 3
-│   ├── klc_backend/        ← LLVM codegen, linker ← ⏳ FASE 3
+│   ├── klc_frontend/       ← Lexer + Parser ✅
+│   ├── klc_semantic/       ← Type checker, symbol resolver ✅
+│   ├── klc_mir/            ← MIR definition, lowering, optimizations ✅
+│   ├── klc_backend/        ← LLVM codegen (inkwell), linker ✅
 │   ├── klc_driver/         ← Pipeline orchestration
 │   ├── klc_cli/            ← CLI binary (klc)
-│   ├── klc_runtime/        ← GC, async, channels, panic handler ← ⏳ FASE 4
-│   └── klc_tools/          ← LSP, formatter, completion ← ⏳ FASE 5
+│   ├── klc_runtime/        ← RAII runtime, async, channels, panic handler ⏳
+│   └── klc_tools/          ← LSP, formatter, completion ⏳
 │
-├── runtime/                ← KL runtime (Rust) ← ⏳ FASE 4
-├── std/                    ← Standard library (KL) ← ⏳ FASE 4
+├── runtime/                ← KL runtime (Rust) ⏳
+├── std/                    ← Standard library (KL) ⏳
 ├── docs/                   ← 16 specification documents (frozen)
 ├── examples/               ← Example .kl programs
-├── tests/                  ← Test suite ← ⏳ FASE 1 (PENDING)
-├── benchmarks/             ← Benchmarks ← ⏳ FASE 4
+├── tests/                  ← Test suite ⏳
+├── benchmarks/             ← Benchmarks ⏳
 └── tools/                  ← Developer scripts
 ```
 
 ## LLVM Configuration
 
-Homebrew LLVM 22.1.7 en `/opt/homebrew/opt/llvm`. Ver `.cargo/config.toml`.
+LLVM 18.1.3 via apt (`llvm-18-dev` + `libpolly-18-dev` + `libzstd-dev`). Ver `.cargo/config.toml`.
 
 ```bash
-# SIEMPRE usar Homebrew LLVM, NO el de Apple:
-/opt/homebrew/opt/llvm/bin/clang --version
-/opt/homebrew/opt/llvm/bin/llvm-config --version
-
-# NUNCA:
-clang --version           # ← Apple LLVM
-/usr/bin/clang            # ← Apple LLVM
+# Sistema (Linux aarch64):
+/usr/bin/llvm-config --version   # → 18.1.3
 ```
 
 ## Development Commands
 
 ```bash
 cargo build --workspace                    # Compila todo
-cargo run --bin klc -- parse <file.kl>     # Parsear y dump AST (✅ funciona)
-cargo run --bin klc -- build <file.kl>     # Compilar (⏳ stub)
-cargo run --bin klc -- run   <file.kl>     # Compilar y ejecutar (⏳ stub)
-cargo run --bin klc -- check <file.kl>     # Type-check (⏳ stub)
-cargo run --bin klc -- help                 # Ayuda (✅ funciona)
-cargo test --workspace                      # Tests (⏳ sin tests aún)
+cargo run --bin klc -- parse <file.kl>     # Parsear y dump AST ✅
+cargo run --bin klc -- build <file.kl>     # Compilar a binario nativo ✅
+cargo run --bin klc -- run   <file.kl>     # Compilar y ejecutar ✅
+cargo run --bin klc -- check <file.kl>     # Type-check ✅
+cargo run --bin klc -- mir   <file.kl>     # Parsear y dump MIR ✅
+cargo run --bin klc -- fmt   <file.kl>     # Formatear código ✅
+cargo run --bin klc -- help                 # Ayuda ✅
+cargo test --workspace                      # 118 tests, 0 failures ✅
 ```
 
-## Roadmap (desde aquí)
+## Roadmap (actualizado)
 
 ```
-FASE 1 (restante) — Terminar Frontend
-├── [ ] Escribir tests unitarios del lexer
-├── [ ] Escribir tests unitarios del parser
-├── [ ] Escribir tests de integración
-├── [ ] Mejorar mensajes de error (span + código + sugerencia)
-│
-FASE 2 — Semantic Analysis (Q4 2026)
-├── [ ] Symbol table + scope resolver
-├── [ ] Type checker (inferencia Hindley-Milner)
-├── [ ] Module resolver (imports)
-├── [ ] Generic monomorphization
-├── [ ] Contract / error / optional validation
-├── [ ] Diagnostics system
-│   Hito: kl check main.kl
-│
-FASE 3 — Compiler Backend (Q1 2027)
-├── [ ] Integrar inkwell (LLVM bindings)
-├── [ ] MIR: bajar AST → IR + optimizaciones
-├── [ ] LLVM IR generation
-├── [ ] Linkear con runtime
-│   Hito: kl build main.kl → binario nativo
-│
-FASE 4 — Std Library & Runtime (Q2 2027)
-├── [ ] GC real (Boehm)
-├── [ ] Async runtime funcional
-├── [ ] Standard library completa
-│   Hito: kl run hello.kl
-│
-FASE 5 — Tooling (Q3-Q4 2027)
-├── [ ] Package manager
-├── [ ] LSP + formatter
-├── [ ] VS Code extension
-│
+FASE 1-2 (complete) — Frontend + Semantic Analysis ✅
+├── [x] Lexer (69 tests)
+├── [x] Parser (recursive descent, indent-based)
+├── [x] AST (all node types + Display)
+├── [x] Type checker Hindley-Milner (47 tests)
+├── [x] Generics, Contracts, Error types, Optionals
+│   Hito: kl check main.kl → No errors found
+
+FASE 3 — Compiler Backend (✅ Complete — build → binario nativo)
+├── [x] MIR definition (mir.rs — MirValue, MirInst, MirBasicBlock, MirFunction)
+├── [x] AST → MIR lowering (lower.rs — all stmts + exprs)
+├── [x] Optimizer (optimize.rs — constant folding, DCE, block removal)
+├── [x] inkwell integration (LLVM 18.1, opaque pointers)
+├── [x] LLVM codegen (codegen.rs — MIR → LLVM IR via TargetMachine)
+├── [x] Linker (linker.rs — clang-based native linking)
+│   Hito: kl build hello.kl → ./hello → exit 0
+
+FASE 4 — Std Library & Runtime (✅ Complete)
+├── [x] Implementar RAII runtime (destructores, refcount)
+├── [x] RAII ownership inference pass
+├── [x] Async runtime funcional
+├── [x] Standard library básica (core, math, io) in KL
+├── [x] Runtime: string ops (contains, to_upper, to_lower, trim, replace, input)
+├── [x] Runtime: file I/O (open, read_str, write_str, close)
+├── [x] Runtime: time (sleep, now)
+├── [x] std/testing.kl — assert, assert_eq, assert_str
+│   Hito: kl run hello.kl → "Hello, World!"
+
+FASE 5 — Tooling (✅ Complete)
+├── [x] Package manager: manifest module + kl add/remove/info commands
+├── [x] LSP: textDocument/documentSymbol, workspace/symbol, textDocument/signatureHelp
+├── [x] LSP: find references, code actions
+├── [x] Formatter: AST pretty-printer (all nodes)
+├── [x] Formatter: comment preservation (requires AST spans; lexer+parser span tracking fixed)
+├── [x] VS Code extension: syntax highlighting, LSP client, build/run/check commands
+│   Hito: klc fmt, klc lsp, kl run, kl build — todo funcional
+
 FASE 6 — Self-Hosting (2028)
 ├── [ ] Compilador escrito en KL
 │   Hito: kl build klc
 ```
+
+### Phase 4/5 Bugfixes
+- `codegen.rs`: MirValue::Param(id) devolvía 0 siempre → ahora resuelve al parámetro LLVM real
+- `lower.rs`: str() pasaba i32 a kl_i64_to_str (espera i64) → añadido Cast i32→i64
+- `lower.rs`: Stmt::Variable/TypedVariable no emitían Store para literales → arreglado
+- `optimize.rs`: DCE eliminaba Store si solo Return lo usaba → añadido collect_terminator_refs
+- `symbol_table.rs`: println faltaba de builtins → añadido
+- `lexer.rs`: make_token() usaba Span::dummy() → ahora usa posición real (line, column, offset)
+- `parser.rs`: todos los AST nodos usaban Span::dummy() → ahora propagan spans desde tokens
+- `formatter.rs`: conservación de comentarios usando last_comment_line tracking + source_lines
 
 ## Key Design Decisions (frozen)
 
@@ -179,22 +261,22 @@ FASE 6 — Self-Hosting (2028)
 |----------|----------|
 | Bloques | Indentación (4 espacios) |
 | Punto y coma | Ninguno — newline termina statements |
-| Variables | Mutables por defecto (minúsculas) |
-| Constantes | UPPERCASE, inmutables, compile-time |
+| Variables | Inmutables por defecto, `mut` para mutable (lowercase) |
+| Constantes | UPPERCASE, siempre inmutables, compile-time, sin `mut` |
 | Referencia a instancia | `this` (no `self`) |
 | Opcionales | `Option<T>` (no `T?`) |
 | Propagación errores | `?` (exclusivo para errores) |
 | Abstracto | `abs class` / `abs fn` |
 | Visibilidad | Convención de nombres (`_` protected, `__` private) |
 | Excepciones | Ninguna — errores explícitos con `!` y `match` |
-| `let`/`var`/`mut` | Ninguno — mutables por defecto |
+| `let`/`var` | Ninguno — `mut` keyword directo |
 | `{}` para bloques | Ninguno — indentación |
 | Export | Ninguno — visibilidad por naming |
 | String encoding | UTF-8 |
 | Integer overflow | Panic en debug, wrapping en release |
 | Entry point | `fn main(args: [str]) -> i32` en `src/main.kl` |
 
-## Documentación (16 docs, frozen)
+## Documentación (16 docs)
 
 | # | Archivo | Contenido |
 |---|---------|-----------|
@@ -207,7 +289,7 @@ FASE 6 — Self-Hosting (2028)
 | 06 | `module-system.md` | Módulos, packages, imports (918 líneas) |
 | 07 | `standard-library.md` | API de la Std Library (948 líneas) |
 | 08 | `async-runtime.md` | Async/await y concurrencia (669 líneas) |
-| 09 | `memory-model.md` | Memoria y GC (405 líneas) |
+| 09 | `memory-model.md` | Memoria RAII + Compiler-Inferred Ownership |
 | 10 | `compiler-architecture.md` | Pipeline de 9 etapas (296 líneas) |
 | 11 | `project-architecture.md` | Estructura del workspace (304 líneas) |
 | 12 | `package-manager.md` | Package manager CLI (446 líneas) |

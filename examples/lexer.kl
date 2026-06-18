@@ -1,0 +1,5 @@
+fn main():
+    a = "hello"
+    b = "world"
+    c = a + b
+    println(c)

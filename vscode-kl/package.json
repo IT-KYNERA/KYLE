@@ -1,0 +1,49 @@
+{
+  "name": "vscode-kl",
+  "displayName": "KL Language Support",
+  "description": "KL (Kynera Language) — syntax highlighting, LSP, and language support",
+  "version": "0.1.0",
+  "publisher": "kynera",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:kl"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "kl",
+        "aliases": ["KL", "kynera"],
+        "extensions": [".kl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "kl",
+        "scopeName": "source.kl",
+        "path": "./syntaxes/kl.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "kl.run",
+        "title": "KL: Run current file"
+      },
+      {
+        "command": "kl.build",
+        "title": "KL: Build current file"
+      },
+      {
+        "command": "kl.check",
+        "title": "KL: Type-check current file"
+      }
+    ]
+  }
+}

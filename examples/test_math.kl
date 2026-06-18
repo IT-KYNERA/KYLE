@@ -1,0 +1,12 @@
+import math
+
+fn main() -> i32:
+    println(str(absolute(-5)))
+    println(str(pow(2, 10)))
+    x = factorial(5)
+    println(str(x))
+    y = fibonacci(10)
+    println(str(y))
+    z = gcd(12, 8)
+    println(str(z))
+    return 0
