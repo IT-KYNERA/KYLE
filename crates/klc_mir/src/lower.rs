@@ -2,6 +2,17 @@ use std::cell::RefCell;
 use klc_core::ast::*;
 use crate::mir::*;
 
+/// Convert a Literal to (MirType, MirConstant).
+fn literal_to_mir(value: &Literal) -> (MirType, MirConstant) {
+    match value {
+        Literal::Integer(n) => (MirType::I32, MirConstant::I32(*n as i32)),
+        Literal::Float(n) => (MirType::F64, MirConstant::F64(*n)),
+        Literal::String(s) => (MirType::Str, MirConstant::String(s.clone())),
+        Literal::Boolean(b) => (MirType::Bool, MirConstant::Bool(*b)),
+        Literal::None => (MirType::I32, MirConstant::Void),
+    }
+}
+
 /// Return true if the MIR type is an integer type (i1, i8, i16, i32, i64, char, bool).
 fn is_int_type(t: &MirType) -> bool {
     matches!(t, MirType::I1 | MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64 | MirType::Char | MirType::Bool)
@@ -460,7 +471,7 @@ impl Lowerer {
                 // Lower each arm with condition checks (forward order).
                 // Each literal arm: check cond → arm_body, fallthrough → next check.
                 // Wildcard/identifier: always execute (no check).
-                let mut arm_count = s.arms.len();
+                let arm_count = s.arms.len();
                 for (i, arm) in s.arms.iter().enumerate() {
                     let arm_label = ctx.fresh_block();
                     let is_last = i == arm_count - 1;

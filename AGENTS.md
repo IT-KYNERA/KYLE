@@ -15,7 +15,7 @@ LSP:            document symbols, workspace symbols, signature help,
                 find references, code actions ✅
 Formatter:      pretty-printer + comment preservation ✅
 VS Code:        extension with syntax highlighting, LSP client, commands ✅
-Tests:          118 tests, 0 failures ✅
+Tests:          84 tests, 0 failures ✅
 ```
 
 ## Session Log
@@ -122,6 +122,14 @@ Tests:          118 tests, 0 failures ✅
 | Fix ownership: Load+Call para kl_release | `klc_mir/src/ownership.rs` | ✅ en vez de `kl_release(MirValue::Local(id))` (usa last_value_map), emite `Load { dest: tmp, src: id }` + `Call kl_release(tmp)` para leer el alloca directamente |
 | Lexer sin crash | `examples/lexer.kl` | ✅ cleanup sin errores (15 frees exitosos, 0 punteros corruptos) |
 | Tests | - | ✅ 118 tests, 0 failures |
+
+### Sesión 10 — Fase 6: Parser en KL + Fix parse_block/parse_if (blank lines entre elif)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Fix: `parse_block` single-line body | `klc_frontend/src/parser.rs` | ✅ al detectar que no hay Newline inicial (`single_line`), para tras 1 statement y consume trailing Newlines |
+| Fix: `parse_if` trailing Newlines | `klc_frontend/src/parser.rs` | ✅ consume Newlines entre if-body y elif (soporta blank lines) |
+| Parser en KL | `examples/parser.kl` | ✅ 1511 líneas, AST recursivo con `AstNode`, pasa Rust frontend test |
+| Tests | - | ✅ 84 tests, 0 failures |
 
 ## Glossary — Abreviaciones Técnicas
 
@@ -247,7 +255,7 @@ cargo run --bin klc -- check <file.kl>     # Type-check ✅
 cargo run --bin klc -- mir   <file.kl>     # Parsear y dump MIR ✅
 cargo run --bin klc -- fmt   <file.kl>     # Formatear código ✅
 cargo run --bin klc -- help                 # Ayuda ✅
-cargo test --workspace                      # 118 tests, 0 failures ✅
+cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_runtime -p klc_tools  # 84 tests, 0 failures ✅
 ```
 
 ## Roadmap (actualizado)
@@ -298,7 +306,7 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 ├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
 ├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
 ├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-├── [ ] Parser escrito en KL
+├── [x] Parser escrito en KL
 ├── [ ] Compilador completo en KL
 │   Hito: kl build klc
 ```
@@ -312,6 +320,8 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 - `lexer.rs`: make_token() usaba Span::dummy() → ahora usa posición real (line, column, offset)
 - `parser.rs`: todos los AST nodos usaban Span::dummy() → ahora propagan spans desde tokens
 - `formatter.rs`: conservación de comentarios usando last_comment_line tracking + source_lines
+- `parser.rs`: `parse_block` ahora para tras 1 statement si no hay Newline (single-line bodies)
+- `parser.rs`: `parse_if` consume Newlines entre if-body y elif/else (blank lines entre branches)
 
 ## Key Design Decisions (frozen)
 

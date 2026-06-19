@@ -666,7 +666,8 @@ impl Parser {
 
     fn parse_block(&mut self) -> Result<Block, String> {
         let start = self.pos;
-        // Consume the Newline and Indent that precede every indented block.
+        // Single-line body: `: stmt` (no Newline/Indent) — parse one statement and stop.
+        let single_line = !self.at(TokenKind::Newline);
         if self.at(TokenKind::Newline) { self.advance(); }
         if self.at(TokenKind::Indent) { self.advance(); }
         let mut statements = Vec::new();
@@ -676,6 +677,12 @@ impl Parser {
             // Newlines between statements are ignored.
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             statements.push(self.parse_stmt()?);
+            if single_line { break; }
+        }
+        if single_line {
+            while self.at(TokenKind::Newline) {
+                self.advance();
+            }
         }
         Ok(Block { statements, span: self.span_from(start) })
     }
@@ -755,7 +762,7 @@ impl Parser {
         }
         // Variable declaration or binding-if: `ident = expr`
         // Disambiguate by checking if the next token after the expr is ':'
-        // (binding-if) or something else (expression statement).
+        // (binding-if) or something else (expression statement with assignment).
         if self.at_identifier() && self.peek_equals() {
             let start = self.pos;
             let name = self.eat_identifier();
@@ -790,6 +797,10 @@ impl Parser {
         let condition = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
         let body = self.parse_block()?;
+        // Consume newlines between if/elif body and next elif/else (supports blank lines)
+        while self.at(TokenKind::Newline) {
+            self.advance();
+        }
         let mut elif_branches = Vec::new();
         let mut else_branch = None;
         while self.at(TokenKind::Elif) {
@@ -798,6 +809,9 @@ impl Parser {
             let cond = self.parse_expr()?;
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
+            while self.at(TokenKind::Newline) {
+                self.advance();
+            }
             elif_branches.push(ElifBranch {
                 condition: Box::new(cond),
                 body,
@@ -1365,5 +1379,13 @@ fn test():\n\
     fn test_user_example() {
         let source = include_str!("../../../examples/user.kl");
         assert!(parse(source).is_ok(), "user.kl should parse");
+    }
+
+    #[test]
+    fn test_parser_example() {
+        let source = include_str!("../../../examples/parser.kl");
+        if let Err(e) = parse(source) {
+            panic!("parser.kl parse error: {}", e);
+        }
     }
 }

@@ -1,174 +1,283 @@
-// klc_semantic::scope — Scope resolution and binding management
-//
-// Manages nested scopes with visibility rules based on naming conventions:
-//   name       → public (visible everywhere)
-//   _name      → protected (visible in module hierarchy)
-//   __name     → private (visible only in current module)
+use klc_core::ast::*;
+use klc_core::types::Type;
+use klc_core::diagnostic::{Diagnostic, ErrorCode, DiagnosticReporter};
+use crate::symbol_table::{SymbolTable, Symbol, SymKind};
 
-use std::collections::HashMap;
-use klc_core::ast::AstType;
-use klc_core::span::Span;
-use klc_core::symbol::Symbol;
-use klc_core::types::Type as KlType;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Visibility {
-    Public,
-    Protected,
-    Private,
+pub struct ScopeResolver {
+    pub symbols: SymbolTable,
+    pub reporter: DiagnosticReporter,
 }
 
-impl Visibility {
-    pub fn from_name(name: &str) -> Self {
-        if name.starts_with("__") {
-            Visibility::Private
-        } else if name.starts_with('_') {
-            Visibility::Protected
-        } else {
-            Visibility::Public
+impl ScopeResolver {
+    pub fn new(reporter: DiagnosticReporter) -> Self {
+        Self { symbols: SymbolTable::new(), reporter }
+    }
+
+    pub fn resolve(&mut self, program: &Program) {
+        for decl in &program.declarations {
+            self.register_decl(decl);
+        }
+        for decl in &program.declarations {
+            self.resolve_decl(decl);
         }
     }
 
-    pub fn is_accessible_from(&self, _from_visibility: &Visibility) -> bool {
-        match self {
-            Visibility::Public => true,
-            Visibility::Protected => true,
-            Visibility::Private => true,
+    fn register_decl(&mut self, decl: &Decl) {
+        let (name, kind) = match decl {
+            Decl::Function(f) => (f.name.clone(), SymKind::Function(f.clone())),
+            Decl::Class(c) => (c.name.clone(), SymKind::Class(c.clone())),
+            Decl::AbstractClass(c) => (c.name.clone(), SymKind::Class(ClassDecl {
+                name: c.name.clone(), type_params: c.type_params.clone(),
+                parent: c.parent.clone(), contracts: c.contracts.clone(),
+                members: c.members.clone(), span: c.span,
+            })),
+            Decl::Struct(s) => (s.name.clone(), SymKind::Struct(s.clone())),
+            Decl::Enum(e) => (e.name.clone(), SymKind::Enum(e.clone())),
+            Decl::Contract(c) => (c.name.clone(), SymKind::Contract(c.clone())),
+            Decl::TypeAlias(t) => (t.name.clone(), SymKind::TypeAlias(t.clone())),
+            Decl::Constant(_) => return,
+            Decl::Import(_) | Decl::FromImport(_) | Decl::Variable(_) => return,
+        };
+        let sym = Symbol::new(name.clone(), kind);
+        if let Err(e) = self.symbols.insert(name, sym) {
+            self.reporter.report(Diagnostic::error(ErrorCode::E0001, e));
         }
     }
-}
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum BindingKind {
-    Variable,
-    Constant,
-    Function,
-    Class,
-    AbstractClass,
-    Struct,
-    Enum,
-    Contract,
-    TypeAlias,
-    Parameter,
-    Field,
-    Method,
-    Constructor,
-    Property,
-    Module,
-    TypeParam,
-}
-
-#[derive(Clone, Debug)]
-pub struct Binding {
-    pub name: String,
-    pub symbol: Symbol,
-    pub kind: BindingKind,
-    pub type_: Option<AstType>,
-    pub resolved_type: Option<KlType>,
-    pub visibility: Visibility,
-    pub is_mutable: bool,
-    pub defined_at: Span,
-}
-
-#[derive(Clone, Debug)]
-pub struct Scope {
-    pub parent: Option<usize>,
-    pub children: Vec<usize>,
-    pub bindings: HashMap<String, Binding>,
-    pub depth: usize,
-    pub scope_id: usize,
-}
-
-pub struct ScopeTree {
-    scopes: Vec<Scope>,
-    next_scope_id: usize,
-}
-
-impl ScopeTree {
-    pub fn new() -> Self {
-        let mut tree = Self {
-            scopes: Vec::new(),
-            next_scope_id: 0,
-        };
-        tree.create_scope(None);
-        tree
-    }
-
-    pub fn create_scope(&mut self, parent: Option<usize>) -> usize {
-        let id = self.next_scope_id;
-        self.next_scope_id += 1;
-        let depth = parent.map_or(0, |p| {
-            self.scopes.get(p).map_or(0, |s| s.depth + 1)
-        });
-        let scope = Scope {
-            parent,
-            children: Vec::new(),
-            bindings: HashMap::new(),
-            depth,
-            scope_id: id,
-        };
-        self.scopes.push(scope);
-        if let Some(pid) = parent {
-            if let Some(parent_scope) = self.scopes.get_mut(pid) {
-                parent_scope.children.push(id);
+    fn resolve_decl(&mut self, decl: &Decl) {
+        match decl {
+            Decl::Function(f) => self.resolve_function(f),
+            Decl::Variable(v) => self.resolve_variable(v),
+            Decl::Constant(_) => {}
+            Decl::Class(c) => self.resolve_class_body(c),
+            Decl::AbstractClass(c) => {
+                let cd = ClassDecl {
+                    name: c.name.clone(), type_params: c.type_params.clone(),
+                    parent: c.parent.clone(), contracts: c.contracts.clone(),
+                    members: c.members.clone(), span: c.span,
+                };
+                self.resolve_class_body(&cd);
             }
+            Decl::Struct(_) | Decl::Enum(_) | Decl::Contract(_) | Decl::TypeAlias(_) => {}
+            Decl::Import(_) | Decl::FromImport(_) => {}
         }
-        id
     }
 
-    pub fn get_scope(&self, id: usize) -> Option<&Scope> {
-        self.scopes.get(id)
-    }
-
-    pub fn get_scope_mut(&mut self, id: usize) -> Option<&mut Scope> {
-        self.scopes.get_mut(id)
-    }
-
-    pub fn define(&mut self, scope_id: usize, binding: Binding) -> Result<(), String> {
-        let scope = self.scopes.get_mut(scope_id)
-            .ok_or_else(|| "invalid scope".to_string())?;
-        if scope.bindings.contains_key(&binding.name) {
-            return Err(format!("'{}' already defined in this scope", binding.name));
+    fn resolve_function(&mut self, f: &FunctionDecl) {
+        self.symbols.push_scope();
+        for param in &f.params {
+            let ty = self.resolve_ast_type(&param.type_);
+            let sym = Symbol::new_var(param.name.clone(), Some(ty), false);
+            let _ = self.symbols.insert(param.name.clone(), sym);
         }
-        scope.bindings.insert(binding.name.clone(), binding);
-        Ok(())
+        if let Some(body) = &f.body {
+            self.resolve_block(body);
+        }
+        self.symbols.pop_scope();
     }
 
-    pub fn lookup(&self, scope_id: usize, name: &str) -> Option<(usize, &Binding)> {
-        let mut current = Some(scope_id);
-        while let Some(sid) = current {
-            if let Some(scope) = self.scopes.get(sid) {
-                if let Some(binding) = scope.bindings.get(name) {
-                    return Some((sid, binding));
+    fn resolve_variable(&mut self, v: &VariableDecl) {
+        let ty = v.type_.as_ref().map(|t| self.resolve_ast_type(t));
+        let sym = Symbol::new_var(v.name.clone(), ty, v.is_mutable);
+        if let Err(e) = self.symbols.insert(v.name.clone(), sym) {
+            self.reporter.report(Diagnostic::error(ErrorCode::E0009, e));
+        }
+    }
+
+    fn resolve_class_body(&mut self, c: &ClassDecl) {
+        self.symbols.push_scope();
+        let _ = self.symbols.insert("this".to_string(),
+            Symbol::new_var("this".to_string(), Some(Type::Named(c.name.clone())), false));
+        for member in &c.members {
+            match member {
+                ClassMember::Field(f) => {
+                    let ty = self.resolve_ast_type(&f.type_);
+                    let _ = self.symbols.insert(f.name.clone(),
+                        Symbol::new_var(f.name.clone(), Some(ty), true));
                 }
-                current = scope.parent;
-            } else {
-                break;
+                ClassMember::Method(m) => self.resolve_function(m),
+                ClassMember::Constructor(con) => {
+                    self.symbols.push_scope();
+                    for param in &con.params {
+                        let ty = self.resolve_ast_type(&param.type_);
+                        let _ = self.symbols.insert(param.name.clone(),
+                            Symbol::new_var(param.name.clone(), Some(ty), false));
+                    }
+                    self.resolve_block(&con.body);
+                    self.symbols.pop_scope();
+                }
+                ClassMember::Property(_) => {}
             }
         }
-        None
+        self.symbols.pop_scope();
     }
 
-    pub fn lookup_local(&self, scope_id: usize, name: &str) -> Option<&Binding> {
-        self.scopes.get(scope_id)
-            .and_then(|s| s.bindings.get(name))
+    fn resolve_block(&mut self, block: &Block) {
+        for stmt in &block.statements {
+            self.resolve_stmt(stmt);
+        }
     }
 
-    pub fn lookup_in_scope(&self, scope_id: usize, name: &str) -> Option<&Binding> {
-        self.lookup(scope_id, name).map(|(_, b)| b)
+    fn resolve_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Variable(v) => self.resolve_variable(v),
+            Stmt::TypedVariable(v) => self.resolve_variable(v),
+            Stmt::Constant(_) => {}
+            Stmt::Expression(e) => { self.resolve_expr(e); }
+            Stmt::Return(e) => { if let Some(e) = e { self.resolve_expr(e); } }
+            Stmt::Break(e) => { if let Some(e) = e { self.resolve_expr(e); } }
+            Stmt::If(s) => {
+                self.resolve_expr(&s.condition);
+                self.resolve_block(&s.body);
+                for el in &s.elif_branches {
+                    self.resolve_expr(&el.condition);
+                    self.resolve_block(&el.body);
+                }
+                if let Some(el) = &s.else_branch { self.resolve_block(el); }
+            }
+            Stmt::BindingIf(b) => {
+                self.resolve_expr(&b.value);
+                self.symbols.push_scope();
+                let _ = self.symbols.insert(b.name.clone(),
+                    Symbol::new_var(b.name.clone(), None, false));
+                self.resolve_block(&b.body);
+                self.symbols.pop_scope();
+                if let Some(el) = &b.else_branch { self.resolve_block(el); }
+            }
+            Stmt::While(w) => {
+                self.resolve_expr(&w.condition);
+                self.resolve_block(&w.body);
+                if let Some(el) = &w.else_branch { self.resolve_block(el); }
+            }
+            Stmt::WhileBind(w) => {
+                self.resolve_expr(&w.iterable);
+                self.symbols.push_scope();
+                let _ = self.symbols.insert(w.name.clone(),
+                    Symbol::new_var(w.name.clone(), None, false));
+                self.resolve_block(&w.body);
+                self.symbols.pop_scope();
+            }
+            Stmt::For(f) => {
+                self.resolve_expr(&f.iterable);
+                self.symbols.push_scope();
+                let _ = self.symbols.insert(f.variable.clone(),
+                    Symbol::new_var(f.variable.clone(), None, false));
+                self.resolve_block(&f.body);
+                self.symbols.pop_scope();
+                if let Some(el) = &f.else_branch { self.resolve_block(el); }
+            }
+            Stmt::Match(m) => {
+                self.resolve_expr(&m.expression);
+                for arm in &m.arms {
+                    self.symbols.push_scope();
+                    if let Pattern::Identifier { name, .. } = &arm.pattern {
+                        let _ = self.symbols.insert(name.clone(),
+                            Symbol::new_var(name.clone(), None, false));
+                    }
+                    if let Some(g) = &arm.guard { self.resolve_expr(g); }
+                    self.resolve_block(&arm.body);
+                    self.symbols.pop_scope();
+                }
+            }
+            Stmt::Defer(d) => { self.resolve_expr(&d.call); }
+            Stmt::Guard(g) => {
+                self.resolve_expr(&g.condition);
+                self.resolve_block(&g.body);
+            }
+            Stmt::Unsafe(u) => { self.resolve_block(&u.body); }
+        }
     }
 
-    pub fn enter_child(&mut self, parent_id: usize) -> usize {
-        self.create_scope(Some(parent_id))
+    fn resolve_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Literal { .. } => {}
+            Expr::Identifier { name, span } => {
+                if self.symbols.lookup(name).is_none() {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0009, format!("undefined symbol '{}'", name))
+                            .with_span(*span)
+                    );
+                }
+            }
+            Expr::Binary { left, right, .. } => {
+                self.resolve_expr(left);
+                self.resolve_expr(right);
+            }
+            Expr::Unary { operand, .. } => self.resolve_expr(operand),
+            Expr::Assignment { target, value, .. } => {
+                if let Expr::Identifier { name, span } = target.as_ref() {
+                    if let Some(sym) = self.symbols.lookup(name) {
+                        match &sym.kind {
+                            SymKind::Variable { is_mutable, .. } if !*is_mutable => {
+                                self.reporter.report(
+                                    Diagnostic::error(ErrorCode::E0007, format!("cannot modify immutable variable '{}'", name))
+                                        .with_span(*span)
+                                );
+                            }
+                            SymKind::Constant(_) => {
+                                self.reporter.report(
+                                    Diagnostic::error(ErrorCode::E0007, format!("cannot modify constant '{}'", name))
+                                        .with_span(*span)
+                                );
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        // First use of a name in assignment: auto-declare as immutable variable.
+                        let _ = self.symbols.insert(name.clone(), Symbol::new_var(name.clone(), None, false));
+                    }
+                }
+                self.resolve_expr(target);
+                self.resolve_expr(value);
+            }
+            Expr::FunctionCall { target, arguments, .. } => {
+                self.resolve_expr(target);
+                for arg in arguments { self.resolve_expr(arg); }
+            }
+            Expr::PropertyAccess { object, .. } => self.resolve_expr(object),
+            Expr::List { elements, .. } => {
+                for e in elements { self.resolve_expr(e); }
+            }
+            Expr::Dictionary { entries, .. } => {
+                for (_, v) in entries { self.resolve_expr(v); }
+            }
+            Expr::Tuple { elements, .. } => {
+                for e in elements { self.resolve_expr(e); }
+            }
+            Expr::Closure { body, .. } => {
+                self.resolve_expr(body);
+            }
+            Expr::Await { expression, .. } => self.resolve_expr(expression),
+            Expr::Async { expression, .. } => self.resolve_expr(expression),
+            Expr::Spread { expression, .. } => self.resolve_expr(expression),
+            Expr::Index { target, index, .. } => {
+                self.resolve_expr(target);
+                self.resolve_expr(index);
+            }
+            Expr::RangeSlice { target, start, end, .. } => {
+                self.resolve_expr(target);
+                if let Some(s) = start { self.resolve_expr(s); }
+                if let Some(e) = end { self.resolve_expr(e); }
+            }
+            Expr::OptionalChain { target, .. } => self.resolve_expr(target),
+            Expr::Loop { body, .. } => self.resolve_block(body),
+            Expr::ErrorProp { expression, .. } => self.resolve_expr(expression),
+        }
     }
 
-    pub fn root_scope(&self) -> usize {
-        0
-    }
-}
-
-impl Default for ScopeTree {
-    fn default() -> Self {
-        Self::new()
+    pub fn resolve_ast_type(&self, ast: &AstType) -> Type {
+        match ast {
+            AstType::Primitive { name, .. } => {
+                self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
+            }
+            AstType::User { name, .. } => {
+                self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
+            }
+            AstType::Generic { name, args, .. } => {
+                Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect())
+            }
+            AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
+            AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
+        }
     }
 }

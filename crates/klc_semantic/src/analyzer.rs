@@ -9,6 +9,7 @@
 use klc_core::ast::{Program, Decl};
 use klc_core::source_map::SourceMap;
 use klc_core::diagnostic::DiagnosticReporter;
+
 use crate::type_checker::TypeChecker;
 use crate::contracts::ContractChecker;
 

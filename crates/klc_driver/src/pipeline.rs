@@ -141,7 +141,11 @@ impl Pipeline {
 fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), String> {
     Target::initialize_aarch64(&InitializationConfig::default());
 
-    let triple = TargetTriple::create("aarch64-unknown-linux-gnu");
+    let triple = TargetTriple::create(if cfg!(target_os = "macos") {
+        "arm64-apple-macosx"
+    } else {
+        "aarch64-unknown-linux-gnu"
+    });
     let target = Target::from_triple(&triple)
         .map_err(|e| format!("Failed to get target: {}", e))?;
     let target_machine = target.create_target_machine(

@@ -1,0 +1,1511 @@
+# Parser for KL — Self-Hosting Phase 6
+# Recursive descent parser that produces a printable AST
+
+# ============================================================
+# Token types
+# ============================================================
+TOK_EOF = 0
+TOK_NEWLINE = 1
+TOK_INDENT = 2
+TOK_DEDENT = 3
+TOK_IDENTIFIER = 4
+TOK_NUMBER = 5
+TOK_STRING = 6
+TOK_KEYWORD = 7
+TOK_OPERATOR = 8
+TOK_LPAREN = 9
+TOK_RPAREN = 10
+TOK_LBRACKET = 11
+TOK_RBRACKET = 12
+TOK_COMMA = 13
+TOK_COLON = 14
+TOK_DOT = 15
+TOK_ARROW = 16
+TOK_FAT_ARROW = 17
+TOK_BOOL = 18
+TOK_CHAR = 19
+
+# ============================================================
+# AST node types
+# ============================================================
+ND_PROGRAM = 0
+ND_FN_DECL = 1
+ND_VAR_DECL = 2
+ND_CONST_DECL = 3
+ND_IF = 4
+ND_WHILE = 5
+ND_FOR = 6
+ND_MATCH = 7
+ND_RETURN = 8
+ND_BREAK = 9
+ND_EXPR_STMT = 10
+ND_BINARY = 11
+ND_UNARY = 12
+ND_LITERAL = 13
+ND_IDENTIFIER = 14
+ND_CALL = 15
+ND_ASSIGN = 16
+ND_LIST = 17
+ND_INDEX = 18
+ND_PROPERTY = 19
+ND_BLOCK = 20
+ND_ELIF = 21
+ND_MATCH_ARM = 22
+ND_PARAM = 23
+ND_STRUCT_DECL = 24
+ND_CLASS_DECL = 25
+ND_IMPORT = 26
+ND_TYPE_ANNOT = 27
+ND_CLASS_BODY = 28
+ND_FIELD = 29
+ND_METHOD = 30
+ND_CONSTRUCTOR = 31
+ND_ENUM_DECL = 32
+ND_CONTRACT_DECL = 33
+ND_FROM_IMPORT = 34
+ND_MUT_DECL = 35
+ND_TYPED_VAR = 36
+ND_NONE_STMT = 37
+ND_DEFER = 38
+ND_GUARD = 39
+ND_UNSAFE = 40
+ND_LOOP = 41
+ND_BINDING_IF = 42
+ND_WHILE_BIND = 43
+ND_DICT = 44
+ND_TUPLE = 45
+ND_CLOSURE = 46
+ND_AWAIT = 47
+ND_ASYNC = 48
+ND_SPREAD = 49
+ND_RANGE_SLICE = 50
+ND_OPT_CHAIN = 51
+ND_ERROR_PROP = 52
+ND_COMPOUND_ASSIGN = 53
+ND_TYPE_ALIAS = 54
+
+# ============================================================
+# Token struct
+# ============================================================
+struct Token:
+    kind: i32
+    value: str
+    line: i32
+    col: i32
+
+# Helper to create a token
+fn make_token(kind: i32, value: str, line: i32, col: i32) -> Token:
+    mut tok: Token
+    tok.kind = kind
+    tok.value = value
+    tok.line = line
+    tok.col = col
+    tok
+
+# ============================================================
+# AST Node struct
+# ============================================================
+struct AstNode:
+    kind: i32
+    value: str
+    children: list<AstNode>
+    line: i32
+    col: i32
+
+fn make_node(kind: i32, value: str, children: list<AstNode>, line: i32, col: i32) -> AstNode:
+    mut node: AstNode
+    node.kind = kind
+    node.value = value
+    node.children = children
+    node.line = line
+    node.col = col
+    node
+
+fn make_leaf(kind: i32, value: str, line: i32, col: i32) -> AstNode:
+    mut node: AstNode
+    node.kind = kind
+    node.value = value
+    node.children = []
+    node.line = line
+    node.col = col
+    node
+
+# ============================================================
+# Keywords
+# ============================================================
+fn is_keyword(s: str) -> i32:
+    if s == "fn": 1
+    elif s == "return": 1
+    elif s == "if": 1
+    elif s == "elif": 1
+    elif s == "else": 1
+    elif s == "while": 1
+    elif s == "for": 1
+    elif s == "in": 1
+    elif s == "match": 1
+    elif s == "break": 1
+    elif s == "mut": 1
+    elif s == "const": 1
+    elif s == "import": 1
+    elif s == "from": 1
+    elif s == "as": 1
+    elif s == "struct": 1
+    elif s == "class": 1
+    elif s == "enum": 1
+    elif s == "contract": 1
+    elif s == "abs": 1
+    elif s == "type": 1
+    elif s == "defer": 1
+    elif s == "guard": 1
+    elif s == "unsafe": 1
+    elif s == "async": 1
+    elif s == "await": 1
+    elif s == "loop": 1
+    else: 0
+
+# ============================================================
+# Tokenizer
+# ============================================================
+fn tokenize(source: str) -> list<Token>:
+    tokens = []
+    len_s = len(source)
+    mut line = 1
+    mut col = 1
+    mut i = 0
+
+    while i < len_s:
+        c = ord(char_at(source, i))
+        start_col = col
+
+        # Newline
+        if c == 10:
+            t = make_token(TOK_NEWLINE, "\\n", line, col)
+            tokens.add(t)
+            line = line + 1
+            col = 1
+            i = i + 1
+
+        # Whitespace (space, tab, CR)
+        elif c == 32 || c == 9 || c == 13:
+            if c == 9:
+                col = col + 4
+            else:
+                col = col + 1
+            i = i + 1
+
+        # Line comment
+        elif c == 35:
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 10:
+                    break
+                i = i + 1
+                col = col + 1
+
+        # Identifier or keyword
+        elif is_alpha(char_at(source, i)):
+            start = i
+            while i < len_s && is_alnum(char_at(source, i)):
+                i = i + 1
+                col = col + 1
+            word = substr(source, start, i - start)
+            if is_keyword(word) == 1:
+                t = make_token(TOK_KEYWORD, word, line, start_col)
+            elif word == "true" || word == "false":
+                t = make_token(TOK_BOOL, word, line, start_col)
+            elif word == "none":
+                t = make_token(TOK_KEYWORD, word, line, start_col)
+            else:
+                t = make_token(TOK_IDENTIFIER, word, line, start_col)
+            tokens.add(t)
+
+        # Number
+        elif is_digit(char_at(source, i)):
+            start = i
+            while i < len_s && is_digit(char_at(source, i)):
+                i = i + 1
+                col = col + 1
+            num = substr(source, start, i - start)
+            t = make_token(TOK_NUMBER, num, line, start_col)
+            tokens.add(t)
+
+        # String literal
+        elif c == 34:
+            start = i
+            i = i + 1
+            col = col + 1
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 34:
+                    i = i + 1
+                    col = col + 1
+                    break
+                elif c2 == 92:
+                    i = i + 2
+                    col = col + 2
+                else:
+                    i = i + 1
+                    col = col + 1
+            sval = substr(source, start, i - start)
+            t = make_token(TOK_STRING, sval, line, start_col)
+            tokens.add(t)
+
+        # Char literal
+        elif c == 39:
+            start = i
+            i = i + 2
+            col = col + 2
+            if i < len_s && ord(char_at(source, i)) == 39:
+                i = i + 1
+                col = col + 1
+            cval = substr(source, start, i - start)
+            t = make_token(TOK_CHAR, cval, line, start_col)
+            tokens.add(t)
+
+        # Multi-char operators
+        elif c == 61:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "==", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_OPERATOR, "=>", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "=", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 33:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "!=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "!", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 60:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "<=", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 60:
+                t = make_token(TOK_OPERATOR, "<<", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "<", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 62:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, ">=", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_OPERATOR, ">>", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, ">", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 38:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 38:
+                t = make_token(TOK_OPERATOR, "&&", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "&", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 124:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 124:
+                t = make_token(TOK_OPERATOR, "||", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "|", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 43:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "+%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "+=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "+", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 45:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_ARROW, "->", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "-%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "-=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "-", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 42:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "*%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "*=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "*", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 47:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "/=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "/", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 37:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "%=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "%", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 94:
+            t = make_token(TOK_OPERATOR, "^", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 126:
+            t = make_token(TOK_OPERATOR, "~", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 63 && i + 1 < len_s && ord(char_at(source, i + 1)) == 46:
+            t = make_token(TOK_OPERATOR, "?.", line, col)
+            tokens.add(t)
+            col = col + 2
+            i = i + 2
+        elif c == 63:
+            t = make_token(TOK_OPERATOR, "?", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+
+        # Single-char tokens
+        elif c == 40:
+            t = make_token(TOK_LPAREN, "(", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 41:
+            t = make_token(TOK_RPAREN, ")", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 91:
+            t = make_token(TOK_LBRACKET, "[", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 93:
+            t = make_token(TOK_RBRACKET, "]", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 44:
+            t = make_token(TOK_COMMA, ",", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 58:
+            t = make_token(TOK_COLON, ":", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 46:
+            t = make_token(TOK_DOT, ".", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        else:
+            t = make_token(TOK_OPERATOR, str(c), line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+
+    t = make_token(TOK_EOF, "EOF", line, col)
+    tokens.add(t)
+    tokens
+
+# ============================================================
+# Parser
+# ============================================================
+struct Parser:
+    tokens: list<Token>
+    pos: i32
+    len: i32
+
+fn new_parser(tokens: list<Token>) -> Parser:
+    mut p: Parser
+    p.tokens = tokens
+    p.pos = 0
+    p.len = len(tokens)
+    p
+
+fn peek(p: Parser) -> Token:
+    if p.pos < p.len:
+        p.tokens[p.pos]
+    else:
+        make_token(TOK_EOF, "EOF", 0, 0)
+
+fn peek_kind(p: Parser) -> i32:
+    t = peek(p)
+    t.kind
+
+fn peek_value(p: Parser) -> str:
+    t = peek(p)
+    t.value
+
+fn advance(p: Parser):
+    if p.pos < p.len:
+        p.pos = p.pos + 1
+
+fn expect(p: Parser, kind: i32) -> Token:
+    t = peek(p)
+    if t.kind == kind:
+        advance(p)
+        t
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected kind=" + str(kind) + " got kind=" + str(t.kind))
+        make_token(TOK_EOF, "ERROR", t.line, t.col)
+
+fn expect_keyword(p: Parser, kw: str) -> Token:
+    t = peek(p)
+    if t.kind == TOK_KEYWORD && t.value == kw:
+        advance(p)
+        t
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected '" + kw + "' got '" + t.value + "'")
+        make_token(TOK_EOF, "ERROR", t.line, t.col)
+
+fn expect_identifier(p: Parser) -> Token:
+    t = peek(p)
+    if t.kind == TOK_IDENTIFIER:
+        advance(p)
+        t
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected identifier got '" + t.value + "'")
+        make_token(TOK_EOF, "ERROR", t.line, t.col)
+
+# Check if current token starts an expression
+fn is_expr_start(p: Parser) -> i32:
+    k = peek_kind(p)
+    if k == TOK_NUMBER: 1
+    elif k == TOK_STRING: 1
+    elif k == TOK_BOOL: 1
+    elif k == TOK_IDENTIFIER: 1
+    elif k == TOK_LPAREN: 1
+    elif k == TOK_LBRACKET: 1
+    elif k == TOK_CHAR: 1
+    elif k == TOK_KEYWORD && peek_value(p) == "true": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "false": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "none": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "async": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "await": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "loop": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "match": 1
+    elif k == TOK_KEYWORD && peek_value(p) == "spread": 1
+    elif k == TOK_OPERATOR && (peek_value(p) == "-" || peek_value(p) == "!" || peek_value(p) == "~"): 1
+    else: 0
+
+# Operator precedence
+fn op_precedence(op: str) -> i32:
+    if op == "||": 1
+    elif op == "&&": 2
+    elif op == "|": 3
+    elif op == "^": 4
+    elif op == "&": 5
+    elif op == "==" || op == "!=": 6
+    elif op == "<" || op == ">" || op == "<=" || op == ">=": 7
+    elif op == "<<" || op == ">>": 8
+    elif op == "+" || op == "-" || op == "+%" || op == "-%": 9
+    elif op == "*" || op == "/" || op == "%" || op == "*%": 10
+    else: 0
+
+fn is_binary_op(op: str) -> i32:
+    if op == "+" || op == "-" || op == "*" || op == "/" || op == "%": 1
+    elif op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=": 1
+    elif op == "&&" || op == "||": 1
+    elif op == "&" || op == "|" || op == "^": 1
+    elif op == "<<" || op == ">>": 1
+    elif op == "+%" || op == "-%" || op == "*%": 1
+    else: 0
+
+# ============================================================
+# Parsing functions
+# ============================================================
+fn parse_program(p: Parser) -> AstNode:
+    mut decls = []
+    while peek_kind(p) != TOK_EOF:
+        d = parse_decl(p)
+        decls.add(d)
+        while peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+    make_node(ND_PROGRAM, "program", decls, 1, 1)
+
+fn parse_decl(p: Parser) -> AstNode:
+    # Skip newlines before declarations
+    while peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+
+    k = peek_kind(p)
+    v = peek_value(p)
+
+    if k == TOK_KEYWORD:
+        if v == "fn":
+            parse_fn_decl(p)
+        elif v == "struct":
+            parse_struct_decl(p)
+        elif v == "class":
+            parse_class_decl(p)
+        elif v == "enum":
+            parse_enum_decl(p)
+        elif v == "contract":
+            parse_contract_decl(p)
+        elif v == "import":
+            parse_import(p)
+        elif v == "from":
+            parse_from_import(p)
+        elif v == "const":
+            parse_const_decl(p)
+        elif v == "mut":
+            parse_mut_decl(p)
+        elif v == "type":
+            parse_type_alias(p)
+        elif v == "abs":
+            parse_abs_decl(p)
+        else:
+            t = peek(p)
+            println("ERROR at " + str(t.line) + ":" + str(t.col) + ": unexpected keyword '" + v + "'")
+            advance(p)
+            make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+    elif k == TOK_IDENTIFIER:
+        parse_var_decl(p)
+    elif k == TOK_EOF:
+        make_leaf(ND_NONE_STMT, "EOF", 0, 0)
+    else:
+        t = peek(p)
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected declaration, got '" + v + "'")
+        advance(p)
+        make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+
+fn parse_fn_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "fn")
+    name_t = expect_identifier(p)
+    expect(p, TOK_LPAREN)
+    mut params = []
+    if peek_kind(p) != TOK_RPAREN:
+        params = parse_params(p)
+    expect(p, TOK_RPAREN)
+    ret_type = make_leaf(ND_TYPE_ANNOT, "void", 0, 0)
+    if peek_kind(p) == TOK_ARROW:
+        advance(p)
+        ret_type = parse_type(p)
+    body = make_leaf(ND_BLOCK, "block", 0, 0)
+    if peek_kind(p) == TOK_COLON:
+        advance(p)
+        body = parse_block(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col)]
+    pc.add(make_node(ND_PARAM, "params", params, 0, 0))
+    pc.add(ret_type)
+    pc.add(body)
+    make_node(ND_FN_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_params(p: Parser) -> list<AstNode>:
+    mut result = []
+    result.add(parse_param(p))
+    while peek_kind(p) == TOK_COMMA:
+        advance(p)
+        result.add(parse_param(p))
+    result
+
+fn parse_param(p: Parser) -> AstNode:
+    name_t = expect_identifier(p)
+    expect(p, TOK_COLON)
+    ty = parse_type(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty]
+    make_node(ND_PARAM, name_t.value, pc, name_t.line, name_t.col)
+
+fn parse_type(p: Parser) -> AstNode:
+    k = peek_kind(p)
+    v = peek_value(p)
+    t = peek(p)
+    if k == TOK_IDENTIFIER || k == TOK_KEYWORD:
+        advance(p)
+        if peek_kind(p) == TOK_OPERATOR && peek_value(p) == "<":
+            advance(p)
+            mut args = []
+            args.add(parse_type(p))
+            while peek_kind(p) == TOK_COMMA:
+                advance(p)
+                args.add(parse_type(p))
+            if peek_kind(p) == TOK_OPERATOR && peek_value(p) == ">":
+                advance(p)
+            make_node(ND_TYPE_ANNOT, v, args, t.line, t.col)
+        else:
+            make_leaf(ND_TYPE_ANNOT, v, t.line, t.col)
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected type, got '" + v + "'")
+        make_leaf(ND_TYPE_ANNOT, "error", t.line, t.col)
+
+fn parse_block(p: Parser) -> AstNode:
+    t = peek(p)
+    if peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+    mut stmts = []
+    while peek_kind(p) != TOK_EOF:
+        k = peek_kind(p)
+        if k == TOK_DEDENT:
+            advance(p)
+            break
+        if k == TOK_INDENT:
+            advance(p)
+            continue
+        if k == TOK_NEWLINE:
+            advance(p)
+            continue
+        stmt = parse_stmt(p)
+        stmts.add(stmt)
+        while peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+    make_node(ND_BLOCK, "block", stmts, t.line, t.col)
+
+fn parse_stmt(p: Parser) -> AstNode:
+    k = peek_kind(p)
+    v = peek_value(p)
+
+    if k == TOK_KEYWORD:
+        if v == "return":
+            parse_return(p)
+        elif v == "break":
+            parse_break(p)
+        elif v == "if":
+            parse_if(p)
+        elif v == "while":
+            parse_while(p)
+        elif v == "for":
+            parse_for(p)
+        elif v == "match":
+            parse_match(p)
+        elif v == "mut":
+            parse_mut_stmt(p)
+        elif v == "defer":
+            parse_defer(p)
+        elif v == "guard":
+            parse_guard(p)
+        elif v == "unsafe":
+            parse_unsafe(p)
+        elif v == "loop":
+            parse_loop(p)
+        elif v == "async":
+            expr = parse_expr(p, 0)
+            make_node(ND_EXPR_STMT, "expr", [expr], 0, 0)
+        else:
+            t = peek(p)
+            println("ERROR at " + str(t.line) + ":" + str(t.col) + ": unexpected keyword '" + v + "'")
+            advance(p)
+            make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+    elif k == TOK_IDENTIFIER:
+        peek_next = ""
+        if p.pos + 1 < p.len:
+            peek_next = p.tokens[p.pos + 1].value
+        if peek_kind(p) == TOK_IDENTIFIER && peek_next == ":":
+            # Typed variable declaration (no mut)
+            name_t = expect_identifier(p)
+            advance(p)
+            ty = parse_type(p)
+            if peek_kind(p) == TOK_OPERATOR && peek_value(p) == "=":
+                advance(p)
+                val = parse_expr(p, 0)
+                pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty, val]
+                make_node(ND_TYPED_VAR, name_t.value, pc, name_t.line, name_t.col)
+            else:
+                pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty]
+                make_node(ND_TYPED_VAR, name_t.value, pc, name_t.line, name_t.col)
+        elif peek_kind(p) == TOK_IDENTIFIER && (peek_next == "=" || peek_next == "+=" || peek_next == "-=" || peek_next == "*=" || peek_next == "/=" || peek_next == "%="):
+            name_t = expect_identifier(p)
+            op = peek_value(p)
+            advance(p)
+            val = parse_expr(p, 0)
+            if op == "=":
+                if peek_kind(p) == TOK_COLON:
+                    advance(p)
+                    body = parse_block(p)
+                    else_body = make_leaf(ND_BLOCK, "block", 0, 0)
+                    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "else":
+                        expect_keyword(p, "else")
+                        else_body = parse_block(p)
+                    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), val, body, else_body]
+                    make_node(ND_BINDING_IF, name_t.value, pc, name_t.line, name_t.col)
+                else:
+                    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), val]
+                    make_node(ND_ASSIGN, name_t.value, pc, name_t.line, name_t.col)
+            else:
+                pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), make_leaf(ND_IDENTIFIER, op, 0, 0), val]
+                make_node(ND_COMPOUND_ASSIGN, name_t.value, pc, name_t.line, name_t.col)
+        else:
+            expr = parse_expr(p, 0)
+            make_node(ND_EXPR_STMT, "expr", [expr], 0, 0)
+    elif k == TOK_NEWLINE || k == TOK_INDENT || k == TOK_DEDENT:
+        advance(p)
+        parse_stmt(p)
+    elif is_expr_start(p) == 1:
+        expr = parse_expr(p, 0)
+        make_node(ND_EXPR_STMT, "expr", [expr], 0, 0)
+    else:
+        t = peek(p)
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": unexpected token '" + v + "'")
+        advance(p)
+        make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+
+fn parse_var_decl(p: Parser) -> AstNode:
+    name_t = expect_identifier(p)
+    expect(p, TOK_OPERATOR)
+    val = parse_expr(p, 0)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), val]
+    make_node(ND_VAR_DECL, name_t.value, pc, name_t.line, name_t.col)
+
+fn parse_mut_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "mut")
+    name_t = expect_identifier(p)
+    expect(p, TOK_OPERATOR)
+    val = parse_expr(p, 0)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), val]
+    make_node(ND_MUT_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_const_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "const")
+    name_t = expect_identifier(p)
+    expect(p, TOK_OPERATOR)
+    val = parse_expr(p, 0)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), val]
+    make_node(ND_CONST_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_mut_stmt(p: Parser) -> AstNode:
+    t = expect_keyword(p, "mut")
+    name_t = expect_identifier(p)
+    ty = make_leaf(ND_TYPE_ANNOT, "none", 0, 0)
+    if peek_kind(p) == TOK_COLON:
+        advance(p)
+        ty = parse_type(p)
+    val = make_leaf(ND_LITERAL, "none", 0, 0)
+    if peek_kind(p) == TOK_OPERATOR && peek_value(p) == "=":
+        advance(p)
+        val = parse_expr(p, 0)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty, val]
+    make_node(ND_MUT_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_import(p: Parser) -> AstNode:
+    t = expect_keyword(p, "import")
+    name_t = expect_identifier(p)
+    alias = make_leaf(ND_IDENTIFIER, "", 0, 0)
+    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "as":
+        advance(p)
+        alias_t = expect_identifier(p)
+        alias = make_leaf(ND_IDENTIFIER, alias_t.value, alias_t.line, alias_t.col)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), alias]
+    make_node(ND_IMPORT, name_t.value, pc, t.line, t.col)
+
+fn parse_from_import(p: Parser) -> AstNode:
+    t = expect_keyword(p, "from")
+    module_t = expect_identifier(p)
+    expect_keyword(p, "import")
+    name_t = expect_identifier(p)
+    pc = [make_leaf(ND_IDENTIFIER, module_t.value, module_t.line, module_t.col)]
+    pc.add(make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col))
+    make_node(ND_FROM_IMPORT, name_t.value, pc, t.line, t.col)
+
+fn parse_return(p: Parser) -> AstNode:
+    t = expect_keyword(p, "return")
+    if is_expr_start(p) == 1:
+        expr = parse_expr(p, 0)
+        make_node(ND_RETURN, "return", [expr], t.line, t.col)
+    else:
+        make_leaf(ND_RETURN, "return", t.line, t.col)
+
+fn parse_break(p: Parser) -> AstNode:
+    t = expect_keyword(p, "break")
+    if is_expr_start(p) == 1:
+        expr = parse_expr(p, 0)
+        make_node(ND_BREAK, "break", [expr], t.line, t.col)
+    else:
+        make_leaf(ND_BREAK, "break", t.line, t.col)
+
+fn parse_if(p: Parser) -> AstNode:
+    t = expect_keyword(p, "if")
+    cond = parse_expr(p, 0)
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    mut elifs = []
+    else_body = make_leaf(ND_BLOCK, "block", 0, 0)
+    while peek_kind(p) == TOK_KEYWORD && peek_value(p) == "elif":
+        elif_t = expect_keyword(p, "elif")
+        elif_cond = parse_expr(p, 0)
+        expect(p, TOK_COLON)
+        elif_body = parse_block(p)
+        elif_node = make_node(ND_ELIF, "elif", [elif_cond, elif_body], elif_t.line, elif_t.col)
+        elifs.add(elif_node)
+    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "else":
+        expect_keyword(p, "else")
+        expect(p, TOK_COLON)
+        else_body = parse_block(p)
+    pc = [cond, body, make_node(ND_ELIF, "elif_branches", elifs, 0, 0), else_body]
+    make_node(ND_IF, "if", pc, t.line, t.col)
+
+fn parse_while(p: Parser) -> AstNode:
+    t = expect_keyword(p, "while")
+    cond = parse_expr(p, 0)
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    else_body = make_leaf(ND_BLOCK, "block", 0, 0)
+    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "else":
+        advance(p)
+        expect(p, TOK_COLON)
+        else_body = parse_block(p)
+    pc = [cond, body, else_body]
+    make_node(ND_WHILE, "while", pc, t.line, t.col)
+
+fn parse_for(p: Parser) -> AstNode:
+    t = expect_keyword(p, "for")
+    var_t = expect_identifier(p)
+    expect_keyword(p, "in")
+    iterable = parse_expr(p, 0)
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    else_body = make_leaf(ND_BLOCK, "block", 0, 0)
+    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "else":
+        advance(p)
+        expect(p, TOK_COLON)
+        else_body = parse_block(p)
+    pc = [make_leaf(ND_IDENTIFIER, var_t.value, var_t.line, var_t.col), iterable, body, else_body]
+    make_node(ND_FOR, var_t.value, pc, t.line, t.col)
+
+fn parse_match(p: Parser) -> AstNode:
+    t = expect_keyword(p, "match")
+    expr = parse_expr(p, 0)
+    expect(p, TOK_COLON)
+    mut arms = []
+    if peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+    if peek_kind(p) == TOK_INDENT:
+        advance(p)
+    while peek_kind(p) != TOK_DEDENT && peek_kind(p) != TOK_EOF:
+        if peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_DEDENT:
+            break
+        arm = parse_match_arm(p)
+        arms.add(arm)
+    if peek_kind(p) == TOK_DEDENT:
+        advance(p)
+    pc = [expr, make_node(ND_MATCH_ARM, "arms", arms, 0, 0)]
+    make_node(ND_MATCH, "match", pc, t.line, t.col)
+
+fn parse_match_arm(p: Parser) -> AstNode:
+    t = peek(p)
+    pat = parse_pattern(p)
+    expect(p, TOK_FAT_ARROW)
+    body = parse_match_body(p)
+    pc = [pat, body]
+    make_node(ND_MATCH_ARM, "arm", pc, t.line, t.col)
+
+fn parse_pattern(p: Parser) -> AstNode:
+    k = peek_kind(p)
+    v = peek_value(p)
+    t = peek(p)
+    if k == TOK_NUMBER || k == TOK_STRING || k == TOK_BOOL:
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_KEYWORD && v == "none":
+        advance(p)
+        make_leaf(ND_LITERAL, "none", t.line, t.col)
+    elif k == TOK_IDENTIFIER:
+        advance(p)
+        make_leaf(ND_IDENTIFIER, v, t.line, t.col)
+    elif k == TOK_OPERATOR && v == "_":
+        advance(p)
+        make_leaf(ND_IDENTIFIER, "_", t.line, t.col)
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected pattern, got '" + v + "'")
+        advance(p)
+        make_leaf(ND_LITERAL, "error", t.line, t.col)
+
+fn parse_match_body(p: Parser) -> AstNode:
+    if peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+        body = parse_block(p)
+        body
+    else:
+        stmt = parse_stmt(p)
+        make_node(ND_BLOCK, "block", [stmt], 0, 0)
+
+fn parse_defer(p: Parser) -> AstNode:
+    t = expect_keyword(p, "defer")
+    call = parse_expr(p, 0)
+    make_node(ND_DEFER, "defer", [call], t.line, t.col)
+
+fn parse_guard(p: Parser) -> AstNode:
+    t = expect_keyword(p, "guard")
+    cond = parse_expr(p, 0)
+    expect_keyword(p, "else")
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    pc = [cond, body]
+    make_node(ND_GUARD, "guard", pc, t.line, t.col)
+
+fn parse_unsafe(p: Parser) -> AstNode:
+    t = expect_keyword(p, "unsafe")
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    make_node(ND_UNSAFE, "unsafe", [body], t.line, t.col)
+
+fn parse_loop(p: Parser) -> AstNode:
+    t = expect_keyword(p, "loop")
+    expect(p, TOK_COLON)
+    body = parse_block(p)
+    make_node(ND_LOOP, "loop", [body], t.line, t.col)
+
+fn parse_struct_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "struct")
+    name_t = expect_identifier(p)
+    mut fields = []
+    if peek_kind(p) == TOK_COLON:
+        advance(p)
+        if peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+        while peek_kind(p) != TOK_DEDENT && peek_kind(p) != TOK_EOF:
+            if peek_kind(p) == TOK_NEWLINE:
+                advance(p)
+                continue
+            if peek_kind(p) == TOK_INDENT:
+                advance(p)
+                continue
+            if peek_kind(p) == TOK_DEDENT:
+                break
+            field = parse_field(p)
+            fields.add(field)
+        if peek_kind(p) == TOK_DEDENT:
+            advance(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col)]
+    pc.add(make_node(ND_FIELD, "fields", fields, 0, 0))
+    make_node(ND_STRUCT_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_field(p: Parser) -> AstNode:
+    name_t = expect_identifier(p)
+    expect(p, TOK_COLON)
+    ty = parse_type(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty]
+    make_node(ND_FIELD, name_t.value, pc, name_t.line, name_t.col)
+
+fn parse_class_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "class")
+    name_t = expect_identifier(p)
+    parent = make_leaf(ND_IDENTIFIER, "", 0, 0)
+    if peek_kind(p) == TOK_OPERATOR && peek_value(p) == ":":
+        advance(p)
+        if peek_kind(p) == TOK_IDENTIFIER:
+            parent_t = expect_identifier(p)
+            parent = make_leaf(ND_IDENTIFIER, parent_t.value, parent_t.line, parent_t.col)
+        if peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+        mut members = []
+        while peek_kind(p) != TOK_DEDENT && peek_kind(p) != TOK_EOF:
+            if peek_kind(p) == TOK_NEWLINE:
+                advance(p)
+                continue
+            member = parse_class_member(p)
+            if member.kind != ND_NONE_STMT:
+                members.add(member)
+        if peek_kind(p) == TOK_DEDENT:
+            advance(p)
+        pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), parent]
+        pc.add(make_node(ND_CLASS_BODY, "body", members, 0, 0))
+        make_node(ND_CLASS_DECL, name_t.value, pc, t.line, t.col)
+    else:
+        pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), parent]
+        pc.add(make_leaf(ND_CLASS_BODY, "body", 0, 0))
+        make_node(ND_CLASS_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_class_member(p: Parser) -> AstNode:
+    k = peek_kind(p)
+    v = peek_value(p)
+    t = peek(p)
+    if k == TOK_KEYWORD && v == "fn":
+        parse_fn_decl(p)
+    elif k == TOK_KEYWORD && v == "abs":
+        expect_keyword(p, "abs")
+        expect_keyword(p, "fn")
+        name_t2 = expect_identifier(p)
+        expect(p, TOK_LPAREN)
+        mut params2 = []
+        if peek_kind(p) != TOK_RPAREN:
+            params2 = parse_params(p)
+        expect(p, TOK_RPAREN)
+        ret_type2 = make_leaf(ND_TYPE_ANNOT, "void", 0, 0)
+        if peek_kind(p) == TOK_ARROW:
+            advance(p)
+            ret_type2 = parse_type(p)
+        pc = [make_leaf(ND_IDENTIFIER, name_t2.value, name_t2.line, name_t2.col)]
+        pc.add(make_node(ND_PARAM, "params", params2, 0, 0))
+        pc.add(ret_type2)
+        make_node(ND_METHOD, name_t2.value, pc, t.line, t.col)
+    elif k == TOK_IDENTIFIER:
+        # Check if it's a field or constructor
+        next_op = ""
+        if p.pos + 1 < p.len:
+            next_op = p.tokens[p.pos + 1].value
+        if next_op == ":":
+            parse_field(p)
+        else:
+            name_t3 = expect_identifier(p)
+            expect(p, TOK_LPAREN)
+            mut params3 = []
+            if peek_kind(p) != TOK_RPAREN:
+                params3 = parse_params(p)
+            expect(p, TOK_RPAREN)
+            expect(p, TOK_COLON)
+            body3 = parse_block(p)
+            pc = [make_leaf(ND_IDENTIFIER, name_t3.value, name_t3.line, name_t3.col)]
+            pc.add(make_node(ND_PARAM, "params", params3, 0, 0))
+            pc.add(body3)
+            make_node(ND_CONSTRUCTOR, name_t3.value, pc, t.line, t.col)
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": unexpected class member '" + v + "'")
+        advance(p)
+        make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+
+fn parse_enum_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "enum")
+    name_t = expect_identifier(p)
+    expect(p, TOK_COLON)
+    mut variants = []
+    if peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+    if peek_kind(p) == TOK_INDENT:
+        advance(p)
+    while peek_kind(p) != TOK_DEDENT && peek_kind(p) != TOK_EOF:
+        if peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_DEDENT:
+            break
+        var_t = expect_identifier(p)
+        variants.add(make_leaf(ND_IDENTIFIER, var_t.value, var_t.line, var_t.col))
+    if peek_kind(p) == TOK_DEDENT:
+        advance(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col)]
+    pc.add(make_node(ND_LIST, "variants", variants, 0, 0))
+    make_node(ND_ENUM_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_contract_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "contract")
+    name_t = expect_identifier(p)
+    expect(p, TOK_COLON)
+    mut methods = []
+    if peek_kind(p) == TOK_NEWLINE:
+        advance(p)
+    if peek_kind(p) == TOK_INDENT:
+        advance(p)
+    while peek_kind(p) != TOK_DEDENT && peek_kind(p) != TOK_EOF:
+        if peek_kind(p) == TOK_NEWLINE:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_INDENT:
+            advance(p)
+            continue
+        if peek_kind(p) == TOK_DEDENT:
+            break
+        expect_keyword(p, "fn")
+        name_t2 = expect_identifier(p)
+        expect(p, TOK_LPAREN)
+        mut params2 = []
+        if peek_kind(p) != TOK_RPAREN:
+            params2 = parse_params(p)
+        expect(p, TOK_RPAREN)
+        ret_type2 = make_leaf(ND_TYPE_ANNOT, "void", 0, 0)
+        if peek_kind(p) == TOK_ARROW:
+            advance(p)
+            ret_type2 = parse_type(p)
+        pc = [make_leaf(ND_IDENTIFIER, name_t2.value, name_t2.line, name_t2.col)]
+        pc.add(make_node(ND_PARAM, "params", params2, 0, 0))
+        pc.add(ret_type2)
+        methods.add(make_node(ND_METHOD, name_t2.value, pc, t.line, t.col))
+    if peek_kind(p) == TOK_DEDENT:
+        advance(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col)]
+    pc.add(make_node(ND_LIST, "methods", methods, 0, 0))
+    make_node(ND_CONTRACT_DECL, name_t.value, pc, t.line, t.col)
+
+fn parse_type_alias(p: Parser) -> AstNode:
+    t = expect_keyword(p, "type")
+    name_t = expect_identifier(p)
+    expect(p, TOK_OPERATOR)
+    ty = parse_type(p)
+    pc = [make_leaf(ND_IDENTIFIER, name_t.value, name_t.line, name_t.col), ty]
+    make_node(ND_TYPE_ALIAS, name_t.value, pc, t.line, t.col)
+
+fn parse_abs_decl(p: Parser) -> AstNode:
+    t = expect_keyword(p, "abs")
+    if peek_kind(p) == TOK_KEYWORD && peek_value(p) == "class":
+        advance(p)
+        parse_class_decl(p)
+    elif peek_kind(p) == TOK_KEYWORD && peek_value(p) == "fn":
+        advance(p)
+        parse_fn_decl(p)
+    else:
+        println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected 'class' or 'fn' after 'abs'")
+        make_leaf(ND_NONE_STMT, "error", t.line, t.col)
+
+# ============================================================
+# Expression parsing
+# ============================================================
+fn parse_expr(p: Parser, min_prec: i32) -> AstNode:
+    left = parse_prefix(p)
+    if left.kind == ND_NONE_STMT:
+        left
+
+    while peek_kind(p) != TOK_EOF:
+        k = peek_kind(p)
+        v = peek_value(p)
+
+        # Postfix: call, index, property, optional chain, error prop
+        if k == TOK_LPAREN:
+            advance(p)
+            mut args = []
+            if peek_kind(p) != TOK_RPAREN:
+                args = parse_expr_list(p)
+            expect(p, TOK_RPAREN)
+            left = make_node(ND_CALL, "call", [left, make_node(ND_LIST, "args", args, 0, 0)], 0, 0)
+            continue
+        elif k == TOK_LBRACKET:
+            advance(p)
+            if peek_kind(p) == TOK_RBRACKET:
+                advance(p)
+                left = make_node(ND_LIST, "[]", [], 0, 0)
+            else:
+                index_expr = parse_expr(p, 0)
+                if peek_kind(p) == TOK_COLON:
+                    advance(p)
+                    end_expr = make_leaf(ND_LITERAL, "none", 0, 0)
+                    if peek_kind(p) != TOK_RBRACKET:
+                        end_expr = parse_expr(p, 0)
+                    expect(p, TOK_RBRACKET)
+                    left = make_node(ND_RANGE_SLICE, "slice", [left, index_expr, end_expr], 0, 0)
+                else:
+                    expect(p, TOK_RBRACKET)
+                    left = make_node(ND_INDEX, "index", [left, index_expr], 0, 0)
+            continue
+        elif k == TOK_DOT:
+            advance(p)
+            prop_t = expect_identifier(p)
+            left = make_node(ND_PROPERTY, prop_t.value, [left, make_leaf(ND_IDENTIFIER, prop_t.value, prop_t.line, prop_t.col)], 0, 0)
+            continue
+        elif k == TOK_OPERATOR && v == "?" && p.pos + 1 < p.len && p.tokens[p.pos + 1].value == ".":
+            advance(p)
+            advance(p)
+            left = make_node(ND_OPT_CHAIN, "?.", [left], 0, 0)
+            continue
+        elif k == TOK_OPERATOR && v == "!":
+            advance(p)
+            left = make_node(ND_ERROR_PROP, "!", [left], 0, 0)
+            continue
+
+        # Binary operators
+        if k == TOK_OPERATOR && is_binary_op(v) == 1:
+            prec = op_precedence(v)
+            if prec < min_prec:
+                break
+            advance(p)
+            right = parse_expr(p, prec + 1)
+            left = make_node(ND_BINARY, v, [left, right], 0, 0)
+        elif k == TOK_OPERATOR && v == "=":
+            advance(p)
+            right = parse_expr(p, 0)
+            left = make_node(ND_ASSIGN, "=", [left, right], 0, 0)
+        elif k == TOK_OPERATOR && (v == "+=" || v == "-=" || v == "*=" || v == "/=" || v == "%="):
+            op2 = v
+            advance(p)
+            right = parse_expr(p, 0)
+            left = make_node(ND_COMPOUND_ASSIGN, op2, [left, right], 0, 0)
+        else:
+            break
+
+    left
+
+fn parse_prefix(p: Parser) -> AstNode:
+    k = peek_kind(p)
+    v = peek_value(p)
+    t = peek(p)
+
+    if k == TOK_NUMBER:
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_STRING:
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_BOOL:
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_CHAR:
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_KEYWORD && (v == "true" || v == "false"):
+        advance(p)
+        make_leaf(ND_LITERAL, v, t.line, t.col)
+    elif k == TOK_KEYWORD && v == "none":
+        advance(p)
+        make_leaf(ND_LITERAL, "none", t.line, t.col)
+    elif k == TOK_IDENTIFIER:
+        advance(p)
+        make_leaf(ND_IDENTIFIER, v, t.line, t.col)
+    elif k == TOK_LPAREN:
+        advance(p)
+        if peek_kind(p) == TOK_RPAREN:
+            advance(p)
+            make_node(ND_TUPLE, "()", [], t.line, t.col)
+        else:
+            expr = parse_expr(p, 0)
+            if peek_kind(p) == TOK_COMMA:
+                mut elems = [expr]
+                while peek_kind(p) == TOK_COMMA:
+                    advance(p)
+                    elems.add(parse_expr(p, 0))
+                expect(p, TOK_RPAREN)
+                make_node(ND_TUPLE, "tuple", elems, t.line, t.col)
+            else:
+                expect(p, TOK_RPAREN)
+                expr
+    elif k == TOK_LBRACKET:
+        advance(p)
+        if peek_kind(p) == TOK_RBRACKET:
+            advance(p)
+            make_node(ND_LIST, "[]", [], t.line, t.col)
+        else:
+            mut elems2 = []
+            elems2.add(parse_expr(p, 0))
+            while peek_kind(p) == TOK_COMMA:
+                advance(p)
+                elems2.add(parse_expr(p, 0))
+            expect(p, TOK_RBRACKET)
+            make_node(ND_LIST, "list", elems2, t.line, t.col)
+    elif k == TOK_OPERATOR && v == "-":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_UNARY, "-", [operand], t.line, t.col)
+    elif k == TOK_OPERATOR && v == "!":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_UNARY, "!", [operand], t.line, t.col)
+    elif k == TOK_OPERATOR && v == "~":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_UNARY, "~", [operand], t.line, t.col)
+    elif k == TOK_KEYWORD && v == "async":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_ASYNC, "async", [operand], t.line, t.col)
+    elif k == TOK_KEYWORD && v == "await":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_AWAIT, "await", [operand], t.line, t.col)
+    elif k == TOK_KEYWORD && v == "spread":
+        advance(p)
+        operand = parse_expr(p, 10)
+        make_node(ND_SPREAD, "spread", [operand], t.line, t.col)
+    else:
+        make_leaf(ND_NONE_STMT, "none", 0, 0)
+
+fn parse_expr_list(p: Parser) -> list<AstNode>:
+    mut result = []
+    result.add(parse_expr(p, 0))
+    while peek_kind(p) == TOK_COMMA:
+        advance(p)
+        result.add(parse_expr(p, 0))
+    result
+
+# ============================================================
+# AST Printer
+# ============================================================
+fn print_indent(depth: i32):
+    mut i = 0
+    while i < depth:
+        print("  ")
+        i = i + 1
+
+fn kind_name(kind: i32) -> str:
+    if kind == ND_PROGRAM: "Program"
+    elif kind == ND_FN_DECL: "FnDecl"
+    elif kind == ND_VAR_DECL: "VarDecl"
+    elif kind == ND_CONST_DECL: "ConstDecl"
+    elif kind == ND_IF: "If"
+    elif kind == ND_WHILE: "While"
+    elif kind == ND_FOR: "For"
+    elif kind == ND_MATCH: "Match"
+    elif kind == ND_RETURN: "Return"
+    elif kind == ND_BREAK: "Break"
+    elif kind == ND_EXPR_STMT: "ExprStmt"
+    elif kind == ND_BINARY: "Binary"
+    elif kind == ND_UNARY: "Unary"
+    elif kind == ND_LITERAL: "Literal"
+    elif kind == ND_IDENTIFIER: "Ident"
+    elif kind == ND_CALL: "Call"
+    elif kind == ND_ASSIGN: "Assign"
+    elif kind == ND_LIST: "List"
+    elif kind == ND_INDEX: "Index"
+    elif kind == ND_PROPERTY: "Property"
+    elif kind == ND_BLOCK: "Block"
+    elif kind == ND_ELIF: "Elif"
+    elif kind == ND_MATCH_ARM: "Arm"
+    elif kind == ND_PARAM: "Param"
+    elif kind == ND_STRUCT_DECL: "Struct"
+    elif kind == ND_CLASS_DECL: "Class"
+    elif kind == ND_IMPORT: "Import"
+    elif kind == ND_TYPE_ANNOT: "Type"
+    elif kind == ND_CLASS_BODY: "ClassBody"
+    elif kind == ND_FIELD: "Field"
+    elif kind == ND_METHOD: "Method"
+    elif kind == ND_CONSTRUCTOR: "Constructor"
+    elif kind == ND_ENUM_DECL: "Enum"
+    elif kind == ND_CONTRACT_DECL: "Contract"
+    elif kind == ND_FROM_IMPORT: "FromImport"
+    elif kind == ND_MUT_DECL: "MutDecl"
+    elif kind == ND_TYPED_VAR: "TypedVar"
+    elif kind == ND_DEFER: "Defer"
+    elif kind == ND_GUARD: "Guard"
+    elif kind == ND_UNSAFE: "Unsafe"
+    elif kind == ND_LOOP: "Loop"
+    elif kind == ND_BINDING_IF: "BindingIf"
+    elif kind == ND_WHILE_BIND: "WhileBind"
+    elif kind == ND_DICT: "Dict"
+    elif kind == ND_TUPLE: "Tuple"
+    elif kind == ND_CLOSURE: "Closure"
+    elif kind == ND_AWAIT: "Await"
+    elif kind == ND_ASYNC: "Async"
+    elif kind == ND_SPREAD: "Spread"
+    elif kind == ND_RANGE_SLICE: "Slice"
+    elif kind == ND_OPT_CHAIN: "OptChain"
+    elif kind == ND_ERROR_PROP: "ErrorProp"
+    elif kind == ND_COMPOUND_ASSIGN: "CompoundAssign"
+    elif kind == ND_TYPE_ALIAS: "TypeAlias"
+    elif kind == ND_NONE_STMT: "None"
+    else: "Unknown(" + str(kind) + ")"
+
+fn print_ast(node: AstNode, depth: i32):
+    print_indent(depth)
+    name = kind_name(node.kind)
+    if node.value != "":
+        println(name + "(" + node.value + ")")
+    else:
+        println(name)
+    mut i = 0
+    while i < len(node.children):
+        print_ast(node.children[i], depth + 1)
+        i = i + 1
+
+# ============================================================
+# Main
+# ============================================================
+fn main():
+    path = "examples/hello.kl"
+    if len(args) > 1:
+        path = args[1]
+
+    fd = open(path, "r")
+    source = read_str(fd, 16384)
+    close(fd)
+
+    println("=== Parser ===")
+    println("Source: " + path)
+    println()
+
+    tokens = tokenize(source)
+    println("Tokens: " + str(len(tokens)))
+    mut i = 0
+    while i < len(tokens):
+        t = tokens[i]
+        kn = "TOK(" + str(t.kind) + ")"
+        if t.kind == TOK_IDENTIFIER: kn = "IDENTIFIER"
+        elif t.kind == TOK_NUMBER: kn = "NUMBER"
+        elif t.kind == TOK_STRING: kn = "STRING"
+        elif t.kind == TOK_KEYWORD: kn = "KEYWORD"
+        elif t.kind == TOK_OPERATOR: kn = "OP"
+        elif t.kind == TOK_NEWLINE: kn = "NEWLINE"
+        elif t.kind == TOK_INDENT: kn = "INDENT"
+        elif t.kind == TOK_DEDENT: kn = "DEDENT"
+        elif t.kind == TOK_LPAREN: kn = "LPAREN"
+        elif t.kind == TOK_RPAREN: kn = "RPAREN"
+        elif t.kind == TOK_LBRACKET: kn = "LBRACKET"
+        elif t.kind == TOK_RBRACKET: kn = "RBRACKET"
+        elif t.kind == TOK_COMMA: kn = "COMMA"
+        elif t.kind == TOK_COLON: kn = "COLON"
+        elif t.kind == TOK_DOT: kn = "DOT"
+        elif t.kind == TOK_ARROW: kn = "ARROW"
+        elif t.kind == TOK_FAT_ARROW: kn = "FAT_ARROW"
+        elif t.kind == TOK_BOOL: kn = "BOOL"
+        elif t.kind == TOK_EOF: kn = "EOF"
+        print("  " + kn + "(" + t.value + ")\n")
+        i = i + 1
+
+    println()
+
+    p = new_parser(tokens)
+    ast = parse_program(p)
+
+    println("=== AST ===")
+    print_ast(ast, 0)
+    println()
+    println("=== Done ===")
