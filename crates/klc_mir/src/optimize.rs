@@ -99,6 +99,10 @@ impl Optimizer {
                         used.insert(*dest);
                         Self::collect_value_refs(value, &mut used);
                     }
+                    MirInst::FieldPtr { dest, ptr, .. } => {
+                        used.insert(*dest);
+                        used.insert(*ptr);
+                    }
                 }
             }
         }

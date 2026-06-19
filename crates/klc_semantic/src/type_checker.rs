@@ -4,6 +4,7 @@
 // Walks the AST to build a type environment, infer types, and report errors.
 
 use std::collections::HashMap;
+use klc_core::ast::StructDecl;
 use klc_core::ast::*;
 use klc_core::diagnostic::{Diagnostic, DiagnosticReporter, ErrorCode};
 use klc_core::source_map::SourceMap;
@@ -181,6 +182,8 @@ pub struct TypeChecker {
     unifier: Unifier,
     return_type: Option<Type>,
     function_is_fallible: bool,
+    /// Registered struct types: struct_name → Vec<(field_name, field_type)>
+    struct_fields: HashMap<String, Vec<(String, Type)>>,
 }
 
 impl TypeChecker {
@@ -191,6 +194,7 @@ impl TypeChecker {
             unifier: Unifier::new(),
             return_type: None,
             function_is_fallible: false,
+            struct_fields: HashMap::new(),
         }
     }
 
@@ -236,7 +240,7 @@ impl TypeChecker {
                     self.check_class_member(member);
                 }
             }
-            Decl::Struct(_s) => {}
+            Decl::Struct(s) => self.check_struct_decl(s),
             Decl::Enum(_e) => {}
             Decl::Contract(_c) => {}
             Decl::TypeAlias(t) => { Type::from_ast_type(&t.type_); }
@@ -320,6 +324,15 @@ impl TypeChecker {
         self.sym_table.leave_scope();
     }
 
+    fn check_struct_decl(&mut self, s: &StructDecl) {
+        let mut fields: Vec<(String, Type)> = Vec::new();
+        for f in &s.fields {
+            let ft = Type::from_ast_type(&f.type_);
+            fields.push((f.name.clone(), ft));
+        }
+        self.struct_fields.insert(s.name.clone(), fields);
+    }
+
     fn check_class_member(&mut self, member: &ClassMember) {
         match member {
             ClassMember::Field(_f) => {}
@@ -365,21 +378,31 @@ impl TypeChecker {
             };
             let _ = self.sym_table.define(binding);
         }
-        let value_type = self.infer_expr_type(&v.value);
-        // Update the binding's resolved_type so identifiers can find it
-        if let Some(binding) = self.sym_table.lookup_local_mut(&v.name) {
-            binding.resolved_type = Some(value_type.clone());
-        }
-        if let Some(ref declared) = v.type_ {
-            let declared_type = Type::from_ast_type(declared);
-            if let Err(msg) = self.unifier.unify(&declared_type, &value_type) {
-                let diag = Diagnostic::error(ErrorCode::E0001, format!(
-                    "type mismatch: {}", msg
-                )).with_span(v.span)
-                  .with_suggestion(format!(
-                      "expected '{}' but value is '{}'", declared_type, value_type
-                  ));
-                self.reporter.report(diag);
+        if let Expr::Literal { value: Literal::None, .. } = &*v.value {
+            // No initializer: use the declared type if available
+            if let Some(ref declared) = v.type_ {
+                let declared_type = Type::from_ast_type(declared);
+                if let Some(binding) = self.sym_table.lookup_local_mut(&v.name) {
+                    binding.resolved_type = Some(declared_type);
+                }
+            }
+        } else {
+            let value_type = self.infer_expr_type(&v.value);
+            // Update the binding's resolved_type so identifiers can find it
+            if let Some(binding) = self.sym_table.lookup_local_mut(&v.name) {
+                binding.resolved_type = Some(value_type.clone());
+            }
+            if let Some(ref declared) = v.type_ {
+                let declared_type = Type::from_ast_type(declared);
+                if let Err(msg) = self.unifier.unify(&declared_type, &value_type) {
+                    let diag = Diagnostic::error(ErrorCode::E0001, format!(
+                        "type mismatch: {}", msg
+                    )).with_span(v.span)
+                      .with_suggestion(format!(
+                          "expected '{}' but value is '{}'", declared_type, value_type
+                      ));
+                    self.reporter.report(diag);
+                }
             }
         }
     }
@@ -694,6 +717,9 @@ impl TypeChecker {
                                 t.clone()
                             } else if let Some(ref ast_type) = binding.type_ {
                                 Type::from_ast_type(ast_type)
+                            } else if matches!(binding.kind, BindingKind::Class | BindingKind::Struct) {
+                                // Constructor call: return the named type
+                                Type::Named(name.clone())
                             } else {
                                 self.unifier.fresh_type_var()
                             }
@@ -714,9 +740,27 @@ impl TypeChecker {
                     self.unifier.fresh_type_var()
                 }
             }
-            Expr::PropertyAccess { object, property: _property, .. } => {
-                let _obj_type = self.infer_expr_type(object);
-                self.unifier.fresh_type_var()
+            Expr::PropertyAccess { object, property, .. } => {
+                let obj_type = self.infer_expr_type(object);
+                match &obj_type {
+                    Type::Named(name) => {
+                        if let Some(fields) = self.struct_fields.get(name) {
+                            if let Some((_, ft)) = fields.iter().find(|(fname, _)| fname == property) {
+                                return ft.clone();
+                            }
+                        }
+                        self.unifier.fresh_type_var()
+                    }
+                    _ => self.unifier.fresh_type_var(),
+                }
+            }
+            Expr::Index { target, index, .. } => {
+                let target_type = self.infer_expr_type(target);
+                let _index_type = self.infer_expr_type(index);
+                match target_type {
+                    Type::List(ref elem_type) => *elem_type.clone(),
+                    _ => self.unifier.fresh_type_var(),
+                }
             }
             Expr::List { elements, .. } => {
                 if elements.is_empty() {
@@ -833,7 +877,12 @@ impl TypeChecker {
                 }
             }
             BinaryOp::Eq | BinaryOp::Neq => {
-                let _ = self.unifier.unify(&left_type, &right_type);
+                if let Err(msg) = self.unifier.unify(&left_type, &right_type) {
+                    let diag = Diagnostic::error(ErrorCode::E0001, format!(
+                        "cannot compare '{}' and '{}' with {:?}: {}", left_type, right_type, operator, msg
+                    )).with_span(*span);
+                    self.reporter.report(diag);
+                }
                 Type::Bool
             }
             BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge => {
@@ -927,6 +976,7 @@ fn stmt_span_from_expr(expr: &Expr) -> Span {
         Expr::Await { span, .. } => *span,
         Expr::Async { span, .. } => *span,
         Expr::Spread { span, .. } => *span,
+        Expr::Index { span, .. } => *span,
         Expr::RangeSlice { span, .. } => *span,
         Expr::OptionalChain { span, .. } => *span,
         Expr::Loop { span, .. } => *span,
@@ -943,6 +993,7 @@ fn expr_span(expr: &Expr) -> Span {
         Expr::Assignment { span, .. } => *span,
         Expr::FunctionCall { span, .. } => *span,
         Expr::PropertyAccess { span, .. } => *span,
+        Expr::Index { span, .. } => *span,
         Expr::List { span, .. } => *span,
         Expr::Dictionary { span, .. } => *span,
         Expr::Tuple { span, .. } => *span,

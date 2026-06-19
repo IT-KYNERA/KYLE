@@ -48,28 +48,20 @@ High Performance
 
 # Root Modules
 
-KL v1.0 ships with:
+KL v2.0 ships with:
 
 ```text
-io
-
-math
-
-json
-
-net
-
-time
-
-filesystem
-
-collections
-
-crypto
-
-async
-
-testing
+io        ✅ implemented  (std/io.kl)
+math      ✅ implemented  (std/math.kl)
+testing   ✅ implemented  (std/testing.kl)
+core      ✅ implemented  (std/core.kl)
+json      🔶 planned
+net       🔶 planned
+time      🔶 planned
+filesystem 🔶 planned
+collections 🔶 planned
+crypto    🔶 planned
+async     🔶 planned
 ```
 
 ---
@@ -79,16 +71,17 @@ testing
 ```text
 std/
 
-├── io
-├── math
-├── json
-├── net
-├── time
-├── filesystem
-├── collections
-├── crypto
-├── async
-└── testing
+├── core.kl      ✅ utility functions
+├── io.kl        ✅ I/O wrappers (print, println, read_line)
+├── math.kl      ✅ abs, pow, sqrt, gcd
+├── testing.kl   ✅ assert, assert_eq, assert_str
+├── json.kl      🔶 planned
+├── net          🔶 planned
+├── time         🔶 planned
+├── filesystem   🔶 planned
+├── collections  🔶 planned
+├── crypto       🔶 planned
+└── async        🔶 planned
 ```
 
 ---
@@ -138,7 +131,7 @@ Hello
 ## Read Line
 
 ```kl
-name = io.read()
+name = io.read_line()
 ```
 
 ---
@@ -155,6 +148,20 @@ age = io.read_i32()
 
 ```kl
 salary = io.read_f64()
+```
+
+## Top-Level Built-in I/O
+
+These functions are available without any import:
+
+```kl
+print(value)              # print without newline
+println(value)            # print with newline
+input(prompt)             # → str: read line from stdin
+open(path, mode)          # → i64: file handle (mode: 0=read, 1=write)
+read_str(handle)          # → str: read entire file
+write_str(handle, text)   # write string to file
+close(handle)             # close file handle
 ```
 
 ---
@@ -351,47 +358,15 @@ response.headers
 
 # Time Module
 
-Import:
+🔶 Planned for `import time`. Currently `now()` and `sleep()` are top-level built-ins:
+
+## Top-Level Time Functions
+
+Available without import:
 
 ```kl
-import time
-```
-
----
-
-## Current Time
-
-```kl
-now = time.now()
-```
-
----
-
-## Timestamp
-
-```kl
-unix = time.unix()
-```
-
----
-
-## Sleep
-
-```kl
-await time.sleep(1000)
-```
-
-Milliseconds.
-
----
-
-## Duration
-
-```kl
-duration = time.duration(
-
-    seconds: 10
-)
+now()                     # → i64: Unix timestamp in milliseconds
+sleep(ms)                 # sleep for milliseconds (blocking)
 ```
 
 ---
@@ -747,45 +722,12 @@ Import:
 import testing
 ```
 
----
-
-# Test Function
+## Assertions
 
 ```kl
-test "sum should return 4":
-
-    result = sum(2, 2)
-
-    testing.equal(
-        result,
-        4
-    )
-```
-
----
-
-# Assertions
-
-```kl
-testing.equal(a, b)
-
-testing.not_equal(a, b)
-
-testing.true(value)
-
-testing.false(value)
-
-testing.none(value)
-```
-
----
-
-# Benchmark
-
-```kl
-benchmark "json parse":
-
-    json.parse(data)
+testing.assert(condition)              # assert truthy
+testing.assert_eq(a, b)                # assert i32 equality
+testing.assert_str(a, b)               # assert string equality
 ```
 
 ---
@@ -835,18 +777,52 @@ tuple
 
 # Built-In Functions
 
+Available without imports:
+
+## String & Character
+
 ```kl
-len()
+len(s)                    # → i32: length of string s
+str(value)                # → str: convert i32/f64/bool to string
+char_at(s, i)             # → char (i8): character at index i
+ord(c)                    # → i32: Unicode codepoint of char
+is_digit(c)               # → i32: 1 if '0'-'9'
+is_alpha(c)               # → i32: 1 if 'a'-'z' or 'A'-'Z'
+is_alnum(c)               # → i32: 1 if alphanumeric
+is_whitespace(c)          # → i32: 1 if space/tab/newline
+is_upper(c)               # → i32: 1 if uppercase letter
+is_lower(c)               # → i32: 1 if lowercase letter
+contains(s, sub)          # → i32: 1 if s contains sub
+to_upper(s)               # → str: uppercase copy
+to_lower(s)               # → str: lowercase copy
+trim(s)                   # → str: trim whitespace
+replace(s, from, to)      # → str: replace all occurrences
+```
 
-type()
+## I/O
 
-str()
+```kl
+print(value)              # print without newline
+println(value)            # print with newline
+input(prompt)             # → str: read line from stdin
+open(path, mode)          # → i64: file handle (mode: 0=read, 1=write)
+read_str(handle)          # → str: read entire file
+write_str(handle, text)   # write string to file
+close(handle)             # close file handle
+```
 
-int()
+## Time
 
-float()
+```kl
+sleep(ms)                 # sleep for milliseconds
+now()                     # → i64: Unix timestamp in milliseconds
+```
 
-bool()
+## Math
+
+```kl
+range(end)                # returns a range value
+range(start, end)         # returns a range value
 ```
 
 ---
@@ -944,5 +920,6 @@ Enterprise Friendly
 # Version
 
 ```text
-KL Standard Library Specification v1.0
+KL Standard Library Specification v2.0
+Last updated: 2026-11-19
 ```

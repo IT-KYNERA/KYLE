@@ -1,0 +1,31 @@
+fn main():
+    source = read_str(open("examples/lexer.kl", "r"), 4096)
+    println(source)
+    mut i = 0
+    while i < len(source):
+        c = ord(char_at(source, i))
+        if is_alpha(char_at(source, i)):
+            start = i
+            while i < len(source) && is_alnum(char_at(source, i)):
+                i = i + 1
+            tok = substr(source, start, i - start)
+            println(tok)
+        elif c == 10:
+            i = i + 1
+        elif is_whitespace(char_at(source, i)):
+            i = i + 1
+        elif c == 61:
+            i = i + 1
+        elif c == 43:
+            i = i + 1
+        elif c == 40:
+            i = i + 1
+        elif c == 41:
+            i = i + 1
+        elif c == 44:
+            i = i + 1
+        elif c == 58:
+            i = i + 1
+        else:
+            i = i + 1
+    println("=== Done ===")

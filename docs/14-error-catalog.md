@@ -380,22 +380,22 @@ KL-P0001: Internal compiler error
   Unexpected error in <compiler_stage>.
 
   Please report this at:
-  https://github.com/kynera/kl/issues
+  https://github.com/anomalyco/KYNERA-LENGUAJE/issues
 ```
 
 ---
 
-## Lint Rules (kl lint)
+## Lint Rules — 🔶 Not Yet Implemented
 
 ```text
-L0001  Prefer explicit types on public API
-L0002  Avoid deep nesting (>4 levels)
-L0003  Function too long (>100 lines)
-L0004  File too long (>1000 lines)
-L0005  Missing error handling on fallible call
-L0006  Prefer early return over nested if
-L0007  Use guard instead of if-not-return pattern
-L0008  Prefer object literal over class for simple data
+L0001  Prefer explicit types on public API          🔶
+L0002  Avoid deep nesting (>4 levels)               🔶
+L0003  Function too long (>100 lines)                🔶
+L0004  File too long (>1000 lines)                   🔶
+L0005  Missing error handling on fallible call       🔶
+L0006  Prefer early return over nested if           🔶
+L0007  Use guard instead of if-not-return pattern   🔶
+L0008  Prefer object literal over class for simple data 🔶
 ```
 
 ---
@@ -403,5 +403,6 @@ L0008  Prefer object literal over class for simple data
 # Version
 
 ```text
-KL Error Catalog Specification v1.0
+KL Error Catalog Specification v2.0
+Last updated: 2026-11-19
 ```

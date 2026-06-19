@@ -647,6 +647,12 @@ impl Parser {
                 let start = self.pos;
                 self.advance();
                 expr = Expr::ErrorProp { expression: Box::new(expr), span: self.span_from(start) };
+            } else if self.at(TokenKind::LBracket) {
+                let start = self.pos;
+                self.advance();
+                let index = self.parse_expr()?;
+                self.expect(TokenKind::RBracket)?;
+                expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
             } else {
                 break;
             }
@@ -722,16 +728,26 @@ impl Parser {
             let body = self.parse_block()?;
             return Ok(Stmt::Unsafe(UnsafeBlock { body, span: self.span_from(start) }));
         }
-        // Mutable variable declaration: `mut ident = expr`
+        // Mutable variable declaration: `mut ident[: Type][ = expr]`
         if self.at(TokenKind::Mut) {
             let start = self.pos;
             self.advance();
             let name = self.eat_identifier();
-            self.expect(TokenKind::Equals)?;
-            let value = self.parse_expr()?;
+            let type_ = if self.at(TokenKind::Colon) {
+                self.advance();
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+            let value = if self.at(TokenKind::Equals) {
+                self.advance();
+                self.parse_expr()?
+            } else {
+                Expr::Literal { value: Literal::None, span: self.span_from(start) }
+            };
             return Ok(Stmt::Variable(VariableDecl {
                 name,
-                type_: None,
+                type_,
                 value: Box::new(value),
                 is_mutable: true,
                 span: self.span_from(start),

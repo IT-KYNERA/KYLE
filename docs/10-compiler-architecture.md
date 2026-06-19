@@ -12,37 +12,40 @@ The KL compiler transforms `.kl` source files into native machine code.
 Source Code (.kl)
     │
     ▼
-Lexer
+Lexer                          (klc_frontend)
     │
     ▼
 Tokens
     │
     ▼
-Parser
+Parser                         (klc_frontend)
     │
     ▼
 AST
     │
     ▼
-Semantic Analyzer
+Semantic Analyzer              (klc_semantic)
     │
     ▼
-Type Checker
+Type Checker                   (klc_semantic)
     │
     ▼
-IR (Intermediate Representation)
+MIR Lowering                   (klc_mir/lower.rs)
     │
     ▼
-Optimizer
+MIR Optimizer                  (klc_mir/optimize.rs)
     │
     ▼
-LLVM IR
+Ownership Inference            (klc_mir/ownership.rs)
     │
     ▼
-LLVM Optimizer
+LLVM Codegen                   (klc_backend/codegen.rs)
     │
     ▼
-Machine Code
+LLVM Optimizer                 (LLVM passes)
+    │
+    ▼
+Native Binary                  (klc_backend/linker.rs)
 ```
 
 ---
@@ -102,28 +105,40 @@ Error safety validation
 Optional safety validation
 ```
 
-### 5. IR Generator (klc_mir)
+### 5. MIR Lowering (klc_mir/lower.rs)
 
 Input: Type-checked AST
 Output: MIR (Mid-level IR)
 
 ```text
-Lower AST to simpler IR
+Lower AST to MIR (MirModule, MirFunction, MirBasicBlock)
 Control flow graph construction
-Basic block analysis
+Builtin function name remapping
+String local tracking
+Break/continue target resolution
 ```
 
-### 6. Optimizer (klc_mir)
+### 6. MIR Optimizer (klc_mir/optimize.rs)
 
 Input: MIR
 Output: Optimized MIR
 
 ```text
 Constant folding
-Dead code elimination
-Inlining
+Dead code elimination (collect_terminator_refs)
+Remove unreachable basic blocks
+```
+
+### 6b. Ownership Inference (klc_mir/ownership.rs)
+
+Input: Optimized MIR
+Output: Ownership-annotated MIR
+
+```text
 Escape analysis
-Loop optimizations
+Move inference (memcpy for single-owner)
+Refcount inference (Arc/Rc for shared)
+Insert retain/release at scope exits
 ```
 
 ### 7. LLVM Codegen (klc_backend)
@@ -162,29 +177,35 @@ Produce executable or library
 
 ---
 
-## Compiler Architecture Diagram
+## Compiler Crate Diagram
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                     klc_cli (Binary)                     │
-│                  build | run | test                      │
-└────────────────────┬────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────┐
-│                    klc_driver                            │
-│              Pipeline Orchestration                      │
-└────┬──────┬──────┬──────┬──────┬──────┬──────┬──────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     klc_cli (Binary)                        │
+│          build | run | test | fmt | lsp | parse             │
+└────────┬──────────┬──────────┬──────────────────────────────┘
+         │          │          │
+┌────────▼──────────▼──────────▼──────────────────────────────┐
+│                     klc_driver                               │
+│                Pipeline Orchestration                        │
+└────┬──────┬──────┬──────┬──────┬──────┬──────┬──────────────┘
      │      │      │      │      │      │      │
-┌────▼──┐ ┌▼─────┐ ┌▼────┐ ┌▼───┐ ┌▼───┐ ┌▼────┐ ┌▼─────┐
-│Lexer  │ │Parser│ │Sem  │ │Type│ │ IR │ │LLVM │ │Linker│
-│       │ │      │ │Ana  │ │Chk │ │Gen │ │CG   │ │      │
-└───┬───┘ └──┬───┘ └──┬──┘ └──┬─┘ └──┬─┘ └──┬──┘ └──┬───┘
+┌────▼──┐ ┌▼─────┐ ┌▼────┐ ┌▼───┐ ┌▼───┐ ┌▼────┐ ┌▼──────────┐
+│Lexer  │ │Parser│ │Sem  │ │Type│ │ MIR│ │LLVM │ │Linker     │
+│       │ │      │ │Ana  │ │Chk │ │    │ │CG   │ │           │
+└───┬───┘ └──┬───┘ └──┬──┘ └──┬─┘ └──┬─┘ └──┬──┘ └──┬───────┘
     │        │        │       │      │      │       │
     └────────┴────────┴───────┴──────┴──────┴───────┘
                         │
-              ┌─────────▼─────────┐
-              │    klc_core       │
-              │ AST, Span, Types  │
+              ┌─────────▼─────────┐   ┌──────────────────────┐
+              │    klc_core       │   │    klc_tools         │
+              │ AST, Span, Types, │   │ LSP, Formatter,      │
+              │ SourceMap, Diag   │   │ Package Manager      │
+              └───────────────────┘   └──────────────────────┘
+              ┌───────────────────┐
+              │   klc_runtime     │
+              │ String, I/O, Time │
+              │ Async, RAII       │
               └───────────────────┘
 ```
 
@@ -194,6 +215,7 @@ Produce executable or library
 
 ```text
 klc_cli → klc_driver
+klc_cli → klc_tools          (lsp, fmt subcommands)
 
 klc_driver → klc_frontend
 klc_driver → klc_semantic
@@ -205,6 +227,8 @@ klc_frontend → klc_core
 klc_semantic → klc_core
 klc_mir      → klc_core
 klc_backend  → klc_core
+klc_tools    → klc_core
+klc_tools    → klc_frontend   (formatter needs AST)
 ```
 
 ---
@@ -292,5 +316,6 @@ web = "1.0"
 ## Compiler Version
 
 ```text
-KL Compiler Architecture Specification v1.0
+KL Compiler Architecture Specification v2.0
+Last updated: 2026-11-19
 ```

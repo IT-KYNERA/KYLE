@@ -1,0 +1,29 @@
+fn main():
+    source = read_str(open("examples/hello.kl", "r"), 4096)
+    mut line = 1
+    mut col = 1
+    mut i = 0
+    while i < len(source):
+        c = ord(char_at(source, i))
+        if is_alpha(char_at(source, i)):
+            start = i
+            while i < len(source) && is_alnum(char_at(source, i)):
+                i = i + 1
+                col = col + 1
+            tok = substr(source, start, i - start)
+            println("IDENTIFIER(" + tok + ") at " + str(line) + ":" + str(col))
+        elif c == 61:
+            println("OPERATOR(=) at " + str(line) + ":" + str(col))
+            col = col + 1
+            i = i + 1
+        elif c == 10:
+            line = line + 1
+            col = 1
+            i = i + 1
+        elif is_whitespace(char_at(source, i)):
+            col = col + 1
+            i = i + 1
+        else:
+            col = col + 1
+            i = i + 1
+    println("=== Done ===")

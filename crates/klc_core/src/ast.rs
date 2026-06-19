@@ -419,6 +419,11 @@ pub enum Expr {
         expression: Box<Expr>,
         span: Span,
     },
+    Index {
+        target: Box<Expr>,
+        index: Box<Expr>,
+        span: Span,
+    },
     RangeSlice {
         target: Box<Expr>,
         start: Option<Box<Expr>>,
@@ -1031,6 +1036,12 @@ impl DisplayDepth for Expr {
                 write_indent(f, d)?;
                 writeln!(f, "Spread")?;
                 expression.fmt_depth(f, d + 1)
+            }
+            Expr::Index { target, index, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "Index")?;
+                target.fmt_depth(f, d + 1)?;
+                index.fmt_depth(f, d + 1)
             }
             Expr::RangeSlice { target, start, end, .. } => {
                 write_indent(f, d)?;

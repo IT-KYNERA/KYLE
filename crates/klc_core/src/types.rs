@@ -83,6 +83,7 @@ impl Type {
     pub fn can_assign_to(&self, target: &Type) -> bool {
         if self == target { return true; }
         match (self, target) {
+            (Type::Char, Type::I8 | Type::I16 | Type::I32 | Type::I64) => true,
             (Type::I8, Type::I16 | Type::I32 | Type::I64) => true,
             (Type::I16, Type::I32 | Type::I64) => true,
             (Type::I32, Type::I64) => true,
@@ -99,6 +100,7 @@ impl Type {
             Type::I8 | Type::I16 | Type::I32 | Type::I64
             | Type::U8 | Type::U16 | Type::U32 | Type::U64
             | Type::F32 | Type::F64
+            | Type::Char
         )
     }
 

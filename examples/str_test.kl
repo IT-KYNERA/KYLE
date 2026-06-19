@@ -1,0 +1,10 @@
+fn tok_name(t: i32) -> str:
+    return "HELLO"
+
+fn main():
+    t = 1
+    val = "x"
+    line = 1
+    col = 1
+    result = tok_name(t) + ":" + val + ":" + str(line) + ":" + str(col)
+    println(result)

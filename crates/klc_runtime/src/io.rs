@@ -78,8 +78,7 @@ pub extern "C" fn kl_input() -> *mut u8 {
         Ok(_) => {
             let trimmed = line.trim_end_matches('\n');
             let len = trimmed.len();
-            let layout = std::alloc::Layout::array::<u8>(len + 1).expect("invalid layout");
-            let ptr = unsafe { std::alloc::alloc(layout) };
+            let ptr = crate::kl_alloc((len + 1) as i64);
             if !ptr.is_null() {
                 unsafe {
                     std::ptr::copy_nonoverlapping(trimmed.as_ptr(), ptr, len);
@@ -134,12 +133,11 @@ pub extern "C" fn kl_open(path: *const u8, mode: *const u8) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_read_str(fd: i32, count: i32) -> *mut u8 {
     if count <= 0 { return std::ptr::null_mut(); }
-    let layout = std::alloc::Layout::array::<u8>(count as usize + 1).expect("invalid layout");
-    let ptr = unsafe { std::alloc::alloc(layout) };
+    let ptr = crate::kl_alloc(count as i64);
     if ptr.is_null() { return std::ptr::null_mut(); }
     let n = unsafe { read(fd, ptr, count as i64) };
     if n < 0 {
-        unsafe { std::alloc::dealloc(ptr, layout); }
+        crate::kl_free(ptr);
         return std::ptr::null_mut();
     }
     unsafe { *ptr.add(n as usize) = 0; }

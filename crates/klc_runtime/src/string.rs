@@ -1,19 +1,17 @@
 use core::ptr;
-use std::alloc::Layout;
 
 /// Convert an i64 to its string representation.
-/// Returns a pointer to a null-terminated C string in a static buffer.
-/// Note: uses a fixed static buffer — not thread-safe but simple for single-threaded use.
+/// Returns a heap-allocated null-terminated C string.
+/// Caller must free with kl_free.
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_i64_to_str(val: i64) -> *const u8 {
-    static mut BUF: [u8; 32] = [0u8; 32];
-    let buf = &raw mut BUF as *mut u8;
+    let mut tmp: [u8; 32] = [0u8; 32];
     let len = 32usize;
     let mut n = if val < 0 { -val } else { val };
     let mut i = len;
     loop {
         i -= 1;
-        unsafe { *buf.add(i) = (n % 10) as u8 + b'0'; }
+        tmp[i] = (n % 10) as u8 + b'0';
         n /= 10;
         if n == 0 {
             break;
@@ -21,9 +19,19 @@ pub extern "C" fn kl_i64_to_str(val: i64) -> *const u8 {
     }
     if val < 0 {
         i -= 1;
-        unsafe { *buf.add(i) = b'-'; }
+        tmp[i] = b'-';
     }
-    unsafe { buf.add(i) as *const u8 }
+    let s = &tmp[i..];
+    let alloc_len = s.len();
+    let buf = crate::kl_alloc((alloc_len + 1) as i64);
+    if buf.is_null() {
+        return std::ptr::null();
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(s.as_ptr(), buf, alloc_len);
+        *buf.add(alloc_len) = 0;
+    }
+    buf as *const u8
 }
 
 /// Get the length of a null-terminated C string (strlen).
@@ -51,8 +59,7 @@ pub extern "C" fn kl_concat(a: *const u8, a_len: i32, b: *const u8, b_len: i32) 
     }
     let len = a_len + b_len;
     let total = (len + 1) as usize;
-    let layout = Layout::array::<u8>(total).expect("invalid layout");
-    let result = unsafe { std::alloc::alloc(layout) };
+    let result = crate::kl_alloc(total as i64);
     if result.is_null() {
         return core::ptr::null_mut();
     }
@@ -104,8 +111,7 @@ pub extern "C" fn kl_str_contains(haystack: *const u8, needle: *const u8) -> i32
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_str_to_upper(ptr: *const u8) -> *mut u8 {
     let len = kl_strlen(ptr) as usize;
-    let layout = std::alloc::Layout::array::<u8>(len + 1).expect("invalid layout");
-    let result = unsafe { std::alloc::alloc(layout) };
+    let result = crate::kl_alloc((len + 1) as i64);
     if result.is_null() { return result; }
     unsafe {
         for i in 0..len {
@@ -121,8 +127,7 @@ pub extern "C" fn kl_str_to_upper(ptr: *const u8) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_str_to_lower(ptr: *const u8) -> *mut u8 {
     let len = kl_strlen(ptr) as usize;
-    let layout = std::alloc::Layout::array::<u8>(len + 1).expect("invalid layout");
-    let result = unsafe { std::alloc::alloc(layout) };
+    let result = crate::kl_alloc((len + 1) as i64);
     if result.is_null() { return result; }
     unsafe {
         for i in 0..len {
@@ -145,8 +150,7 @@ pub extern "C" fn kl_str_trim(ptr: *const u8) -> *mut u8 {
         let mut end = len;
         while end > start && *ptr.add(end - 1) <= b' ' { end -= 1; }
         let new_len = end - start;
-        let layout = std::alloc::Layout::array::<u8>(new_len + 1).expect("invalid layout");
-        let result = std::alloc::alloc(layout);
+        let result = crate::kl_alloc((new_len + 1) as i64);
         if result.is_null() { return result; }
         core::ptr::copy_nonoverlapping(ptr.add(start), result, new_len);
         *result.add(new_len) = 0;
@@ -163,8 +167,7 @@ pub extern "C" fn kl_str_replace(ptr: *const u8, from: *const u8, to: *const u8)
     let tlen = kl_strlen(to) as usize;
     if flen == 0 || flen > slen {
         // no replacement possible, return copy
-        let layout = std::alloc::Layout::array::<u8>(slen + 1).expect("invalid layout");
-        let result = unsafe { std::alloc::alloc(layout) };
+        let result = crate::kl_alloc((slen + 1) as i64);
         if result.is_null() { return result; }
         unsafe {
             core::ptr::copy_nonoverlapping(ptr, result, slen);
@@ -185,8 +188,7 @@ pub extern "C" fn kl_str_replace(ptr: *const u8, from: *const u8, to: *const u8)
             else { i += 1; }
         }
         let new_len = slen + (tlen.saturating_sub(flen)) * (count as usize);
-        let layout = std::alloc::Layout::array::<u8>(new_len + 1).expect("invalid layout");
-        let result = std::alloc::alloc(layout);
+        let result = crate::kl_alloc((new_len + 1) as i64);
         if result.is_null() { return result; }
         let mut wp = result;
         let mut rp = ptr;
@@ -273,4 +275,26 @@ pub extern "C" fn kl_is_lower(c: i8) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_ord(c: i8) -> i32 {
     c as i32
+}
+
+/// Extract a substring from a C string.
+/// Returns a heap-allocated, null-terminated string.
+/// start: byte offset, count: number of bytes to extract.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_substr(s: *const u8, start: i64, count: i64) -> *const u8 {
+    if s.is_null() || count <= 0 {
+        return std::ptr::null();
+    }
+    let len = count as usize;
+    let buf = crate::kl_alloc((len + 1) as i64);
+    if buf.is_null() {
+        return std::ptr::null();
+    }
+    unsafe {
+        for i in 0..len {
+            *buf.add(i) = *s.add(start as usize + i);
+        }
+        *buf.add(len) = 0;
+    }
+    buf as *const u8
 }

@@ -579,6 +579,12 @@ impl Formatter {
                 write!(out, "..").unwrap();
                 self.write_expr(out, expression);
             }
+            Expr::Index { target, index, .. } => {
+                self.write_expr(out, target);
+                out.push('[');
+                self.write_expr(out, index);
+                out.push(']');
+            }
             Expr::RangeSlice { start, end, .. } => {
                 if let Some(s) = start {
                     self.write_expr(out, s);
@@ -696,6 +702,7 @@ fn expr_span(expr: &Expr) -> klc_core::span::Span {
         Expr::PropertyAccess { span, .. } => *span,
         Expr::OptionalChain { span, .. } => *span,
         Expr::ErrorProp { span, .. } => *span,
+        Expr::Index { span, .. } => *span,
         Expr::List { span, .. } => *span,
         Expr::Dictionary { span, .. } => *span,
         Expr::Tuple { span, .. } => *span,

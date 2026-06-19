@@ -73,6 +73,56 @@ Tests:          118 tests, 0 failures ✅
 | LSP client | `vscode-kl/src/extension.ts` | ✅ launches `klc lsp`, commands `kl.run/build/check` |
 | CLI lsp command | `klc_cli/src/main.rs` | ✅ `klc lsp` (ya existía) |
 
+### Sesión 6 — Fase 6: Self-Hosting infraestructura (char ops, fixes, lexer.kl)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Runtime char ops | `klc_runtime/src/string.rs` | ✅ `kl_char_at`, `kl_is_digit`, `kl_is_alpha`, `kl_is_alnum`, `kl_is_whitespace`, `kl_is_upper`, `kl_is_lower` |
+| Runtime `ord()` | `klc_runtime/src/string.rs` | ✅ `kl_ord(i8) -> i32` |
+| Compiler char builtins | `symbol_table.rs`, `lower.rs`, `codegen.rs` | ✅ extern decls, name remapping, return types |
+| Fix: hardcoded `if_then` block name | `lower.rs` | ✅ `Stmt::If` usa `ctx.fresh_block()` en vez de `"if_then"` |
+| Fix: elif chain block collision | `lower.rs` | ✅ cada elif usa su propio nombre de bloque (`elif_cond_labels[i]`) |
+| Fix: string escape sequences | `klc_frontend/src/lexer.rs` | ✅ `lex_string()` procesa `\n`, `\t`, `\"`, etc. |
+| Fix: string return from user fn | `lower.rs` | ✅ `fn_returns` map + `MirType::Str` en calls |
+| Fix: string concat result type | `lower.rs` | ✅ `MirType::I64` → `MirType::Str` para que `string_locals` funcione |
+| Fix: `Stmt::Break` lowering | `lower.rs` | ✅ `Unreachable` → `Br(loop_end)` via `break_targets` stack |
+| Lexer escrito en KL | `examples/lexer.kl` | ✅ tokeniza `x = 1 + 2\n` → 7 tokens correctos |
+| Tests | - | ✅ 118 tests, 0 failures |
+
+### Sesión 7 — Documentación: docs sync con estado real del compilador
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Roadmap actualizado | `docs/13-roadmap.md` | ✅ Fase 4 ✓, Fase 5 ✓, Fase 6 en progreso |
+| Language spec v2.0 | `docs/01-language-specification.md` | ✅ string escapes, char literals, builtins, break |
+| Std library spec v2.0 | `docs/07-standard-library.md` | ✅ builtins reales, testing API, time top-level |
+| Formal grammar | `docs/02-formal-grammar.md` | ✅ char_literal, escape_sequence, character production |
+| Compiler architecture | `docs/10-compiler-architecture.md` | ✅ MIR pipeline real, klc_tools, ownership pass |
+| Error catalog | `docs/14-error-catalog.md` | ✅ repo URL fixed, lint rules marked 🔶 |
+
+### Sesión 8 — Fase 6: Char comparison fix, RAII alloc fix, string lists, lexer file I/O
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| `Type::Char` → `is_numeric()` + `can_assign_to()` | `klc_core/src/types.rs` | ✅ char se trata como numérico para `+`, `==`, `<`, etc. |
+| Type checker Eq/Neq diagnostic | `klc_semantic/src/type_checker.rs` | ✅ reporta error si unificación falla |
+| Lowering: Cast antes de BinaryOp | `klc_mir/src/lower.rs` | ✅ inserta Cast si operandos tienen distinto ancho |
+| Runtime: `kl_read_str` usa `kl_alloc` | `klc_runtime/src/io.rs` | ✅ RAII cleanup no crashea |
+| Runtime: string ops usan `kl_alloc` | `klc_runtime/src/string.rs` | ✅ concat, upper, lower, trim, replace, substr |
+| Runtime: `kl_input` usa `kl_alloc` | `klc_runtime/src/io.rs` | ✅ RAII cleanup no crashea |
+| Codegen: Cast ptr↔int via ptrtoint/inttoptr | `klc_backend/src/codegen.rs` | ✅ string lists funcionan |
+| Lowering: `substr` special case con cast i64 | `klc_mir/src/lower.rs` | ✅ args pasados como i64, resultado en string_locals |
+| Lowering: `Expr::Index` detecta `List(Str)` | `klc_mir/src/lower.rs` | ✅ retorna Str con inttoptr |
+| Lowering: `Expr::List` inferencia de tipo | `klc_mir/src/lower.rs` | ✅ `["a", "b"]` → `List(Str)`, `[1, 2]` → `List(I32)` |
+| Lexer real (file I/O) | `examples/lexer.kl` | ✅ lee `examples/hello.kl`, tokeniza con posición |
+| Tests | - | ✅ 118 tests, 0 failures |
+
+### Sesión 9 — Fase 6: SSA dominance fix para kl_release (crash en cleanup)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Root cause: SSA dominance violation | `klc_backend/src/codegen.rs`, `klc_mir/src/ownership.rs` | ✅ `last_value_map` almacenaba SSA values de `kl_concat` en basic block del loop body, usados por `kl_release` en basic block no-dominante (return). LLVM generaba código con punteros basura (stack garbage, kernel addresses). |
+| Fix codegen: Store call results a alloca | `klc_backend/src/codegen.rs` | ✅ `build_store` después de `build_call` para que el alloca tenga el valor correcto para cross-block reads |
+| Fix ownership: Load+Call para kl_release | `klc_mir/src/ownership.rs` | ✅ en vez de `kl_release(MirValue::Local(id))` (usa last_value_map), emite `Load { dest: tmp, src: id }` + `Call kl_release(tmp)` para leer el alloca directamente |
+| Lexer sin crash | `examples/lexer.kl` | ✅ cleanup sin errores (15 frees exitosos, 0 punteros corruptos) |
+| Tests | - | ✅ 118 tests, 0 failures |
+
 ## Glossary — Abreviaciones Técnicas
 
 | Sigla | Inglés | Español / Qué es |
@@ -119,12 +169,12 @@ Source (.kl)               ← tú escribes esto
 | `klc_core` | `source_map.rs` | 61 | ✅ completo |
 | `klc_core` | `diagnostic.rs` | ~200 | 🔶 le faltan códigos de error |
 | `klc_frontend` | `token.rs` | 147 | ✅ completo |
-| `klc_frontend` | `lexer.rs` | 427 → ~810 | ✅ span tracking, Position real |
+| `klc_frontend` | `lexer.rs` | 809 | ✅ span tracking, Position real, escape strings |
 | `klc_frontend` | `parser.rs` | 812 → ~1353 | ✅ span tracking agregado (60+ nodos) |
 | `klc_semantic` | `type_checker.rs` | 1380 | ✅ 47 tests |
 | `klc_semantic` | `symbol_table.rs` | - | ✅ builtins completos |
 | `klc_mir` | `mir.rs` | 312 | ✅ completo |
-| `klc_mir` | `lower.rs` | 814 | ✅ string ops, type inference |
+| `klc_mir` | `lower.rs` | 860 | ✅ string ops, type inference, break targets |
 | `klc_mir` | `optimize.rs` | 180 | ✅ 2 tests |
 | `klc_mir` | `ownership.rs` | - | ✅ RAII inference pass |
 | `klc_backend` | `codegen.rs` | 479 | ✅ LLVM 18.1, inkwell |
@@ -170,7 +220,7 @@ kl/
 │
 ├── runtime/                ← KL runtime (Rust) ⏳
 ├── std/                    ← Standard library (KL) ⏳
-├── docs/                   ← 16 specification documents (frozen)
+├── docs/                   ← 16 specification documents (mantener al día)
 ├── examples/               ← Example .kl programs
 ├── tests/                  ← Test suite ⏳
 ├── benchmarks/             ← Benchmarks ⏳
@@ -240,8 +290,16 @@ FASE 5 — Tooling (✅ Complete)
 ├── [x] VS Code extension: syntax highlighting, LSP client, build/run/check commands
 │   Hito: klc fmt, klc lsp, kl run, kl build — todo funcional
 
-FASE 6 — Self-Hosting (2028)
-├── [ ] Compilador escrito en KL
+FASE 6 — Self-Hosting (⏳ In Progress)
+├── [x] Runtime char ops + ord() builtin
+├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
+├── [x] Lexer escrito en KL (examples/lexer.kl) — tokeniza archivos reales
+├── [x] Fix: char/int comparison + type widening en lowering
+├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
+├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
+├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
+├── [ ] Parser escrito en KL
+├── [ ] Compilador completo en KL
 │   Hito: kl build klc
 ```
 
@@ -281,8 +339,8 @@ FASE 6 — Self-Hosting (2028)
 | # | Archivo | Contenido |
 |---|---------|-----------|
 | 00 | `vision.md` | Filosofía y principios de diseño |
-| 01 | `language-specification.md` | Sintaxis completa del lenguaje (1566 líneas) |
-| 02 | `formal-grammar.md` | Gramática EBNF formal (1076 líneas) |
+| 01 | `language-specification.md` | Sintaxis completa del lenguaje (~1650 líneas) |
+| 02 | `formal-grammar.md` | Gramática EBNF formal (~1085 líneas) |
 | 03 | `ast-specification.md` | Definición de nodos AST (905 líneas) |
 | 04 | `type-system.md` | Sistema de tipos y reglas (1038 líneas) |
 | 05 | `error-system.md` | Manejo de errores (810 líneas) |

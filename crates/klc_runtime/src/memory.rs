@@ -11,7 +11,9 @@ const HEADER_SIZE: usize = std::mem::size_of::<Header>();
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_alloc(size: i64) -> *mut u8 {
     let total = size as usize + HEADER_SIZE;
-    let layout = std::alloc::Layout::array::<u8>(total).expect("invalid layout");
+    // Ensure alignment for Header (AtomicI64 requires 8-byte alignment on aarch64)
+    let layout = std::alloc::Layout::from_size_align(total, std::mem::align_of::<Header>())
+        .expect("invalid layout");
     let ptr = unsafe { std::alloc::alloc(layout) };
     if ptr.is_null() {
         return ptr;
@@ -32,7 +34,8 @@ pub extern "C" fn kl_free(ptr: *mut u8) {
     unsafe {
         let header_ptr = ptr.sub(HEADER_SIZE) as *mut Header;
         let total = (*header_ptr).size as usize + HEADER_SIZE;
-        let layout = std::alloc::Layout::array::<u8>(total).expect("invalid layout");
+        let layout = std::alloc::Layout::from_size_align(total, std::mem::align_of::<Header>())
+            .expect("invalid layout");
         std::alloc::dealloc(header_ptr as *mut u8, layout);
     }
 }

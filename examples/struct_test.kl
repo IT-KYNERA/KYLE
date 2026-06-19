@@ -1,0 +1,11 @@
+struct Point:
+    x: i32
+    y: i32
+
+fn main() -> i32:
+    mut p: Point
+    p.x = 10
+    p.y = 20
+    result = "x: " + str(p.x) + " y: " + str(p.y)
+    println(result)
+    0

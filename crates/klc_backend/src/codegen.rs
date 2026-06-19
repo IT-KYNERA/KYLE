@@ -191,6 +191,47 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i8_ty.fn_type(&params, false);
             self.module.add_function("kl_char_at", ft, None);
         }
+        // ptr kl_list_new()
+        {
+            let ft = ptr_ty.fn_type(&[], false);
+            self.module.add_function("kl_list_new", ft, None);
+        }
+        // void kl_list_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_free", ft, None);
+        }
+        // void kl_list_push(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_push", ft, None);
+        }
+        // i64 kl_list_get(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_get", ft, None);
+        }
+        // void kl_list_set(ptr, i64, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_set", ft, None);
+        }
+        // i64 kl_list_len(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_len", ft, None);
+        }
+        // ptr kl_substr(ptr, i64, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_substr", ft, None);
+        }
         // i32 kl_is_digit(i8), kl_is_alpha(i8), etc.
         {
             let i8_ty = self.context.i8_type();
@@ -216,13 +257,23 @@ impl<'ctx> Codegen<'ctx> {
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
             MirType::Char => self.context.i8_type().as_basic_type_enum(),
             MirType::Str => self.context.ptr_type(Default::default()).as_basic_type_enum(),
+            MirType::List(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Void => self.context.i32_type().as_basic_type_enum(),
             MirType::Ptr(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Array(inner) => {
                 let base = self.llvm_type(inner);
                 base.array_type(0).as_basic_type_enum()
             }
-            MirType::Struct(_) => self.context.i32_type().as_basic_type_enum(),
+            MirType::Struct(name, fields) => {
+                let struct_ty = self.context.opaque_struct_type(name);
+                if struct_ty.is_opaque() {
+                    let field_types: Vec<BasicTypeEnum<'ctx>> = fields.iter()
+                        .map(|(_, ty)| self.llvm_type(ty))
+                        .collect();
+                    struct_ty.set_body(&field_types, false);
+                }
+                struct_ty.as_basic_type_enum()
+            }
         }
     }
 
@@ -380,6 +431,12 @@ impl<'ctx> Codegen<'ctx> {
                                 "is_upper" => "kl_is_upper",
                                 "is_lower" => "kl_is_lower",
                                 "ord" => "kl_ord",
+                                "substr" => "kl_substr",
+                                "list_new" => "kl_list_new",
+                                "list_push" => "kl_list_push",
+                                "list_get" => "kl_list_get",
+                                "list_set" => "kl_list_set",
+                                "list_len" => "kl_list_len",
                                 _ => name,
                             };
                             let callee = self.module.get_function(runtime_name);
@@ -394,6 +451,13 @@ impl<'ctx> Codegen<'ctx> {
                                     .map_err(|e| format!("call {}: {}", name, e))?;
                                 if let Some(d) = dest {
                                     if let inkwell::values::ValueKind::Basic(ret_val) = call_result.try_as_basic_value() {
+                                        // Store call result to both the last_value_map (for SSA-style use
+                                        // within the same basic block) AND the alloca (for cross-block
+                                        // references like kl_release in the return block)
+                                        if let Some(alloca_ptr) = alloca_map.get(*d).and_then(|p| *p) {
+                                            self.builder.build_store(alloca_ptr, ret_val)
+                                                .map_err(|e| format!("call store {}: {}", name, e))?;
+                                        }
                                         last_value_map.insert(*d, ret_val);
                                     }
                                 }
@@ -412,15 +476,39 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             }
                         }
+                        MirInst::FieldPtr { dest, ptr, field_index, .. } => {
+                            if let Some(base_ptr) = alloca_map.get(*ptr).and_then(|p| *p) {
+                                if let Some(struct_type) = alloca_types.get(ptr) {
+                                    let zero = self.context.i32_type().const_zero();
+                                    let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
+                                    let gep = unsafe {
+                                        self.builder.build_gep(*struct_type, base_ptr, &[zero, idx_val], "")
+                                            .map_err(|e| format!("field_ptr: {}", e))?
+                                    };
+                                    alloca_map[*dest] = Some(gep);
+                                }
+                            }
+                        }
                         MirInst::Cast { dest, value, to_type } => {
                             let val = self.value_to_llvm(value, &last_value_map)?;
                             let target_type = self.llvm_type(to_type);
-                            if let BasicValueEnum::IntValue(int_val) = val {
-                                if let BasicTypeEnum::IntType(t) = target_type {
-                                    let result = self.builder.build_int_cast(int_val, t, "")
+                            match (&val, &target_type) {
+                                (BasicValueEnum::IntValue(int_val), BasicTypeEnum::IntType(t)) => {
+                                    let result = self.builder.build_int_cast(*int_val, *t, "")
                                         .map_err(|e| format!("cast: {}", e))?;
                                     last_value_map.insert(*dest, result.as_basic_value_enum());
                                 }
+                                (BasicValueEnum::PointerValue(ptr_val), BasicTypeEnum::IntType(t)) => {
+                                    let result = self.builder.build_ptr_to_int(*ptr_val, *t, "")
+                                        .map_err(|e| format!("ptrtoint: {}", e))?;
+                                    last_value_map.insert(*dest, result.as_basic_value_enum());
+                                }
+                                (BasicValueEnum::IntValue(int_val), BasicTypeEnum::PointerType(t)) => {
+                                    let result = self.builder.build_int_to_ptr(*int_val, *t, "")
+                                        .map_err(|e| format!("inttoptr: {}", e))?;
+                                    last_value_map.insert(*dest, result.as_basic_value_enum());
+                                }
+                                _ => {} // type pair not supported
                             }
                         }
                     }

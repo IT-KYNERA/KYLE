@@ -35,7 +35,9 @@ pub enum MirType {
     Void,
     Ptr(Box<MirType>),
     Array(Box<MirType>),
-    Struct(Vec<MirType>),
+    List(Box<MirType>),
+    /// A struct type with name, field names, and field types.
+    Struct(String, Vec<(String, MirType)>),
 }
 
 /// Binary operators in MIR.
@@ -68,8 +70,10 @@ pub enum MirInst {
     UnaryOp { dest: usize, op: MirUnaryOp, operand: MirValue },
     /// Call a function: dest = func(args...).
     Call { dest: Option<usize>, name: String, args: Vec<MirValue> },
-    /// Get pointer to array/struct element.
+    /// Get pointer to array element.
     PtrOffset { dest: usize, ptr: usize, index: MirValue },
+    /// Get pointer to a struct field by index.
+    FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
     /// Cast between types.
     Cast { dest: usize, value: MirValue, to_type: MirType },
 }
@@ -165,13 +169,14 @@ impl fmt::Display for MirType {
             MirType::Void => write!(f, "void"),
             MirType::Ptr(inner) => write!(f, "{}*", inner),
             MirType::Array(inner) => write!(f, "[{}]", inner),
-            MirType::Struct(fields) => {
-                write!(f, "{{")?;
-                for (i, t) in fields.iter().enumerate() {
+            MirType::List(inner) => write!(f, "list<{}>", inner),
+            MirType::Struct(name, fields) => {
+                write!(f, "{} {{ ", name)?;
+                for (i, (fname, t)) in fields.iter().enumerate() {
                     if i > 0 { write!(f, ", ")?; }
-                    write!(f, "{}", t)?;
+                    write!(f, "{}: {}", fname, t)?;
                 }
-                write!(f, "}}")
+                write!(f, " }}")
             }
         }
     }
@@ -260,6 +265,9 @@ impl fmt::Display for MirInst {
             }
             MirInst::PtrOffset { dest, ptr, index } => {
                 write!(f, "  %{} = ptr_offset %{}, {}", dest, ptr, index)
+            }
+            MirInst::FieldPtr { dest, ptr, field_index, .. } => {
+                write!(f, "  %{} = field_ptr %{}, field {}", dest, ptr, field_index)
             }
             MirInst::Cast { dest, value, to_type } => {
                 write!(f, "  %{} = cast {} to {}", dest, value, to_type)

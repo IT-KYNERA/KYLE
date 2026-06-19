@@ -74,6 +74,12 @@ impl SemanticSymbolTable {
             ("is_upper", Type::Bool),
             ("is_lower", Type::Bool),
             ("ord", Type::I32),
+            ("list_new", Type::I64),
+            ("list_push", Type::Void),
+            ("list_get", Type::I64),
+            ("list_set", Type::Void),
+            ("list_len", Type::I64),
+            ("substr", Type::Str),
         ];
         for (name, return_type) in builtins {
             let binding = Binding {

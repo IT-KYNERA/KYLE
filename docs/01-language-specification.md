@@ -122,6 +122,20 @@ char
 str
 ```
 
+## Char Literals
+
+Single-quoted characters with optional escape sequences:
+
+```kl
+c = 'x'
+newline = 'n'     # newline character (same as \n in strings)
+tab = 't'         # tab character
+backslash = '\\'  # backslash
+quote = '\''      # single quote
+```
+
+Supported escape sequences match string escapes: `\n`, `\t`, `\r`, `\\`, `\'`, `\0`.
+
 ---
 
 # Optional Types
@@ -464,6 +478,33 @@ Attributes appear before the declaration on a separate line, starting with `#[`
 
 ---
 
+# String Literals
+
+Double-quoted strings:
+
+```kl
+name = "Hello"
+```
+
+## Escape Sequences
+
+String literals support these escape sequences:
+
+| Sequence | Meaning |
+|----------|---------|
+| `\n`     | Newline |
+| `\t`     | Tab |
+| `\r`     | Carriage return |
+| `\\`     | Backslash |
+| `\"`     | Double quote |
+| `\{`     | Opening brace (escaped interpolation) |
+| `\0`     | Null character |
+
+```kl
+text = "Line1\nLine2\tindented"
+path = "C:\\Users\\name"
+```
+
 # String Interpolation
 
 Embed expressions inside double-quoted strings with `{}`:
@@ -486,6 +527,58 @@ Rule:
 ```text
 Interpolation is only supported in double-quoted strings.
 Single-quoted chars (char) do not support interpolation.
+```
+
+---
+
+# Built-in Functions
+
+Available without imports:
+
+## String & Character
+
+```kl
+len(s)                    # → i32: length of string s
+str(value)                # → str: convert i32/f64/bool to string
+char_at(s, i)             # → char (i8): character at index i
+ord(c)                    # → i32: Unicode codepoint of char
+is_digit(c)               # → i32: 1 if '0'-'9'
+is_alpha(c)               # → i32: 1 if 'a'-'z' or 'A'-'Z'
+is_alnum(c)               # → i32: 1 if alphanumeric
+is_whitespace(c)          # → i32: 1 if space/tab/newline
+is_upper(c)               # → i32: 1 if uppercase letter
+is_lower(c)               # → i32: 1 if lowercase letter
+contains(s, sub)          # → i32: 1 if s contains sub
+to_upper(s)               # → str: uppercase copy
+to_lower(s)               # → str: lowercase copy
+trim(s)                   # → str: trim whitespace
+replace(s, from, to)      # → str: replace all occurrences
+input(prompt)             # → str: read line from stdin
+```
+
+## I/O
+
+```kl
+print(value)              # print without newline
+println(value)            # print with newline
+open(path, mode)          # → i64: file handle (mode: 0=read, 1=write)
+read_str(handle)          # → str: read entire file
+write_str(handle, text)   # write string to file
+close(handle)             # close file handle
+```
+
+## Time
+
+```kl
+sleep(ms)                 # sleep for milliseconds
+now()                     # → i64: Unix timestamp in milliseconds
+```
+
+## Math (top-level builtins)
+
+```kl
+range(end)                # returns a range value
+range(start, end)         # returns a range value
 ```
 
 ---
@@ -859,9 +952,19 @@ match x:
 
 ---
 
-# Break With Value
+# Break
 
-Return a value from a loop:
+Terminate the current loop early. Optionally return a value from a `loop:` expression:
+
+```kl
+while running:
+
+    if done:
+
+        break
+```
+
+Break with value (only in `loop:` expressions):
 
 ```kl
 result = loop:
@@ -871,7 +974,7 @@ result = loop:
         break result_value
 ```
 
-Equivalent to a labeled break with expression.
+Equivalent to a labeled break with expression. `break` terminates only the innermost loop; `break` in nested loops targets the direct enclosing loop.
 
 ---
 
@@ -1566,5 +1669,6 @@ Kynera Language
 # Version
 
 ```text
-KL Programming Language Specification v1.0
+KL Programming Language Specification v2.0
+Last updated: 2026-11-19
 ```

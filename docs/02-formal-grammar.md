@@ -122,7 +122,7 @@ Examples:
 ```ebnf
 string =
     '"'
-    { character | interpolation }
+    { character | escape_sequence | interpolation }
     '"'
 ;
 
@@ -130,6 +130,20 @@ interpolation =
     "{"
     expression
     "}"
+;
+
+escape_sequence =
+      "\\n"    (* newline *)
+    | "\\t"    (* tab *)
+    | "\\r"    (* carriage return *)
+    | "\\\\"  (* backslash *)
+    | "\\\""  (* double quote *)
+    | "\\{"   (* escaped interpolation *)
+    | "\\0"   (* null *)
+;
+
+character =
+    ? any Unicode codepoint except '"', '{', and '\' ?
 ;
 ```
 
@@ -139,7 +153,30 @@ Examples:
 "John"
 "Hello World"
 ""
+"Line1\nLine2"
 "Hello {name}, age {age}"
+```
+
+---
+
+## Char
+
+```ebnf
+char_literal =
+    "'"
+    ( character | escape_sequence )
+    "'"
+;
+```
+
+Char literals are single characters with the same escape sequences as strings:
+
+```kl
+'x'
+'n'        (* newline *)
+'t'        (* tab *)
+'\\'       (* backslash *)
+'\''       (* single quote *)
 ```
 
 ---
