@@ -131,7 +131,7 @@ Tests:          86 tests, 0 failures ✅
 | Parser en Kyle | `examples/parser.kl` | ✅ 1511 líneas, AST recursivo con `AstNode`, pasa Rust frontend test |
 | Tests | - | ✅ 84 tests, 0 failures |
 
-### Sesión 11 — Fase 6: RAII per-block release fix + lexer.kl funcionando + kl_list_pop
+### Sesión 11 — Fase 6: RAII per-block release fix + lexer.kl funcionando + kl_list_pop + auto-declare fix
 | Feature | Archivos | Estado |
 |---------|----------|--------|
 | Fix: RAII per-block release temp IDs | `klc_mir/src/ownership.rs` | ✅ temp IDs únicos con orden inverso para inserts correctos |
@@ -141,6 +141,9 @@ Tests:          86 tests, 0 failures ✅
 | Lowering: `pop()` method call | `klc_mir/src/lower.rs` | ✅ `list.pop()` → `kl_list_pop(list)` (análogo a `add`) |
 | Codegen: `kl_list_pop` decl | `klc_backend/src/codegen.rs` | ✅ `i64 kl_list_pop(ptr)` extern declaration |
 | Lexer en Kyle | `examples/lexer.kl` | ✅ tokeniza `examples/hello.kl` correctamente con INDENT/DEDENT |
+| Fix: type checker auto-declare `ident = expr` | `klc_semantic/src/type_checker.rs` | ✅ `check_stmt` intercepta `Stmt::Expression(Expr::Assignment)` con destino `Identifier`, infiere el tipo del valor y registra la variable en el scope actual |
+| Root cause | scope.rs / type_checker.rs | ✅ Scope resolver auto-declara variables dentro del scope de la función, pero `resolve_function` hace `pop_scope()` al terminar, eliminando las variables. El type checker arranca con un símbol table vacío (sin variables auto-declaradas). |
+| Verificación | `examples/fibonacci.kl` | ✅ `klc run examples/fibonacci.kl` → `fibonacci(10) = 55` |
 | Tests | - | ✅ 86 tests, 0 failures |
 
 ## Glossary — Abreviaciones Técnicas
@@ -318,8 +321,14 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 ├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
 ├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
 ├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
+<<<<<<< Updated upstream
 ├── [x] Parser escrito en Kyle
 ├── [ ] Compilador completo en Kyle
+=======
+├── [x] Parser escrito en KL
+├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
+├── [ ] Compilador completo en KL
+>>>>>>> Stashed changes
 │   Hito: kl build klc
 ```
 
@@ -334,6 +343,8 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 - `formatter.rs`: conservación de comentarios usando last_comment_line tracking + source_lines
 - `parser.rs`: `parse_block` ahora para tras 1 statement si no hay Newline (single-line bodies)
 - `parser.rs`: `parse_if` consume Newlines entre if-body y elif/else (blank lines entre branches)
+- `type_checker.rs`: auto-declara `ident = expr` con el tipo inferido del valor (para que `str(result)` funcione)
+- `type_checker.rs`: auto-declara `ident = expr` con el tipo inferido del valor (para que `str(result)` funcione)
 
 ## Key Design Decisions (frozen)
 
