@@ -1,10 +1,10 @@
-# KL Module System Specification v1.0
+# Kyle Module System Specification v1.0
 
 ---
 
 # Philosophy
 
-The KL module system is designed around:
+The Kyle module system is designed around:
 
 ```text
 Simplicity
@@ -48,7 +48,7 @@ Enterprise Ready
 
 # Core Concepts
 
-KL organizes code using:
+Kyle organizes code using:
 
 ```text
 Module
@@ -257,7 +257,7 @@ Visible only inside current module.
 
 # Visibility
 
-KL uses naming conventions for visibility — no keywords needed.
+Kyle uses naming conventions for visibility — no keywords needed.
 
 ```kl
 name          # public — visible to all modules
@@ -481,7 +481,7 @@ version = "1.0.0"
 
 edition = "1"
 
-authors = ["Kynera"]
+authors = ["Kyle"]
 
 license = "MIT"
 ```
@@ -572,7 +572,7 @@ members = [
 Example:
 
 ```text
-kynera/
+kyle/
 
     apps/
 
@@ -636,7 +636,7 @@ Example:
 Default:
 
 ```text
-KL Registry
+Kyle Registry
 ```
 
 Commands:
@@ -914,5 +914,5 @@ Cloud Native
 # Version
 
 ```text
-KL Module System Specification v1.0
+Kyle Module System Specification v1.0
 ```

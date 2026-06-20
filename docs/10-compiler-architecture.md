@@ -1,10 +1,10 @@
-# KL Compiler Architecture Specification v1.0
+# Kyle Compiler Architecture Specification v1.0
 
 ---
 
 ## Overview
 
-The KL compiler transforms `.kl` source files into native machine code.
+The Kyle compiler transforms `.kl` source files into native machine code.
 
 ### Pipeline
 
@@ -316,6 +316,6 @@ web = "1.0"
 ## Compiler Version
 
 ```text
-KL Compiler Architecture Specification v2.0
+Kyle Compiler Architecture Specification v2.0
 Last updated: 2026-11-19
 ```

@@ -1,8 +1,8 @@
-# KL Formal Grammar Specification v1.0
+# Kyle Formal Grammar Specification v1.0
 
 ## Introduction
 
-This document defines the formal grammar of the KL programming language.
+This document defines the formal grammar of the Kyle programming language.
 
 Notation is based on EBNF (Extended Backus-Naur Form).
 
@@ -1105,7 +1105,7 @@ block =
 Rule:
 
 ```text
-KL uses indentation-based blocks.
+Kyle uses indentation-based blocks.
 
 No braces {} exist.
 

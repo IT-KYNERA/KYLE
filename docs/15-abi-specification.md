@@ -1,11 +1,11 @@
-# KL ABI Specification v1.0
+# Kyle ABI Specification v1.0
 
 ## Philosophy
 
-The KL ABI defines how compiled code interacts with:
+The Kyle ABI defines how compiled code interacts with:
 - The operating system
 - C libraries (FFI)
-- Other KL modules
+- Other Kyle modules
 - The RAII runtime (memory allocator, destructors)
 - The async runtime
 
@@ -13,10 +13,10 @@ The KL ABI defines how compiled code interacts with:
 
 ## Name Mangling
 
-KL uses a simple name mangling scheme for symbol export:
+Kyle uses a simple name mangling scheme for symbol export:
 
 ```text
-KL_<module_hash>_<name>
+Kyle_<module_hash>_<name>
 ```
 
 Module hash is a stable hash of the fully qualified module path.
@@ -66,7 +66,7 @@ Padding is added between fields as required.
 
 ## Calling Convention
 
-KL uses the platform default C calling convention for all external calls:
+Kyle uses the platform default C calling convention for all external calls:
 
 ```text
 macOS ARM64:    ARM64 AAPCS
@@ -74,13 +74,13 @@ Linux x86_64:   System V AMD64 ABI
 Windows x86_64: Microsoft x64 ABI
 ```
 
-Internal KL-to-KL calls may use a faster convention determined by the compiler.
+Internal Kyle-to-Kyle calls may use a faster convention determined by the compiler.
 
 ---
 
 ## RAII Runtime ABI
 
-KL uses RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. No garbage collector.
+Kyle uses RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. No garbage collector.
 Memory is managed at compile time: values are either moved (zero-cost memcpy) or reference-counted (automatic retain/release).
 
 The runtime exposes:
@@ -151,7 +151,7 @@ include_dirs = ["/usr/local/include"]
 
 ## Versioning Policy
 
-KL follows Semantic Versioning (SemVer 2.0):
+Kyle follows Semantic Versioning (SemVer 2.0):
 
 ```text
 MAJOR: Breaking changes to the language, ABI, or standard library.
@@ -162,7 +162,7 @@ PATCH: Bug fixes, performance improvements, no API changes.
 ABI stability is guaranteed within a MAJOR version.
 
 ```text
-Code compiled with KL 1.x is link-compatible with any other 1.x code.
+Code compiled with Kyle 1.x is link-compatible with any other 1.x code.
 Code compiled with different MAJOR versions is NOT link-compatible.
 ```
 
@@ -179,5 +179,5 @@ Pre-release versions:
 # Version
 
 ```text
-KL ABI Specification v1.0
+Kyle ABI Specification v1.0
 ```

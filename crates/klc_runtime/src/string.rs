@@ -298,3 +298,25 @@ pub extern "C" fn kl_substr(s: *const u8, start: i64, count: i64) -> *const u8 {
     }
     buf as *const u8
 }
+
+/// Compare two C strings for equality.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_eq_str(a: *const u8, b: *const u8) -> i32 {
+    if a.is_null() || b.is_null() {
+        return 0;
+    }
+    unsafe {
+        let mut i: isize = 0;
+        loop {
+            let ca = *a.offset(i);
+            let cb = *b.offset(i);
+            if ca != cb {
+                return 0;
+            }
+            if ca == 0 {
+                return 1;
+            }
+            i += 1;
+        }
+    }
+}

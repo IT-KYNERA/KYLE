@@ -1,10 +1,10 @@
-# KL Standard Library Specification v1.0
+# Kyle Standard Library Specification v1.0
 
 ---
 
 # Philosophy
 
-The KL Standard Library is designed around:
+The Kyle Standard Library is designed around:
 
 ```text
 Minimal
@@ -48,7 +48,7 @@ High Performance
 
 # Root Modules
 
-KL v2.0 ships with:
+Kyle v2.0 ships with:
 
 ```text
 io        ✅ implemented  (std/io.kl)
@@ -920,6 +920,6 @@ Enterprise Friendly
 # Version
 
 ```text
-KL Standard Library Specification v2.0
+Kyle Standard Library Specification v2.0
 Last updated: 2026-11-19
 ```

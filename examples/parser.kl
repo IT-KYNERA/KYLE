@@ -1461,8 +1461,6 @@ fn print_ast(node: AstNode, depth: i32):
 # ============================================================
 fn main():
     path = "examples/hello.kl"
-    if len(args) > 1:
-        path = args[1]
 
     fd = open(path, "r")
     source = read_str(fd, 16384)

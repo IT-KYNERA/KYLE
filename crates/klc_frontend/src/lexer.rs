@@ -234,6 +234,7 @@ impl Lexer {
             "match" => TokenKind::Match,
             "return" => TokenKind::Return,
             "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
             "defer" => TokenKind::Defer,
             "guard" => TokenKind::Guard,
             "unsafe" => TokenKind::Unsafe,

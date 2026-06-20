@@ -713,6 +713,10 @@ impl Parser {
             } else { None };
             return Ok(Stmt::Break(value));
         }
+        if self.at(TokenKind::Continue) {
+            self.advance();
+            return Ok(Stmt::Continue);
+        }
         if self.at(TokenKind::Defer) {
             let start = self.pos;
             self.advance();

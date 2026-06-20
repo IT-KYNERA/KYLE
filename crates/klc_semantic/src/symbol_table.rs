@@ -4,7 +4,7 @@ use klc_core::types::Type;
 
 #[derive(Clone, Debug)]
 pub enum SymKind {
-    Variable { type_: Option<Type>, is_mutable: bool },
+    Variable { type_: Option<Type>, is_mutable: bool, is_auto: bool },
     Constant(Type),
     Function(FunctionDecl),
     Class(ClassDecl),
@@ -28,7 +28,11 @@ impl Symbol {
     }
 
     pub fn new_var(name: String, type_: Option<Type>, is_mutable: bool) -> Self {
-        Self { name, kind: SymKind::Variable { type_, is_mutable } }
+        Self { name, kind: SymKind::Variable { type_, is_mutable, is_auto: false } }
+    }
+
+    pub fn new_auto(name: String, type_: Option<Type>) -> Self {
+        Self { name, kind: SymKind::Variable { type_, is_mutable: false, is_auto: true } }
     }
 }
 

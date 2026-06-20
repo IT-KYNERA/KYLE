@@ -1,21 +1,21 @@
-# KL Programming Language — Project Context v3.0
+# Kyle Programming Language — Project Context v3.0
 
 ## Overview
 
-KL (Kynera Language) — compiled, statically-typed language combining Python readability (indentation blocks), Rust type safety (strong typing, generics, pattern matching), Go simplicity (fast compilation, built-in tooling), and LLVM performance.
+Kyle — compiled, statically-typed language combining Python readability (indentation blocks), Rust type safety (strong typing, generics, pattern matching), Go simplicity (fast compilation, built-in tooling), and LLVM performance.
 
 ## State — Resumen Ejecutivo
 
 ```
 Pipeline completo: Lexer → Parser → Semantic → MIR → Backend → Linker ✅
 Runtime:        RAII, async, file I/O, string ops, time, testing lib ✅
-Std Library:    core, math, io en KL ✅
+Std Library:    core, math, io en Kyle ✅
 Package Mgr:    manifest, lock, add, remove, info, build, run, test ✅
 LSP:            document symbols, workspace symbols, signature help,
                 find references, code actions ✅
 Formatter:      pretty-printer + comment preservation ✅
 VS Code:        extension with syntax highlighting, LSP client, commands ✅
-Tests:          84 tests, 0 failures ✅
+Tests:          86 tests, 0 failures ✅
 ```
 
 ## Session Log
@@ -85,7 +85,7 @@ Tests:          84 tests, 0 failures ✅
 | Fix: string return from user fn | `lower.rs` | ✅ `fn_returns` map + `MirType::Str` en calls |
 | Fix: string concat result type | `lower.rs` | ✅ `MirType::I64` → `MirType::Str` para que `string_locals` funcione |
 | Fix: `Stmt::Break` lowering | `lower.rs` | ✅ `Unreachable` → `Br(loop_end)` via `break_targets` stack |
-| Lexer escrito en KL | `examples/lexer.kl` | ✅ tokeniza `x = 1 + 2\n` → 7 tokens correctos |
+| Lexer escrito en Kyle | `examples/lexer.kl` | ✅ tokeniza `x = 1 + 2\n` → 7 tokens correctos |
 | Tests | - | ✅ 118 tests, 0 failures |
 
 ### Sesión 7 — Documentación: docs sync con estado real del compilador
@@ -123,13 +123,25 @@ Tests:          84 tests, 0 failures ✅
 | Lexer sin crash | `examples/lexer.kl` | ✅ cleanup sin errores (15 frees exitosos, 0 punteros corruptos) |
 | Tests | - | ✅ 118 tests, 0 failures |
 
-### Sesión 10 — Fase 6: Parser en KL + Fix parse_block/parse_if (blank lines entre elif)
+### Sesión 10 — Fase 6: Parser en Kyle + Fix parse_block/parse_if (blank lines entre elif)
 | Feature | Archivos | Estado |
 |---------|----------|--------|
 | Fix: `parse_block` single-line body | `klc_frontend/src/parser.rs` | ✅ al detectar que no hay Newline inicial (`single_line`), para tras 1 statement y consume trailing Newlines |
 | Fix: `parse_if` trailing Newlines | `klc_frontend/src/parser.rs` | ✅ consume Newlines entre if-body y elif (soporta blank lines) |
-| Parser en KL | `examples/parser.kl` | ✅ 1511 líneas, AST recursivo con `AstNode`, pasa Rust frontend test |
+| Parser en Kyle | `examples/parser.kl` | ✅ 1511 líneas, AST recursivo con `AstNode`, pasa Rust frontend test |
 | Tests | - | ✅ 84 tests, 0 failures |
+
+### Sesión 11 — Fase 6: RAII per-block release fix + lexer.kl funcionando + kl_list_pop
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Fix: RAII per-block release temp IDs | `klc_mir/src/ownership.rs` | ✅ temp IDs únicos con orden inverso para inserts correctos |
+| Fix: Store handler (eliminado inttoptr logic) | `klc_backend/src/codegen.rs` | ✅ revertido cambio innecesario de Sesión 9 |
+| Fix: lexer stale `c` después de newline_pending | `examples/lexer.kl` | ✅ re-read `c` + `start_col` tras procesar indentación |
+| Runtime: `kl_list_pop` | `klc_runtime/src/list.rs` | ✅ `i64 kl_list_pop(ptr)` — decrementa len, retorna valor |
+| Lowering: `pop()` method call | `klc_mir/src/lower.rs` | ✅ `list.pop()` → `kl_list_pop(list)` (análogo a `add`) |
+| Codegen: `kl_list_pop` decl | `klc_backend/src/codegen.rs` | ✅ `i64 kl_list_pop(ptr)` extern declaration |
+| Lexer en Kyle | `examples/lexer.kl` | ✅ tokeniza `examples/hello.kl` correctamente con INDENT/DEDENT |
+| Tests | - | ✅ 86 tests, 0 failures |
 
 ## Glossary — Abreviaciones Técnicas
 
@@ -145,7 +157,7 @@ Tests:          84 tests, 0 failures ✅
 | **RC** | Reference Counting | Conteo de Referencias — gestión automática de memoria compartida |
 | **CFG** | Control Flow Graph | Grafo de Flujo de Control — representación de caminos de ejecución |
 | **DCE** | Dead Code Elimination | Eliminación de Código Muerto — optimización que remueve código no ejecutado |
-| **FFI** | Foreign Function Interface | Interfaz de Funciones Externas — llamar código C desde KL |
+| **FFI** | Foreign Function Interface | Interfaz de Funciones Externas — llamar código C desde Kyle |
 | **CLI** | Command Line Interface | Interfaz de Línea de Comandos — el binario `klc` |
 | **LHS/RHS** | Left/Right Hand Side | Lado izquierdo/derecho de una asignación u operación |
 
@@ -213,7 +225,7 @@ kl/
 ├── AGENTS.md               ← este archivo
 ├── Cargo.toml              ← workspace Rust raíz
 ├── .cargo/config.toml      ← config LLVM (Linux)
-├── kl.toml                 ← manifest KL
+├── kl.toml                 ← manifest Kyle
 │
 ├── crates/                 ← 9 crates del compilador
 │   ├── klc_core/           ← AST, Span, Types, SourceMap, Diagnostics
@@ -226,8 +238,8 @@ kl/
 │   ├── klc_runtime/        ← RAII runtime, async, channels, panic handler ⏳
 │   └── klc_tools/          ← LSP, formatter, completion ⏳
 │
-├── runtime/                ← KL runtime (Rust) ⏳
-├── std/                    ← Standard library (KL) ⏳
+├── runtime/                ← Kyle runtime (Rust) ⏳
+├── std/                    ← Standard library (Kyle) ⏳
 ├── docs/                   ← 16 specification documents (mantener al día)
 ├── examples/               ← Example .kl programs
 ├── tests/                  ← Test suite ⏳
@@ -282,7 +294,7 @@ FASE 4 — Std Library & Runtime (✅ Complete)
 ├── [x] Implementar RAII runtime (destructores, refcount)
 ├── [x] RAII ownership inference pass
 ├── [x] Async runtime funcional
-├── [x] Standard library básica (core, math, io) in KL
+├── [x] Standard library básica (core, math, io) in Kyle
 ├── [x] Runtime: string ops (contains, to_upper, to_lower, trim, replace, input)
 ├── [x] Runtime: file I/O (open, read_str, write_str, close)
 ├── [x] Runtime: time (sleep, now)
@@ -301,13 +313,13 @@ FASE 5 — Tooling (✅ Complete)
 FASE 6 — Self-Hosting (⏳ In Progress)
 ├── [x] Runtime char ops + ord() builtin
 ├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
-├── [x] Lexer escrito en KL (examples/lexer.kl) — tokeniza archivos reales
+├── [x] Lexer escrito en Kyle (examples/lexer.kl) — tokeniza archivos reales
 ├── [x] Fix: char/int comparison + type widening en lowering
 ├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
 ├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
 ├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-├── [x] Parser escrito en KL
-├── [ ] Compilador completo en KL
+├── [x] Parser escrito en Kyle
+├── [ ] Compilador completo en Kyle
 │   Hito: kl build klc
 ```
 

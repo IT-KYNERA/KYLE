@@ -1,69 +1,461 @@
-fn main():
-    fd = open("examples/hello.kl", "r")
-    source = read_str(fd, 4096)
-    close(fd)
+# Lexer for Kyle — Self-Hosting Phase 6
+# Produces tokens including INDENT/DEDENT for indentation-based blocks
 
-    println("=== Lexer ===")
-    println(source)
-    println("=== Tokens ===")
+TOK_EOF = 0
+TOK_NEWLINE = 1
+TOK_INDENT = 2
+TOK_DEDENT = 3
+TOK_IDENTIFIER = 4
+TOK_NUMBER = 5
+TOK_STRING = 6
+TOK_KEYWORD = 7
+TOK_OPERATOR = 8
+TOK_LPAREN = 9
+TOK_RPAREN = 10
+TOK_LBRACKET = 11
+TOK_RBRACKET = 12
+TOK_COMMA = 13
+TOK_COLON = 14
+TOK_DOT = 15
+TOK_ARROW = 16
+TOK_FAT_ARROW = 17
+TOK_BOOL = 18
+TOK_CHAR = 19
 
+struct Token:
+    kind: i32
+    value: str
+    line: i32
+    col: i32
+
+fn make_token(kind: i32, value: str, line: i32, col: i32) -> Token:
+    mut tok: Token
+    tok.kind = kind
+    tok.value = value
+    tok.line = line
+    tok.col = col
+    tok
+
+fn is_keyword(s: str) -> i32:
+    if s == "fn": 1
+    elif s == "return": 1
+    elif s == "if": 1
+    elif s == "elif": 1
+    elif s == "else": 1
+    elif s == "while": 1
+    elif s == "for": 1
+    elif s == "in": 1
+    elif s == "match": 1
+    elif s == "break": 1
+    elif s == "mut": 1
+    elif s == "const": 1
+    elif s == "import": 1
+    elif s == "from": 1
+    elif s == "as": 1
+    elif s == "struct": 1
+    elif s == "class": 1
+    elif s == "enum": 1
+    elif s == "contract": 1
+    elif s == "abs": 1
+    elif s == "type": 1
+    elif s == "defer": 1
+    elif s == "guard": 1
+    elif s == "unsafe": 1
+    elif s == "async": 1
+    elif s == "await": 1
+    elif s == "loop": 1
+    else: 0
+
+fn tokenize(source: str) -> list<Token>:
+    tokens = []
     len_s = len(source)
     mut line = 1
     mut col = 1
     mut i = 0
+    mut indent_stack = [0]
+    mut newline_pending = 1
+
     while i < len_s:
         c = ord(char_at(source, i))
         start_col = col
 
+        if newline_pending == 1:
+            mut indent_level = 0
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 32:
+                    indent_level = indent_level + 1
+                    col = col + 1
+                    i = i + 1
+                elif c2 == 9:
+                    indent_level = indent_level + 4
+                    col = col + 4
+                    i = i + 1
+                else:
+                    break
+            top = indent_stack[len(indent_stack) - 1]
+            if indent_level > top:
+                indent_stack.add(indent_level)
+                t = make_token(TOK_INDENT, "INDENT", line, 1)
+                tokens.add(t)
+            elif indent_level < top:
+                while indent_stack[len(indent_stack) - 1] > indent_level:
+                    indent_stack.pop()
+                    t = make_token(TOK_DEDENT, "DEDENT", line, 1)
+                    tokens.add(t)
+            newline_pending = 0
+
+        # Re-read c since newline_pending block may have advanced i
+        if i >= len_s:
+            break
+        c = ord(char_at(source, i))
+        start_col = col
+
         if c == 10:
-            println("NEWLINE at line=" + str(line))
+            t = make_token(TOK_NEWLINE, "\\n", line, col)
+            tokens.add(t)
             line = line + 1
             col = 1
             i = i + 1
-        elif is_whitespace(char_at(source, i)):
-            col = col + 1
+            newline_pending = 1
+
+        elif c == 32 || c == 9 || c == 13:
+            if c == 9:
+                col = col + 4
+            else:
+                col = col + 1
             i = i + 1
+
+        elif c == 35:
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 10:
+                    break
+                i = i + 1
+                col = col + 1
+
         elif is_alpha(char_at(source, i)):
             start = i
             while i < len_s && is_alnum(char_at(source, i)):
                 i = i + 1
                 col = col + 1
-            tok = substr(source, start, i - start)
-            println("IDENTIFIER(" + tok + ") at " + str(line) + ":" + str(start_col))
+            word = substr(source, start, i - start)
+            if is_keyword(word) == 1:
+                t = make_token(TOK_KEYWORD, word, line, start_col)
+            elif word == "true" || word == "false":
+                t = make_token(TOK_BOOL, word, line, start_col)
+            elif word == "none":
+                t = make_token(TOK_KEYWORD, word, line, start_col)
+            else:
+                t = make_token(TOK_IDENTIFIER, word, line, start_col)
+            tokens.add(t)
+
         elif is_digit(char_at(source, i)):
             start = i
             while i < len_s && is_digit(char_at(source, i)):
                 i = i + 1
                 col = col + 1
-            tok = substr(source, start, i - start)
-            println("INTEGER(" + tok + ") at " + str(line) + ":" + str(start_col))
+            num = substr(source, start, i - start)
+            t = make_token(TOK_NUMBER, num, line, start_col)
+            tokens.add(t)
+
+        elif c == 34:
+            start = i
+            i = i + 1
+            col = col + 1
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 34:
+                    i = i + 1
+                    col = col + 1
+                    break
+                elif c2 == 92:
+                    i = i + 2
+                    col = col + 2
+                else:
+                    i = i + 1
+                    col = col + 1
+            sval = substr(source, start, i - start)
+            t = make_token(TOK_STRING, sval, line, start_col)
+            tokens.add(t)
+
+        elif c == 39:
+            start = i
+            i = i + 2
+            col = col + 2
+            if i < len_s && ord(char_at(source, i)) == 39:
+                i = i + 1
+                col = col + 1
+            cval = substr(source, start, i - start)
+            t = make_token(TOK_CHAR, cval, line, start_col)
+            tokens.add(t)
+
         elif c == 61:
-            println("OPERATOR(=) at " + str(line) + ":" + str(col))
-            col = col + 1
-            i = i + 1
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "==", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_OPERATOR, "=>", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "=", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 33:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "!=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "!", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 60:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "<=", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 60:
+                t = make_token(TOK_OPERATOR, "<<", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "<", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 62:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, ">=", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_OPERATOR, ">>", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, ">", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 38:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 38:
+                t = make_token(TOK_OPERATOR, "&&", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "&", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 124:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 124:
+                t = make_token(TOK_OPERATOR, "||", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "|", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
         elif c == 43:
-            println("OPERATOR(+) at " + str(line) + ":" + str(col))
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "+%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "+=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "+", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 45:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 62:
+                t = make_token(TOK_ARROW, "->", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "-%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "-=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "-", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 42:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 37:
+                t = make_token(TOK_OPERATOR, "*%", line, col)
+                col = col + 2
+                i = i + 2
+            elif i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "*=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "*", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 47:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "/=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "/", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 37:
+            if i + 1 < len_s && ord(char_at(source, i + 1)) == 61:
+                t = make_token(TOK_OPERATOR, "%=", line, col)
+                col = col + 2
+                i = i + 2
+            else:
+                t = make_token(TOK_OPERATOR, "%", line, col)
+                col = col + 1
+                i = i + 1
+            tokens.add(t)
+        elif c == 94:
+            t = make_token(TOK_OPERATOR, "^", line, col)
+            tokens.add(t)
             col = col + 1
             i = i + 1
-        elif c == 40:
-            println("LPAREN at " + str(line) + ":" + str(col))
+        elif c == 126:
+            t = make_token(TOK_OPERATOR, "~", line, col)
+            tokens.add(t)
             col = col + 1
             i = i + 1
-        elif c == 41:
-            println("RPAREN at " + str(line) + ":" + str(col))
-            col = col + 1
-            i = i + 1
-        elif c == 44:
-            println("COMMA at " + str(line) + ":" + str(col))
-            col = col + 1
-            i = i + 1
-        elif c == 58:
-            println("COLON at " + str(line) + ":" + str(col))
-            col = col + 1
-            i = i + 1
-        else:
-            println("CHAR(" + str(c) + ") at " + str(line) + ":" + str(col))
+        elif c == 63 && i + 1 < len_s && ord(char_at(source, i + 1)) == 46:
+            t = make_token(TOK_OPERATOR, "?.", line, col)
+            tokens.add(t)
+            col = col + 2
+            i = i + 2
+        elif c == 63:
+            t = make_token(TOK_OPERATOR, "?", line, col)
+            tokens.add(t)
             col = col + 1
             i = i + 1
 
-    println("=== EOF ===")
+        elif c == 40:
+            t = make_token(TOK_LPAREN, "(", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 41:
+            t = make_token(TOK_RPAREN, ")", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 91:
+            t = make_token(TOK_LBRACKET, "[", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 93:
+            t = make_token(TOK_RBRACKET, "]", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 44:
+            t = make_token(TOK_COMMA, ",", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 58:
+            t = make_token(TOK_COLON, ":", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        elif c == 46:
+            t = make_token(TOK_DOT, ".", line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+        else:
+            t = make_token(TOK_OPERATOR, str(c), line, col)
+            tokens.add(t)
+            col = col + 1
+            i = i + 1
+
+    len_stack = len(indent_stack)
+    while len_stack > 1:
+        indent_stack.pop()
+        t = make_token(TOK_DEDENT, "DEDENT", line, col)
+        tokens.add(t)
+        len_stack = len_stack - 1
+
+    t = make_token(TOK_EOF, "EOF", line, col)
+    tokens.add(t)
+    tokens
+
+fn print_tokens(tokens: list<Token>):
+    len_t = len(tokens)
+    mut i = 0
+    while i < len_t:
+        tok = tokens[i]
+        if tok.kind == TOK_INDENT:
+            println("INDENT")
+        elif tok.kind == TOK_DEDENT:
+            println("DEDENT")
+        elif tok.kind == TOK_NEWLINE:
+            println("NEWLINE")
+        elif tok.kind == TOK_EOF:
+            println("EOF")
+        elif tok.kind == TOK_KEYWORD:
+            println("KEYWORD(" + tok.value + ")")
+        elif tok.kind == TOK_IDENTIFIER:
+            println("IDENTIFIER(" + tok.value + ")")
+        elif tok.kind == TOK_NUMBER:
+            println("NUMBER(" + tok.value + ")")
+        elif tok.kind == TOK_STRING:
+            println("STRING(" + tok.value + ")")
+        elif tok.kind == TOK_CHAR:
+            println("CHAR(" + tok.value + ")")
+        elif tok.kind == TOK_BOOL:
+            println("BOOL(" + tok.value + ")")
+        elif tok.kind == TOK_OPERATOR:
+            println("OPERATOR(" + tok.value + ")")
+        elif tok.kind == TOK_LPAREN:
+            println("LPAREN")
+        elif tok.kind == TOK_RPAREN:
+            println("RPAREN")
+        elif tok.kind == TOK_LBRACKET:
+            println("LBRACKET")
+        elif tok.kind == TOK_RBRACKET:
+            println("RBRACKET")
+        elif tok.kind == TOK_COMMA:
+            println("COMMA")
+        elif tok.kind == TOK_COLON:
+            println("COLON")
+        elif tok.kind == TOK_DOT:
+            println("DOT")
+        elif tok.kind == TOK_ARROW:
+            println("ARROW")
+        elif tok.kind == TOK_FAT_ARROW:
+            println("FAT_ARROW")
+        else:
+            println("TOKEN(" + tok.value + "=" + str(tok.kind) + ")")
+        i = i + 1
+
+fn main():
+    fd = open("examples/hello.kl", "r")
+    source = read_str(fd, 4096)
+    close(fd)
+
+    println("=== Tokens ===")
+
+    tokens = tokenize(source)
+    print_tokens(tokens)

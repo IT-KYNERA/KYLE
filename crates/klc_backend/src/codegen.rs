@@ -208,6 +208,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_list_push", ft, None);
         }
+        // i64 kl_list_pop(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_pop", ft, None);
+        }
         // i64 kl_list_get(ptr, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into()];
@@ -242,6 +248,12 @@ impl<'ctx> Codegen<'ctx> {
                           "kl_ord"] {
                 self.module.add_function(name, ft, None);
             }
+        }
+        // i32 kl_eq_str(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("kl_eq_str", ft, None);
         }
     }
 
@@ -489,6 +501,19 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             }
                         }
+                        MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
+                            if let Some(dest_ptr) = last_value_map.get(dest_ptr_local) {
+                                if let Some(src_val) = last_value_map.get(src_alloca_local) {
+                                    if let BasicValueEnum::StructValue(struct_val) = src_val {
+                                        let heap_ptr = dest_ptr.into_pointer_value();
+                                        let struct_ptr = self.builder.build_pointer_cast(heap_ptr, self.context.ptr_type(Default::default()), "_mc")
+                                            .map_err(|e| format!("memcpy bitcast: {}", e))?;
+                                        self.builder.build_store(struct_ptr, *struct_val)
+                                            .map_err(|e| format!("memcpy store: {}", e))?;
+                                    }
+                                }
+                            }
+                        }
                         MirInst::Cast { dest, value, to_type } => {
                             let val = self.value_to_llvm(value, &last_value_map)?;
                             let target_type = self.llvm_type(to_type);
@@ -507,6 +532,26 @@ impl<'ctx> Codegen<'ctx> {
                                     let result = self.builder.build_int_to_ptr(*int_val, *t, "")
                                         .map_err(|e| format!("inttoptr: {}", e))?;
                                     last_value_map.insert(*dest, result.as_basic_value_enum());
+                                }
+                                        (BasicValueEnum::IntValue(int_val), BasicTypeEnum::StructType(s)) => {
+                                    let ptr_ty = self.context.ptr_type(Default::default());
+                                    let ptr_val = self.builder.build_int_to_ptr(*int_val, ptr_ty, "_ptr")
+                                        .map_err(|e| format!("inttoptr: {}", e))?;
+                                    let loaded = self.builder.build_load(*s, ptr_val, "_struct")
+                                        .map_err(|e| format!("load struct: {}", e))?;
+                                    last_value_map.insert(*dest, loaded);
+                                }
+                                (BasicValueEnum::StructValue(struct_val), BasicTypeEnum::IntType(i)) => {
+                                    // Allocate a temp, store the struct, ptrtoint the pointer
+                                    let struct_ty = struct_val.get_type();
+                                    let temp_alloca = self.builder.build_alloca(struct_ty, "_tmp_struct")
+                                        .map_err(|e| format!("alloca: {}", e))?;
+                                    self.builder.build_store(temp_alloca, *struct_val)
+                                        .map_err(|e| format!("store struct: {}", e))?;
+                                    let ptr = temp_alloca.as_basic_value_enum();
+                                    let ptr_val = self.builder.build_ptr_to_int(ptr.into_pointer_value(), *i, "_ptrint")
+                                        .map_err(|e| format!("ptrtoint: {}", e))?;
+                                    last_value_map.insert(*dest, ptr_val.as_basic_value_enum());
                                 }
                                 _ => {} // type pair not supported
                             }

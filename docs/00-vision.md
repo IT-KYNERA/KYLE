@@ -1,12 +1,12 @@
-# KL Vision Document v1.0
+# Kyle Vision Document v1.0
 
 ## Introduction
 
-KL (Kynera Language) is a compiled programming language designed for the modern software era. It combines the readability of Python with the type safety of Rust and the performance of native compilation via LLVM.
+Kyle is a compiled programming language designed for the modern software era. It combines the readability of Python with the type safety of Rust and the performance of native compilation via LLVM.
 
 ---
 
-## Why KL?
+## Why Kyle?
 
 Existing languages force trade-offs:
 
@@ -16,7 +16,7 @@ Existing languages force trade-offs:
 - TypeScript: typed but transpiled, runtime types
 - C#/Java: verbose, heavy runtime, legacy baggage
 
-KL aims to eliminate these trade-offs.
+Kyle aims to eliminate these trade-offs.
 
 ---
 
@@ -125,7 +125,7 @@ Embedded systems
 
 ---
 
-## What KL Eliminates
+## What Kyle Eliminates
 
 ```text
 self
@@ -147,7 +147,7 @@ circular dependencies
 
 ---
 
-## KL in One Example
+## Kyle in One Example
 
 ```kl
 import io
@@ -176,7 +176,7 @@ fn main():
 
 ## Comparison Table
 
-| Feature | KL | Python | Rust | Go | TypeScript |
+| Feature | Kyle | Python | Rust | Go | TypeScript |
 |---------|----|--------|------|-----|------------|
 | Compiled | Yes | No | Yes | Yes | No |
 | Type Safety | Strong | Weak | Strong | Weak | Weak |
@@ -194,12 +194,12 @@ fn main():
 
 ## Market Position
 
-KL occupies the space between:
+Kyle occupies the space between:
 
 ```text
 Python (readability)
     ↓
-KL
+Kyle
     ↓
 Rust (safety, performance)
 ```
@@ -226,5 +226,5 @@ Next phase: Compiler Implementation (Frontend)
 ## Version
 
 ```text
-KL Vision Document v1.0
+Kyle Vision Document v1.0
 ```

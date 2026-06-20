@@ -76,6 +76,8 @@ pub enum MirInst {
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
     /// Cast between types.
     Cast { dest: usize, value: MirValue, to_type: MirType },
+    /// Copy struct value from a local alloca to a heap pointer (i64).
+    Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
 }
 
 /// How a basic block ends.
@@ -271,6 +273,9 @@ impl fmt::Display for MirInst {
             }
             MirInst::Cast { dest, value, to_type } => {
                 write!(f, "  %{} = cast {} to {}", dest, value, to_type)
+            }
+            MirInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
+                write!(f, "  memcpy %{} <- %{}, type {}", dest_ptr_local, src_alloca_local, struct_type)
             }
         }
     }

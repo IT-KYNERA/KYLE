@@ -6,4 +6,4 @@
 [env]
 # macOS (Homebrew): brew install llvm@18 → /opt/homebrew/opt/llvm@18
 # Linux (Ubuntu Noble): apt install llvm-18-dev → /usr/lib/llvm-18
-LLVM_SYS_181_PREFIX = "/opt/homebrew/opt/llvm@18"
+LLVM_SYS_181_PREFIX = "/usr/lib/llvm-18"

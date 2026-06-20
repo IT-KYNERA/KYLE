@@ -1,10 +1,10 @@
-# KL Language Roadmap v2.0 — RAII Memory Model
+# Kyle Language Roadmap v2.0 — RAII Memory Model
 
 ---
 
 ## Overview
 
-KL is developed in 6 phases. Phases 1–3 (compiler pipeline) are complete. Phase 4 (Runtime + Std Library) is the current focus. Each phase builds on the previous, adding features, stability, and tooling.
+Kyle is developed in 6 phases. Phases 1–3 (compiler pipeline) are complete. Phase 4 (Runtime + Std Library) is the current focus. Each phase builds on the previous, adding features, stability, and tooling.
 
 **Memory model:** RAII + Compiler-Inferred Ownership (NO garbage collector).
 
@@ -185,7 +185,7 @@ All examples compile and run (hello, fibonacci, user) ✅
 
 ### Goal
 
-Build the RAII runtime and standard library so KL programs can do real I/O, use strings, math, collections, and async.
+Build the RAII runtime and standard library so Kyle programs can do real I/O, use strings, math, collections, and async.
 
 ### Milestone
 
@@ -327,7 +327,7 @@ IDE support (LSP)       ← Q3 2026 ✅
 
 ### Goal
 
-Rewrite the KL compiler in KL itself. Postponed until the language is stable and the compiler is feature-complete.
+Rewrite the Kyle compiler in Kyle itself. Postponed until the language is stable and the compiler is feature-complete.
 
 ### Milestone
 
@@ -338,7 +338,7 @@ kl build klc   # compiler compiles itself  ← 2026 Q4
 ### Tasks
 
 ```text
-[x] Write lexer in KL — examples/lexer.kl ✅ (200+ lines, tokeniza correctamente)
+[x] Write lexer in Kyle — examples/lexer.kl ✅ (200+ lines, tokeniza correctamente)
 [x] Fix compiler bugs for self-hosting
     - if_then block naming collision → fresh_block() ✅
     - elif chain block collision → elif_cond_labels vector ✅
@@ -346,10 +346,10 @@ kl build klc   # compiler compiles itself  ← 2026 Q4
     - string return from user functions → fn_returns map ✅
     - string concat result type → MirType::Str ✅
     - Stmt::Break lowering → Br(loop_end) via break_targets stack ✅
-[ ] Write parser in KL
-[ ] Write semantic analyzer in KL
-[ ] Write MIR lowering in KL
-[ ] Write codegen in KL
+[ ] Write parser in Kyle
+[ ] Write semantic analyzer in Kyle
+[ ] Write MIR lowering in Kyle
+[ ] Write codegen in Kyle
 [ ] Bootstrap and self-host
 ```
 
@@ -439,6 +439,6 @@ Full test suite passing
 ## Version
 
 ```text
-KL Language Roadmap v3.0
+Kyle Language Roadmap v3.0
 Last updated: 2026-11-19
 ```

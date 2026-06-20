@@ -1,4 +1,4 @@
-# KL Error Catalog Specification v1.0
+# Kyle Error Catalog Specification v1.0
 
 ## Philosophy
 
@@ -13,7 +13,7 @@ Every compiler error must be:
 ## Format
 
 ```text
-KL-EXXXX: <title>
+Kyle-EXXXX: <title>
 
   <description>
 
@@ -29,7 +29,7 @@ KL-EXXXX: <title>
 ### E0001 - Type Mismatch
 
 ```text
-KL-E0001: Type mismatch
+Kyle-E0001: Type mismatch
 
   Expected <type>, received <type>
 
@@ -44,7 +44,7 @@ KL-E0001: Type mismatch
 ### E0002 - Unhandled Error
 
 ```text
-KL-E0002: Unhandled error value
+Kyle-E0002: Unhandled error value
 
   A fallible function returns an error that must be handled.
 
@@ -61,7 +61,7 @@ KL-E0002: Unhandled error value
 ### E0003 - Unsafe Operation Outside Unsafe Block
 
 ```text
-KL-E0003: Unsafe operation outside unsafe block
+Kyle-E0003: Unsafe operation outside unsafe block
 
   Pointer arithmetic and FFI calls require an unsafe block.
 
@@ -77,7 +77,7 @@ KL-E0003: Unsafe operation outside unsafe block
 ### E0004 - Non-Exhaustive Match
 
 ```text
-KL-E0004: Non-exhaustive match
+Kyle-E0004: Non-exhaustive match
 
   Match does not cover all cases.
 
@@ -91,7 +91,7 @@ KL-E0004: Non-exhaustive match
 ### E0005 - Unreachable Code
 
 ```text
-KL-E0005: Unreachable code
+Kyle-E0005: Unreachable code
 
   Code after return, break, or panic cannot be executed.
 
@@ -105,7 +105,7 @@ KL-E0005: Unreachable code
 ### E0006 - Circular Dependency
 
 ```text
-KL-E0006: Circular dependency detected
+Kyle-E0006: Circular dependency detected
 
   Module A imports module B which imports A.
 
@@ -119,7 +119,7 @@ KL-E0006: Circular dependency detected
 ### E0007 - Cannot Modify Constant
 
 ```text
-KL-E0007: Cannot modify constant
+Kyle-E0007: Cannot modify constant
 
   UPPERCASE names are constants and cannot be reassigned.
 
@@ -131,7 +131,7 @@ KL-E0007: Cannot modify constant
 This error also occurs when attempting to reassign an immutable variable:
 
 ```text
-KL-E0007: Cannot modify constant
+Kyle-E0007: Cannot modify constant
 
   cannot assign to immutable variable 'x'
 
@@ -145,7 +145,7 @@ KL-E0007: Cannot modify constant
 ### E0008 - Optional Not Checked
 
 ```text
-KL-E0008: Optional value not checked
+Kyle-E0008: Optional value not checked
 
   Accessing an optional value without checking for None.
 
@@ -161,7 +161,7 @@ KL-E0008: Optional value not checked
 ### E0009 - Undefined Symbol
 
 ```text
-KL-E0009: Undefined symbol
+Kyle-E0009: Undefined symbol
 
   <name> is not defined in the current scope.
 
@@ -175,7 +175,7 @@ KL-E0009: Undefined symbol
 ### E0010 - Potential Data Loss
 
 ```text
-KL-E0010: Potential data loss
+Kyle-E0010: Potential data loss
 
   Narrowing conversion from <type> to <type> may lose data.
 
@@ -189,7 +189,7 @@ KL-E0010: Potential data loss
 ### E0011 - Integer Overflow
 
 ```text
-KL-E0011: Integer overflow
+Kyle-E0011: Integer overflow
 
   Arithmetic operation overflowed in debug build.
 
@@ -203,7 +203,7 @@ KL-E0011: Integer overflow
 ### E0012 - Division By Zero
 
 ```text
-KL-E0012: Division by zero
+Kyle-E0012: Division by zero
 
   Division or modulo by zero is not allowed.
 
@@ -217,7 +217,7 @@ KL-E0012: Division by zero
 ### E0013 - Invalid UTF-8
 
 ```text
-KL-E0013: Invalid UTF-8 sequence
+Kyle-E0013: Invalid UTF-8 sequence
 
   String literal contains invalid UTF-8 bytes.
 
@@ -231,7 +231,7 @@ KL-E0013: Invalid UTF-8 sequence
 ### E0014 - Private Access
 
 ```text
-KL-E0014: Cannot access private member
+Kyle-E0014: Cannot access private member
 
   <name> is private (__ prefix) to its module.
 
@@ -245,7 +245,7 @@ KL-E0014: Cannot access private member
 ### E0015 - Unused Import
 
 ```text
-KL-E0015: Unused import (warning)
+Kyle-E0015: Unused import (warning)
 
   <name> is imported but never used.
 
@@ -259,7 +259,7 @@ KL-E0015: Unused import (warning)
 ### E0016 - Dead Code
 
 ```text
-KL-E0016: Dead code (warning)
+Kyle-E0016: Dead code (warning)
 
   <name> is declared but never used.
 
@@ -273,7 +273,7 @@ KL-E0016: Dead code (warning)
 ### E0017 - Generic Type Not Found
 
 ```text
-KL-E0017: Unknown generic type
+Kyle-E0017: Unknown generic type
 
   <name> is not a valid type argument.
 
@@ -287,7 +287,7 @@ KL-E0017: Unknown generic type
 ### E0018 - Fallible Function Not Handled
 
 ```text
-KL-E0018: Fallible function not handled
+Kyle-E0018: Fallible function not handled
 
   A function marked with ! returns a Result that must be handled.
 
@@ -301,7 +301,7 @@ KL-E0018: Fallible function not handled
 ### E0019 - Cannot Inherit From Final Class
 
 ```text
-KL-E0019: Cannot inherit from final class
+Kyle-E0019: Cannot inherit from final class
 
   Class <name> is not marked as inheritable.
 
@@ -315,7 +315,7 @@ KL-E0019: Cannot inherit from final class
 ### E0020 - Invalid Attribute Argument
 
 ```text
-KL-E0020: Invalid attribute argument
+Kyle-E0020: Invalid attribute argument
 
   Attribute #[<name>] received an invalid argument.
 
@@ -331,7 +331,7 @@ KL-E0020: Invalid attribute argument
 ### W0001 - Unused Variable
 
 ```text
-KL-W0001: Unused variable (warning)
+Kyle-W0001: Unused variable (warning)
 
   <name> is assigned but never read.
 
@@ -345,7 +345,7 @@ KL-W0001: Unused variable (warning)
 ### W0002 - Shadowed Variable
 
 ```text
-KL-W0002: Shadowed variable (warning)
+Kyle-W0002: Shadowed variable (warning)
 
   <name> shadows a previous declaration in the same scope.
 
@@ -359,7 +359,7 @@ KL-W0002: Shadowed variable (warning)
 ### W0003 - Redundant Cast
 
 ```text
-KL-W0003: Redundant cast (warning)
+Kyle-W0003: Redundant cast (warning)
 
   Cast from <type> to <type> is unnecessary.
 
@@ -375,12 +375,12 @@ KL-W0003: Redundant cast (warning)
 ### P0001 - Internal Compiler Error
 
 ```text
-KL-P0001: Internal compiler error
+Kyle-P0001: Internal compiler error
 
   Unexpected error in <compiler_stage>.
 
   Please report this at:
-  https://github.com/anomalyco/KYNERA-LENGUAJE/issues
+  https://github.com/IT-KYNERA/KYLE/issues
 ```
 
 ---
@@ -403,6 +403,6 @@ L0008  Prefer object literal over class for simple data 🔶
 # Version
 
 ```text
-KL Error Catalog Specification v2.0
+Kyle Error Catalog Specification v2.0
 Last updated: 2026-11-19
 ```

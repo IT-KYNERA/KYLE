@@ -1,4 +1,4 @@
-# KL Async Runtime Specification v1.0
+# Kyle Async Runtime Specification v1.0
 
 ---
 
@@ -248,7 +248,7 @@ match result:
 
 # Scheduler
 
-KL runtime includes a scheduler.
+Kyle runtime includes a scheduler.
 
 Responsibilities:
 

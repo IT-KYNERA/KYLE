@@ -103,6 +103,10 @@ impl Optimizer {
                         used.insert(*dest);
                         used.insert(*ptr);
                     }
+                    MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
+                        used.insert(*dest_ptr_local);
+                        used.insert(*src_alloca_local);
+                    }
                 }
             }
         }

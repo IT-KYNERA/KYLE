@@ -1,10 +1,10 @@
-# KL Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
+# Kyle Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
 
 ---
 
 ## Philosophy
 
-KL manages memory automatically using RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. The developer never manually allocates or frees memory. The compiler determines at compile time whether a value can be moved (zero-cost) or needs reference counting.
+Kyle manages memory automatically using RAII (Resource Acquisition Is Initialization) with compiler-inferred ownership. The developer never manually allocates or frees memory. The compiler determines at compile time whether a value can be moved (zero-cost) or needs reference counting.
 
 ```text
 No malloc
@@ -35,7 +35,7 @@ No garbage collector pauses
 
 ## Memory Regions
 
-KL uses two memory regions:
+Kyle uses two memory regions:
 
 ```text
 Stack
@@ -117,7 +117,7 @@ fn create_user() -> User:
 
 ## Ownership Model — Compiler-Inferred
 
-KL does NOT require the programmer to write ownership annotations. The compiler infers the ownership model automatically.
+Kyle does NOT require the programmer to write ownership annotations. The compiler infers the ownership model automatically.
 
 ### Move Inference (Zero-Cost)
 
@@ -387,9 +387,9 @@ fn fetch_url(url: str) -> str:
 
 ---
 
-## Comparison: KL vs Rust
+## Comparison: Kyle vs Rust
 
-| Concept | Rust | KL |
+| Concept | Rust | Kyle |
 |---------|------|----|
 | Default mutability | Immutable (`let`) | Immutable |
 | Mutable syntax | `let mut x` | `mut x` |
@@ -454,5 +454,5 @@ Compiler inserts padding as needed for alignment.
 ## Memory Model Version
 
 ```text
-KL Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
+Kyle Memory Model Specification v2.0 — RAII + Compiler-Inferred Ownership
 ```

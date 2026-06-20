@@ -59,7 +59,10 @@ impl TypeChecker {
             match decl {
                 Decl::Function(f) => { self.check_function(f); }
                 Decl::Variable(v) => { self.check_variable(v); }
-                Decl::Constant(c) => { self.infer_expr(&c.value); }
+                Decl::Constant(c) => {
+                    let ty = self.infer_expr(&c.value);
+                    let _ = self.symbols.insert(c.name.clone(), Symbol::new(c.name.clone(), SymKind::Constant(ty)));
+                }
                 _ => {}
             }
         }
@@ -79,10 +82,19 @@ impl TypeChecker {
     }
 
     fn check_variable(&mut self, v: &VariableDecl) {
-        let inferred = self.infer_expr(&v.value);
+        let is_uninit = matches!(v.value.as_ref(), Expr::Literal { value: Literal::None, .. });
+        let inferred = if is_uninit {
+            if let Some(declared) = &v.type_ {
+                self.resolve_ast_type(declared)
+            } else {
+                Type::Option(Box::new(Type::Void))
+            }
+        } else {
+            self.infer_expr(&v.value)
+        };
         if let Some(declared) = &v.type_ {
             let declared_ty = self.resolve_ast_type(declared);
-            if !self.types_match(&inferred, &declared_ty) {
+            if !is_uninit && !self.types_match(&inferred, &declared_ty) {
                 self.reporter.report(
                     Diagnostic::error(ErrorCode::E0001,
                         format!("type mismatch: expected '{}', found '{}'", declared_ty, inferred))
@@ -108,6 +120,7 @@ impl TypeChecker {
             Stmt::Expression(e) => { self.infer_expr(e); }
             Stmt::Return(e) => { if let Some(e) = e { self.infer_expr(e); } }
             Stmt::Break(e) => { if let Some(e) = e { self.infer_expr(e); } }
+            Stmt::Continue => {}
             Stmt::If(s) => {
                 self.infer_expr(&s.condition);
                 self.check_block(&s.body);
@@ -226,7 +239,15 @@ impl TypeChecker {
                     UnaryOp::BitNot => ot,
                 }
             }
-            Expr::Assignment { value, .. } => self.infer_expr(value),
+            Expr::Assignment { target, value, .. } => {
+                let ty = self.infer_expr(value);
+                if let Expr::Identifier { name, .. } = target.as_ref() {
+                    if self.symbols.lookup(name).is_none() {
+                        let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(ty.clone())));
+                    }
+                }
+                ty
+            }
             Expr::FunctionCall { target, arguments, .. } => {
                 let fn_type = self.infer_expr(target);
                 for arg in arguments { self.infer_expr(arg); }

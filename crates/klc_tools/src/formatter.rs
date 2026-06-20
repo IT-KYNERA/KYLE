@@ -405,6 +405,10 @@ impl Formatter {
                 self.indent(out, depth);
                 out.push_str("break\n");
             }
+            Stmt::Continue => {
+                self.indent(out, depth);
+                out.push_str("continue\n");
+            }
             Stmt::WhileBind(w) => {
                 self.indent(out, depth);
                 write!(out, "while {} = ", w.name).unwrap();
@@ -686,6 +690,7 @@ fn stmt_span(stmt: &Stmt) -> klc_core::span::Span {
         Stmt::Defer(s) => s.span,
         Stmt::BindingIf(s) => s.span,
         Stmt::Break(_) => klc_core::span::Span::dummy(),
+        Stmt::Continue => klc_core::span::Span::dummy(),
         Stmt::WhileBind(s) => s.span,
         Stmt::Constant(c) => c.span,
     }

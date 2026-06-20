@@ -98,6 +98,20 @@ pub extern "C" fn kl_list_set(list: *mut KlList, index: i64, val: i64) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn kl_list_pop(list: *mut KlList) -> i64 {
+    if list.is_null() {
+        return 0;
+    }
+    unsafe {
+        if (*list).len <= 0 {
+            return 0;
+        }
+        (*list).len -= 1;
+        std::ptr::read((*list).data.add((*list).len as usize))
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn kl_list_len(list: *const KlList) -> i64 {
     if list.is_null() {
         return 0;

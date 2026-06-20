@@ -1,10 +1,10 @@
-# KL Package Manager Specification v1.0
+# Kyle Package Manager Specification v1.0
 
 ---
 
 ## Philosophy
 
-The KL package manager is built-in. No third-party tools needed.
+The Kyle package manager is built-in. No third-party tools needed.
 
 ```text
 No npm
@@ -152,7 +152,7 @@ kl check
 kl doctor
 ```
 
-Checks KL installation.
+Checks Kyle installation.
 
 ### Clean
 
@@ -184,9 +184,9 @@ File: `kl.toml`
 name = "my_app"
 version = "1.0.0"
 edition = "1"
-authors = ["Kynera"]
+authors = ["Kyle"]
 license = "MIT"
-description = "My KL application"
+description = "My Kyle application"
 
 [compiler]
 optimization = "O2"
@@ -442,5 +442,5 @@ Vulnerability scanning (future)
 ## Version
 
 ```text
-KL Package Manager Specification v1.0
+Kyle Package Manager Specification v1.0
 ```

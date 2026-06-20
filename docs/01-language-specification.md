@@ -1,8 +1,8 @@
-# KL Programming Language Specification v1.0
+# Kyle Programming Language Specification v1.0
 
 ## Philosophy
 
-KL is a compiled programming language designed around:
+Kyle is a compiled programming language designed around:
 
 - Simplicity
 - Readability
@@ -30,11 +30,11 @@ KL is a compiled programming language designed around:
 
 # Entry Point
 
-Every executable KL program must have a `main` function in the root of `src/`:
+Every executable Kyle program must have a `main` function in the root of `src/`:
 
 ```kl
 fn main():
-    print("Hello from KL")
+    print("Hello from Kyle")
 ```
 
 With arguments and exit code:
@@ -1324,7 +1324,7 @@ match result:
 Rule:
 
 ```text
-KL does not use exceptions.
+Kyle does not use exceptions.
 
 Errors are explicit.
 ```
@@ -1655,13 +1655,13 @@ Self-Hosting Compiler
 # Official Language Name
 
 ```text
-KL
+Kyle
 ```
 
 Meaning:
 
 ```text
-Kynera Language
+Kyle
 ```
 
 ---
@@ -1669,6 +1669,6 @@ Kynera Language
 # Version
 
 ```text
-KL Programming Language Specification v2.0
+Kyle Programming Language Specification v2.0
 Last updated: 2026-11-19
 ```

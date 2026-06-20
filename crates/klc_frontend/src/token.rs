@@ -54,6 +54,7 @@ pub enum TokenKind {
     Match,      // match
     Return,     // return
     Break,      // break
+    Continue,   // continue
     Defer,      // defer
     Guard,      // guard
     Unsafe,     // unsafe

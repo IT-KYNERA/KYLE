@@ -1,15 +1,15 @@
-# KL Project Architecture Specification v1.0
+# Kyle Project Architecture Specification v1.0
 
 ---
 
 ## Workspace Structure
 
-KL uses a Cargo-inspired workspace structure.
+Kyle uses a Cargo-inspired workspace structure.
 
 ```text
 kl/
 ├── Cargo.toml              # Rust workspace root
-├── kl.toml                 # KL project configuration
+├── kl.toml                 # Kyle project configuration
 ├── .gitignore
 ├── README.md
 │
@@ -24,13 +24,13 @@ kl/
 │   ├── klc_runtime/        # RAII runtime, async, panic handling
 │   └── klc_tools/          # LSP, formatter, debugger
 │
-├── runtime/                # KL runtime source (Rust)
+├── runtime/                # Kyle runtime source (Rust)
 │   ├── memory/
 │   ├── async/
 │   ├── collections/
 │   └── io/
 │
-├── std/                    # Standard library (KL source)
+├── std/                    # Standard library (Kyle source)
 │   ├── core/
 │   ├── math/
 │   ├── json/
@@ -42,7 +42,7 @@ kl/
 │   ├── crypto/
 │   └── testing/
 │
-├── examples/               # Example KL programs
+├── examples/               # Example Kyle programs
 │
 ├── tests/                  # Compiler tests
 │
@@ -75,7 +75,7 @@ Contents:
 ### klc_frontend
 
 ```text
-Purpose: Parse KL source into AST
+Purpose: Parse Kyle source into AST
 Depends on: klc_core
 
 Contents:
@@ -155,7 +155,7 @@ Contents:
 ### klc_runtime
 
 ```text
-Purpose: Runtime support for compiled KL programs
+Purpose: Runtime support for compiled Kyle programs
 Depends on: libc
 
 Contents:
@@ -281,7 +281,7 @@ File: `kl.toml`
 name = "my_app"
 version = "1.0.0"
 edition = "1"
-authors = ["Kynera"]
+authors = ["Kyle"]
 license = "MIT"
 
 [compiler]
@@ -301,5 +301,5 @@ testing = "1.0"
 ## Version
 
 ```text
-KL Project Architecture Specification v1.0
+Kyle Project Architecture Specification v1.0
 ```

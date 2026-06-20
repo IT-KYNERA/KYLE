@@ -1,8 +1,8 @@
-# KL AST Specification v1.0
+# Kyle AST Specification v1.0
 
 ## Introduction
 
-The Abstract Syntax Tree (AST) is the internal representation of a KL source file after parsing.
+The Abstract Syntax Tree (AST) is the internal representation of a Kyle source file after parsing.
 
 The parser transforms source code into AST nodes.
 

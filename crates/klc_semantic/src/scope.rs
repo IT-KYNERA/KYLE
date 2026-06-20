@@ -35,7 +35,13 @@ impl ScopeResolver {
             Decl::Enum(e) => (e.name.clone(), SymKind::Enum(e.clone())),
             Decl::Contract(c) => (c.name.clone(), SymKind::Contract(c.clone())),
             Decl::TypeAlias(t) => (t.name.clone(), SymKind::TypeAlias(t.clone())),
-            Decl::Constant(_) => return,
+            Decl::Constant(c) => {
+                let sym = Symbol::new(c.name.clone(), SymKind::Constant(Type::I32));
+                if let Err(e) = self.symbols.insert(c.name.clone(), sym) {
+                    self.reporter.report(Diagnostic::error(ErrorCode::E0001, e));
+                }
+                return;
+            }
             Decl::Import(_) | Decl::FromImport(_) | Decl::Variable(_) => return,
         };
         let sym = Symbol::new(name.clone(), kind);
@@ -185,6 +191,7 @@ impl ScopeResolver {
                 self.resolve_block(&g.body);
             }
             Stmt::Unsafe(u) => { self.resolve_block(&u.body); }
+            Stmt::Continue => {}
         }
     }
 
@@ -208,7 +215,7 @@ impl ScopeResolver {
                 if let Expr::Identifier { name, span } = target.as_ref() {
                     if let Some(sym) = self.symbols.lookup(name) {
                         match &sym.kind {
-                            SymKind::Variable { is_mutable, .. } if !*is_mutable => {
+                            SymKind::Variable { is_mutable, is_auto, .. } if !*is_mutable && !*is_auto => {
                                 self.reporter.report(
                                     Diagnostic::error(ErrorCode::E0007, format!("cannot modify immutable variable '{}'", name))
                                         .with_span(*span)
@@ -222,10 +229,10 @@ impl ScopeResolver {
                             }
                             _ => {}
                         }
-                    } else {
-                        // First use of a name in assignment: auto-declare as immutable variable.
-                        let _ = self.symbols.insert(name.clone(), Symbol::new_var(name.clone(), None, false));
-                    }
+                } else {
+                    // First use of a name in assignment: auto-declare as immutable variable.
+                    let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), None));
+                }
                 }
                 self.resolve_expr(target);
                 self.resolve_expr(value);

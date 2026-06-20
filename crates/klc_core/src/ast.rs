@@ -338,6 +338,7 @@ pub enum Stmt {
     Expression(Expr),
     Return(Option<Box<Expr>>),
     Break(Option<Box<Expr>>),
+    Continue,
     If(IfStmt),
     BindingIf(BindingIf),
     While(WhileStmt),
@@ -821,6 +822,10 @@ impl DisplayDepth for Stmt {
                 } else {
                     writeln!(f, "Break")
                 }
+            }
+            Stmt::Continue => {
+                write_indent(f, d)?;
+                writeln!(f, "Continue")
             }
             Stmt::If(s) => {
                 write_indent(f, d)?;

@@ -1,8 +1,8 @@
-# KL Type System Specification v1.0
+# Kyle Type System Specification v1.0
 
 ## Introduction
 
-The KL type system is responsible for:
+The Kyle type system is responsible for:
 
 * Type Safety
 * Type Inference
@@ -168,7 +168,7 @@ Indexing is O(1) by byte offset. Use .chars() for code point iteration.
 
 # Type Inference
 
-KL automatically infers types whenever possible.
+Kyle automatically infers types whenever possible.
 
 Example:
 
@@ -368,7 +368,7 @@ value = i8(100)
 
 # Explicit Casting
 
-KL uses constructor-style syntax for numeric and type casts:
+Kyle uses constructor-style syntax for numeric and type casts:
 
 ```kl
 i32(value)     # i32 -> i32 (identity)
@@ -530,7 +530,7 @@ fn save() -> void:
 
 # Error Types
 
-KL uses:
+Kyle uses:
 
 ```kl
 !

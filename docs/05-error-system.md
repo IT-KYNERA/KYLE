@@ -1,10 +1,10 @@
-# KL Error System Specification v1.0
+# Kyle Error System Specification v1.0
 
 ---
 
 # Philosophy
 
-KL does not use exceptions.
+Kyle does not use exceptions.
 
 The language follows these principles:
 
@@ -324,7 +324,7 @@ InvalidUserId
 
 # Enum Variants With Data
 
-KL supports enum variants with payload data. This is how `Result<T, E>`
+Kyle supports enum variants with payload data. This is how `Result<T, E>`
 and `Option<T>` are defined internally.
 
 ## Internal Definitions
@@ -525,7 +525,7 @@ If false:
 
 # Nullable Values
 
-KL discourages nullable references.
+Kyle discourages nullable references.
 
 Instead:
 
@@ -733,7 +733,7 @@ Implementation detail hidden from developer.
 
 # Standard Error Types
 
-Initial KL standard library:
+Initial Kyle standard library:
 
 ```text
 Error
@@ -806,5 +806,5 @@ Structured Logging Integration
 # Version
 
 ```text
-KL Error System Specification v1.0
+Kyle Error System Specification v1.0
 ```
