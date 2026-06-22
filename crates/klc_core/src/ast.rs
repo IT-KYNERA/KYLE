@@ -399,6 +399,11 @@ pub enum Expr {
         entries: Vec<(String, Expr)>,
         span: Span,
     },
+    StructLiteral {
+        struct_name: String,
+        fields: Vec<(String, Expr)>,
+        span: Span,
+    },
     Tuple {
         elements: Vec<Expr>,
         span: Span,
@@ -1010,6 +1015,16 @@ impl DisplayDepth for Expr {
                 for (key, val) in entries {
                     write_indent(f, d + 1)?;
                     writeln!(f, "key=\"{}\"", key)?;
+                    val.fmt_depth(f, d + 2)?;
+                }
+                Ok(())
+            }
+            Expr::StructLiteral { struct_name, fields, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "StructLiteral \"{}\" ({} fields)", struct_name, fields.len())?;
+                for (key, val) in fields {
+                    write_indent(f, d + 1)?;
+                    writeln!(f, "{}", key)?;
                     val.fmt_depth(f, d + 2)?;
                 }
                 Ok(())

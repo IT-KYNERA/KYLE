@@ -444,8 +444,13 @@ impl Parser {
             if self.at(TokenKind::RParen) { break; }
             let param_start = self.pos;
             let name = self.eat_identifier();
-            self.expect(TokenKind::Colon)?;
-            let type_ = self.parse_type()?;
+            let type_ = if self.at(TokenKind::Colon) {
+                self.advance();
+                self.parse_type()?
+            } else {
+                // Untyped parameter (e.g. `this` in class methods) — type will be inferred
+                AstType::Primitive { name: "void".into(), span: self.span_from(param_start) }
+            };
             let default = if self.at(TokenKind::Equals) {
                 self.advance();
                 Some(Box::new(self.parse_expr()?))
@@ -482,6 +487,17 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<AstType, String> {
         let start = self.pos;
+        // Handle list shorthand: [T] → List<T>
+        if self.at(TokenKind::LBracket) {
+            self.advance();
+            let inner = self.parse_type()?;
+            self.expect(TokenKind::RBracket)?;
+            return Ok(AstType::Generic {
+                name: "List".to_string(),
+                args: vec![inner],
+                span: self.span_from(start),
+            });
+        }
         let name = self.eat_identifier();
         if name.is_empty() {
             let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
@@ -497,6 +513,9 @@ impl Parser {
             }
             self.expect(TokenKind::Greater)?;
             Ok(AstType::Generic { name, args, span: self.span_from(start) })
+        } else if self.at(TokenKind::Question) {
+            self.advance();
+            Ok(AstType::Optional { inner: Box::new(AstType::User { name, span: self.span_from(start) }), span: self.span_from(start) })
         } else {
             Ok(AstType::User { name, span: self.span_from(start) })
         }
@@ -653,6 +672,25 @@ impl Parser {
                 let index = self.parse_expr()?;
                 self.expect(TokenKind::RBracket)?;
                 expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
+                } else if self.at(TokenKind::LBrace) {
+                // Struct literal: Identifier { field: value, ... }
+                let start = self.pos;
+                if let Expr::Identifier { name: struct_name, .. } = &expr {
+                    let sname = struct_name.clone();
+                    self.advance(); // consume '{'
+                    let mut fields = Vec::new();
+                    while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                        let key = self.eat_identifier();
+                        self.expect(TokenKind::Colon)?;
+                        let value = self.parse_expr()?;
+                        fields.push((key, value));
+                        if self.at(TokenKind::Comma) { self.advance(); }
+                    }
+                    self.expect(TokenKind::RBrace)?;
+                    expr = Expr::StructLiteral { struct_name: sname, fields, span: self.span_from(start) };
+                } else {
+                    break;
+                }
             } else {
                 break;
             }

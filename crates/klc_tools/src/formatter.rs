@@ -554,6 +554,18 @@ impl Formatter {
                 }
                 out.push('}');
             }
+            Expr::StructLiteral { struct_name, fields, .. } => {
+                out.push_str(struct_name);
+                out.push(' ');
+                out.push('{');
+                for (i, (k, v)) in fields.iter().enumerate() {
+                    if i > 0 { out.push_str(", "); }
+                    out.push_str(k);
+                    out.push_str(": ");
+                    self.write_expr(out, v);
+                }
+                out.push('}');
+            }
             Expr::Tuple { elements, .. } => {
                 out.push('(');
                 for (i, e) in elements.iter().enumerate() {
@@ -717,5 +729,6 @@ fn expr_span(expr: &Expr) -> klc_core::span::Span {
         Expr::Spread { span, .. } => *span,
         Expr::RangeSlice { span, .. } => *span,
         Expr::Loop { span, .. } => *span,
+        Expr::StructLiteral { span, .. } => *span,
     }
 }

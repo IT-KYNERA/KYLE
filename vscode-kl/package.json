@@ -11,10 +11,13 @@
     "Programming Languages",
     "Linters"
   ],
-  "activationEvents": [
-    "onLanguage:kl"
-  ],
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:kl",
+    "onCommand:kl.run",
+    "onCommand:kl.build",
+    "onCommand:kl.check"
+  ],
   "contributes": {
     "languages": [
       {
@@ -43,6 +46,13 @@
       {
         "command": "kl.check",
         "title": "KL: Type-check current file"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "kl-icon-theme",
+        "label": "KL Language Icons",
+        "path": "./icons/kl-icon-theme.json"
       }
     ]
   }

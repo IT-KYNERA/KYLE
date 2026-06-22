@@ -1,12 +1,18 @@
-# Kyle Language Roadmap v2.0 — RAII Memory Model
+# Kyle Language Roadmap v3.1 — RAII Memory Model
 
 ---
 
 ## Overview
 
-Kyle is developed in 6 phases. Phases 1–3 (compiler pipeline) are complete. Phase 4 (Runtime + Std Library) is the current focus. Each phase builds on the previous, adding features, stability, and tooling.
+Kyle is developed in phases. Phases 1–5 (compiler pipeline, runtime,
+and tooling) are complete and verified — `klc run examples/fibonacci.kl`
+produces a working native binary. The current work is **Phase 3.5**
+(closing the codegen gap) which unblocks **Phase 6** (self-hosting).
 
 **Memory model:** RAII + Compiler-Inferred Ownership (NO garbage collector).
+
+For the precise, verified breakdown of what generates working code vs.
+what is still a placeholder, see **`docs/16-status.md`**.
 
 ---
 
@@ -242,13 +248,17 @@ klc run string_test.kl     → string ops work     ✅
 
 #### 4.4 — Standard Library
 
+The runtime builtins (print, str, len, char ops, string ops, file I/O,
+time) are implemented in Rust inside `klc_runtime/` and work today.
+The **importable `std/*.kl` modules** (io, math, testing, core) are
+planned but not yet written — see `docs/16-status.md`.
+
 ```text
-[x] std/core.kl: utility functions ✅
-[x] std/math.kl: abs, pow, sqrt, gcd ✅
-[x] std/io.kl: I/O wrappers ✅
-[x] std/testing.kl: assert, assert_eq, assert_str ✅
-[~] Collections (List, Map, Set) — pendiente de runtime arrays 🔶
-[~] Module resolution for stdlib paths — imports desde .kl ✅
+[x] Runtime builtins (klc_runtime/) — print, str, len, char_at, etc. ✅
+[x] String ops, char ops, file I/O, time — all working ✅
+[~] std/core.kl, std/math.kl, std/io.kl, std/testing.kl — 🔶 not yet written
+[~] Collections (List, Map, Set) — runtime List works, Map/Set pending 🔶
+[~] Module resolution for stdlib paths — 🔶 pending
 ```
 
 #### 4.5 — Async Runtime
@@ -321,36 +331,90 @@ IDE support (LSP)       ← Q3 2026 ✅
 
 ---
 
-## Phase 6: Self-Hosting
+## Phase 3.5: Complete the Backend (prerequisite for self-hosting)
 
-### Status: 🔄 Current — In Progress
+### Status: 🔶 Required next — blocking Phase 6
 
 ### Goal
 
-Rewrite the Kyle compiler in Kyle itself. Postponed until the language is stable and the compiler is feature-complete.
+Close the gap between the spec and the codegen. Several language
+features parse and type-check correctly but generate no functional
+code (the lowering is a placeholder that just evaluates sub-expressions
+and discards the result). These must be implemented for the
+self-hosting compiler to be writable in Kyle.
+
+### Why this blocks Phase 6
+
+A compiler written in Kyle will use closures (for visitor patterns),
+method dispatch (for AST node types), and match with enum variants.
+None of these currently lower to working code. Self-hosting is
+impossible until they do.
+
+### Tasks — see `docs/16-status.md` for the verified gap matrix
+
+```text
+[ ] Closures  ((x) => x*2)  — currently placeholder, no callable value
+[ ] Method dispatch real  (obj.method())  — currently hardcoded to list.add/pop
+[ ] Match with enum variants and data  (text(s): ...)  — only literal/wildcard
+[ ] Async/await state machines  — currently placeholder
+[ ] Tuples (creation + destructuring)  — currently placeholder
+[ ] Dict / object literals  — currently placeholder
+[ ] String interpolation  ("Hello {name}")  — not yet implemented
+[ ] Optional chaining  (user?.name)  — currently placeholder
+[ ] Error propagation  (?)  real lowering  — currently placeholder
+[ ] Class inheritance + vtables  — not yet implemented
+```
 
 ### Milestone
 
 ```text
-kl build klc   # compiler compiles itself  ← 2026 Q4
+klc run examples/closures_test.kl   → works
+klc run examples/async_test.kl      → works
+klc run examples/match_enum.kl      → works
 ```
 
-### Tasks
+---
+
+## Phase 6: Self-Hosting
+
+### Status: 🔄 In Progress (parser + lexer written, ~15% of the rewrite done)
+
+### Goal
+
+Rewrite the Kyle compiler in Kyle itself.
+
+### What is done
 
 ```text
-[x] Write lexer in Kyle — examples/lexer.kl ✅ (200+ lines, tokeniza correctamente)
-[x] Fix compiler bugs for self-hosting
+[x] Lexer in Kyle  — examples/lexer.kl (461 lines, tokenizes real files) ✅
+[x] Parser in Kyle — examples/parser.kl (1509 lines, recursive AST) ✅
+[x] Bug fixes that unblocked self-hosting
     - if_then block naming collision → fresh_block() ✅
     - elif chain block collision → elif_cond_labels vector ✅
-    - string escape sequences → lex_string procesa \n, \t, \" etc. ✅
+    - string escape sequences → lex_string ✅
     - string return from user functions → fn_returns map ✅
     - string concat result type → MirType::Str ✅
     - Stmt::Break lowering → Br(loop_end) via break_targets stack ✅
-[ ] Write parser in Kyle
-[ ] Write semantic analyzer in Kyle
-[ ] Write MIR lowering in Kyle
-[ ] Write codegen in Kyle
-[ ] Bootstrap and self-host
+    - char/int comparison + type widening ✅
+    - RAII alloc in all string runtime functions ✅
+    - SSA dominance fix for kl_release (crash in cleanup) ✅
+    - auto-declared variable type inference ✅
+```
+
+### What remains (after Phase 3.5 unblocks it)
+
+```text
+[ ] Semantic analyzer in Kyle
+[ ] MIR lowering in Kyle
+[ ] Codegen in Kyle (this is the hardest part — needs LLVM FFI)
+[ ] Bootstrap: klc compiles itself
+[ ] Self-host complete
+```
+
+### Milestone
+
+```text
+kl build klc   # compiler compiles itself
 ```
 
 ---
@@ -358,14 +422,20 @@ kl build klc   # compiler compiles itself  ← 2026 Q4
 ## Timeline
 
 ```text
-Phase 0: Language Design        — Complete (Jun 2026)
-Phase 1: Compiler Frontend      — Complete (Jul 2026)
-Phase 2: Semantic Analysis      — Complete (Aug 2026)
-Phase 3: Compiler Backend       — Complete (Sep 2026)
-Phase 4: Runtime + Std Library  — Complete (Oct 2026)
-Phase 5: Tooling & Ecosystem    — Complete (Nov 2026)
-Phase 6: Self-Hosting           — In Progress (Nov 2026 – ...)
+Phase 0:   Language Design              — Complete
+Phase 1:   Compiler Frontend            — Complete
+Phase 2:   Semantic Analysis            — Complete
+Phase 3:   Compiler Backend             — Complete (core constructs)
+Phase 4:   Runtime + Builtins           — Complete (runtime in Rust)
+Phase 5:   Tooling & Ecosystem          — Complete
+Phase 3.5: Backend gap closure          — 🔶 Required next (blocks Phase 6)
+Phase 6:   Self-Hosting                 — 🔄 In progress (~15% done)
+Phase 7:   Stdlib + maturity            — Planned
 ```
+
+Note: earlier drafts of this document listed fixed future calendar dates
+per phase. Those were aspirational and have been removed — development
+proceeds at the pace the work allows, tracked by the checkboxes above.
 
 ---
 
@@ -439,6 +509,6 @@ Full test suite passing
 ## Version
 
 ```text
-Kyle Language Roadmap v3.0
-Last updated: 2026-11-19
+Kyle Language Roadmap v3.1
+Last updated: 2026-06-21
 ```

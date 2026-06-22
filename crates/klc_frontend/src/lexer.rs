@@ -256,6 +256,9 @@ impl Lexer {
             "set" => TokenKind::Set,
             "mut" => TokenKind::Mut,
             "implements" => TokenKind::Implements,
+            "and" => TokenKind::And,
+            "or" => TokenKind::Or,
+            "not" => TokenKind::Bang,
             _ => TokenKind::Identifier(word.to_string()),
         }
     }

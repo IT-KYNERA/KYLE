@@ -1,9 +1,20 @@
 # KL Compiler — LLVM Configuration
 #
-# Linux (Ubuntu Noble): system LLVM 18 via apt (llvm-18-dev)
-# llvm-config path: /usr/bin/llvm-config (symlink to /usr/lib/llvm-18/bin/llvm-config)
+# inkwell 0.9 requires LLVM 18.1. Set LLVM_SYS_181_PREFIX to point at it.
+#
+# This file sets the Linux default. macOS users: export the env var instead,
+# because Cargo's [env] table is static (cannot auto-detect per-OS).
+#
+# Setup:
+#   Linux (Ubuntu/Debian):  apt install llvm-18-dev
+#       → works out of the box (this file points at /usr/lib/llvm-18)
+#   macOS (Homebrew Apple Silicon):  brew install llvm@18
+#       → run:  export LLVM_SYS_181_PREFIX=/opt/homebrew/opt/llvm@18
+#   macOS (Homebrew Intel):  brew install llvm@18
+#       → run:  export LLVM_SYS_181_PREFIX=/usr/local/opt/llvm@18
+#
+# To make the macOS setting permanent, add the export line to your ~/.zshrc,
+# or use a tool like `direnv` with a project-local .envrc.
 
 [env]
-# macOS (Homebrew): brew install llvm@18 → /opt/homebrew/opt/llvm@18
-# Linux (Ubuntu Noble): apt install llvm-18-dev → /usr/lib/llvm-18
 LLVM_SYS_181_PREFIX = "/usr/lib/llvm-18"

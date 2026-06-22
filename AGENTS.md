@@ -321,14 +321,12 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 ├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
 ├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
 ├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-<<<<<<< Updated upstream
-├── [x] Parser escrito en Kyle
-├── [ ] Compilador completo en Kyle
-=======
-├── [x] Parser escrito en KL
+├── [x] Parser escrito en Kyle (examples/parser.kl — 1509 líneas, AST recursivo)
 ├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
-├── [ ] Compilador completo en KL
->>>>>>> Stashed changes
+├── [x] Semantic analyzer en Kyle
+├── [ ] MIR lowering en Kyle
+├── [ ] Codegen en Kyle
+├── [ ] Bootstrap y self-host completo
 │   Hito: kl build klc
 ```
 
@@ -387,3 +385,29 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 | 13 | `roadmap.md` | Roadmap de 6 fases (438 líneas) |
 | 14 | `error-catalog.md` | Catálogo de errores E/W/L (395 líneas) |
 | 15 | `abi-specification.md` | ABI y FFI (168 líneas) |
+| 16 | `status.md` | **Estado verificado del implementation gap** (fuente de verdad) |
+
+## Session Log (append)
+
+### Sesión 12 — Phase 3.5: StructLiteral + Method Dispatch + Ownership Fixes
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| `parse_params` optional types | `parser.rs` | ✅ `name` or `name: Type` supported |
+| `[T]` list type syntax | `parser.rs` | ✅ `[str]` parsed as `List<T>` |
+| `Expr::StructLiteral` AST node | `ast.rs`, `parser.rs` | ✅ `Counter { field: value }` syntax |
+| StructLiteral lowering | `lower.rs` | ✅ FieldPtr+Store for struct fields |
+| Constructor param binding | `lower.rs` | ✅ params bound to locals |
+| Method `this` param dedup | `lower.rs` | ✅ skip explicit `this` param if first |
+| Ownership: don't release return values | `ownership.rs` | ✅ concat results used in Return skipped |
+| Method dispatch test | `examples/method_test.kl` | ✅ `(4, 6)` from immutable methods |
+| parser.kl infinite loop fix | `examples/parser.kl` | ✅ `advance()` on error in expect/expect_keyword/expect_identifier |
+| Tests | - | ✅ 84 tests, 0 failures |
+
+### Sesión 13 — Phase 6: semantic.kl + Rust lexer fixes
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| semantic.kl (1291 lines) | `examples/semantic.kl` | ✅ standalone tokenizer + parser + type checker |
+| Rust lexer: and/or/not keywords | `klc_frontend/src/lexer.rs` | ✅ `and`→And, `or`→Or, `not`→Bang |
+| semantic.kl passes `klc check` | — | ✅ no errors (parsing + type checking) |
+| LLVM codegen SIGSEGV (large files) | `klc_backend/src/codegen.rs` | ❌ pre-existing: parser.kl & semantic.kl crash codegen |
+| Tests | - | ✅ 84 tests, 0 failures |

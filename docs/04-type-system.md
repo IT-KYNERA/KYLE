@@ -149,11 +149,23 @@ name: str = "John"
 
 Encoding: UTF-8 internally.
 
+Target API (some operations are not yet implemented — see notes):
+
 ```text
-len(str)     = byte count (not code point count)
-str[i]       = byte access (O(1), not guaranteed char boundary)
-str[0..5]    = byte slice (panics if not on char boundary)
-.chars()     = iterator over Unicode code points
+len(str)     = byte count                    ✅ implemented
+str[i]       = char_at(s, i) → char (i8)    ✅ implemented (via char_at builtin)
+str[0..5]    = byte slice                    🔶 not yet lowered (RangeSlice is a placeholder)
+.chars()     = iterator over code points     🔶 not yet implemented
+```
+
+Today, working string code looks like:
+
+```kl
+s = "Hello"
+n = len(s)              # ✅ 5
+c = char_at(s, 0)       # ✅ 'H' as i8
+upper = to_upper(s)     # ✅ "HELLO"
+part = substr(s, 0, 3)  # ✅ "Hel" (use substr, not str[0..3] yet)
 ```
 
 Rules:

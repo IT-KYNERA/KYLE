@@ -20,6 +20,30 @@ pub struct Codegen<'ctx> {
 }
 
 impl<'ctx> Codegen<'ctx> {
+    /// Load a local's value from last_value_map when available (works intra-block),
+    /// or from the alloca (works cross-block when the alloca has been stored to).
+    fn load_local_value(
+        &self,
+        id: usize,
+        last_values: &HashMap<usize, BasicValueEnum<'ctx>>,
+        alloca_map: &[Option<PointerValue<'ctx>>],
+        alloca_types: &HashMap<usize, BasicTypeEnum<'ctx>>,
+    ) -> Result<BasicValueEnum<'ctx>, String> {
+        // Prefer last_value_map for the most recent value
+        if let Some(val) = last_values.get(&id) {
+            return Ok(*val);
+        }
+        // Fall back to loading from the alloca
+        if let Some(Some(ptr)) = alloca_map.get(id) {
+            if let Some(pointee_type) = alloca_types.get(&id) {
+                let loaded = self.builder.build_load(*pointee_type, *ptr, "")
+                    .map_err(|e| format!("load_local {}: {}", id, e))?;
+                return Ok(loaded);
+            }
+        }
+        Ok(self.context.i32_type().const_zero().as_basic_value_enum())
+    }
+
     pub fn new(context: &'ctx Context, module_name: &str) -> Self {
         let builder = context.create_builder();
         let module = context.create_module(module_name);
@@ -277,13 +301,17 @@ impl<'ctx> Codegen<'ctx> {
                 base.array_type(0).as_basic_type_enum()
             }
             MirType::Struct(name, fields) => {
-                let struct_ty = self.context.opaque_struct_type(name);
-                if struct_ty.is_opaque() {
-                    let field_types: Vec<BasicTypeEnum<'ctx>> = fields.iter()
-                        .map(|(_, ty)| self.llvm_type(ty))
-                        .collect();
-                    struct_ty.set_body(&field_types, false);
-                }
+                // Reuse existing struct type to avoid creating duplicate types
+                // with numbered suffixes (e.g. Token.1, Token.2, ...)
+                let struct_ty = self.module.get_struct_type(name)
+                    .unwrap_or_else(|| {
+                        let new_ty = self.context.opaque_struct_type(name);
+                        let field_types: Vec<BasicTypeEnum<'ctx>> = fields.iter()
+                            .map(|(_, ty)| self.llvm_type(ty))
+                            .collect();
+                        new_ty.set_body(&field_types, false);
+                        new_ty
+                    });
                 struct_ty.as_basic_type_enum()
             }
         }
@@ -363,6 +391,11 @@ impl<'ctx> Codegen<'ctx> {
                                 if let Some(pointee_type) = alloca_types.get(src) {
                                     let loaded = self.builder.build_load(*pointee_type, ptr, "")
                                         .map_err(|e| format!("load: {}", e))?;
+                                    // Store to dest alloca for cross-block reads
+                                    if let Some(dest_ptr) = alloca_map.get(*dest).and_then(|p| *p) {
+                                        self.builder.build_store(dest_ptr, loaded)
+                                            .map_err(|e| format!("load-store: {}", e))?;
+                                    }
                                     last_value_map.insert(*dest, loaded);
                                 }
                             }
@@ -372,6 +405,17 @@ impl<'ctx> Codegen<'ctx> {
                             let r = self.value_to_llvm(right, &last_value_map)?;
                             let li = self.to_int_value(l);
                             let ri = self.to_int_value(r);
+
+                            // For logical ops, truncate wider operands to i1 first
+                            let bool_ty = self.context.bool_type();
+                            let to_i1 = |val: inkwell::values::IntValue<'ctx>| {
+                                if val.get_type().get_bit_width() > 1 {
+                                    self.builder.build_int_truncate(val, bool_ty, "")
+                                } else {
+                                    Ok(val)
+                                }
+                            };
+
                             let result = match op {
                                 MirBinaryOp::Add => self.builder.build_int_add(li, ri, "")
                                     .map_err(|e| format!("add: {}", e))?,
@@ -383,12 +427,30 @@ impl<'ctx> Codegen<'ctx> {
                                     .map_err(|e| format!("div: {}", e))?,
                                 MirBinaryOp::Rem => self.builder.build_int_signed_rem(li, ri, "")
                                     .map_err(|e| format!("rem: {}", e))?,
-                                MirBinaryOp::And => self.builder.build_and(li, ri, "")
-                                    .map_err(|e| format!("and: {}", e))?,
-                                MirBinaryOp::Or => self.builder.build_or(li, ri, "")
-                                    .map_err(|e| format!("or: {}", e))?,
-                                MirBinaryOp::Xor => self.builder.build_xor(li, ri, "")
-                                    .map_err(|e| format!("xor: {}", e))?,
+                                MirBinaryOp::And => {
+                                    let l1 = to_i1(li)
+                                        .map_err(|e| format!("and-trunc: {}", e))?;
+                                    let r1 = to_i1(ri)
+                                        .map_err(|e| format!("and-trunc: {}", e))?;
+                                    self.builder.build_and(l1, r1, "")
+                                        .map_err(|e| format!("and: {}", e))?
+                                },
+                                MirBinaryOp::Or => {
+                                    let l1 = to_i1(li)
+                                        .map_err(|e| format!("or-trunc: {}", e))?;
+                                    let r1 = to_i1(ri)
+                                        .map_err(|e| format!("or-trunc: {}", e))?;
+                                    self.builder.build_or(l1, r1, "")
+                                        .map_err(|e| format!("or: {}", e))?
+                                },
+                                MirBinaryOp::Xor => {
+                                    let l1 = to_i1(li)
+                                        .map_err(|e| format!("xor-trunc: {}", e))?;
+                                    let r1 = to_i1(ri)
+                                        .map_err(|e| format!("xor-trunc: {}", e))?;
+                                    self.builder.build_xor(l1, r1, "")
+                                        .map_err(|e| format!("xor: {}", e))?
+                                },
                                 MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "")
                                     .map_err(|e| format!("shl: {}", e))?,
                                 MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "")
@@ -406,7 +468,12 @@ impl<'ctx> Codegen<'ctx> {
                                 MirBinaryOp::Ge => self.builder.build_int_compare(IntPredicate::SGE, li, ri, "")
                                     .map_err(|e| format!("ge: {}", e))?,
                             };
-                            last_value_map.insert(*dest, result.as_basic_value_enum());
+                            let result_val = result.as_basic_value_enum();
+                            if let Some(dest_ptr) = alloca_map.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(dest_ptr, result_val)
+                                    .map_err(|e| format!("binop-store: {}", e))?;
+                            }
+                            last_value_map.insert(*dest, result_val);
                         }
                         MirInst::UnaryOp { dest, op, operand } => {
                             let val = self.value_to_llvm(operand, &last_value_map)?;
@@ -561,7 +628,10 @@ impl<'ctx> Codegen<'ctx> {
 
                 match &bb.terminator {
                     MirTerminator::Return(value) => {
-                        let val = self.value_to_llvm(value, &last_value_map)?;
+                        let val = match value {
+                            MirValue::Local(id) => self.load_local_value(*id, &last_value_map, &alloca_map, &alloca_types)?,
+                            _ => self.value_to_llvm(value, &last_value_map)?,
+                        };
                         self.builder.build_return(Some(&val))
                             .map_err(|e| format!("ret: {}", e))?;
                     }
@@ -571,10 +641,21 @@ impl<'ctx> Codegen<'ctx> {
                         }
                     }
                     MirTerminator::CondBr { cond, true_block, false_block } => {
-                        let cond_val = self.value_to_llvm(cond, &last_value_map)?;
+                        let cond_val = match cond {
+                            MirValue::Local(id) => self.load_local_value(*id, &last_value_map, &alloca_map, &alloca_types)?,
+                            _ => self.value_to_llvm(cond, &last_value_map)?,
+                        };
                         let cond_int = cond_val.into_int_value();
+                        // Truncate to i1 if needed (e.g. string eq returns i32)
+                        let i1_cond = if cond_int.get_type().get_bit_width() > 1 {
+                            let i1_ty = self.context.bool_type();
+                            self.builder.build_int_truncate(cond_int, i1_ty, "")
+                                .map_err(|e| format!("cond trunc: {}", e))?
+                        } else {
+                            cond_int
+                        };
                         if let (Some(&t), Some(&f)) = (block_map.get(true_block), block_map.get(false_block)) {
-                            let _ = self.builder.build_conditional_branch(cond_int, t, f);
+                            let _ = self.builder.build_conditional_branch(i1_cond, t, f);
                         }
                     }
                     MirTerminator::Unreachable => {

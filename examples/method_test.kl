@@ -1,0 +1,17 @@
+class Counter:
+    value: i32
+
+    Counter(val: i32):
+        Counter { value: val }
+
+    fn add(this, amount: i32):
+        this.value = this.value + amount
+
+    fn get(this) -> i32:
+        this.value
+
+fn main(args: [str]) -> i32:
+    c = Counter(5)
+    print("value=")
+    println(str(c.get()))
+    0

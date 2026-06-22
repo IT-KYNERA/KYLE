@@ -14,6 +14,7 @@ use klc_backend::linker::Linker;
 use inkwell::context::Context;
 use inkwell::targets::{FileType, InitializationConfig, Target, TargetTriple};
 use inkwell::OptimizationLevel;
+use std::io::Write;
 
 #[derive(Default)]
 pub struct Pipeline;
@@ -124,6 +125,18 @@ impl Pipeline {
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "kl_module");
         codegen.compile(&mir.module)?;
+
+        // Verify module before emitting
+        if let Err(msg) = codegen.module().verify() {
+            // Dump LLVM IR for debugging
+            let ir_path = output_path.with_extension("ll");
+            let ir_str = codegen.module().print_to_string().to_string();
+            if let Ok(mut f) = std::fs::File::create(&ir_path) {
+                let _ = write!(f, "{}", ir_str);
+            }
+            eprintln!("LLVM IR dumped to {:?}", ir_path);
+            return Err(format!("LLVM verification failed: {}", msg));
+        }
 
         let obj_path = output_path.with_extension("o");
         emit_object(codegen.module(), &obj_path)?;

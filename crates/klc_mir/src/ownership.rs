@@ -53,7 +53,7 @@ impl OwnershipPass {
         }
 
         // 3. Only process concat results that are NOT forwarded.
-        let mut heap_ids: Vec<usize> = concat_dests.iter().filter(|id| !forwarded.contains(id)).copied().collect();
+        let heap_ids: Vec<usize> = concat_dests.iter().filter(|id| !forwarded.contains(id)).copied().collect();
         if heap_ids.is_empty() {
             return;
         }
@@ -83,8 +83,19 @@ impl OwnershipPass {
             }
         }
 
-        // 6. For each block, find the last use of each non-forwarded concat result
-        //    and insert a release after it.
+        // 6. Find which concat results are used in Return terminators (they
+        //    must NOT be released — the caller takes ownership).
+        let mut return_used: HashSet<usize> = HashSet::new();
+        for bb in &func.basic_blocks {
+            if let MirTerminator::Return(MirValue::Local(id)) = &bb.terminator {
+                if concat_dests.contains(id) {
+                    return_used.insert(*id);
+                }
+            }
+        }
+
+        // 7. For each block, find the last use of each non-forwarded concat result
+        //    and insert a release after it. SKIP concat results used in Return.
         let mut tmp_counter = max_local + 1;
         struct ReleaseOp { pos: usize, id: usize, tmp: usize }
 
@@ -103,11 +114,15 @@ impl OwnershipPass {
                         }
                     }
                 }
-                let mut releases: Vec<ReleaseOp> = ids.iter().map(|id| {
-                    let pos = last_use.get(id).copied().unwrap_or(bb.insts.len().saturating_sub(1));
-                    let tmp = tmp_counter;
-                    tmp_counter += 1;
-                    ReleaseOp { pos, id: *id, tmp }
+                let mut releases: Vec<ReleaseOp> = ids.iter().filter_map(|id| {
+                    if return_used.contains(id) {
+                        None  // skip — return value, caller owns it
+                    } else {
+                        let pos = last_use.get(id).copied().unwrap_or(bb.insts.len().saturating_sub(1));
+                        let tmp = tmp_counter;
+                        tmp_counter += 1;
+                        Some(ReleaseOp { pos, id: *id, tmp })
+                    }
                 }).collect();
                 releases.sort_by(|a, b| b.pos.cmp(&a.pos));
                 for op in releases {

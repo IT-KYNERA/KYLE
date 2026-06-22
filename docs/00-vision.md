@@ -217,14 +217,22 @@ Performance of C
 
 ## Project Status
 
-Current phase: Language Design & Specification
+Current phase: Phase 6 — Self-Hosting (in progress)
 
-Next phase: Compiler Implementation (Frontend)
+Phases 1–5 are complete: the compiler produces working native binaries
+(verified end-to-end with `klc run examples/fibonacci.kl`), the RAII runtime,
+tooling (CLI, LSP, formatter, VS Code extension), and a package manager are
+all functional.
+
+See `docs/13-roadmap.md` for the phase breakdown and `docs/16-status.md`
+for the verified feature matrix (what really generates code vs. what is
+still a placeholder).
 
 ---
 
 ## Version
 
 ```text
-Kyle Vision Document v1.0
+Kyle Vision Document v1.1
+Last updated: 2026-06-21
 ```

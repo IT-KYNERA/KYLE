@@ -508,6 +508,7 @@ fn expect(p: Parser, kind: i32) -> Token:
         t
     else:
         println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected kind=" + str(kind) + " got kind=" + str(t.kind))
+        advance(p)  # consume unexpected token to avoid infinite loop
         make_token(TOK_EOF, "ERROR", t.line, t.col)
 
 fn expect_keyword(p: Parser, kw: str) -> Token:
@@ -517,6 +518,7 @@ fn expect_keyword(p: Parser, kw: str) -> Token:
         t
     else:
         println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected '" + kw + "' got '" + t.value + "'")
+        advance(p)  # consume unexpected token to avoid infinite loop
         make_token(TOK_EOF, "ERROR", t.line, t.col)
 
 fn expect_identifier(p: Parser) -> Token:
@@ -526,6 +528,7 @@ fn expect_identifier(p: Parser) -> Token:
         t
     else:
         println("ERROR at " + str(t.line) + ":" + str(t.col) + ": expected identifier got '" + t.value + "'")
+        advance(p)  # consume unexpected token to avoid infinite loop
         make_token(TOK_EOF, "ERROR", t.line, t.col)
 
 # Check if current token starts an expression

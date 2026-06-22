@@ -1,0 +1,7 @@
+fn main(args: [str]) -> i32:
+    mut names: list<str>
+    names.add("hello")
+    names.add("world")
+    print(names[0])
+    print(names[1])
+    0

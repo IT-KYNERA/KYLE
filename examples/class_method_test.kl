@@ -1,0 +1,26 @@
+# Class method dispatch test — Fase 3.5 Paso 1
+# Verifies that obj.method(args) lowers to Call ClassName::method(obj, args...)
+
+class Counter:
+    count: i32
+
+    Counter(start: i32):
+        this.count = start
+
+    fn increment():
+        this.count = this.count + 1
+
+    fn add(n: i32):
+        this.count = this.count + n
+
+    fn value() -> i32:
+        return this.count
+
+
+fn main() -> i32:
+    c = Counter(10)
+    c.increment()
+    c.increment()
+    c.add(5)
+    println(str(c.value()))
+    return 0

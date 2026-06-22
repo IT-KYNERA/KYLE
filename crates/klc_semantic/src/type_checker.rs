@@ -285,6 +285,9 @@ impl TypeChecker {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }
                 Type::Dict(Box::new(Type::Str), Box::new(Type::I32))
             }
+            Expr::StructLiteral { struct_name, .. } => {
+                Type::Named(struct_name.clone())
+            }
             Expr::Tuple { elements, .. } => {
                 Type::Tuple(elements.iter().map(|e| self.infer_expr(e)).collect())
             }

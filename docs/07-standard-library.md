@@ -48,33 +48,55 @@ High Performance
 
 # Root Modules
 
-Kyle v2.0 ships with:
+Kyle's standard library has two layers:
+
+1. **Runtime builtins** — functions written in Rust inside `klc_runtime/`
+   and exposed to every Kyle program without `import`. These are
+   **implemented and working** (print, str, len, char_at, file I/O, etc.).
+2. **Importable `std/` modules** — `.kl` source files the program imports
+   with `import io`, `import math`, etc. These are **planned but not yet
+   written**; the `std/` directory does not exist yet.
+
+Current status:
 
 ```text
-io        ✅ implemented  (std/io.kl)
-math      ✅ implemented  (std/math.kl)
-testing   ✅ implemented  (std/testing.kl)
-core      ✅ implemented  (std/core.kl)
+BUILTINS (runtime, no import)              STATUS
+print, println, input, len, str            ✅ working
+char_at, ord, is_digit, is_alpha, ...      ✅ working
+contains, to_upper, to_lower, trim,        ✅ working
+  replace, substr
+open, read_str, write_str, close           ✅ working
+sleep, now                                  ✅ working
+
+IMPORTABLE MODULES (need `import X`)       STATUS
+io        🔶 planned — not yet written
+math      🔶 planned — not yet written
+testing   🔶 planned — not yet written
+core      🔶 planned — not yet written
 json      🔶 planned
 net       🔶 planned
-time      🔶 planned
+time       🔶 planned
 filesystem 🔶 planned
 collections 🔶 planned
 crypto    🔶 planned
 async     🔶 planned
 ```
 
+The builtins above are sufficient to write real programs today
+(see `examples/fibonacci.kl`, `examples/lexer.kl`). The importable
+modules are Phase 6/7 work.
+
 ---
 
-# Module Structure
+# Module Structure (target)
 
 ```text
 std/
 
-├── core.kl      ✅ utility functions
-├── io.kl        ✅ I/O wrappers (print, println, read_line)
-├── math.kl      ✅ abs, pow, sqrt, gcd
-├── testing.kl   ✅ assert, assert_eq, assert_str
+├── core.kl      🔶 planned — utility functions
+├── io.kl        🔶 planned — I/O wrappers (print, println, read_line)
+├── math.kl      🔶 planned — abs, pow, sqrt, gcd
+├── testing.kl   🔶 planned — assert, assert_eq, assert_str
 ├── json.kl      🔶 planned
 ├── net          🔶 planned
 ├── time         🔶 planned
@@ -920,6 +942,6 @@ Enterprise Friendly
 # Version
 
 ```text
-Kyle Standard Library Specification v2.0
-Last updated: 2026-11-19
+Kyle Standard Library Specification v2.1
+Last updated: 2026-06-21
 ```

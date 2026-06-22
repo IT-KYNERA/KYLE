@@ -248,6 +248,9 @@ impl ScopeResolver {
             Expr::Dictionary { entries, .. } => {
                 for (_, v) in entries { self.resolve_expr(v); }
             }
+            Expr::StructLiteral { fields, .. } => {
+                for (_, v) in fields { self.resolve_expr(v); }
+            }
             Expr::Tuple { elements, .. } => {
                 for e in elements { self.resolve_expr(e); }
             }

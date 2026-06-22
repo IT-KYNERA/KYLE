@@ -115,6 +115,10 @@ pub struct Lowerer {
     struct_defs: RefCell<std::collections::HashMap<String, Vec<(String, MirType)>>>,
     class_constructor_map: RefCell<std::collections::HashMap<String, String>>,
     const_values: RefCell<std::collections::HashMap<String, Expr>>,
+    /// Method dispatch table: class_name -> (method_name -> mangled_function_name).
+    /// Built during lower_program by scanning ClassMember::Method entries.
+    /// Used to lower `obj.method(args)` into `Call ClassName::method(obj, args...)`.
+    method_table: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
 }
 
 impl Lowerer {
@@ -124,6 +128,7 @@ impl Lowerer {
             struct_defs: RefCell::new(std::collections::HashMap::new()),
             class_constructor_map: RefCell::new(std::collections::HashMap::new()),
             const_values: RefCell::new(std::collections::HashMap::new()),
+            method_table: RefCell::new(std::collections::HashMap::new()),
         }
     }
 
@@ -170,8 +175,10 @@ impl Lowerer {
         {
             let mut fn_returns = self.fn_returns.borrow_mut();
             let mut cc_map = self.class_constructor_map.borrow_mut();
+            let mut method_table = self.method_table.borrow_mut();
             fn_returns.clear();
             cc_map.clear();
+            method_table.clear();
             for decl in &program.declarations {
                 if let Decl::Function(f) = decl {
                     let struct_defs = self.struct_defs.borrow().clone();
@@ -191,6 +198,25 @@ impl Lowerer {
                             }
                         }
                     }
+                    // Build method dispatch table for this class.
+                    // Each method `fn foo()` inside `class C` becomes a free function
+                    // named `C::foo` that takes `this: C` as its first parameter.
+                    let mut methods: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                    for member in &c.members {
+                        if let ClassMember::Method(m) = member {
+                            let mangled = format!("{}::{}", c.name, m.name);
+                            methods.insert(m.name.clone(), mangled.clone());
+                            // Record the method's return type for call resolution.
+                            let defs = self.struct_defs.borrow();
+                            let ret_type = m.return_type.as_ref()
+                                .map(|rt| ast_type_to_mir(rt, Some(&defs)))
+                                .unwrap_or(MirType::Void);
+                            fn_returns.insert(mangled, ret_type);
+                        }
+                    }
+                    if !methods.is_empty() {
+                        method_table.insert(c.name.clone(), methods);
+                    }
                 }
             }
         }
@@ -207,7 +233,7 @@ impl Lowerer {
                 Decl::Class(c) => {
                     for member in &c.members {
                         if let ClassMember::Method(m) = member {
-                            if let Some(func) = self.lower_function(m) {
+                            if let Some(func) = self.lower_method(m, &c.name) {
                                 module.functions.push(func);
                             }
                         }
@@ -227,11 +253,28 @@ impl Lowerer {
                             mir_func.local_count = 1;
                             let mut ctx = LowerCtx::new();
                             ctx.struct_defs = self.struct_defs.borrow().clone();
+                            // Bind constructor params to locals
+                            for (i, param) in ctor.params.iter().enumerate() {
+                                let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: local,
+                                    value: MirValue::Param(i),
+                                });
+                                ctx.locals.insert(param.name.clone(), local);
+                            }
+                            let last_is_tail = matches!(ctor.body.statements.last(), Some(Stmt::Expression(_)));
                             for stmt in &ctor.body.statements {
                                 ctx = self.lower_stmt(ctx, stmt);
                             }
-                            ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
-                            // drop last empty block
+                            if ctx.current_block.terminator == MirTerminator::Unreachable {
+                                if last_is_tail {
+                                    let val_local = ctx.next_local - 1;
+                                    ctx.finish_block(MirTerminator::Return(MirValue::Local(val_local)));
+                                } else {
+                                    ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
+                                }
+                            }
+                            mir_func.local_count = ctx.next_local;
                             mir_func.basic_blocks = ctx.blocks;
                             module.functions.push(mir_func);
                         }
@@ -280,6 +323,85 @@ impl Lowerer {
         }
 
         // Default terminator: return void or tail expression value
+        if ctx.current_block.terminator == MirTerminator::Unreachable {
+            if last_is_tail {
+                let val_local = ctx.next_local - 1;
+                ctx.finish_block(MirTerminator::Return(MirValue::Local(val_local)));
+            } else if !last_is_if_tail {
+                ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
+            }
+        }
+
+        mir_func.basic_blocks = ctx.blocks;
+        mir_func.local_count = ctx.next_local;
+        Some(mir_func)
+    }
+
+    /// Lower a class method. Like `lower_function`, but the method's MIR
+    /// signature prepends an implicit `this` parameter of type
+    /// `MirType::Struct(class_name, fields)` so the body can reference `this`
+    /// and the method can be called as `ClassName::method(obj, args...)`.
+    fn lower_method(&self, m: &FunctionDecl, class_name: &str) -> Option<MirFunction> {
+        let body = m.body.as_ref()?;
+        let struct_defs = self.struct_defs.borrow().clone();
+        let mut mir_func = MirFunction::new(&format!("{}::{}", class_name, m.name));
+        let this_type = struct_defs.get(class_name)
+            .map(|fields| MirType::Struct(class_name.to_string(), fields.clone()))
+            .unwrap_or(MirType::Struct(class_name.to_string(), vec![]));
+        // First param is `this` (the receiver), then the explicit params
+        // (skipping the first explicit param if it's named "this").
+        let mut params: Vec<MirType> = vec![this_type.clone()];
+        for (i, p) in m.params.iter().enumerate() {
+            if i == 0 && p.name == "this" {
+                continue;
+            }
+            params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
+        }
+        mir_func.params = params;
+        mir_func.return_type = m.return_type.as_ref()
+            .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
+            .unwrap_or(MirType::Void);
+
+        let mut ctx = LowerCtx::new();
+        ctx.struct_defs = struct_defs;
+
+        // Bind `this` (param 0) into a local so the body's `Expr::PropertyAccess`
+        // on `this` resolves to a struct field.
+        let this_local = ctx.alloc_local("this", this_type);
+        ctx.current_block.insts.push(MirInst::Store {
+            dest: this_local,
+            value: MirValue::Param(0),
+        });
+        ctx.locals.insert("this".to_string(), this_local);
+
+        // Bind the explicit params (offset by 1 because of implicit `this`).
+        // Skip the first explicit param if it's named "this" (it IS the receiver).
+        let mut param_offset = 1;
+        for (i, param) in m.params.iter().enumerate() {
+            if i == 0 && param.name == "this" {
+                // This param IS the receiver (this) — already bound above
+                continue;
+            }
+            let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+            ctx.current_block.insts.push(MirInst::Store {
+                dest: local,
+                value: MirValue::Param(param_offset),
+            });
+            ctx.locals.insert(param.name.clone(), local);
+            param_offset += 1;
+        }
+
+        // Lower body statements
+        let last_is_tail = matches!(body.statements.last(), Some(Stmt::Expression(_)));
+        let last_is_if_tail = matches!(body.statements.last(), Some(Stmt::If(_)));
+        let stmt_count = body.statements.len();
+        for (i, stmt) in body.statements.iter().enumerate() {
+            if i + 1 == stmt_count && last_is_if_tail {
+                ctx.tail_if_as_return = true;
+            }
+            ctx = self.lower_stmt(ctx, stmt);
+        }
+
         if ctx.current_block.terminator == MirTerminator::Unreachable {
             if last_is_tail {
                 let val_local = ctx.next_local - 1;
@@ -477,9 +599,9 @@ impl Lowerer {
                 }
 
                 if is_tail {
-                    // All branches return directly; no merge block needed
+                    // All branches return directly; merge block returns void
                     ctx.current_block = MirBasicBlock::new(end_label);
-                    // Keep Unreachable terminator; will be caught by default return code and ignored
+                    ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
                 } else {
                     ctx.current_block = MirBasicBlock::new(end_label);
                 }
@@ -953,60 +1075,109 @@ impl Lowerer {
                 ctx
             }
             Expr::FunctionCall { target, arguments, .. } => {
-                // Method call: tokens.add(val) → kl_list_push
+                // Method dispatch: obj.method(args) → Call ClassName::method(obj, args...)
+                // Checked BEFORE the list-specific shortcuts so real class methods win
+                // over the generic list.add/list.pop fallbacks.
                 if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
-                    if property == "pop" {
-                        ctx = self.lower_expr(ctx, object);
-                        let obj_val = ctx.next_local - 1;
-                        let result = ctx.alloc_local("_pop", MirType::I64);
-                        ctx.current_block.insts.push(MirInst::Call {
-                            dest: Some(result),
-                            name: "kl_list_pop".to_string(),
-                            args: vec![MirValue::Local(obj_val)],
-                        });
-                        return ctx;
-                    }
-                    if property == "add" {
-                        ctx = self.lower_expr(ctx, object);
-                        let obj_val = ctx.next_local - 1;
-                        for arg in arguments {
-                            ctx = self.lower_expr(ctx, arg);
-                            let arg_val = ctx.next_local - 1;
-                            let arg_type = ctx.local_types.get(&arg_val).cloned().unwrap_or(MirType::I32);
-                            let arg_i64 = ctx.alloc_local("_arg64", MirType::I64);
-                            if matches!(arg_type, MirType::Struct(_, _)) {
-                                // Allocate heap memory for struct, store value there, push pointer
-                                let heap_ptr = ctx.alloc_local("_heapp", MirType::I64);
+                    // Lower the receiver first to learn its type.
+                    ctx = self.lower_expr(ctx, object);
+                    let obj_local = ctx.next_local - 1;
+                    let obj_type = ctx.local_types.get(&obj_local).cloned();
+
+                    // If the receiver is a class instance (MirType::Struct) and the class
+                    // declares a method named `property`, emit a real method call.
+                    if let Some(MirType::Struct(class_name, _)) = &obj_type {
+                        let method_table = self.method_table.borrow();
+                        if let Some(methods) = method_table.get(class_name) {
+                            if let Some(mangled) = methods.get(property) {
+                                // First argument is the receiver (this).
+                                let mut call_args = vec![MirValue::Local(obj_local)];
+                                for arg in arguments {
+                                    ctx = self.lower_expr(ctx, arg);
+                                    call_args.push(MirValue::Local(ctx.next_local - 1));
+                                }
+                                let call_type = self.fn_returns.borrow()
+                                    .get(mangled).cloned().unwrap_or(MirType::Void);
+                                let dest = ctx.alloc_local("_mcall", call_type.clone());
+                                if call_type == MirType::Str {
+                                    ctx.string_locals.push(dest);
+                                }
                                 ctx.current_block.insts.push(MirInst::Call {
-                                    dest: Some(heap_ptr),
-                                    name: "kl_alloc".to_string(),
-                                    args: vec![MirValue::Constant(MirConstant::I32(64))],
+                                    dest: Some(dest),
+                                    name: mangled.clone(),
+                                    args: call_args,
                                 });
-                                // Copy struct value to heap memory
-                                ctx.current_block.insts.push(MirInst::Memcpy {
-                                    dest_ptr_local: heap_ptr,
-                                    src_alloca_local: arg_val,
-                                    struct_type: Box::new(arg_type.clone()),
-                                });
-                                ctx.current_block.insts.push(MirInst::Cast {
-                                    dest: arg_i64,
-                                    value: MirValue::Local(heap_ptr),
-                                    to_type: MirType::I64,
-                                });
-                            } else {
-                                ctx.current_block.insts.push(MirInst::Cast {
-                                    dest: arg_i64,
-                                    value: MirValue::Local(arg_val),
-                                    to_type: MirType::I64,
+                                return ctx;
+                            }
+                        }
+                    }
+
+                    // Otherwise, fall back to list method shortcuts (pop/add) when the
+                    // receiver is a list, not a class instance.
+                    let is_list = obj_type.as_ref().map(|t| matches!(t, MirType::List(_))).unwrap_or(false);
+                    if is_list {
+                        if property == "pop" {
+                            let result = ctx.alloc_local("_pop", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result),
+                                name: "kl_list_pop".to_string(),
+                                args: vec![MirValue::Local(obj_local)],
+                            });
+                            return ctx;
+                        }
+                        if property == "add" {
+                            for arg in arguments {
+                                ctx = self.lower_expr(ctx, arg);
+                                let arg_val = ctx.next_local - 1;
+                                let arg_type = ctx.local_types.get(&arg_val).cloned().unwrap_or(MirType::I32);
+                                let arg_i64 = ctx.alloc_local("_arg64", MirType::I64);
+                                if matches!(arg_type, MirType::Struct(_, _)) {
+                                    // When adding a struct to a list whose elem type is I64 (inferred),
+                                    // update the list's ELEMENT type so that list[i] returns the struct.
+                                    // We need to update the alloca's type, not the loaded value's type.
+                                    if let Expr::Identifier { name, .. } = object.as_ref() {
+                                        if let Some(var_local) = ctx.locals.get(name) {
+                                            if let Some(MirType::List(elem)) = ctx.local_types.get(var_local) {
+                                                if matches!(elem.as_ref(), MirType::I64) {
+                                                    let struct_type = arg_type.clone();
+                                                    ctx.local_types.insert(*var_local, MirType::List(Box::new(struct_type)));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // Allocate heap memory for struct, store value there, push pointer
+                                    let heap_ptr = ctx.alloc_local("_heapp", MirType::I64);
+                                    ctx.current_block.insts.push(MirInst::Call {
+                                        dest: Some(heap_ptr),
+                                        name: "kl_alloc".to_string(),
+                                        args: vec![MirValue::Constant(MirConstant::I64(64))],
+                                    });
+                                    // Copy struct value to heap memory
+                                    ctx.current_block.insts.push(MirInst::Memcpy {
+                                        dest_ptr_local: heap_ptr,
+                                        src_alloca_local: arg_val,
+                                        struct_type: Box::new(arg_type.clone()),
+                                    });
+                                    ctx.current_block.insts.push(MirInst::Cast {
+                                        dest: arg_i64,
+                                        value: MirValue::Local(heap_ptr),
+                                        to_type: MirType::I64,
+                                    });
+                                } else {
+                                    ctx.current_block.insts.push(MirInst::Cast {
+                                        dest: arg_i64,
+                                        value: MirValue::Local(arg_val),
+                                        to_type: MirType::I64,
+                                    });
+                                }
+                                ctx.current_block.insts.push(MirInst::Call {
+                                    dest: None,
+                                    name: "kl_list_push".to_string(),
+                                    args: vec![MirValue::Local(obj_local), MirValue::Local(arg_i64)],
                                 });
                             }
-                            ctx.current_block.insts.push(MirInst::Call {
-                                dest: None,
-                                name: "kl_list_push".to_string(),
-                                args: vec![MirValue::Local(obj_val), MirValue::Local(arg_i64)],
-                            });
+                            return ctx;
                         }
-                        return ctx;
                     }
                 }
 
@@ -1143,6 +1314,19 @@ impl Lowerer {
                     ctx.string_locals.push(dest);
                 }
 
+                // Special case: println() with no arguments — print a newline
+                if name == "println" && args.is_empty() {
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(dest),
+                        name: "kl_println".to_string(),
+                        args: vec![
+                            MirValue::Constant(MirConstant::String("\n".to_string())),
+                            MirValue::Constant(MirConstant::I32(1)),
+                        ],
+                    });
+                    return ctx;
+                }
+
                 // For print/println with dynamic arguments
                 if (name == "print" || name == "println") && !args.is_empty() {
                     let first_arg = &args[0];
@@ -1270,16 +1454,30 @@ impl Lowerer {
                 ctx
             }
             Expr::PropertyAccess { object, property, .. } => {
+                // If accessing `len` on a list-typed variable, call kl_list_len.
+                // Must check type before lowering to avoid treating struct fields
+                // named `len` (e.g., Parser.len) as list length calls.
                 if property == "len" {
-                    ctx = self.lower_expr(ctx, object);
-                    let obj_val = ctx.next_local - 1;
-                    let result = ctx.alloc_local("_len", MirType::I64);
-                    ctx.current_block.insts.push(MirInst::Call {
-                        dest: Some(result),
-                        name: "kl_list_len".to_string(),
-                        args: vec![MirValue::Local(obj_val)],
-                    });
-                    return ctx;
+                    let is_list = match object.as_ref() {
+                        Expr::Identifier { name, .. } => {
+                            ctx.locals.get(name)
+                                .and_then(|l| ctx.local_types.get(l))
+                                .map(|t| matches!(t, MirType::List(_)))
+                                .unwrap_or(false)
+                        }
+                        _ => false,
+                    };
+                    if is_list {
+                        ctx = self.lower_expr(ctx, object);
+                        let obj_val = ctx.next_local - 1;
+                        let result = ctx.alloc_local("_len", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result),
+                            name: "kl_list_len".to_string(),
+                            args: vec![MirValue::Local(obj_val)],
+                        });
+                        return ctx;
+                    }
                 }
                 // Struct field access: use the variable's alloca pointer directly
                 let obj_ptr = if let Expr::Identifier { name, .. } = object.as_ref() {
@@ -1421,6 +1619,54 @@ impl Lowerer {
                 for (_, val) in entries {
                     ctx = self.lower_expr(ctx, val);
                 }
+                ctx
+            }
+            Expr::StructLiteral { struct_name, fields, .. } => {
+                let struct_defs = ctx.struct_defs.clone();
+                if let Some(def_fields) = struct_defs.get(struct_name.as_str()) {
+                    let def_fields = def_fields.clone();
+                    let struct_type = MirType::Struct(struct_name.clone(), def_fields.clone());
+                    let struct_local = ctx.alloc_local("_slit", struct_type.clone());
+                    for (field_name, field_expr) in fields {
+                        ctx = self.lower_expr(ctx, field_expr);
+                        let val_local = ctx.next_local - 1;
+                        if let Some(field_idx) = def_fields.iter()
+                            .position(|(fname, _)| fname == field_name)
+                        {
+                            let fptr = ctx.alloc_local("_sfptr", MirType::Void);
+                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                dest: fptr,
+                                ptr: struct_local,
+                                field_index: field_idx,
+                                struct_type: Box::new(MirType::Struct(struct_name.clone(), def_fields.clone())),
+                            });
+                            let field_type = def_fields[field_idx].1.clone();
+                            let cast_val = if field_type != ctx.local_types.get(&val_local).cloned().unwrap_or(MirType::I64) {
+                                let cast_local = ctx.alloc_local("_scast", field_type.clone());
+                                ctx.current_block.insts.push(MirInst::Cast {
+                                    dest: cast_local,
+                                    value: MirValue::Local(val_local),
+                                    to_type: field_type,
+                                });
+                                MirValue::Local(cast_local)
+                            } else {
+                                MirValue::Local(val_local)
+                            };
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: fptr,
+                                value: cast_val,
+                            });
+                        }
+                    }
+                    let result = ctx.alloc_local("_sval", struct_type);
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: result,
+                        src: struct_local,
+                    });
+                    result
+                } else {
+                    ctx.alloc_local("_slit_err", MirType::Void)
+                };
                 ctx
             }
             Expr::Tuple { elements, .. } => {
