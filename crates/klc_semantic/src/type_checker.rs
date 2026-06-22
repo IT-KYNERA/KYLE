@@ -112,6 +112,24 @@ impl TypeChecker {
         }
     }
 
+    fn bind_pattern(&mut self, pattern: &Pattern, match_type: Option<&Type>) {
+        match pattern {
+            Pattern::Identifier { name, .. } => {
+                // For enum variant payloads, use I32 as default (payload is i64 in MIR).
+                // For standalone identifiers, leave type as None for inference.
+                let inferred = match_type.map(|_| Type::I32);
+                let _ = self.symbols.insert(name.clone(),
+                    Symbol::new_var(name.clone(), inferred, false));
+            }
+            Pattern::EnumVariant { args, .. } => {
+                for arg in args {
+                    self.bind_pattern(arg, Some(&Type::I32));
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn check_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Variable(v) => { self.check_variable(v); }
@@ -150,6 +168,7 @@ impl TypeChecker {
                 self.infer_expr(&m.expression);
                 for arm in &m.arms {
                     self.symbols.push_scope();
+                    self.bind_pattern(&arm.pattern, None);
                     if let Some(g) = &arm.guard { self.infer_expr(g); }
                     self.check_block(&arm.body);
                     self.symbols.pop_scope();
@@ -291,11 +310,18 @@ impl TypeChecker {
             Expr::Tuple { elements, .. } => {
                 Type::Tuple(elements.iter().map(|e| self.infer_expr(e)).collect())
             }
-            Expr::Closure { body, .. } => {
-                self.infer_expr(body);
+            Expr::Closure { params, body, .. } => {
+                self.symbols.push_scope();
+                for p in params {
+                    let _ = self.symbols.insert(p.clone(),
+                        Symbol::new_var(p.clone(), Some(Type::I32), false));
+                }
+                let ret = self.infer_expr(body);
+                self.symbols.pop_scope();
+                let param_types = params.iter().map(|_| Type::I32).collect();
                 Type::Function(FunctionType {
                     is_async: false, is_const: false,
-                    params: vec![], return_: Box::new(Type::I32), fallible: false,
+                    params: param_types, return_: Box::new(ret), fallible: false,
                 })
             }
             Expr::Await { expression, .. } => {
@@ -306,10 +332,10 @@ impl TypeChecker {
                 }
             }
             Expr::Async { expression, .. } => {
-                self.infer_expr(expression);
+                let ret = self.infer_expr(expression);
                 Type::Function(FunctionType {
                     is_async: true, is_const: false,
-                    params: vec![], return_: Box::new(Type::Void), fallible: false,
+                    params: vec![], return_: Box::new(ret), fallible: false,
                 })
             }
             Expr::Spread { expression, .. } => self.infer_expr(expression),
@@ -318,7 +344,7 @@ impl TypeChecker {
                 self.infer_expr(index);
                 match tt {
                     Type::List(et) => *et,
-                    Type::Str => Type::Char,
+                    Type::Str => Type::Str,
                     _ => Type::I32,
                 }
             }

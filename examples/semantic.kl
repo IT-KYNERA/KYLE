@@ -129,250 +129,277 @@ fn dump_ast(node: AstNode, indent: str):
 KEYWORDS = ["fn", "mut", "const", "if", "elif", "else", "while", "for", "in", "return", "break", "struct", "class", "enum", "import", "from", "true", "false", "and", "or", "not", "match", "loop", "defer", "pub", "abs", "override", "static", "abstract", "contract", "impl", "async", "await", "unsafe", "guard", "type"]
 
 fn is_keyword(s: str) -> i32:
-    i = 0
-    while i < len(KEYWORDS):
-        if KEYWORDS[i] == s:
-            1
-            return
-        i = i + 1
-    0
+    if s == "fn": 1
+    elif s == "mut": 1
+    elif s == "const": 1
+    elif s == "if": 1
+    elif s == "elif": 1
+    elif s == "else": 1
+    elif s == "while": 1
+    elif s == "for": 1
+    elif s == "in": 1
+    elif s == "return": 1
+    elif s == "break": 1
+    elif s == "struct": 1
+    elif s == "class": 1
+    elif s == "enum": 1
+    elif s == "import": 1
+    elif s == "from": 1
+    elif s == "true": 1
+    elif s == "false": 1
+    elif s == "and": 1
+    elif s == "or": 1
+    elif s == "not": 1
+    elif s == "match": 1
+    elif s == "loop": 1
+    elif s == "defer": 1
+    elif s == "pub": 1
+    elif s == "abs": 1
+    elif s == "override": 1
+    elif s == "static": 1
+    elif s == "abstract": 1
+    elif s == "contract": 1
+    elif s == "impl": 1
+    elif s == "async": 1
+    elif s == "await": 1
+    elif s == "unsafe": 1
+    elif s == "guard": 1
+    elif s == "type": 1
+    else: 0
 
 # ============================================================
-# Tokenizer
+# Tokenizer (inline, like lexer.kl)
 # ============================================================
-struct Tokenizer:
-    source: str
-    pos: i32
-    line: i32
-    col: i32
-    indent_stack: list<i32>
-    tokens: list<Token>
-    bol: i32
-    pending: list<Token>
+fn tokenize(source: str) -> list<Token>:
+    tokens = []
+    len_s = len(source)
+    mut line = 1
+    mut col = 1
+    mut i = 0
+    mut indent_stack = [0]
+    mut newline_pending = 1
 
-fn make_tokenizer(src: str) -> Tokenizer:
-    mut t: Tokenizer
-    t.source = src
-    t.pos = 0
-    t.line = 1
-    t.col = 1
-    t.indent_stack = [0]
-    t.tokens = []
-    t.bol = 1
-    t.pending = []
-    t
+    while i < len_s:
+        c = ord(char_at(source, i))
+        start_col = col
 
-fn peek(t: Tokenizer) -> str:
-    if t.pos < len(t.source):
-        t.source[t.pos]
-    else:
-        ""
+        if newline_pending == 1:
+            mut indent_level = 0
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 32:
+                    indent_level = indent_level + 1
+                    col = col + 1
+                    i = i + 1
+                elif c2 == 9:
+                    indent_level = indent_level + 4
+                    col = col + 4
+                    i = i + 1
+                else:
+                    break
+            top = indent_stack[len(indent_stack) - 1]
+            if indent_level > top:
+                indent_stack.add(indent_level)
+                tokens.add(make_token(TOK_INDENT, "", line, 1))
+            elif indent_level < top:
+                while indent_stack[len(indent_stack) - 1] > indent_level:
+                    indent_stack.pop()
+                    tokens.add(make_token(TOK_DEDENT, "", line, 1))
+            newline_pending = 0
 
-fn advance(t: Tokenizer):
-    if t.pos < len(t.source):
-        c = t.source[t.pos]
-        t.pos = t.pos + 1
-        if c == "\n":
-            t.line = t.line + 1
-            t.col = 1
-        else:
-            t.col = t.col + 1
+        if i >= len_s:
+            break
+        c = ord(char_at(source, i))
+        start_col = col
 
-fn add_tok(t: Tokenizer, kind: i32, value: str):
-    t.tokens.add(make_token(kind, value, t.line, t.col - len(value)))
+        if c == 10:
+            tokens.add(make_token(TOK_NEWLINE, "\\n", line, col))
+            line = line + 1
+            col = 1
+            i = i + 1
+            newline_pending = 1
 
-fn handle_indent(t: Tokenizer):
-    indent = 0
-    while peek(t) == " ":
-        indent = indent + 1
-        advance(t)
-    if peek(t) == "#":
-        while peek(t) != "" and peek(t) != "\n":
-            advance(t)
-    if peek(t) == "\n" or peek(t) == "":
-        return
-    top = t.indent_stack[len(t.indent_stack) - 1]
-    if indent > top:
-        t.indent_stack.add(indent)
-        add_tok(t, TOK_INDENT, "")
-    elif indent < top:
-        while indent < t.indent_stack[len(t.indent_stack) - 1]:
-            t.indent_stack.pop()
-            add_tok(t, TOK_DEDENT, "")
-
-fn skip_comment(t: Tokenizer):
-    while peek(t) != "" and peek(t) != "\n":
-        advance(t)
-
-fn tokenize_string(t: Tokenizer):
-    advance(t)
-    mut value = ""
-    while peek(t) != "" and peek(t) != "\"":
-        if peek(t) == "\\":
-            advance(t)
-            if peek(t) == "n":
-                value = value + "\n"
-                advance(t)
-            elif peek(t) == "t":
-                value = value + "\t"
-                advance(t)
-            elif peek(t) == "\\":
-                value = value + "\\"
-                advance(t)
-            elif peek(t) == "\"":
-                value = value + "\""
-                advance(t)
+        elif c == 32 or c == 9 or c == 13:
+            if c == 9:
+                col = col + 4
             else:
-                value = value + "\\"
-        else:
-            value = value + peek(t)
-            advance(t)
-    if peek(t) == "\"":
-        advance(t)
-    add_tok(t, TOK_STRING, value)
+                col = col + 1
+            i = i + 1
 
-fn tokenize_char(t: Tokenizer):
-    advance(t)
-    mut value = ""
-    if peek(t) == "\\":
-        advance(t)
-        if peek(t) == "n":
-            value = "\n"
-            advance(t)
-        elif peek(t) == "t":
-            value = "\t"
-            advance(t)
-        elif peek(t) == "\\":
-            value = "\\"
-            advance(t)
-        elif peek(t) == "'":
-            value = "'"
-            advance(t)
-        else:
-            value = "\\"
-    else:
-        value = peek(t)
-        advance(t)
-    if peek(t) == "'":
-        advance(t)
-    add_tok(t, TOK_CHAR, value)
+        elif c == 35:
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 10:
+                    break
+                i = i + 1
+                col = col + 1
 
-fn tokenize_number(t: Tokenizer):
-    mut value = ""
-    c = peek(t)
-    while c >= "0" and c <= "9":
-        value = value + c
-        advance(t)
-        c = peek(t)
-    add_tok(t, TOK_NUMBER, value)
-
-fn tokenize_word(t: Tokenizer):
-    mut value = ""
-    c = peek(t)
-    while (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_" or (len(value) > 0 and c >= "0" and c <= "9"):
-        value = value + c
-        advance(t)
-        c = peek(t)
-    if value == "true" or value == "false":
-        add_tok(t, TOK_BOOL, value)
-    elif is_keyword(value):
-        add_tok(t, TOK_KEYWORD, value)
-    else:
-        add_tok(t, TOK_IDENTIFIER, value)
-
-fn tokenize_op(t: Tokenizer):
-    c = peek(t)
-    if c == "+" or c == "-" or c == "*" or c == "/" or c == "%":
-        advance(t)
-        if c == "-" and peek(t) == ">":
-            advance(t)
-            add_tok(t, TOK_ARROW, "->")
-            return
-        add_tok(t, TOK_OPERATOR, c)
-    elif c == "=":
-        advance(t)
-        if peek(t) == "=":
-            advance(t)
-            add_tok(t, TOK_OPERATOR, "==")
-        else:
-            add_tok(t, TOK_OPERATOR, "=")
-    elif c == "!":
-        advance(t)
-        if peek(t) == "=":
-            advance(t)
-            add_tok(t, TOK_OPERATOR, "!=")
-        else:
-            advance(t)
-    elif c == "<":
-        advance(t)
-        if peek(t) == "=":
-            advance(t)
-            add_tok(t, TOK_OPERATOR, "<=")
-        else:
-            add_tok(t, TOK_OPERATOR, "<")
-    elif c == ">":
-        advance(t)
-        if peek(t) == "=":
-            advance(t)
-            add_tok(t, TOK_OPERATOR, ">=")
-        else:
-            add_tok(t, TOK_OPERATOR, ">")
-    elif c == "(":
-        advance(t)
-        add_tok(t, TOK_LPAREN, "(")
-    elif c == ")":
-        advance(t)
-        add_tok(t, TOK_RPAREN, ")")
-    elif c == "[":
-        advance(t)
-        add_tok(t, TOK_LBRACKET, "[")
-    elif c == "]":
-        advance(t)
-        add_tok(t, TOK_RBRACKET, "]")
-    elif c == ",":
-        advance(t)
-        add_tok(t, TOK_COMMA, ",")
-    elif c == ":":
-        advance(t)
-        add_tok(t, TOK_COLON, ":")
-    elif c == ".":
-        advance(t)
-        add_tok(t, TOK_DOT, ".")
-    elif c == "|":
-        advance(t)
-        add_tok(t, TOK_OPERATOR, "|")
-    else:
-        advance(t)
-
-fn tokenize(t: Tokenizer):
-    while peek(t) != "":
-        c = peek(t)
-        if c == " ":
-            if t.bol == 1:
-                handle_indent(t)
-                t.bol = 0
+        elif (c >= 97 and c <= 122) or (c >= 65 and c <= 90) or c == 95:
+            start = i
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if (c2 >= 97 and c2 <= 122) or (c2 >= 65 and c2 <= 90) or c2 == 95 or (c2 >= 48 and c2 <= 57):
+                    i = i + 1
+                    col = col + 1
+                else:
+                    break
+            word = substr(source, start, i - start)
+            if word == "true" or word == "false":
+                tokens.add(make_token(TOK_BOOL, word, line, start_col))
+            elif is_keyword(word) == 1:
+                tokens.add(make_token(TOK_KEYWORD, word, line, start_col))
             else:
-                advance(t)
-            continue
-        elif c == "\n":
-            add_tok(t, TOK_NEWLINE, "")
-            advance(t)
-            t.bol = 1
-            continue
-        elif c == "#":
-            skip_comment(t)
-            continue
-        elif c == "\"":
-            tokenize_string(t)
-        elif c == "'":
-            tokenize_char(t)
-        elif c >= "0" and c <= "9":
-            tokenize_number(t)
-        elif (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_":
-            tokenize_word(t)
+                tokens.add(make_token(TOK_IDENTIFIER, word, line, start_col))
+
+        elif c >= 48 and c <= 57:
+            start = i
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 >= 48 and c2 <= 57:
+                    i = i + 1
+                    col = col + 1
+                else:
+                    break
+            num = substr(source, start, i - start)
+            tokens.add(make_token(TOK_NUMBER, num, line, start_col))
+
+        elif c == 34:
+            start = i
+            i = i + 1
+            col = col + 1
+            while i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 34:
+                    i = i + 1
+                    col = col + 1
+                    break
+                elif c2 == 92:
+                    i = i + 2
+                    col = col + 2
+                else:
+                    i = i + 1
+                    col = col + 1
+            sval = substr(source, start, i - start)
+            tokens.add(make_token(TOK_STRING, sval, line, start_col))
+
+        elif c == 39:
+            start = i
+            i = i + 1
+            col = col + 1
+            if i < len_s:
+                c2 = ord(char_at(source, i))
+                if c2 == 92:
+                    i = i + 1
+                    col = col + 1
+                    if i < len_s:
+                        i = i + 1
+                        col = col + 1
+                else:
+                    i = i + 1
+                    col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 39:
+                i = i + 1
+                col = col + 1
+            cval = substr(source, start, i - start)
+            tokens.add(make_token(TOK_CHAR, cval, line, start_col))
+
+        elif c == 40:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_LPAREN, "(", line, start_col))
+        elif c == 41:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_RPAREN, ")", line, start_col))
+        elif c == 91:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_LBRACKET, "[", line, start_col))
+        elif c == 93:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_RBRACKET, "]", line, start_col))
+        elif c == 44:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_COMMA, ",", line, start_col))
+        elif c == 58:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_COLON, ":", line, start_col))
+        elif c == 46:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_DOT, ".", line, start_col))
+        elif c == 61:
+            i = i + 1
+            col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 61:
+                i = i + 1
+                col = col + 1
+                tokens.add(make_token(TOK_OPERATOR, "==", line, start_col))
+            else:
+                tokens.add(make_token(TOK_OPERATOR, "=", line, start_col))
+        elif c == 33:
+            i = i + 1
+            col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 61:
+                i = i + 1
+                col = col + 1
+                tokens.add(make_token(TOK_OPERATOR, "!=", line, start_col))
+        elif c == 60:
+            i = i + 1
+            col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 61:
+                i = i + 1
+                col = col + 1
+                tokens.add(make_token(TOK_OPERATOR, "<=", line, start_col))
+            else:
+                tokens.add(make_token(TOK_OPERATOR, "<", line, start_col))
+        elif c == 62:
+            i = i + 1
+            col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 61:
+                i = i + 1
+                col = col + 1
+                tokens.add(make_token(TOK_OPERATOR, ">=", line, start_col))
+            else:
+                tokens.add(make_token(TOK_OPERATOR, ">", line, start_col))
+        elif c == 43:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_OPERATOR, "+", line, start_col))
+        elif c == 45:
+            i = i + 1
+            col = col + 1
+            if i < len_s and ord(char_at(source, i)) == 62:
+                i = i + 1
+                col = col + 1
+                tokens.add(make_token(TOK_ARROW, "->", line, start_col))
+            else:
+                tokens.add(make_token(TOK_OPERATOR, "-", line, start_col))
+        elif c == 42:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_OPERATOR, "*", line, start_col))
+        elif c == 47:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_OPERATOR, "/", line, start_col))
+        elif c == 37:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_OPERATOR, "%", line, start_col))
+        elif c == 124:
+            i = i + 1
+            col = col + 1
+            tokens.add(make_token(TOK_OPERATOR, "|", line, start_col))
         else:
-            tokenize_op(t)
-    add_tok(t, TOK_EOF, "")
+            i = i + 1
+            col = col + 1
+
+    tokens.add(make_token(TOK_EOF, "", line, col))
+    tokens
 
 # ============================================================
 # Parser
@@ -935,8 +962,7 @@ fn lookup_sym(c: Checker, name: str) -> Symbol:
         j = len(scope) - 1
         while j >= 0:
             if scope[j].name == name:
-                scope[j]
-                return
+                return scope[j]
             j = j - 1
         i = i - 1
     make_sym("", -1, TYPE_UNKNOWN, "", 0)
@@ -1004,7 +1030,7 @@ fn infer_expr_type(c: Checker, node: AstNode) -> i32:
 fn infer_literal_type(value: str) -> i32:
     if value == "true" or value == "false":
         TYPE_BOOL
-    elif len(value) > 0 and ord(value[0]) >= 48 and ord(value[0]) <= 57:
+    elif len(value) > 0 and ord(char_at(value, 0)) >= 48 and ord(char_at(value, 0)) <= 57:
         TYPE_I32
     elif len(value) > 0 and value[0] == "\"":
         TYPE_STR
@@ -1258,26 +1284,28 @@ fn type_id_from_name(name: str) -> i32:
 # Main
 # ============================================================
 fn main(args: [str]) -> i32:
-    if len(args) < 2:
+    if len(args) < 1:
         print("usage: klc run examples/semantic.kl <file.kl>")
         1
         return
 
-    filename = args[1]
-    src = read_str(filename)
+    filename = args[0]
+    fd = open(filename, "r")
+    src = read_str(fd, 16384)
+    close(fd)
     if len(src) == 0:
         println("error: could not read " + filename)
         1
         return
 
-    t = make_tokenizer(src)
-    tokenize(t)
-    tokens = t.tokens
+    tokens = tokenize(src)
 
     ast = parse_program(tokens)
+    println("parsed")
 
     c = make_checker()
     check_program(c, ast)
+    println("checked")
 
     if len(c.errors) > 0:
         i = 0

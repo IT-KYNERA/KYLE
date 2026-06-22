@@ -78,6 +78,10 @@ pub enum MirInst {
     Cast { dest: usize, value: MirValue, to_type: MirType },
     /// Copy struct value from a local alloca to a heap pointer (i64).
     Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
+    /// Load address of a named function into a local (for closures).
+    FnAddr { dest: usize, name: String },
+    /// Call through a function pointer.
+    CallIndirect { dest: Option<usize>, fn_ptr: usize, ret_type: MirType, param_types: Vec<MirType>, args: Vec<MirValue> },
 }
 
 /// How a basic block ends.
@@ -276,6 +280,16 @@ impl fmt::Display for MirInst {
             }
             MirInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
                 write!(f, "  memcpy %{} <- %{}, type {}", dest_ptr_local, src_alloca_local, struct_type)
+            }
+            MirInst::FnAddr { dest, name } => {
+                write!(f, "  %{} = fn_addr {}", dest, name)
+            }
+            MirInst::CallIndirect { dest, fn_ptr, ret_type: _, param_types: _, args } => {
+                if let Some(d) = dest {
+                    write!(f, "  %{} = call_indirect %{}({})", d, fn_ptr, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+                } else {
+                    write!(f, "  call_indirect %{}({})", fn_ptr, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+                }
             }
         }
     }

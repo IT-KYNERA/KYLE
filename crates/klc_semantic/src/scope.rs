@@ -124,6 +124,22 @@ impl ScopeResolver {
         }
     }
 
+    /// Bind identifiers in a pattern into the current scope.
+    fn bind_pattern(&mut self, pattern: &Pattern) {
+        match pattern {
+            Pattern::Identifier { name, .. } => {
+                let _ = self.symbols.insert(name.clone(),
+                    Symbol::new_var(name.clone(), None, false));
+            }
+            Pattern::EnumVariant { args, .. } => {
+                for arg in args {
+                    self.bind_pattern(arg);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn resolve_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Variable(v) => self.resolve_variable(v),
@@ -176,10 +192,7 @@ impl ScopeResolver {
                 self.resolve_expr(&m.expression);
                 for arm in &m.arms {
                     self.symbols.push_scope();
-                    if let Pattern::Identifier { name, .. } = &arm.pattern {
-                        let _ = self.symbols.insert(name.clone(),
-                            Symbol::new_var(name.clone(), None, false));
-                    }
+                    self.bind_pattern(&arm.pattern);
                     if let Some(g) = &arm.guard { self.resolve_expr(g); }
                     self.resolve_block(&arm.body);
                     self.symbols.pop_scope();
@@ -254,8 +267,14 @@ impl ScopeResolver {
             Expr::Tuple { elements, .. } => {
                 for e in elements { self.resolve_expr(e); }
             }
-            Expr::Closure { body, .. } => {
+            Expr::Closure { params, body, .. } => {
+                self.symbols.push_scope();
+                for p in params {
+                    let _ = self.symbols.insert(p.clone(),
+                        Symbol::new_var(p.clone(), None, false));
+                }
                 self.resolve_expr(body);
+                self.symbols.pop_scope();
             }
             Expr::Await { expression, .. } => self.resolve_expr(expression),
             Expr::Async { expression, .. } => self.resolve_expr(expression),

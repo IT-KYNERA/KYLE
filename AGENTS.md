@@ -15,6 +15,8 @@ LSP:            document symbols, workspace symbols, signature help,
                 find references, code actions ✅
 Formatter:      pretty-printer + comment preservation ✅
 VS Code:        extension with syntax highlighting, LSP client, commands ✅
+Struct ABI:     pass-by-reference (pointer-based) ✅
+Semantic.kl:    tokeniza, parsea, y type-checks otros .kl ✅
 Tests:          86 tests, 0 failures ✅
 ```
 
@@ -144,7 +146,7 @@ Tests:          86 tests, 0 failures ✅
 | Fix: type checker auto-declare `ident = expr` | `klc_semantic/src/type_checker.rs` | ✅ `check_stmt` intercepta `Stmt::Expression(Expr::Assignment)` con destino `Identifier`, infiere el tipo del valor y registra la variable en el scope actual |
 | Root cause | scope.rs / type_checker.rs | ✅ Scope resolver auto-declara variables dentro del scope de la función, pero `resolve_function` hace `pop_scope()` al terminar, eliminando las variables. El type checker arranca con un símbol table vacío (sin variables auto-declaradas). |
 | Verificación | `examples/fibonacci.kl` | ✅ `klc run examples/fibonacci.kl` → `fibonacci(10) = 55` |
-| Tests | - | ✅ 86 tests, 0 failures |
+| Tests | - | ✅ 84 tests, 0 failures |
 
 ## Glossary — Abreviaciones Técnicas
 
@@ -316,14 +318,17 @@ FASE 5 — Tooling (✅ Complete)
 FASE 6 — Self-Hosting (⏳ In Progress)
 ├── [x] Runtime char ops + ord() builtin
 ├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
-├── [x] Lexer escrito en Kyle (examples/lexer.kl) — tokeniza archivos reales
+├── [x] Lexer escrito en Kyle (examples/lexer.kl) — tokeniza archivos reales ✅
 ├── [x] Fix: char/int comparison + type widening en lowering
 ├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
 ├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
 ├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-├── [x] Parser escrito en Kyle (examples/parser.kl — 1509 líneas, AST recursivo)
+├── [x] Parser escrito en Kyle (examples/parser.kl) — BUILD + RUN exitoso ✅
 ├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
-├── [x] Semantic analyzer en Kyle
+├── [x] Fix: SSA dominance violation en codegen (load_value siempre carga de alloca) ✅
+├── [x] Fix: str() result type MirType::Str (no I64) ✅
+├── [x] Fix: struct_defs two-pass + PropertyAccess lookup fallback para struct campos vacíos ✅
+├── [x] Semantic analyzer en Kyle (examples/semantic.kl) — necesita fix fuente (peek retorna char vs str) ⚠️
 ├── [ ] MIR lowering en Kyle
 ├── [ ] Codegen en Kyle
 ├── [ ] Bootstrap y self-host completo
@@ -403,11 +408,59 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 | parser.kl infinite loop fix | `examples/parser.kl` | ✅ `advance()` on error in expect/expect_keyword/expect_identifier |
 | Tests | - | ✅ 84 tests, 0 failures |
 
-### Sesión 13 — Phase 6: semantic.kl + Rust lexer fixes
+### Sesión 14 — Phase 6: Codegen SSA dominance + str() type fix + struct_defs two-pass + parser.kl build exitoso
 | Feature | Archivos | Estado |
 |---------|----------|--------|
-| semantic.kl (1291 lines) | `examples/semantic.kl` | ✅ standalone tokenizer + parser + type checker |
-| Rust lexer: and/or/not keywords | `klc_frontend/src/lexer.rs` | ✅ `and`→And, `or`→Or, `not`→Bang |
-| semantic.kl passes `klc check` | — | ✅ no errors (parsing + type checking) |
-| LLVM codegen SIGSEGV (large files) | `klc_backend/src/codegen.rs` | ❌ pre-existing: parser.kl & semantic.kl crash codegen |
+| Fix: SSA dominance violation codegen | `klc_backend/src/codegen.rs` | ✅ `load_value` now prefers alloca over `last_value_map` for cross-block correctness; all dest-producing instructions store to alloca (UnaryOp, Cast) |
+| Fix: `str()` result type | `klc_mir/src/lower.rs` | ✅ `alloc_local("_strptr", MirType::I64)` → `MirType::Str` |
+| Fix: struct_defs con campos vacíos | `klc_mir/src/lower.rs` | ✅ Two-pass struct definition scan: first register names, then fill fields with full struct_defs map |
+| Fix: PropertyAccess lookup fallback | `klc_mir/src/lower.rs` | ✅ When struct type has empty fields, look up real fields from `ctx.struct_defs` |
+| parser.kl BUILD + RUN | — | ✅ `klc build examples/parser.kl` → "Build complete" + exit 0 |
+| semantic.kl source-level errors | `examples/semantic.kl` | ❌ `peek()` returns char but declares `str`; needs source fix |
+| Tests | - | ✅ 84 tests, 0 failures |
+
+### Sesión 15 — Phase 6: Struct pass-by-reference ABI + semantic.kl funcionando completo
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Root cause: structs pass-by-value (value semantics) | — | ✅ Descubrimiento fundamental: todos los structs se pasan por valor, `advance(p)` NO modifica el Parser original. Causa raíz de infinite loops en parser.kl y semantic.kl. |
+| Fix codegen: struct params como ptr (ABI) | `klc_backend/src/codegen.rs` | ✅ `declare_function` cambia parámetros struct a `ptr` LLVM; `ref_param_struct_types` trackea allocas que almacenan punteros; `FieldPtr` carga ptr del alloca antes de GEP; `Return` dereferencia ref params; `Call` pasa alloca pointer para struct locals |
+| Fix lowering: struct args sin Load | `klc_mir/src/lower.rs` | ✅ En call args y method dispatch, detecta `Expr::Identifier` de tipo Struct y usa el local original (sin emitir `Load` que copia) |
+| Fix CLI: forward args a binary | `klc_cli/src/main.rs` | ✅ `cmd_run` pasa `args[3..]` al binario compilado (proyecto y file mode) |
+| semantic.kl funcional | `examples/semantic.kl` | ✅ Tokeniza, parsea, y type-checks `fibonacci.kl` → "parsed", "checked", "ok", exit 0 |
+| parser.kl funcional | `examples/parser.kl` | ✅ Tokeniza y parsea `hello.kl` correctamente (sin infinite loop) |
+| Tests | - | ✅ 84 tests, 0 failures |
+
+### Sesión 16 — Phase 3.5: Match con enum variants + enum construction
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Enum register in struct_defs | `klc_mir/src/lower.rs` | ✅ Enums registered as `{disc: I32, payload: I64}` tagged union |
+| Enum variant index pre-scan | `klc_mir/src/lower.rs` | ✅ `enum_variants` map `enum_name → {variant_name → index}` |
+| `Decl::Enum` in main lowering loop | `klc_mir/src/lower.rs` | ✅ No-op (type already registered) |
+| `Pattern::EnumVariant` in match lowering | `klc_mir/src/lower.rs` | ✅ Discriminant check + payload binding via FieldPtr |
+| Enum construction in `Expr::FunctionCall` | `klc_mir/src/lower.rs` | ✅ `Option.Some(v)` → tagged union creation |
+| Enum construction in `Expr::PropertyAccess` | `klc_mir/src/lower.rs` | ✅ `Option.None` → tagged union without payload |
+| Fix: struct local allocated LAST in enum construction | `klc_mir/src/lower.rs` | ✅ So `ctx.next_local - 1` returns the struct, not a temp |
+| Fix: `eat_identifier` accepts `None`, `True`, `False` | `klc_frontend/src/parser.rs` | ✅ Enum variants with keyword names parse correctly |
+| Fix: `parse_enum` safety check for empty name | `klc_frontend/src/parser.rs` | ✅ Prevents infinite loop |
+| Fix: type checker `bind_pattern` for match arms | `klc_semantic/src/type_checker.rs` | ✅ Pattern variables registered in type checker's symbol table |
+| Fix: i32→i64 cast for `println(i32)` | `klc_mir/src/lower.rs` | ✅ Non-string print args widened to i64 for `kl_println_int` |
+| enum_test end-to-end | `examples/enum_test.kl` | ✅ `Option.Some(42)` → match → `v=42` PASS |
+| enum_test2 end-to-end | `examples/enum_test2.kl` | ✅ `Some(42)` + `None` ambos funcionan → PASS |
+| Tests | - | ✅ 84 tests, 0 failures |
+
+### Sesión 17 — Phase 3.5: Closures end-to-end (I32 params + I32 return)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Closure: MIR `FnAddr` + `CallIndirect` | `klc_mir/src/mir.rs` | ✅ FnAddr stores fn pointer, CallIndirect calls through it |
+| Closure: Parser `(x) => body` | `klc_frontend/src/parser.rs` | ✅ LParen backtracking to detect closure |
+| Closure: Scope resolution | `klc_semantic/src/scope.rs` | ✅ Push scope, bind params |
+| Closure: Type checker | `klc_semantic/src/type_checker.rs` | ✅ I32 params, infer return type |
+| Closure: Lowering `Expr::Closure` | `klc_mir/src/lower.rs` | ✅ Creates unique `_closure_N` function + `FnAddr` |
+| Closure: Lowering `CallIndirect` | `klc_mir/src/lower.rs` | ✅ Detects closure-typed local, emits `CallIndirect` |
+| Closure: Codegen `FnAddr` | `klc_backend/src/codegen.rs` | ✅ Stores function pointer via `as_pointer_value()` |
+| Closure: Codegen `CallIndirect` | `klc_backend/src/codegen.rs` | ✅ `build_indirect_call` with dynamic params |
+| Fix: Closure functions lost before collection | `klc_mir/src/lower.rs` | ✅ Second collection pass after declaration lowering |
+| Fix: `try_as_basic_value()` incorrect API | `klc_backend/src/codegen.rs` | ✅ Usa `ValueKind::Basic(result)` pattern existente |
+| closure_test | `examples/closure_test.kl` | ✅ `(x) => x*2`, `double(21)` → 42 PASS |
+| closure_test2 | `examples/closure_test2.kl` | ✅ `(a,b) => a+b`, `add(100,1)` → 101 PASS |
 | Tests | - | ✅ 84 tests, 0 failures |

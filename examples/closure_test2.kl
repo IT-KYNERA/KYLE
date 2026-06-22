@@ -1,0 +1,11 @@
+fn main(args: [str]) -> i32:
+    add = (a, b) => a + b
+    result = add(100, 1)
+    println("101 = ")
+    println(result)
+    if result == 101:
+        println("PASS")
+        0
+    else:
+        println("FAIL")
+        1

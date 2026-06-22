@@ -1,0 +1,8 @@
+enum Color:
+    Red
+    Green
+    Blue
+
+fn main(args: [str]) -> i32:
+    println(42)
+    0

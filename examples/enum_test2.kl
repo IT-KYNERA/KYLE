@@ -1,0 +1,41 @@
+enum Option<T>:
+    None
+    Some(T)
+
+fn test_some() -> i32:
+    mut x = Option.Some(42)
+    result = 0
+    match x:
+        Option.Some(v):
+            result = v
+        Option.None:
+            result = -1
+    result
+
+fn test_none() -> i32:
+    mut x = Option.None
+    result = 0
+    match x:
+        Option.Some(v):
+            result = v
+        Option.None:
+            result = -1
+    result
+
+fn main(args: [str]) -> i32:
+    a = test_some()
+    b = test_none()
+    println("a = ")
+    println(a)
+    println("b = ")
+    println(b)
+    if a == 42:
+        if b == -1:
+            println("PASS")
+            0
+        else:
+            println("FAIL: b")
+            1
+    else:
+        println("FAIL: a")
+        1

@@ -119,6 +119,12 @@ pub struct Lowerer {
     /// Built during lower_program by scanning ClassMember::Method entries.
     /// Used to lower `obj.method(args)` into `Call ClassName::method(obj, args...)`.
     method_table: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    /// Enum variant index map: enum_name -> (variant_name -> index)
+    enum_variants: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, usize>>>,
+    /// Counter for generating unique closure function names.
+    closure_counter: RefCell<usize>,
+    /// Closure functions generated during lowering.
+    closure_functions: RefCell<Vec<MirFunction>>,
 }
 
 impl Lowerer {
@@ -129,19 +135,37 @@ impl Lowerer {
             class_constructor_map: RefCell::new(std::collections::HashMap::new()),
             const_values: RefCell::new(std::collections::HashMap::new()),
             method_table: RefCell::new(std::collections::HashMap::new()),
+            enum_variants: RefCell::new(std::collections::HashMap::new()),
+            closure_counter: RefCell::new(0),
+            closure_functions: RefCell::new(Vec::new()),
         }
     }
 
     /// Lower a program to a MirModule.
     pub fn lower_program(&self, program: &Program) -> MirModule {
         // Pre-scan struct declarations to build struct definition map
+        // Two-pass: first register all struct/class names, then resolve field types
+        // with the complete map so nested struct references work.
         {
             let mut struct_defs = self.struct_defs.borrow_mut();
             struct_defs.clear();
+            // Pass 1: insert all names with empty field lists
+            for decl in &program.declarations {
+                if let Decl::Struct(s) = decl {
+                    struct_defs.insert(s.name.clone(), vec![]);
+                }
+                if let Decl::Class(c) = decl {
+                    struct_defs.insert(c.name.clone(), vec![]);
+                }
+                if let Decl::Enum(e) = decl {
+                    struct_defs.insert(e.name.clone(), vec![]);
+                }
+            }
+            // Pass 2: resolve field types with full struct_defs map
             for decl in &program.declarations {
                 if let Decl::Struct(s) = decl {
                     let fields: Vec<(String, MirType)> = s.fields.iter()
-                        .map(|f| (f.name.clone(), ast_type_to_mir(&f.type_, None)))
+                        .map(|f| (f.name.clone(), ast_type_to_mir(&f.type_, Some(&struct_defs))))
                         .collect();
                     struct_defs.insert(s.name.clone(), fields);
                 }
@@ -149,13 +173,21 @@ impl Lowerer {
                     let fields: Vec<(String, MirType)> = c.members.iter()
                         .filter_map(|m| {
                             if let ClassMember::Field(f) = m {
-                                Some((f.name.clone(), ast_type_to_mir(&f.type_, None)))
+                                Some((f.name.clone(), ast_type_to_mir(&f.type_, Some(&struct_defs))))
                             } else {
                                 None
                             }
                         })
                         .collect();
                     struct_defs.insert(c.name.clone(), fields);
+                }
+                if let Decl::Enum(e) = decl {
+                    // Enums are represented as tagged unions: { disc: I32, payload: I64 }
+                    let fields = vec![
+                        ("disc".to_string(), MirType::I32),
+                        ("payload".to_string(), MirType::I64),
+                    ];
+                    struct_defs.insert(e.name.clone(), fields);
                 }
             }
         }
@@ -167,6 +199,21 @@ impl Lowerer {
             for decl in &program.declarations {
                 if let Decl::Constant(c) = decl {
                     cv.insert(c.name.clone(), *c.value.clone());
+                }
+            }
+        }
+
+        // Pre-scan enum variant indices
+        {
+            let mut ev = self.enum_variants.borrow_mut();
+            ev.clear();
+            for decl in &program.declarations {
+                if let Decl::Enum(e) = decl {
+                    let mut variant_map = std::collections::HashMap::new();
+                    for (idx, variant) in e.variants.iter().enumerate() {
+                        variant_map.insert(variant.name.clone(), idx);
+                    }
+                    ev.insert(e.name.clone(), variant_map);
                 }
             }
         }
@@ -222,6 +269,14 @@ impl Lowerer {
         }
 
         let mut module = MirModule::new();
+
+        // Collect any closure functions generated during previous lower_program calls
+        {
+            let cf = self.closure_functions.borrow();
+            for func in cf.iter() {
+                module.functions.push(func.clone());
+            }
+        }
 
         for decl in &program.declarations {
             match decl {
@@ -284,6 +339,16 @@ impl Lowerer {
             }
         }
 
+        // Collect closure functions generated during this lower_program call
+        {
+            let cf = self.closure_functions.borrow();
+            for func in cf.iter() {
+                if !module.functions.iter().any(|f| f.name == func.name) {
+                    module.functions.push(func.clone());
+                }
+            }
+        }
+
         module
     }
 
@@ -327,6 +392,12 @@ impl Lowerer {
             if last_is_tail {
                 let val_local = ctx.next_local - 1;
                 ctx.finish_block(MirTerminator::Return(MirValue::Local(val_local)));
+                // Infer return type from the tail expression when no explicit type given
+                if mir_func.return_type == MirType::Void {
+                    if let Some(actual_type) = ctx.local_types.get(&val_local) {
+                        mir_func.return_type = actual_type.clone();
+                    }
+                }
             } else if !last_is_if_tail {
                 ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
             }
@@ -406,6 +477,12 @@ impl Lowerer {
             if last_is_tail {
                 let val_local = ctx.next_local - 1;
                 ctx.finish_block(MirTerminator::Return(MirValue::Local(val_local)));
+                // Infer return type from tail expression when no explicit type
+                if mir_func.return_type == MirType::Void {
+                    if let Some(actual_type) = ctx.local_types.get(&val_local) {
+                        mir_func.return_type = actual_type.clone();
+                    }
+                }
             } else if !last_is_if_tail {
                 ctx.finish_block(MirTerminator::Return(MirValue::Constant(MirConstant::Void)));
             }
@@ -667,14 +744,16 @@ impl Lowerer {
             }
             Stmt::Match(s) => {
                 let end_label = ctx.fresh_block();
-                let has_lit = s.arms.iter().any(|a| matches!(a.pattern, Pattern::Literal { .. }));
-                if has_lit {
+                let needs_val = s.arms.iter().any(|a|
+                    matches!(a.pattern, Pattern::Literal { .. } | Pattern::EnumVariant { .. })
+                );
+                if needs_val {
                     ctx = self.lower_expr(ctx, &s.expression);
                 }
-                let match_val = if has_lit { Some(ctx.next_local - 1) } else { None };
+                let match_val = if needs_val { Some(ctx.next_local - 1) } else { None };
 
                 // Lower each arm with condition checks (forward order).
-                // Each literal arm: check cond → arm_body, fallthrough → next check.
+                // Each literal/variant arm: check cond → arm_body, fallthrough → next check.
                 // Wildcard/identifier: always execute (no check).
                 let arm_count = s.arms.len();
                 for (i, arm) in s.arms.iter().enumerate() {
@@ -711,6 +790,99 @@ impl Lowerer {
                             }
                             ctx.finish_block(MirTerminator::Br(end_label.clone()));
                             // Switch to the false_target (next check or end)
+                            if !is_last {
+                                ctx.current_block = MirBasicBlock::new(false_target);
+                            }
+                        }
+                        Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                            // Look up variant index from enum_variants map
+                            let ev_map = self.enum_variants.borrow();
+                            let variant_idx = ev_map.get(enum_name)
+                                .and_then(|m| m.get(variant))
+                                .copied()
+                                .unwrap_or(0);
+
+                            let struct_type = MirType::Struct(enum_name.clone(), vec![
+                                ("disc".to_string(), MirType::I32),
+                                ("payload".to_string(), MirType::I64),
+                            ]);
+
+                            // Load discriminant from match value
+                            let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                dest: disc_ptr,
+                                ptr: match_val.unwrap(),
+                                field_index: 0,
+                                struct_type: Box::new(struct_type.clone()),
+                            });
+                            let disc_val = ctx.alloc_local("_disc", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Load {
+                                dest: disc_val,
+                                src: disc_ptr,
+                            });
+
+                            // Compare discriminant with variant index
+                            let idx_local = ctx.alloc_local("_vidx", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: idx_local,
+                                value: MirValue::Constant(MirConstant::I32(variant_idx as i32)),
+                            });
+                            let eq = ctx.alloc_local("_eq", MirType::Bool);
+                            ctx.current_block.insts.push(MirInst::BinaryOp {
+                                dest: eq, op: MirBinaryOp::Eq,
+                                left: MirValue::Local(disc_val),
+                                right: MirValue::Local(idx_local),
+                            });
+
+                            let false_target = if is_last {
+                                end_label.clone()
+                            } else {
+                                ctx.fresh_block()
+                            };
+                            ctx.finish_block(MirTerminator::CondBr {
+                                cond: MirValue::Local(eq),
+                                true_block: arm_label.clone(),
+                                false_block: false_target.clone(),
+                            });
+
+                            // Arm body block
+                            ctx.current_block = MirBasicBlock::new(arm_label);
+
+                            // Bind payload values to pattern variables
+                            if !args.is_empty() {
+                                let payload_ptr = ctx.alloc_local("_pay_ptr", MirType::I64);
+                                ctx.current_block.insts.push(MirInst::FieldPtr {
+                                    dest: payload_ptr,
+                                    ptr: match_val.unwrap(),
+                                    field_index: 1,
+                                    struct_type: Box::new(struct_type),
+                                });
+
+                                for (_pi, arg) in args.iter().enumerate() {
+                                    match arg {
+                                        Pattern::Identifier { name, .. } => {
+                                            let pay_val = ctx.alloc_local("_pay", MirType::I64);
+                                            ctx.current_block.insts.push(MirInst::Load {
+                                                dest: pay_val,
+                                                src: payload_ptr,
+                                            });
+                                            let local = ctx.alloc_local(name, MirType::I64);
+                                            ctx.current_block.insts.push(MirInst::Store {
+                                                dest: local,
+                                                value: MirValue::Local(pay_val),
+                                            });
+                                            ctx.locals.insert(name.clone(), local);
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+
+                            for stmt in &arm.body.statements {
+                                ctx = self.lower_stmt(ctx, stmt);
+                            }
+                            ctx.finish_block(MirTerminator::Br(end_label.clone()));
+
                             if !is_last {
                                 ctx.current_block = MirBasicBlock::new(false_target);
                             }
@@ -1079,9 +1251,87 @@ impl Lowerer {
                 // Checked BEFORE the list-specific shortcuts so real class methods win
                 // over the generic list.add/list.pop fallbacks.
                 if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
-                    // Lower the receiver first to learn its type.
-                    ctx = self.lower_expr(ctx, object);
-                    let obj_local = ctx.next_local - 1;
+                    // Check for enum variant construction: Option.Some(value)
+                    // This must come BEFORE method dispatch because enum type names
+                    // are not variables and cannot be lowered as expressions.
+                    if let Expr::Identifier { name: enum_name, .. } = object.as_ref() {
+                        let ev_map = self.enum_variants.borrow();
+                        if let Some(variants) = ev_map.get(enum_name) {
+                            if let Some(&variant_idx) = variants.get(property) {
+                                let struct_type = MirType::Struct(enum_name.clone(), vec![
+                                    ("disc".to_string(), MirType::I32),
+                                    ("payload".to_string(), MirType::I64),
+                                ]);
+
+                                // Allocate temps FIRST, struct LAST so the result local is the struct
+                                let disc_ptr = ctx.alloc_local("_edp", MirType::I64);
+                                let disc_val = MirValue::Constant(MirConstant::I32(variant_idx as i32));
+
+                                let (pay_ptr, arg_val) = if let Some(arg) = arguments.first() {
+                                    ctx = self.lower_expr(ctx, arg);
+                                    let av = ctx.next_local - 1;
+                                    let pp = ctx.alloc_local("_epp", MirType::I64);
+                                    let ai = ctx.alloc_local("_epv", MirType::I64);
+                                    ctx.current_block.insts.push(MirInst::Cast {
+                                        dest: ai,
+                                        value: MirValue::Local(av),
+                                        to_type: MirType::I64,
+                                    });
+                                    (Some(pp), Some(ai))
+                                } else {
+                                    (None, None)
+                                };
+
+                                // Allocate struct LAST so the caller sees the correct result local
+                                let dest = ctx.alloc_local("_enum", struct_type.clone());
+
+                                // Store discriminant
+                                ctx.current_block.insts.push(MirInst::FieldPtr {
+                                    dest: disc_ptr,
+                                    ptr: dest,
+                                    field_index: 0,
+                                    struct_type: Box::new(struct_type.clone()),
+                                });
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: disc_ptr,
+                                    value: disc_val,
+                                });
+
+                                // Store payload
+                                if let (Some(pp), Some(av)) = (pay_ptr, arg_val) {
+                                    ctx.current_block.insts.push(MirInst::FieldPtr {
+                                        dest: pp,
+                                        ptr: dest,
+                                        field_index: 1,
+                                        struct_type: Box::new(struct_type),
+                                    });
+                                    ctx.current_block.insts.push(MirInst::Store {
+                                        dest: pp,
+                                        value: MirValue::Local(av),
+                                    });
+                                }
+
+                                return ctx;
+                            }
+                        }
+                    }
+                    // Lower the receiver first, but for struct identifiers pass by reference (no copy).
+                    let obj_local = if let Expr::Identifier { name, .. } = object.as_ref() {
+                        if let Some(&local) = ctx.locals.get(name) {
+                            if matches!(ctx.local_types.get(&local), Some(MirType::Struct(_, _))) {
+                                local
+                            } else {
+                                ctx = self.lower_expr(ctx, object);
+                                ctx.next_local - 1
+                            }
+                        } else {
+                            ctx = self.lower_expr(ctx, object);
+                            ctx.next_local - 1
+                        }
+                    } else {
+                        ctx = self.lower_expr(ctx, object);
+                        ctx.next_local - 1
+                    };
                     let obj_type = ctx.local_types.get(&obj_local).cloned();
 
                     // If the receiver is a class instance (MirType::Struct) and the class
@@ -1093,6 +1343,15 @@ impl Lowerer {
                                 // First argument is the receiver (this).
                                 let mut call_args = vec![MirValue::Local(obj_local)];
                                 for arg in arguments {
+                                    // Struct-typed identifiers: pass original local by reference
+                                    if let Expr::Identifier { name, .. } = arg {
+                                        if let Some(&local) = ctx.locals.get(name) {
+                                            if matches!(ctx.local_types.get(&local), Some(MirType::Struct(_, _))) {
+                                                call_args.push(MirValue::Local(local));
+                                                continue;
+                                            }
+                                        }
+                                    }
                                     ctx = self.lower_expr(ctx, arg);
                                     call_args.push(MirValue::Local(ctx.next_local - 1));
                                 }
@@ -1187,6 +1446,30 @@ impl Lowerer {
                     "_call".to_string()
                 };
 
+                // Check for closure call: if `name` refers to a closure-typed local,
+                // emit an indirect call through the function pointer.
+                if let Some(&local) = ctx.locals.get(&name) {
+                    if let Some(MirType::Ptr(_)) = ctx.local_types.get(&local) {
+                        // Lower arguments
+                        let mut args = Vec::new();
+                        for arg in arguments {
+                            ctx = self.lower_expr(ctx, arg);
+                            args.push(MirValue::Local(ctx.next_local - 1));
+                        }
+                        let ret_type = MirType::I32;
+                        let param_types = vec![MirType::I32; args.len()];
+                        let dest = ctx.alloc_local("_ccall", ret_type.clone());
+                        ctx.current_block.insts.push(MirInst::CallIndirect {
+                            dest: Some(dest),
+                            fn_ptr: local,
+                            ret_type,
+                            param_types,
+                            args,
+                        });
+                        return ctx;
+                    }
+                }
+
                 // Special case: len() built-in — return string or list length
                 if name == "len" && arguments.len() == 1 {
                     ctx = self.lower_expr(ctx, &arguments[0]);
@@ -1236,7 +1519,7 @@ impl Lowerer {
                         to_type: MirType::I64,
                     });
                     // Call kl_i64_to_str(cast_arg) → returns string pointer
-                    let ptr_dest = ctx.alloc_local("_strptr", MirType::I64);
+                    let ptr_dest = ctx.alloc_local("_strptr", MirType::Str);
                     ctx.current_block.insts.push(MirInst::Call {
                         dest: Some(ptr_dest),
                         name: "kl_i64_to_str".to_string(),
@@ -1303,6 +1586,15 @@ impl Lowerer {
 
                 let mut args = Vec::new();
                 for arg in arguments {
+                    // Struct-typed identifiers: pass original local by reference (no copy)
+                    if let Expr::Identifier { name, .. } = arg {
+                        if let Some(&local) = ctx.locals.get(name) {
+                            if matches!(ctx.local_types.get(&local), Some(MirType::Struct(_, _))) {
+                                args.push(MirValue::Local(local));
+                                continue;
+                            }
+                        }
+                    }
                     ctx = self.lower_expr(ctx, arg);
                     args.push(MirValue::Local(ctx.next_local - 1));
                 }
@@ -1350,12 +1642,28 @@ impl Lowerer {
                             });
                             return ctx;
                         } else {
-                            // Non-string argument — call kl_print_int / kl_println_int
+                            // Non-string argument — cast to i64, call kl_print_int / kl_println_int
+                            let call_val = if *id < ctx.local_types.len() {
+                                let id_type = ctx.local_types.get(id).cloned().unwrap_or(MirType::I64);
+                                if id_type != MirType::I64 && id_type != MirType::Str {
+                                    let ext = ctx.alloc_local("_ext", MirType::I64);
+                                    ctx.current_block.insts.push(MirInst::Cast {
+                                        dest: ext,
+                                        value: MirValue::Local(*id),
+                                        to_type: MirType::I64,
+                                    });
+                                    MirValue::Local(ext)
+                                } else {
+                                    MirValue::Local(*id)
+                                }
+                            } else {
+                                MirValue::Local(*id)
+                            };
                             let call_name = if name == "println" { "kl_println_int" } else { "kl_print_int" };
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(dest),
                                 name: call_name.to_string(),
-                                args: vec![MirValue::Local(*id)],
+                                args: vec![call_val],
                             });
                             return ctx;
                         }
@@ -1454,6 +1762,31 @@ impl Lowerer {
                 ctx
             }
             Expr::PropertyAccess { object, property, .. } => {
+                // Check for enum variant without payload: Option.None
+                if let Expr::Identifier { name: enum_name, .. } = object.as_ref() {
+                    let ev_map = self.enum_variants.borrow();
+                    if let Some(variants) = ev_map.get(enum_name) {
+                        if let Some(&variant_idx) = variants.get(property) {
+                            let struct_type = MirType::Struct(enum_name.clone(), vec![
+                                ("disc".to_string(), MirType::I32),
+                                ("payload".to_string(), MirType::I64),
+                            ]);
+                            let disc_ptr = ctx.alloc_local("_edp", MirType::I64);
+                            let dest = ctx.alloc_local("_enum", struct_type.clone());
+                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                dest: disc_ptr,
+                                ptr: dest,
+                                field_index: 0,
+                                struct_type: Box::new(struct_type),
+                            });
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: disc_ptr,
+                                value: MirValue::Constant(MirConstant::I32(variant_idx as i32)),
+                            });
+                            return ctx;
+                        }
+                    }
+                }
                 // If accessing `len` on a list-typed variable, call kl_list_len.
                 // Must check type before lowering to avoid treating struct fields
                 // named `len` (e.g., Parser.len) as list length calls.
@@ -1490,15 +1823,23 @@ impl Lowerer {
                 };
                 if let Some(obj_ptr) = obj_ptr {
                     let obj_type = ctx.local_types.get(&obj_ptr).cloned();
-                    if let Some(MirType::Struct(_, fields)) = &obj_type {
-                        if let Some(field_idx) = fields.iter().position(|(fname, _)| fname == property) {
-                            let field_type = fields[field_idx].1.clone();
+                    if let Some(MirType::Struct(sname, fields)) = &obj_type {
+                        // If the stored type has empty fields (e.g. from recursive
+                        // or forward-declared structs), look up the real fields
+                        // from struct_defs
+                        let resolved_fields = if fields.is_empty() {
+                            ctx.struct_defs.get(sname).cloned().unwrap_or_default()
+                        } else {
+                            fields.clone()
+                        };
+                        if let Some(field_idx) = resolved_fields.iter().position(|(fname, _)| fname == property) {
+                            let field_type = resolved_fields[field_idx].1.clone();
                             let field_ptr = ctx.alloc_local("_fieldptr", field_type.clone());
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: field_ptr,
                                 ptr: obj_ptr,
                                 field_index: field_idx,
-                                struct_type: Box::new(obj_type.unwrap()),
+                                struct_type: Box::new(MirType::Struct(sname.clone(), resolved_fields)),
                             });
                             let result = ctx.alloc_local("_field", field_type.clone());
                             ctx.current_block.insts.push(MirInst::Load {
@@ -1564,19 +1905,24 @@ impl Lowerer {
                 let index_val = ctx.next_local - 1;
                 let target_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I32);
                 if target_type == MirType::Str {
-                    // String indexing: source[i] -> char_at(source, i) -> returns i8
-                    let idx_i32 = ctx.alloc_local("_idx32", MirType::I32);
+                    // String indexing: source[i] -> substr(source, i, 1) -> returns str
+                    let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
                     ctx.current_block.insts.push(MirInst::Cast {
-                        dest: idx_i32,
+                        dest: idx_i64,
                         value: MirValue::Local(index_val),
-                        to_type: MirType::I32,
+                        to_type: MirType::I64,
                     });
-                    let result = ctx.alloc_local("_char", MirType::I32);
+                    let result = ctx.alloc_local("_substr", MirType::Str);
                     ctx.current_block.insts.push(MirInst::Call {
                         dest: Some(result),
-                        name: "kl_char_at".to_string(),
-                        args: vec![MirValue::Local(target_val), MirValue::Local(idx_i32)],
+                        name: "kl_substr".to_string(),
+                        args: vec![
+                            MirValue::Local(target_val),
+                            MirValue::Local(idx_i64),
+                            MirValue::Constant(MirConstant::I64(1)),
+                        ],
                     });
+                    ctx.string_locals.push(result);
                     return ctx;
                 }
                 let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
@@ -1675,8 +2021,50 @@ impl Lowerer {
                 }
                 ctx
             }
-            Expr::Closure { body, .. } => {
-                ctx = self.lower_expr(ctx, body);
+            Expr::Closure { params, body, .. } => {
+                let mut counter = self.closure_counter.borrow_mut();
+                let fn_name = format!("_closure_{}", *counter);
+                *counter += 1;
+                drop(counter);
+
+                let mut mir_func = MirFunction::new(&fn_name);
+                // All closure params are I32 by default (like type checker)
+                mir_func.params = params.iter().map(|_| MirType::I32).collect();
+                mir_func.return_type = MirType::I32; // default, will be inferred
+
+                let mut cctx = LowerCtx::new();
+                // Bind params to locals
+                for (i, pname) in params.iter().enumerate() {
+                    let local = cctx.alloc_local(pname, MirType::I32);
+                    cctx.current_block.insts.push(MirInst::Store {
+                        dest: local,
+                        value: MirValue::Param(i),
+                    });
+                    cctx.locals.insert(pname.clone(), local);
+                }
+                // Lower body expression
+                cctx = self.lower_expr(cctx, body);
+                let val_local = cctx.next_local - 1;
+                // Infer return type if needed
+                if mir_func.return_type == MirType::I32 {
+                    if let Some(actual_type) = cctx.local_types.get(&val_local) {
+                        mir_func.return_type = actual_type.clone();
+                    }
+                }
+                cctx.finish_block(MirTerminator::Return(MirValue::Local(val_local)));
+                mir_func.local_count = cctx.next_local;
+                mir_func.basic_blocks = cctx.blocks;
+
+                // Store the closure function
+                self.closure_functions.borrow_mut().push(mir_func);
+
+                // Emit FnAddr to get the function pointer
+                let ptr_type = MirType::Ptr(Box::new(MirType::I8));
+                let dest = ctx.alloc_local("_closure", ptr_type);
+                ctx.current_block.insts.push(MirInst::FnAddr {
+                    dest,
+                    name: fn_name,
+                });
                 ctx
             }
             Expr::Await { expression, .. } => {

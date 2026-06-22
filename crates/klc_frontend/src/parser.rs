@@ -405,7 +405,24 @@ impl Parser {
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             let variant_start = self.pos;
             let variant_name = self.eat_identifier();
-            variants.push(EnumVariant { name: variant_name, payload: vec![], span: self.span_from(variant_start) });
+            if variant_name.is_empty() {
+                let found = format!("{:?}", self.current()?.kind);
+                return Err(format!("expected enum variant name, found {}", found));
+            }
+            let payload = if self.at(TokenKind::LParen) {
+                self.advance();
+                let mut types = Vec::new();
+                loop {
+                    types.push(self.parse_type()?);
+                    if self.at(TokenKind::Comma) { self.advance(); }
+                    else { break; }
+                }
+                self.expect(TokenKind::RParen)?;
+                types
+            } else {
+                vec![]
+            };
+            variants.push(EnumVariant { name: variant_name, payload, span: self.span_from(variant_start) });
         }
         Ok(EnumDecl { name, type_params, variants, span: self.span_from(start) })
     }
@@ -493,7 +510,7 @@ impl Parser {
             let inner = self.parse_type()?;
             self.expect(TokenKind::RBracket)?;
             return Ok(AstType::Generic {
-                name: "List".to_string(),
+                name: "list".to_string(),
                 args: vec![inner],
                 span: self.span_from(start),
             });
@@ -567,6 +584,11 @@ impl Parser {
             self.advance();
             return Ok(Expr::Unary { operator: UnaryOp::BitNot, operand: Box::new(self.parse_primary()?), span: self.span_from(start) });
         }
+        if self.at(TokenKind::Await) {
+            let start = self.pos;
+            self.advance();
+            return Ok(Expr::Await { expression: Box::new(self.parse_primary()?), span: self.span_from(start) });
+        }
         self.parse_primary()
     }
 
@@ -607,10 +629,31 @@ impl Parser {
                 Expr::Identifier { name: val, span: self.span_from(start) }
             }
             TokenKind::LParen => {
-                self.advance();
-                let expr = self.parse_expr()?;
-                self.expect(TokenKind::RParen)?;
-                expr
+                let start = self.pos;
+                self.advance(); // consume '('
+                // Try closure: (params) => expr
+                let saved = self.pos;
+                let params = self.parse_closure_params();
+                if self.at(TokenKind::RParen) {
+                    self.advance(); // consume ')'
+                    if self.at(TokenKind::FatArrow) {
+                        self.advance(); // consume '=>'
+                        let body = self.parse_expr()?;
+                        Expr::Closure { params, body: Box::new(body), span: self.span_from(start) }
+                    } else {
+                        // Not a closure — backtrack and parse as parenthesized expression
+                        self.pos = saved;
+                        let expr = self.parse_expr()?;
+                        self.expect(TokenKind::RParen)?;
+                        expr
+                    }
+                } else {
+                    // Not a closure — backtrack and parse as parenthesized expression
+                    self.pos = saved;
+                    let expr = self.parse_expr()?;
+                    self.expect(TokenKind::RParen)?;
+                    expr
+                }
             }
             TokenKind::LBracket => {
                 self.advance();
@@ -634,6 +677,11 @@ impl Parser {
                 }
                 self.expect(TokenKind::RBrace)?;
                 Expr::Dictionary { entries, span: self.span_from(start) }
+            }
+            TokenKind::Async => {
+                self.advance();
+                let expr = self.parse_expr()?;
+                Expr::Async { expression: Box::new(expr), span: self.span_from(start) }
             }
             _ => return Err(format!("unexpected token in expression: {:?}", tok.kind)),
         };
@@ -942,6 +990,30 @@ impl Parser {
         let start = self.pos;
         if self.at_identifier() {
             let name = self.eat_identifier();
+            // Check for enum variant pattern: Option.Some(v)
+            if self.at(TokenKind::Dot) {
+                self.advance();
+                let variant = self.eat_identifier();
+                let args = if self.at(TokenKind::LParen) {
+                    self.advance();
+                    let mut patterns = Vec::new();
+                    loop {
+                        patterns.push(self.parse_pattern()?);
+                        if self.at(TokenKind::Comma) { self.advance(); }
+                        else { break; }
+                    }
+                    self.expect(TokenKind::RParen)?;
+                    patterns
+                } else {
+                    vec![]
+                };
+                return Ok(Pattern::EnumVariant {
+                    enum_name: name,
+                    variant,
+                    args,
+                    span: self.span_from(start),
+                });
+            }
             return Ok(Pattern::Identifier { name, span: self.span_from(start) });
         }
         let lit = match &self.current()?.kind {
@@ -1005,15 +1077,39 @@ impl Parser {
     }
 
     /// Consume the current identifier and return its name.
+    /// Also accepts soft keywords (get, set) and common value keywords (None, True, False) as identifiers.
     fn eat_identifier(&mut self) -> String {
         if let Ok(tok) = self.current() {
-            if let TokenKind::Identifier(name) = &tok.kind {
-                let name = name.clone();
+            let name = match &tok.kind {
+                TokenKind::Identifier(n) => Some(n.clone()),
+                TokenKind::Get => Some("get".to_string()),
+                TokenKind::Set => Some("set".to_string()),
+                TokenKind::None => Some("None".to_string()),
+                TokenKind::True => Some("True".to_string()),
+                TokenKind::False => Some("False".to_string()),
+                _ => None,
+            };
+            if let Some(n) = name {
                 self.advance();
-                return name;
+                return n;
             }
         }
         String::new()
+    }
+
+    /// Try to parse closure parameter list: zero or more comma-separated identifiers.
+    /// Advancement stops BEFORE the closing `)` (if any).
+    fn parse_closure_params(&mut self) -> Vec<String> {
+        let mut params = Vec::new();
+        if self.at(TokenKind::RParen) { return params; }
+        loop {
+            let name = self.eat_identifier();
+            if name.is_empty() { break; }
+            params.push(name);
+            if self.at(TokenKind::Comma) { self.advance(); }
+            else { break; }
+        }
+        params
     }
 
     /// Expect a specific token kind; return error if not found.

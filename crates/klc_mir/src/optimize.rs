@@ -107,6 +107,18 @@ impl Optimizer {
                         used.insert(*dest_ptr_local);
                         used.insert(*src_alloca_local);
                     }
+                    MirInst::FnAddr { dest, .. } => {
+                        used.insert(*dest);
+                    }
+                    MirInst::CallIndirect { dest, fn_ptr, args, .. } => {
+                        if let Some(d) = dest {
+                            used.insert(*d);
+                        }
+                        used.insert(*fn_ptr);
+                        for arg in args {
+                            Self::collect_value_refs(arg, &mut used);
+                        }
+                    }
                 }
             }
         }

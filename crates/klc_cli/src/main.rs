@@ -245,8 +245,12 @@ fn cmd_run(args: &[String]) {
                 }
                 match klc_driver::pipeline::Pipeline::build_source(&source, &file, &output) {
                     Ok(()) => {
-                        let status = std::process::Command::new(&output)
-                            .status()
+                        let mut cmd = std::process::Command::new(&output);
+                        // Forward remaining CLI args to the compiled program
+                        for extra_arg in args.iter().skip(2) {
+                            cmd.arg(extra_arg);
+                        }
+                        let status = cmd.status()
                             .expect("Failed to execute binary");
                         if !status.success() {
                             process::exit(status.code().unwrap_or(1));
@@ -269,8 +273,12 @@ fn cmd_run(args: &[String]) {
     let output = std::path::Path::new(file).with_extension("");
     match klc_driver::pipeline::Pipeline::build_source(&source, file, &output) {
         Ok(()) => {
-            let status = std::process::Command::new(&output)
-                .status()
+            let mut cmd = std::process::Command::new(&output);
+            // Forward remaining CLI args to the compiled program (args[3..])
+            for extra_arg in args.iter().skip(3) {
+                cmd.arg(extra_arg);
+            }
+            let status = cmd.status()
                 .expect("Failed to execute binary");
             if !status.success() {
                 process::exit(status.code().unwrap_or(1));

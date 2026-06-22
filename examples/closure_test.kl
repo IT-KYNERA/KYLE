@@ -1,0 +1,11 @@
+fn main(args: [str]) -> i32:
+    double = (x) => x * 2
+    result = double(21)
+    println("result = ")
+    println(result)
+    if result == 42:
+        println("PASS")
+        0
+    else:
+        println("FAIL")
+        1

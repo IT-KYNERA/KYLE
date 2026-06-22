@@ -17,29 +17,46 @@ pub struct Codegen<'ctx> {
     module: Module<'ctx>,
     fn_value_map: HashMap<String, inkwell::values::FunctionValue<'ctx>>,
     param_values: HashMap<usize, BasicValueEnum<'ctx>>,
+    alloca_map: Vec<Option<PointerValue<'ctx>>>,
+    alloca_types: HashMap<usize, BasicTypeEnum<'ctx>>,
+    field_ptr_allocas: Vec<Option<PointerValue<'ctx>>>,
+    needs_main_wrapper: bool,
+    /// Local IDs holding struct values via pointer (pass-by-reference semantics).
+    /// Maps local_id → the original LLVM struct type (used for GEP/load).
+    ref_param_struct_types: HashMap<usize, BasicTypeEnum<'ctx>>,
 }
 
 impl<'ctx> Codegen<'ctx> {
-    /// Load a local's value from last_value_map when available (works intra-block),
-    /// or from the alloca (works cross-block when the alloca has been stored to).
-    fn load_local_value(
+    /// Load a local's value, always preferring the alloca for cross-block correctness.
+    /// Falls back to last_value_map for values that weren't stored to an alloca.
+    fn load_value(
         &self,
         id: usize,
         last_values: &HashMap<usize, BasicValueEnum<'ctx>>,
-        alloca_map: &[Option<PointerValue<'ctx>>],
-        alloca_types: &HashMap<usize, BasicTypeEnum<'ctx>>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
-        // Prefer last_value_map for the most recent value
-        if let Some(val) = last_values.get(&id) {
-            return Ok(*val);
+        // Check if this is a field pointer: load GEP first, then load field value
+        if id < self.field_ptr_allocas.len() && self.field_ptr_allocas[id].is_some() {
+            if let Some(field_ptr_alloca) = self.field_ptr_allocas[id] {
+                let gep = self.builder.build_load(
+                    self.context.ptr_type(Default::default()),
+                    field_ptr_alloca, "_fgepload"
+                ).map_err(|e| format!("load_value fptr {}: {}", id, e))?;
+                if let Some(pointee_type) = self.alloca_types.get(&id) {
+                    let loaded = self.builder.build_load(*pointee_type, gep.into_pointer_value(), "")
+                        .map_err(|e| format!("load_value field {}: {}", id, e))?;
+                    return Ok(loaded);
+                }
+            }
         }
-        // Fall back to loading from the alloca
-        if let Some(Some(ptr)) = alloca_map.get(id) {
-            if let Some(pointee_type) = alloca_types.get(&id) {
+        if let Some(Some(ptr)) = self.alloca_map.get(id) {
+            if let Some(pointee_type) = self.alloca_types.get(&id) {
                 let loaded = self.builder.build_load(*pointee_type, *ptr, "")
-                    .map_err(|e| format!("load_local {}: {}", id, e))?;
+                    .map_err(|e| format!("load_value {}: {}", id, e))?;
                 return Ok(loaded);
             }
+        }
+        if let Some(val) = last_values.get(&id) {
+            return Ok(*val);
         }
         Ok(self.context.i32_type().const_zero().as_basic_value_enum())
     }
@@ -53,6 +70,11 @@ impl<'ctx> Codegen<'ctx> {
             module,
             fn_value_map: HashMap::new(),
             param_values: HashMap::new(),
+            alloca_map: Vec::new(),
+            alloca_types: HashMap::new(),
+            field_ptr_allocas: Vec::new(),
+            needs_main_wrapper: false,
+            ref_param_struct_types: HashMap::new(),
         }
     }
 
@@ -67,6 +89,9 @@ impl<'ctx> Codegen<'ctx> {
         }
         for func in &mir_module.functions {
             self.compile_function(func)?;
+        }
+        if self.needs_main_wrapper {
+            self.generate_main_wrapper()?;
         }
         Ok(())
     }
@@ -279,6 +304,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("kl_eq_str", ft, None);
         }
+        // ptr kl_init_args(i32, ptr)  — convert C argv to Kyle list
+        {
+            let params = [i32_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_init_args", ft, None);
+        }
     }
 
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
@@ -319,25 +350,66 @@ impl<'ctx> Codegen<'ctx> {
 
     fn declare_function(&mut self, func: &MirFunction) -> Result<(), String> {
         let ret_type = self.llvm_type(&func.return_type);
+        let ptr_ty = self.context.ptr_type(Default::default());
         let param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = func.params
             .iter()
-            .map(|p| self.llvm_type(p).into())
+            .map(|p| {
+                if matches!(p, MirType::Struct(_, _)) {
+                    ptr_ty.into()
+                } else {
+                    self.llvm_type(p).into()
+                }
+            })
             .collect();
+
+        // If main has a list parameter (e.g. args: [str]), rename to kyle_main
+        // and generate a C-compatible main(i32, ptr) wrapper later.
+        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+            self.needs_main_wrapper = true;
+            "kyle_main"
+        } else {
+            &func.name
+        };
+
         let fn_type = ret_type.fn_type(&param_types, false);
-        let fn_value = self.module.add_function(&func.name, fn_type, None);
-        self.fn_value_map.insert(func.name.clone(), fn_value);
+        let fn_value = self.module.add_function(fn_name, fn_type, None);
+        self.fn_value_map.insert(fn_name.to_string(), fn_value);
         Ok(())
     }
 
     fn compile_function(&mut self, func: &MirFunction) -> Result<(), String> {
-        let fn_value = self.fn_value_map.get(&func.name)
-            .ok_or_else(|| format!("Function {} not declared", func.name))?;
+        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+            "kyle_main"
+        } else {
+            &func.name
+        };
+        let fn_value = self.fn_value_map.get(fn_name)
+            .ok_or_else(|| format!("Function {} not declared", fn_name))?;
 
-        let mut alloca_types: HashMap<usize, BasicTypeEnum<'ctx>> = HashMap::new();
+        self.alloca_types.clear();
+        self.ref_param_struct_types.clear();
+        self.field_ptr_allocas.clear();
+        let ptr_ty = self.context.ptr_type(Default::default());
         for bb in &func.basic_blocks {
             for inst in &bb.insts {
                 if let MirInst::Alloca { dest, type_, .. } = inst {
-                    alloca_types.entry(*dest).or_insert_with(|| self.llvm_type(type_));
+                    let llvm_ty = self.llvm_type(type_);
+                    self.alloca_types.entry(*dest).or_insert(llvm_ty);
+                }
+            }
+        }
+
+        // Pre-scan for struct function params: change their alloca type to `ptr`
+        // so they receive a pointer to the caller's struct (pass-by-reference ABI).
+        for bb in &func.basic_blocks {
+            for inst in &bb.insts {
+                if let MirInst::Store { dest, value: MirValue::Param(_) } = inst {
+                    if let Some(&llvm_type) = self.alloca_types.get(dest) {
+                        if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
+                            let orig_type = self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum()).unwrap();
+                            self.ref_param_struct_types.insert(*dest, orig_type);
+                        }
+                    }
                 }
             }
         }
@@ -348,19 +420,35 @@ impl<'ctx> Codegen<'ctx> {
             block_map.insert(bb.label.clone(), llvm_bb);
         }
 
-        let mut alloca_map: Vec<Option<PointerValue<'ctx>>> = Vec::new();
+        self.alloca_map.clear();
 
         if let Some(entry_bb) = func.basic_blocks.first() {
             if let Some(&llvm_entry) = block_map.get(&entry_bb.label) {
                 self.builder.position_at_end(llvm_entry);
 
-                for (dest, llvm_type) in &alloca_types {
-                    while alloca_map.len() <= *dest {
-                        alloca_map.push(None);
+                for (dest, llvm_type) in &self.alloca_types {
+                    while self.alloca_map.len() <= *dest {
+                        self.alloca_map.push(None);
                     }
                     let ptr = self.builder.build_alloca(*llvm_type, "")
                         .map_err(|e| format!("alloca {}: {}", dest, e))?;
-                    alloca_map[*dest] = Some(ptr);
+                    self.alloca_map[*dest] = Some(ptr);
+                }
+
+                let ptr_ty = self.context.ptr_type(Default::default());
+                for bb in &func.basic_blocks {
+                    for inst in &bb.insts {
+                        if let MirInst::FieldPtr { dest, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *dest {
+                                self.field_ptr_allocas.push(None);
+                            }
+                            if self.field_ptr_allocas[*dest].is_none() {
+                                let alloca = self.builder.build_alloca(ptr_ty, "_fgep")
+                                    .map_err(|e| format!("fgep alloca {}: {}", dest, e))?;
+                                self.field_ptr_allocas[*dest] = Some(alloca);
+                            }
+                        }
+                    }
                 }
 
                 for (i, param) in fn_value.get_param_iter().enumerate() {
@@ -380,19 +468,46 @@ impl<'ctx> Codegen<'ctx> {
                         MirInst::Alloca { .. } => {}
                         MirInst::Store { dest, value } => {
                             let val = self.value_to_llvm(value, &last_value_map)?;
-                            if let Some(ptr) = alloca_map.get(*dest).and_then(|p| *p) {
+                            // Check if this is a store to a field pointer
+                            if *dest < self.field_ptr_allocas.len() && self.field_ptr_allocas[*dest].is_some() {
+                                if let Some(field_ptr_alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                    let gep = self.builder.build_load(
+                                        self.context.ptr_type(Default::default()),
+                                        field_ptr_alloca, "_fgepload"
+                                    ).map_err(|e| format!("fptr store load: {}", e))?;
+                                    self.builder.build_store(gep.into_pointer_value(), val)
+                                        .map_err(|e| format!("fptr store: {}", e))?;
+                                }
+                            } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                 self.builder.build_store(ptr, val)
                                     .map_err(|e| format!("store: {}", e))?;
                             }
                             last_value_map.insert(*dest, val);
                         }
                         MirInst::Load { dest, src } => {
-                            if let Some(ptr) = alloca_map.get(*src).and_then(|p| *p) {
-                                if let Some(pointee_type) = alloca_types.get(src) {
+                            // Check if this is a load from a field pointer
+                            if *src < self.field_ptr_allocas.len() && self.field_ptr_allocas[*src].is_some() {
+                                if let Some(field_ptr_alloca) = self.field_ptr_allocas.get(*src).and_then(|p| *p) {
+                                    let gep = self.builder.build_load(
+                                        self.context.ptr_type(Default::default()), 
+                                        field_ptr_alloca, "_fgepload"
+                                    ).map_err(|e| format!("fptr load: {}", e))?;
+                                    if let Some(pointee_type) = self.alloca_types.get(src) {
+                                        let loaded = self.builder.build_load(*pointee_type, gep.into_pointer_value(), "")
+                                            .map_err(|e| format!("field load: {}", e))?;
+                                        if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                            self.builder.build_store(dest_ptr, loaded)
+                                                .map_err(|e| format!("field load-store: {}", e))?;
+                                        }
+                                        last_value_map.insert(*dest, loaded);
+                                    }
+                                }
+                            } else if let Some(ptr) = self.alloca_map.get(*src).and_then(|p| *p) {
+                                if let Some(pointee_type) = self.alloca_types.get(src) {
                                     let loaded = self.builder.build_load(*pointee_type, ptr, "")
                                         .map_err(|e| format!("load: {}", e))?;
                                     // Store to dest alloca for cross-block reads
-                                    if let Some(dest_ptr) = alloca_map.get(*dest).and_then(|p| *p) {
+                                    if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                         self.builder.build_store(dest_ptr, loaded)
                                             .map_err(|e| format!("load-store: {}", e))?;
                                     }
@@ -469,7 +584,7 @@ impl<'ctx> Codegen<'ctx> {
                                     .map_err(|e| format!("ge: {}", e))?,
                             };
                             let result_val = result.as_basic_value_enum();
-                            if let Some(dest_ptr) = alloca_map.get(*dest).and_then(|p| *p) {
+                            if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                 self.builder.build_store(dest_ptr, result_val)
                                     .map_err(|e| format!("binop-store: {}", e))?;
                             }
@@ -484,7 +599,12 @@ impl<'ctx> Codegen<'ctx> {
                                 MirUnaryOp::Not | MirUnaryOp::BitNot => self.builder.build_not(int_val, "")
                                     .map_err(|e| format!("not: {}", e))?,
                             };
-                            last_value_map.insert(*dest, result.as_basic_value_enum());
+                            let result_val = result.as_basic_value_enum();
+                            if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(dest_ptr, result_val)
+                                    .map_err(|e| format!("unary-store: {}", e))?;
+                            }
+                            last_value_map.insert(*dest, result_val);
                         }
                         MirInst::Call { dest, name, args } => {
                             let runtime_name = match name.as_str() {
@@ -520,9 +640,43 @@ impl<'ctx> Codegen<'ctx> {
                             };
                             let callee = self.module.get_function(runtime_name);
                             if let Some(callee_fn) = callee {
+                                let fn_ty = callee_fn.get_type();
+                                let param_types = fn_ty.get_param_types();
                                 let llvm_args: Vec<BasicValueEnum<'ctx>> = args
                                     .iter()
-                                    .map(|a| self.value_to_llvm(a, &last_value_map))
+                                    .enumerate()
+                                    .map(|(i, a)| {
+                                        // Pass struct locals by pointer (pass-by-reference ABI)
+                                        if let MirValue::Local(id) = a {
+                                            // Regular struct local: pass alloca pointer
+                                            if let Some(&struct_type) = self.alloca_types.get(id) {
+                                                if matches!(struct_type, BasicTypeEnum::StructType(_)) {
+                                                    if let Some(ptr) = self.alloca_map.get(*id).and_then(|p| *p) {
+                                                        return Ok(ptr.as_basic_value_enum());
+                                                    }
+                                                }
+                                            }
+                                            // Ref param: alloca stores ptr, load it as-is (already a ptr)
+                                            if self.ref_param_struct_types.contains_key(id) {
+                                                let val = self.load_value(*id, &last_value_map)?;
+                                                return Ok(val);
+                                            }
+                                        }
+                                        let val = self.value_to_llvm(a, &last_value_map)?;
+                                        // Auto-cast i64 → ptr when function expects ptr
+                                        if i < param_types.len() {
+                                            let expected = param_types[i];
+                                            if matches!(expected, inkwell::types::BasicMetadataTypeEnum::PointerType(_)) {
+                                                if let BasicValueEnum::IntValue(int_val) = val {
+                                                    let ptr_ty = self.context.ptr_type(Default::default());
+                                                    return Ok(self.builder.build_int_to_ptr(int_val, ptr_ty, "_argptr")
+                                                        .map_err(|e| format!("arg inttoptr: {}", e))?
+                                                        .as_basic_value_enum());
+                                                }
+                                            }
+                                        }
+                                        Ok(val)
+                                    })
                                     .collect::<Result<Vec<_>, String>>()?;
                                 let llvm_arg_refs: Vec<inkwell::values::BasicMetadataValueEnum<'ctx>> =
                                     llvm_args.iter().map(|a| (*a).into()).collect();
@@ -533,7 +687,7 @@ impl<'ctx> Codegen<'ctx> {
                                         // Store call result to both the last_value_map (for SSA-style use
                                         // within the same basic block) AND the alloca (for cross-block
                                         // references like kl_release in the return block)
-                                        if let Some(alloca_ptr) = alloca_map.get(*d).and_then(|p| *p) {
+                                        if let Some(alloca_ptr) = self.alloca_map.get(*d).and_then(|p| *p) {
                                             self.builder.build_store(alloca_ptr, ret_val)
                                                 .map_err(|e| format!("call store {}: {}", name, e))?;
                                         }
@@ -543,10 +697,10 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         MirInst::PtrOffset { dest, ptr, index } => {
-                            if let Some(base_ptr) = alloca_map.get(*ptr).and_then(|p| *p) {
+                            if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {
                                 let idx = self.value_to_llvm(index, &last_value_map)?;
                                 let int_idx = idx.into_int_value();
-                                if let Some(pointee_type) = alloca_types.get(ptr) {
+                                if let Some(pointee_type) = self.alloca_types.get(ptr) {
                                     let gep = unsafe {
                                         self.builder.build_gep(*pointee_type, base_ptr, &[int_idx], "")
                                             .map_err(|e| format!("gep: {}", e))?
@@ -556,15 +710,34 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         MirInst::FieldPtr { dest, ptr, field_index, .. } => {
-                            if let Some(base_ptr) = alloca_map.get(*ptr).and_then(|p| *p) {
-                                if let Some(struct_type) = alloca_types.get(ptr) {
+                            if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                                // Ref param: alloca stores pointer-to-struct, load it first
+                                if let Some(&orig_struct_type) = self.ref_param_struct_types.get(ptr) {
+                                    let struct_ptr = self.builder.build_load(
+                                        self.context.ptr_type(Default::default()),
+                                        base_ptr, "_ref_load"
+                                    ).map_err(|e| format!("ref_field_ptr load: {}", e))?;
+                                    let zero = self.context.i32_type().const_zero();
+                                    let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
+                                    let gep = unsafe {
+                                        self.builder.build_gep(orig_struct_type, struct_ptr.into_pointer_value(), &[zero, idx_val], "")
+                                            .map_err(|e| format!("ref_field_ptr: {}", e))?
+                                    };
+                                    if let Some(alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                        self.builder.build_store(alloca, gep)
+                                            .map_err(|e| format!("ref_fgep store: {}", e))?;
+                                    }
+                                } else if let Some(struct_type) = self.alloca_types.get(ptr) {
                                     let zero = self.context.i32_type().const_zero();
                                     let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
                                     let gep = unsafe {
                                         self.builder.build_gep(*struct_type, base_ptr, &[zero, idx_val], "")
                                             .map_err(|e| format!("field_ptr: {}", e))?
                                     };
-                                    alloca_map[*dest] = Some(gep);
+                                    if let Some(alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                        self.builder.build_store(alloca, gep)
+                                            .map_err(|e| format!("fgep store: {}", e))?;
+                                    }
                                 }
                             }
                         }
@@ -584,43 +757,86 @@ impl<'ctx> Codegen<'ctx> {
                         MirInst::Cast { dest, value, to_type } => {
                             let val = self.value_to_llvm(value, &last_value_map)?;
                             let target_type = self.llvm_type(to_type);
-                            match (&val, &target_type) {
+                            let result = match (&val, &target_type) {
                                 (BasicValueEnum::IntValue(int_val), BasicTypeEnum::IntType(t)) => {
-                                    let result = self.builder.build_int_cast(*int_val, *t, "")
-                                        .map_err(|e| format!("cast: {}", e))?;
-                                    last_value_map.insert(*dest, result.as_basic_value_enum());
+                                    self.builder.build_int_cast(*int_val, *t, "")
+                                        .map_err(|e| format!("cast: {}", e))?
+                                        .as_basic_value_enum()
                                 }
                                 (BasicValueEnum::PointerValue(ptr_val), BasicTypeEnum::IntType(t)) => {
-                                    let result = self.builder.build_ptr_to_int(*ptr_val, *t, "")
-                                        .map_err(|e| format!("ptrtoint: {}", e))?;
-                                    last_value_map.insert(*dest, result.as_basic_value_enum());
+                                    self.builder.build_ptr_to_int(*ptr_val, *t, "")
+                                        .map_err(|e| format!("ptrtoint: {}", e))?
+                                        .as_basic_value_enum()
                                 }
                                 (BasicValueEnum::IntValue(int_val), BasicTypeEnum::PointerType(t)) => {
-                                    let result = self.builder.build_int_to_ptr(*int_val, *t, "")
-                                        .map_err(|e| format!("inttoptr: {}", e))?;
-                                    last_value_map.insert(*dest, result.as_basic_value_enum());
+                                    self.builder.build_int_to_ptr(*int_val, *t, "")
+                                        .map_err(|e| format!("inttoptr: {}", e))?
+                                        .as_basic_value_enum()
                                 }
-                                        (BasicValueEnum::IntValue(int_val), BasicTypeEnum::StructType(s)) => {
+                                (BasicValueEnum::IntValue(int_val), BasicTypeEnum::StructType(s)) => {
                                     let ptr_ty = self.context.ptr_type(Default::default());
                                     let ptr_val = self.builder.build_int_to_ptr(*int_val, ptr_ty, "_ptr")
                                         .map_err(|e| format!("inttoptr: {}", e))?;
-                                    let loaded = self.builder.build_load(*s, ptr_val, "_struct")
-                                        .map_err(|e| format!("load struct: {}", e))?;
-                                    last_value_map.insert(*dest, loaded);
+                                    self.builder.build_load(*s, ptr_val, "_struct")
+                                        .map_err(|e| format!("load struct: {}", e))?
                                 }
                                 (BasicValueEnum::StructValue(struct_val), BasicTypeEnum::IntType(i)) => {
-                                    // Allocate a temp, store the struct, ptrtoint the pointer
                                     let struct_ty = struct_val.get_type();
                                     let temp_alloca = self.builder.build_alloca(struct_ty, "_tmp_struct")
                                         .map_err(|e| format!("alloca: {}", e))?;
                                     self.builder.build_store(temp_alloca, *struct_val)
                                         .map_err(|e| format!("store struct: {}", e))?;
                                     let ptr = temp_alloca.as_basic_value_enum();
-                                    let ptr_val = self.builder.build_ptr_to_int(ptr.into_pointer_value(), *i, "_ptrint")
-                                        .map_err(|e| format!("ptrtoint: {}", e))?;
-                                    last_value_map.insert(*dest, ptr_val.as_basic_value_enum());
+                                    self.builder.build_ptr_to_int(ptr.into_pointer_value(), *i, "_ptrint")
+                                        .map_err(|e| format!("ptrtoint: {}", e))?
+                                        .as_basic_value_enum()
                                 }
-                                _ => {} // type pair not supported
+                                _ => self.context.i32_type().const_zero().as_basic_value_enum(),
+                            };
+                            if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(dest_ptr, result)
+                                    .map_err(|e| format!("cast-store: {}", e))?;
+                            }
+                            last_value_map.insert(*dest, result);
+                        }
+                        MirInst::FnAddr { dest, name } => {
+                            if let Some(fn_val) = self.fn_value_map.get(name) {
+                                let global = fn_val.as_global_value();
+                                let ptr = global.as_pointer_value();
+                                if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    self.builder.build_store(alloca, ptr)
+                                        .map_err(|e| format!("fnaddr store: {}", e))?;
+                                }
+                                last_value_map.insert(*dest, ptr.as_basic_value_enum());
+                            }
+                        }
+                        MirInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
+                            let ptr_val = self.load_value(*fn_ptr, &last_value_map)?;
+                            let fn_ptr = ptr_val.into_pointer_value();
+                            let llvm_ret = self.llvm_type(ret_type);
+                            let llvm_params: Vec<inkwell::types::BasicMetadataTypeEnum> = param_types.iter()
+                                .map(|p| self.llvm_type(p).into())
+                                .collect();
+                            let fn_ty = llvm_ret.fn_type(&llvm_params, false);
+                            let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum> = args.iter()
+                                .map(|a| {
+                                    self.value_to_llvm(a, &last_value_map)
+                                        .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum())
+                                        .into()
+                                })
+                                .collect();
+                            let call_result = unsafe {
+                                self.builder.build_indirect_call(fn_ty, fn_ptr, &llvm_args, "_icl")
+                                    .map_err(|e| format!("indirect call: {}", e))?
+                            };
+                            if let Some(d) = dest {
+                                if let inkwell::values::ValueKind::Basic(result) = call_result.try_as_basic_value() {
+                                    if let Some(alloca) = self.alloca_map.get(*d).and_then(|p| *p) {
+                                        self.builder.build_store(alloca, result)
+                                            .map_err(|e| format!("icall store: {}", e))?;
+                                    }
+                                    last_value_map.insert(*d, result);
+                                }
                             }
                         }
                     }
@@ -629,9 +845,47 @@ impl<'ctx> Codegen<'ctx> {
                 match &bb.terminator {
                     MirTerminator::Return(value) => {
                         let val = match value {
-                            MirValue::Local(id) => self.load_local_value(*id, &last_value_map, &alloca_map, &alloca_types)?,
+                            MirValue::Local(id) => {
+                                // Ref params: the alloca stores a ptr, dereference to get struct value
+                                if let Some(&struct_type) = self.ref_param_struct_types.get(id) {
+                                    let ptr_val = self.load_value(*id, &last_value_map)?;
+                                    self.builder.build_load(struct_type, ptr_val.into_pointer_value(), "_retderef")
+                                        .map_err(|e| format!("ret ref deref: {}", e))?
+                                } else {
+                                    self.load_value(*id, &last_value_map)?
+                                }
+                            }
                             _ => self.value_to_llvm(value, &last_value_map)?,
                         };
+                        // Auto-cast return value if it doesn't match function return type
+                        let fn_ret_type = fn_value.get_type().get_return_type();
+                        let val = if let Some(expected_ret_ty) = fn_ret_type {
+                            if val.get_type() != expected_ret_ty.as_basic_type_enum() {
+                                match (&val, &expected_ret_ty) {
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::PointerType(pt)) =>
+                                        self.builder.build_int_to_ptr(*iv, *pt, "_retptr")
+                                            .map_err(|e| format!("ret inttoptr: {}", e))?
+                                            .as_basic_value_enum(),
+                                    (BasicValueEnum::PointerValue(pv), BasicTypeEnum::IntType(it)) =>
+                                        self.builder.build_ptr_to_int(*pv, *it, "_retint")
+                                            .map_err(|e| format!("ret ptrtoint: {}", e))?
+                                            .as_basic_value_enum(),
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::IntType(it)) =>
+                                        self.builder.build_int_cast(*iv, *it, "")
+                                            .map_err(|e| format!("ret intcast: {}", e))?
+                                            .as_basic_value_enum(),
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::StructType(st)) => {
+                                        // Heap pointer (i64) → dereference to struct value
+                                        let ptr_ty = self.context.ptr_type(Default::default());
+                                        let ptr_val = self.builder.build_int_to_ptr(*iv, ptr_ty, "_retptr")
+                                            .map_err(|e| format!("ret inttoptr: {}", e))?;
+                                        self.builder.build_load(*st, ptr_val, "_retstruct")
+                                            .map_err(|e| format!("ret load struct: {}", e))?
+                                    }
+                                    _ => val,
+                                }
+                            } else { val }
+                        } else { val };
                         self.builder.build_return(Some(&val))
                             .map_err(|e| format!("ret: {}", e))?;
                     }
@@ -642,7 +896,7 @@ impl<'ctx> Codegen<'ctx> {
                     }
                     MirTerminator::CondBr { cond, true_block, false_block } => {
                         let cond_val = match cond {
-                            MirValue::Local(id) => self.load_local_value(*id, &last_value_map, &alloca_map, &alloca_types)?,
+                            MirValue::Local(id) => self.load_value(*id, &last_value_map)?,
                             _ => self.value_to_llvm(cond, &last_value_map)?,
                         };
                         let cond_int = cond_val.into_int_value();
@@ -669,6 +923,60 @@ impl<'ctx> Codegen<'ctx> {
         Ok(())
     }
 
+    /// Generate a C-compatible main(i32, ptr) wrapper that:
+    /// 1. Calls kl_init_args(argc, argv) to build a Kyle list<str>
+    /// 2. Calls kyle_main(list) with the original function's logic
+    fn generate_main_wrapper(&mut self) -> Result<(), String> {
+        let i32_ty = self.context.i32_type();
+        let ptr_ty = self.context.ptr_type(Default::default());
+
+        // Get the kyle_main function that was declared instead of main
+        let kyle_main = self.fn_value_map.get("kyle_main")
+            .ok_or_else(|| "kyle_main not declared for wrapper".to_string())?;
+
+        // Declare i32 @main(i32, ptr)
+        let param_tys = [i32_ty.into(), ptr_ty.into()];
+        let main_type = i32_ty.fn_type(&param_tys, false);
+        let main_fn = self.module.add_function("main", main_type, None);
+
+        let bb = self.context.append_basic_block(main_fn, "entry");
+        self.builder.position_at_end(bb);
+
+        // Convert parameters to BasicMetadataValueEnum
+        let argc = main_fn.get_nth_param(0).unwrap();
+        let argv = main_fn.get_nth_param(1).unwrap();
+        let argc_meta: inkwell::values::BasicMetadataValueEnum = argc.into();
+        let argv_meta: inkwell::values::BasicMetadataValueEnum = argv.into();
+
+        // Call kl_init_args(argc, argv) -> ptr (list handle)
+        let init_args_fn = self.module.get_function("kl_init_args")
+            .ok_or_else(|| "kl_init_args not declared".to_string())?;
+        let args_call = self.builder.build_call(init_args_fn, &[argc_meta, argv_meta], "args")
+            .map_err(|e| format!("call kl_init_args: {}", e))?;
+        let args_list = match args_call.try_as_basic_value() {
+            inkwell::values::ValueKind::Basic(bv) => bv,
+            _ => return Err("kl_init_args did not return a basic value".to_string()),
+        };
+        let args_meta: inkwell::values::BasicMetadataValueEnum = args_list.into();
+
+        // Call kyle_main(args_list)
+        let result_call = self.builder.build_call(*kyle_main, &[args_meta], "result")
+            .map_err(|e| format!("call kyle_main: {}", e))?;
+        match result_call.try_as_basic_value() {
+            inkwell::values::ValueKind::Basic(bv) => {
+                self.builder.build_return(Some(&bv))
+                    .map_err(|e| format!("main_wrapper ret: {}", e))?;
+            }
+            _ => {
+                // kyle_main returns void — return 0
+                self.builder.build_return(Some(&i32_ty.const_zero()))
+                    .map_err(|e| format!("main_wrapper ret void: {}", e))?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Convert a BasicValueEnum to an IntValue, converting pointer to int if needed.
     fn to_int_value(&self, val: BasicValueEnum<'ctx>) -> inkwell::values::IntValue<'ctx> {
         match val {
@@ -687,11 +995,7 @@ impl<'ctx> Codegen<'ctx> {
         last_values: &HashMap<usize, BasicValueEnum<'ctx>>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
         match value {
-            MirValue::Local(id) => {
-                Ok(last_values.get(id).copied().unwrap_or_else(|| {
-                    self.context.i32_type().const_zero().as_basic_value_enum()
-                }))
-            }
+            MirValue::Local(id) => self.load_value(*id, last_values),
             MirValue::Param(id) => {
                 Ok(self.param_values.get(id).copied().unwrap_or_else(|| {
                     self.context.i32_type().const_zero().as_basic_value_enum()

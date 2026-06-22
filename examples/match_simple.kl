@@ -1,0 +1,10 @@
+fn main(args: [str]) -> i32:
+    x = 42
+    match x:
+        1:
+            println(10)
+        2:
+            println(20)
+        _:
+            println(0)
+    0

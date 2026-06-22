@@ -118,3 +118,33 @@ pub extern "C" fn kl_list_len(list: *const KlList) -> i64 {
     }
     unsafe { (*list).len }
 }
+
+/// Convert C's argc/argv to a Kyle list<str>.
+/// Skips argv[0] (program name).
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_init_args(argc: i32, argv: *mut *mut u8) -> *mut KlList {
+    let list = kl_list_new();
+    if list.is_null() {
+        return std::ptr::null_mut();
+    }
+    for i in 1..argc {
+        let cstr = unsafe { *argv.add(i as usize) };
+        if cstr.is_null() {
+            continue;
+        }
+        let len = unsafe {
+            let mut n: i32 = 0;
+            while *cstr.add(n as usize) != 0 { n += 1; }
+            n
+        };
+        // Allocate Kyle string (ptr + len layout: ptr to bytes, but we store null-terminated)
+        let kstr = kl_alloc(len as i64 + 1) as *mut u8;
+        if kstr.is_null() { continue; }
+        for j in 0..len {
+            unsafe { *kstr.add(j as usize) = *cstr.add(j as usize); }
+        }
+        unsafe { *kstr.add(len as usize) = 0; }
+        kl_list_push(list, kstr as i64);
+    }
+    list
+}
