@@ -281,6 +281,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("kl_list_len", ft, None);
         }
+        // ptr kl_list_slice(ptr, i64, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_slice", ft, None);
+        }
+        // void kl_list_extend(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_extend", ft, None);
+        }
         // ptr kl_substr(ptr, i64, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];

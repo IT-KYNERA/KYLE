@@ -755,6 +755,28 @@ await load_users()
 
 ---
 
+## TernaryNode
+
+```text
+TernaryNode
+
+├── condition
+
+├── then_expr
+
+└── else_expr
+```
+
+The ternary operator evaluates `condition`, then returns `then_expr` if truthy, `else_expr` otherwise.
+
+Example:
+
+```kl
+status = age >= 18 ? "Adult" : "Minor"
+```
+
+---
+
 # Type Nodes
 
 ## PrimitiveTypeNode

@@ -148,3 +148,33 @@ pub extern "C" fn kl_init_args(argc: i32, argv: *mut *mut u8) -> *mut KlList {
     }
     list
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_slice(list: *mut KlList, start: i64, end: i64) -> *mut KlList {
+    if list.is_null() { return std::ptr::null_mut(); }
+    let result = kl_list_new();
+    if result.is_null() { return std::ptr::null_mut(); }
+    unsafe {
+        let len = (*list).len;
+        let s = if start < 0 { 0 } else if start > len { len } else { start };
+        let e = if end < 0 { len } else if end > len { len } else { end };
+        let s = s.min(e);
+        for i in s..e {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            kl_list_push(result, val);
+        }
+    }
+    result
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_extend(dest: *mut KlList, src: *mut KlList) {
+    if dest.is_null() || src.is_null() { return; }
+    unsafe {
+        let src_len = (*src).len;
+        for i in 0..src_len {
+            let val = std::ptr::read((*src).data.add(i as usize));
+            kl_list_push(dest, val);
+        }
+    }
+}

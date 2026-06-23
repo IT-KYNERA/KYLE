@@ -550,6 +550,38 @@ impl Parser {
         let start = self.pos;
         let mut left = self.parse_unary()?;
         loop {
+            // Check for '?' — BOTH ternary (cond ? then : else) and error-prop (expr?)
+            if self.at(TokenKind::Question) {
+                const TERNARY_PREC: u8 = 2;
+                if TERNARY_PREC < min_prec { break; }
+                let saved = self.pos;
+                self.advance(); // consume '?'
+                // Try ternary first: parse middle expression, check for ':'
+                match self.parse_binary(0) {
+                    Ok(middle) => {
+                        if self.at(TokenKind::Colon) {
+                            self.advance(); // consume ':'
+                            let right = self.parse_binary(TERNARY_PREC)?;
+                            left = Expr::Ternary {
+                                cond: Box::new(left),
+                                then_expr: Box::new(middle),
+                                else_expr: Box::new(right),
+                                span: self.span_from(start),
+                            };
+                            continue; // allow chaining: a ? b : c ? d : e
+                        }
+                        // Not ternary — fall through to error prop
+                    }
+                    Err(_) => {
+                        // Not ternary — fall through to error prop
+                    }
+                }
+                // Restore and handle as error propagation
+                self.pos = saved;
+                self.advance(); // consume '?'
+                left = Expr::ErrorProp { expression: Box::new(left), span: self.span_from(start) };
+                continue;
+            }
             let op = match self.current_operator() {
                 Some(op) => op,
                 None => break,
@@ -609,7 +641,11 @@ impl Parser {
             TokenKind::String(s) => {
                 let val = s.clone();
                 self.advance();
-                Expr::Literal { value: Literal::String(val), span: self.span_from(start) }
+                if val.contains('{') {
+                    self.parse_string_interp(&val, start)?
+                } else {
+                    Expr::Literal { value: Literal::String(val), span: self.span_from(start) }
+                }
             }
             TokenKind::True => {
                 self.advance();
@@ -659,7 +695,14 @@ impl Parser {
                 self.advance();
                 let mut elements = Vec::new();
                 while !self.at(TokenKind::RBracket) && !self.at(TokenKind::Eof) {
-                    elements.push(self.parse_expr()?);
+                    if self.at(TokenKind::DotDotDot) {
+                        let span_start = self.pos;
+                        self.advance();
+                        let expr = self.parse_expr()?;
+                        elements.push(Expr::Spread { expression: Box::new(expr), span: self.span_from(span_start) });
+                    } else {
+                        elements.push(self.parse_expr()?);
+                    }
                     if self.at(TokenKind::Comma) { self.advance(); }
                 }
                 self.expect(TokenKind::RBracket)?;
@@ -682,6 +725,9 @@ impl Parser {
                 self.advance();
                 let expr = self.parse_expr()?;
                 Expr::Async { expression: Box::new(expr), span: self.span_from(start) }
+            }
+            TokenKind::Match => {
+                return self.parse_match_expr();
             }
             _ => return Err(format!("unexpected token in expression: {:?}", tok.kind)),
         };
@@ -710,17 +756,23 @@ impl Parser {
                 self.advance();
                 let property = self.eat_identifier();
                 expr = Expr::OptionalChain { target: Box::new(expr), property, span: self.span_from(start) };
-            } else if self.at(TokenKind::Question) {
-                let start = self.pos;
-                self.advance();
-                expr = Expr::ErrorProp { expression: Box::new(expr), span: self.span_from(start) };
             } else if self.at(TokenKind::LBracket) {
                 let start = self.pos;
                 self.advance();
                 let index = self.parse_expr()?;
                 self.expect(TokenKind::RBracket)?;
-                expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
-                } else if self.at(TokenKind::LBrace) {
+                // Detect range expression inside brackets: items[start..end] → RangeSlice
+                if let Expr::Binary { left, operator: BinaryOp::Range, right, .. } = &index {
+                    expr = Expr::RangeSlice {
+                        target: Box::new(expr),
+                        start: Some(left.clone()),
+                        end: Some(right.clone()),
+                        span: self.span_from(start),
+                    };
+                } else {
+                    expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
+                }
+            } else if self.at(TokenKind::LBrace) {
                 // Struct literal: Identifier { field: value, ... }
                 let start = self.pos;
                 if let Expr::Identifier { name: struct_name, .. } = &expr {
@@ -986,6 +1038,32 @@ impl Parser {
         Ok(Stmt::Match(MatchStmt { expression: Box::new(expression), arms, span: self.span_from(start) }))
     }
 
+    fn parse_match_expr(&mut self) -> Result<Expr, String> {
+        let start = self.pos;
+        self.advance(); // consume 'match'
+        let expression = self.parse_expr()?;
+        self.expect(TokenKind::Colon)?;
+        // Consume Newline and Indent that precede the match body
+        if self.at(TokenKind::Newline) { self.advance(); }
+        if self.at(TokenKind::Indent) { self.advance(); }
+        let mut arms = Vec::new();
+        loop {
+            if self.at(TokenKind::Newline) { self.advance(); continue; }
+            if self.at(TokenKind::Dedent) { self.advance(); break; }
+            if self.at(TokenKind::Eof) { break; }
+            let arm_start = self.pos;
+            let pattern = self.parse_pattern()?;
+            let guard = if self.at(TokenKind::If) {
+                self.advance();
+                Some(Box::new(self.parse_expr()?))
+            } else { None };
+            self.expect(TokenKind::Colon)?;
+            let body = self.parse_block()?;
+            arms.push(MatchArm { pattern, guard, body, span: self.span_from(arm_start) });
+        }
+        Ok(Expr::MatchExpr { expression: Box::new(expression), arms, span: self.span_from(start) })
+    }
+
     fn parse_pattern(&mut self) -> Result<Pattern, String> {
         let start = self.pos;
         if self.at_identifier() {
@@ -1039,6 +1117,75 @@ impl Parser {
             value: lit,
             span: self.span_from(start),
         })
+    }
+
+    /// Parse string interpolation: split `"Hello {name}"` into parts.
+    fn parse_string_interp(&mut self, s: &str, start: usize) -> Result<Expr, String> {
+        let mut parts: Vec<Expr> = Vec::new();
+        let mut current = String::new();
+        let chars: Vec<char> = s.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            if chars[i] == '\\' && i + 1 < chars.len() && (chars[i + 1] == '{' || chars[i + 1] == '}') {
+                current.push(chars[i + 1]);
+                i += 2;
+            } else if chars[i] == '{' {
+                if !current.is_empty() {
+                    parts.push(Expr::Literal {
+                        value: Literal::String(std::mem::take(&mut current)),
+                        span: self.span_from(start),
+                    });
+                }
+                i += 1;
+                let expr_start = i;
+                let mut depth = 1;
+                while i < chars.len() && depth > 0 {
+                    if chars[i] == '{' { depth += 1; }
+                    else if chars[i] == '}' { depth -= 1; }
+                    if depth > 0 { i += 1; }
+                }
+                let expr_text: String = chars[expr_start..i].iter().collect();
+                let expr = self.parse_interp_expr_text(&expr_text)?;
+                parts.push(expr);
+                i += 1;
+            } else {
+                current.push(chars[i]);
+                i += 1;
+            }
+        }
+
+        if !current.is_empty() {
+            parts.push(Expr::Literal {
+                value: Literal::String(current),
+                span: self.span_from(start),
+            });
+        }
+
+        if parts.is_empty() {
+            parts.push(Expr::Literal {
+                value: Literal::String(String::new()),
+                span: self.span_from(start),
+            });
+        }
+
+        // If only one part and it's a string literal, return a plain literal (no interpolation)
+        if parts.len() == 1 {
+            if let Expr::Literal { .. } = &parts[0] {
+                return Ok(parts.remove(0));
+            }
+        }
+
+        Ok(Expr::StringInterp { parts, span: self.span_from(start) })
+    }
+
+    /// Parse an expression from raw text (used inside `{...}` in string interpolation).
+    fn parse_interp_expr_text(&self, text: &str) -> Result<Expr, String> {
+        use crate::lexer::Lexer;
+        let mut lexer = Lexer::new(text);
+        let tokens = lexer.tokenize();
+        let mut parser = Parser::new(tokens);
+        parser.parse_expr()
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt, String> {
@@ -1178,6 +1325,7 @@ impl Parser {
             TokenKind::GreaterGreaterEquals => Some(BinaryOp::ShrAssign),
             TokenKind::And => Some(BinaryOp::And),
             TokenKind::Or => Some(BinaryOp::Or),
+            TokenKind::DotDot => Some(BinaryOp::Range),
             _ => Option::None,
         }
     }
@@ -1188,6 +1336,7 @@ impl Parser {
             | BinaryOp::MulAssign | BinaryOp::DivAssign | BinaryOp::RemAssign
             | BinaryOp::BitAndAssign | BinaryOp::BitOrAssign | BinaryOp::BitXorAssign
             | BinaryOp::ShlAssign | BinaryOp::ShrAssign => 1,
+            BinaryOp::Range => 2,
             BinaryOp::Or => 2,
             BinaryOp::And => 3,
             BinaryOp::Eq | BinaryOp::Neq => 4,
@@ -1208,7 +1357,8 @@ impl Parser {
             TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::String(_)
             | TokenKind::True | TokenKind::False | TokenKind::Identifier(_)
             | TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace
-            | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde => true,
+            | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde
+            | TokenKind::Async | TokenKind::Match => true,
             _ => false,
         })
     }

@@ -536,6 +536,54 @@ impl Formatter {
                 self.write_expr(out, expression);
                 out.push('?');
             }
+            Expr::StringInterp { parts, .. } => {
+                out.push('"');
+                for part in parts {
+                    if let Expr::Literal { value: Literal::String(s), .. } = part {
+                        out.push_str(s);
+                    } else {
+                        out.push('{');
+                        self.write_expr(out, part);
+                        out.push('}');
+                    }
+                }
+                out.push('"');
+            }
+            Expr::Ternary { cond, then_expr, else_expr, .. } => {
+                self.write_expr(out, cond);
+                out.push_str(" ? ");
+                self.write_expr(out, then_expr);
+                out.push_str(" : ");
+                self.write_expr(out, else_expr);
+            }
+            Expr::MatchExpr { expression, arms, .. } => {
+                out.push_str("match ");
+                self.write_expr(out, expression);
+                out.push_str(":\n");
+                for arm in arms {
+                    self.indent(out, 1);
+                    match &arm.pattern {
+                        Pattern::Identifier { name, .. } => out.push_str(name),
+                        Pattern::Literal { value, .. } => self.write_literal(out, value),
+                        Pattern::Wildcard { .. } => out.push('_'),
+                        Pattern::EnumVariant { enum_name, variant, .. } => {
+                            write!(out, "{}.{}", enum_name, variant).unwrap();
+                        }
+                        Pattern::IsType { type_, .. } => {
+                            write!(out, "is ").unwrap();
+                            self.write_type(out, type_);
+                        }
+                    }
+                    if let Some(g) = &arm.guard {
+                        write!(out, " if ").unwrap();
+                        self.write_expr(out, g);
+                    }
+                    out.push_str(":\n");
+                    for stmt in &arm.body.statements {
+                        self.write_stmt(out, stmt, 2);
+                    }
+                }
+            }
             Expr::List { elements, .. } => {
                 out.push('[');
                 for (i, e) in elements.iter().enumerate() {
@@ -601,7 +649,9 @@ impl Formatter {
                 self.write_expr(out, index);
                 out.push(']');
             }
-            Expr::RangeSlice { start, end, .. } => {
+            Expr::RangeSlice { target, start, end, .. } => {
+                self.write_expr(out, target);
+                out.push('[');
                 if let Some(s) = start {
                     self.write_expr(out, s);
                 }
@@ -609,6 +659,7 @@ impl Formatter {
                 if let Some(e) = end {
                     self.write_expr(out, e);
                 }
+                out.push(']');
             }
             Expr::Loop { body, .. } => {
                 out.push_str("loop:\n");
@@ -667,6 +718,7 @@ impl Formatter {
             BinaryOp::BitXorAssign => "^=",
             BinaryOp::ShlAssign => "<<=",
             BinaryOp::ShrAssign => ">>=",
+            BinaryOp::Range => "..",
         }
     }
 }
@@ -730,5 +782,8 @@ fn expr_span(expr: &Expr) -> klc_core::span::Span {
         Expr::RangeSlice { span, .. } => *span,
         Expr::Loop { span, .. } => *span,
         Expr::StructLiteral { span, .. } => *span,
+        Expr::StringInterp { span, .. } => *span,
+        Expr::Ternary { span, .. } => *span,
+        Expr::MatchExpr { span, .. } => *span,
     }
 }

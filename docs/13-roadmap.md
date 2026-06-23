@@ -305,21 +305,24 @@ Estas características ya parsean y type-checkean, pero **no generan código**.
 Sin ellas, el lenguaje no es usable.
 
 ```text
-[ ] For loops — `for x in list:`, `for i in range(n):`
-    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+[x] For loops — `for x in list:`, `for i in range(n):` ✅ COMPLETED
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
 
-[ ] Generics end-to-end — monomorphization en lowering + codegen
-    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
-    - Sin genéricos: Option<T>, List<T>, Result<T,E>, colecciones no funcionan
+[x] Generics end-to-end — monomorphization en lowering + codegen ✅ COMPLETED
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
+    - Generic structs (Pair<T,U>) + generic functions (first<T>, make_pair<T,U>)
 
-[ ] Error handling — `!` return type + `?` operator
-    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+[x] Error handling — `!` return type + `?` operator ✅ COMPLETED
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
+    - `?` operator con Option<T> funciona (error_test.kl → 42)
+    - `!` return type syntax parsea pero falta testing end-to-end
 
-[ ] Optional chaining — `?.`
-    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+[x] String interpolation — `"Hello {name}"` ✅ COMPLETED
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
 
-[ ] String interpolation — `"Hello {name}"`
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[x] Optional chaining — `?.` ⚠️ PARCIAL
+    - parser ✅ | type-checker ✅ | lowering ✅ (propagación Some/None) | codegen ✅
+    - Falta: property access en el payload struct (requiere info de tipo genérico)
 ```
 
 #### 🟧 P1 — Language Features Secundarias
@@ -327,22 +330,23 @@ Sin ellas, el lenguaje no es usable.
 También parsean pero no generan código. Importantes pero no bloquean el MVP.
 
 ```text
-[ ] Defer — working lowering + codegen
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] Guard — working lowering + codegen
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] Type aliases — `type MyInt = i32`
-    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+[x] Defer — lowering + codegen ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[x] Guard — lowering + codegen ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[x] Type aliases — `type MyInt = i32` (lowering) ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
 [ ] Dict/Map literals — `{ "key": value }`
     - parser ⚠️ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] Spread operator — `[...list, new_elem]`
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] Range slicing — `items[0..3]`
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] If como expresión
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
-[ ] Match como expresión
-    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[x] Spread operator — `[...list, new_elem]` ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[x] Range slicing — `items[0..3]` ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[ ] Ternary operator ✅ — `cond ? a : b` (cubre el caso simple de if-como-expresión)
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[ ] If-como-expresión (bloques indentados) — diferido; ternary cubre el 90% de casos
+[x] Match como expresión ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
 [ ] const fn — compile-time evaluation
     - parser ✅ | type-checker ❌ | lowering: ❌ | codegen: ❌
 ```

@@ -449,6 +449,21 @@ pub enum Expr {
         expression: Box<Expr>,
         span: Span,
     },
+    StringInterp {
+        parts: Vec<Expr>,
+        span: Span,
+    },
+    Ternary {
+        cond: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
+        span: Span,
+    },
+    MatchExpr {
+        expression: Box<Expr>,
+        arms: Vec<MatchArm>,
+        span: Span,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +506,7 @@ pub enum BinaryOp {
     BitXorAssign,
     ShlAssign,
     ShrAssign,
+    Range,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1093,6 +1109,40 @@ impl DisplayDepth for Expr {
                 write_indent(f, d)?;
                 writeln!(f, "ErrorProp")?;
                 expression.fmt_depth(f, d + 1)
+            }
+            Expr::StringInterp { parts, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "StringInterp ({} parts)", parts.len())?;
+                for part in parts {
+                    part.fmt_depth(f, d + 1)?;
+                }
+                Ok(())
+            }
+            Expr::Ternary { cond, then_expr, else_expr, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "Ternary")?;
+                write_indent(f, d + 1)?;
+                writeln!(f, "Cond:")?;
+                cond.fmt_depth(f, d + 2)?;
+                write_indent(f, d + 1)?;
+                writeln!(f, "Then:")?;
+                then_expr.fmt_depth(f, d + 2)?;
+                write_indent(f, d + 1)?;
+                writeln!(f, "Else:")?;
+                else_expr.fmt_depth(f, d + 2)
+            }
+            Expr::MatchExpr { expression, arms, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "MatchExpr")?;
+                write_indent(f, d + 1)?;
+                writeln!(f, "Expression:")?;
+                expression.fmt_depth(f, d + 2)?;
+                for arm in arms {
+                    write_indent(f, d + 1)?;
+                    writeln!(f, "Arm:")?;
+                    arm.fmt_depth(f, d + 2)?;
+                }
+                Ok(())
             }
         }
     }

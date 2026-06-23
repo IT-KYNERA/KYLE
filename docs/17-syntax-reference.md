@@ -324,13 +324,10 @@ if obtener_usuario():
 
 La variable `usuario` solo existe dentro del bloque `if`.
 
-### If como expresión 🔶
+### Ternary / operador ternario ✅
 
 ```kl
-categoria = if edad >= 18:       # 🔶 parsea pero no genera código
-    "Adulto"
-else:
-    "Menor"
+categoria = edad >= 18 ? "Adulto" : "Menor"
 ```
 
 ---
@@ -446,10 +443,10 @@ match valor:                     # ✅
         print("User")
 ```
 
-### Match como expresión 🔶
+### Match como expresión ✅
 
 ```kl
-descripcion = match x:           # 🔶 parsea, sin codegen
+descripcion = match x:           # ✅
     0:
         "cero"
     n if n > 0:
@@ -476,24 +473,24 @@ resultado = loop:                # ✅ break con valor
 
 `break` termina el bucle más interno. `break valor` solo en `loop:` expressions.
 
-### Defer 🔶
+### Defer ✅
 
 ```kl
-fn procesar_archivo():           # 🔶 parsea, sin codegen completo
+fn procesar_archivo():           # ✅
     archivo = open("datos.txt")
-    defer archivo.close()        # 🔶
+    defer archivo.close()        # ✅ LIFO, se ejecuta al retornar
     ...
 ```
 
 Los defers se ejecutan en orden inverso (LIFO) al salir del scope.
 
-### Guard 🔶
+### Guard ✅
 
 ```kl
-fn procesar(usuario: Option<User>):  # 🔶 parsea, sin codegen completo
-    guard usuario != None else:      # 🔶
-        return                       # 🔶
-    print(usuario.nombre)            # 🔶
+fn procesar(usuario: Option<User>):  # ✅
+    guard usuario != None else:      # ✅ CondBr lowering
+        return                       # ✅
+    print(usuario.nombre)            # ✅
 ```
 
 Equivalente a:
@@ -530,13 +527,14 @@ texto = "Línea1\nLínea2\tindentado"   # ✅
 ruta = "C:\\Usuarios\\nombre"         # ✅
 ```
 
-### String Interpolation 🔶
+### String Interpolation ✅
 
 ```kl
 nombre = "Ana"
 edad = 30
-print("Hola {nombre}, tienes {edad} años")  # 🔶 parsea, sin codegen
-print("Suma: {a + b}")                      # 🔶
+print("Hola {nombre}, tienes {edad} años")  # ✅ genera código
+print("Suma: {a + b}")                      # ✅ expresión arbitraria
+```
 ```
 
 Solo en strings de doble comilla. No en chars (comilla simple).
@@ -617,10 +615,10 @@ origen = Punto(x: 0.0, y: 0.0)   # ✅ named fields
 punto = Punto(x: 10, y: 20)      # ✅
 ```
 
-### Struct con genéricos 🔶
+### Struct con genéricos ✅
 
 ```kl
-struct Par<T, U>:                 # 🔶 parsea y type-checkea, sin codegen
+struct Par<T, U>:                 # ✅ parsea, type-checkea, genera código
     primero: T
     segundo: U
 ```
@@ -783,12 +781,12 @@ class Usuario:                   # ✅
 
 ---
 
-## 21. Genéricos
+## 21. Genéricos ✅
 
-### Funciones genéricas 🔶
+### Funciones genéricas ✅
 
 ```kl
-fn primero<T>(items: [T]) -> T:     # 🔶 parsea y type-checkea, sin codegen
+fn primero<T>(items: [T]) -> T:     # ✅ parsea, type-checkea, genera código
     return items[0]
 ```
 
@@ -799,18 +797,18 @@ class Repositorio<T>:               # 🔶 parsea y type-checkea, sin codegen
     fn agregar(item: T)
 ```
 
-### Structs genéricos 🔶
+### Structs genéricos ✅
 
 ```kl
-struct Par<T, U>:                   # 🔶 parsea y type-checkea, sin codegen
+struct Par<T, U>:                   # ✅ parsea, type-checkea, genera código
     primero: T
     segundo: U
 ```
 
-### Uso 🔶
+### Uso ✅
 
 ```kl
-numeros = Repositorio<i32>()        # 🔶 parsea, sin codegen
+numeros = Pair<i32, i32> { first: 1, second: 2 }  # ✅ monomorfización funcionando
 ```
 
 ---
@@ -834,10 +832,7 @@ ciudad = usuario?.direccion?.ciudad # 🔶
 Equivale a:
 
 ```kl
-nombre = if usuario:
-    usuario.nombre
-else:
-    None
+nombre = usuario ? usuario.nombre : None
 ```
 
 ### Pattern matching con Option ✅
@@ -862,11 +857,11 @@ fn encontrar_usuario(id: i32) -> Usuario!  # 🔶 parsea y type-checkea, sin cod
 
 `!` indica que la función puede retornar un error.
 
-### Operador ? 🔶
+### Operador ? ✅
 
 ```kl
-fn procesar() -> Resultado!:        # 🔶 parsea y type-checkea, sin codegen
-    usuario = encontrar_usuario(1)? # 🔶 propaga el error
+fn procesar():
+    usuario = encontrar_usuario(1)? # ✅ propaga el error (Option<T>)
     ...
 ```
 
@@ -1260,10 +1255,10 @@ usuario["nombre"]  ❌ — los object literals usan punto
 | **For / For-Else / For Range** | **✅ Listas completo** / **🔶 Range/Else** |
 | Match + guards + enum variants | ✅ Completo |
 | Break (con y sin valor) | ✅ Completo |
-| **Defer** | **🔶 Sin codegen completo** |
-| **Guard** | **🔶 Sin codegen completo** |
+| **Defer** | **✅ Completo** |
+| **Guard** | **✅ Completo** |
 | Strings + chars + escapes | ✅ Completo |
-| **String Interpolation** | **🔶 Sin codegen** |
+| **String Interpolation** | **✅ Completo** |
 | Listas + indexación + métodos | ✅ Completo |
 | Tuplas + destructuring | ✅ Completo |
 | Structs | ✅ Completo |
@@ -1274,20 +1269,20 @@ usuario["nombre"]  ❌ — los object literals usan punto
 | Contracts (interfaces) | ✅ Completo |
 | Properties (get/set) | ✅ Completo |
 | Visibilidad por naming | ✅ Completo |
-| **Genéricos** | **🔶 Parse + type-check, sin codegen** |
+| **Genéricos** | **✅ Completo** |
 | Option<T> + Option.Some/None | ✅ Completo |
 | **Optional Chaining ?.** | **🔶 Sin codegen** |
 | Error types ! | ✅ Parse + type-check, **🔶 sin codegen** |
-| **Operador ?** | **🔶 Sin codegen** |
+| **Operador ?** | **✅ Completo** |
 | Async/Await | ✅ Completo |
 | Imports (import, from, alias) | ✅ Completo |
 | Object literals { } | ✅ Completo |
 | **Dict< K, V>** | **📄 Solo especificado** |
-| **Spread operator (...)** | **🔶 Sin codegen** |
-| **Range + Slicing** | **🔶 Sin codegen** |
+| **Spread operator (...)** | **✅ Completo** |
+| **Range + Slicing** | **✅ Completo** |
 | Operator overloading | ✅ Completo |
 | **const fn** | **📄 Solo especificado** |
-| **Type aliases** | **🔶 Sin codegen** |
+| **Type aliases** | **✅ Completo** |
 | Attributes (#[ ]) | ✅ Completo |
 | Built-in functions | ✅ Completo |
 | Comentarios (# y #[#]) | ✅ Completo |
@@ -1299,23 +1294,24 @@ usuario["nombre"]  ❌ — los object literals usan punto
 
 ### 🟥 P0 — End-to-end language features (bloquean el MVP)
 
-1. **For loops** — lowering + codegen ✅ **COMPLETED**
-2. **Genéricos** — monomorphization en lowering + codegen
-3. **Error handling** — `!` y `?` lowering + codegen
-4. **Optional chaining** — `?.` lowering + codegen
-5. **String interpolation** — desugaring a concat
+1. **For loops** — ✅ **COMPLETED**
+2. **Genéricos** — ✅ **COMPLETED**
+3. **Error handling** — `!` y `?` ✅ **COMPLETED**
+4. **Optional chaining** — `?.` lowering + codegen (⚠️ PARCIAL)
+5. **String interpolation** — ✅ **COMPLETED**
 
 ### 🟧 P1 — Secondary features
 
-6. Defer / Guard — lowering y codegen
-7. Type aliases — codegen
+6. Defer — ✅ **COMPLETED** (Sesión 25, LIFO lowering)
+7. Type aliases — ✅ **COMPLETED** (Sesión 25)
 8. Dict/Map literals — parse + type-check + codegen
-9. Spread operator — codegen
-10. Range slicing — codegen
+9. Spread operator — ✅ **COMPLETED** (Sesión 25)
+10. Range slicing — ✅ **COMPLETED** (Sesión 25)
 11. const fn — compile-time evaluation
-12. If como expresión — codegen
-13. Match como expresión — codegen
-14. Standard library — collections, json, str, time
+12. If como expresión (bloques) — codegen (ternary cubre 90% casos)
+13. Match como expresión — ✅ **COMPLETED** (Sesión 24)
+14. Guard — ✅ **COMPLETED** (Sesión 24, CondBr lowering)
+15. Standard library — collections, json, str, time
 
 ### 🟪 P4 — Tooling polish
 

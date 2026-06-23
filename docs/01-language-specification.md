@@ -323,6 +323,22 @@ if active && verified:
 
 ---
 
+## Ternary
+
+```kl
+? :
+```
+
+The ternary operator selects between two expressions based on a boolean condition:
+
+```kl
+status = age >= 18 ? "Adult" : "Minor"
+```
+
+Right-associative: `a ? b ? c : d : e` ≡ `a ? (b ? c : d) : e`.
+
+---
+
 ## Assignment
 
 ```kl
@@ -952,6 +968,27 @@ match x:
 
 ---
 
+# Match como expresión
+
+`match` puede usarse como expresión para producir un valor:
+
+```kl
+descripcion = match x:          # ✅
+
+    0:
+        "cero"
+
+    n if n > 0:
+        "positivo"
+
+    _:
+        "negativo"
+```
+
+Todas las ramas deben retornar el mismo tipo.
+
+---
+
 # Break
 
 Terminate the current loop early. Optionally return a value from a `loop:` expression:
@@ -980,6 +1017,10 @@ Equivalent to a labeled break with expression. `break` terminates only the inner
 
 # Conditionals
 
+## `if` / `elif` / `else` (statement)
+
+For multi-branch control flow with statement bodies:
+
 ```kl
 if age >= 18:
 
@@ -994,7 +1035,21 @@ else:
     print("Child")
 ```
 
+## Ternary operator `cond ? a : b` (expression)
+
+For quick inline conditional values:
+
+```kl
+status = age >= 18 ? "Adult" : "Minor"
+x = 5 == 5 ? 42 : 0
+```
+
+El ternary es **right-asociativo**: `a ? b ? c : d : e` ≡ `a ? (b ? c : d) : e`.
+Funciona con cualquier tipo (i32, str, bool, etc.). Los paréntesis son opcionales pero recomendados para claridad: `(cond) ? (then_expr) : (else_expr)`.
+
 ---
+
+
 
 # Binding Condition
 
@@ -1210,10 +1265,7 @@ city = user?.address?.city # deep optional access
 Equivalent to:
 
 ```kl
-name = if user:
-    user.name
-else:
-    None
+name = user ? user.name : None
 ```
 
 ---

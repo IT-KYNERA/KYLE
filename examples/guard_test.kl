@@ -1,0 +1,10 @@
+fn process(x: i32):
+    guard x >= 0 else:
+        print("negative")
+        return
+    print("non-negative")
+
+fn main():
+    process(5)
+    process(-3)
+    print("done")

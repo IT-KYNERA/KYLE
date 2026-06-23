@@ -256,6 +256,7 @@ impl TypeChecker {
                     | BinaryOp::MulAssign | BinaryOp::DivAssign | BinaryOp::RemAssign
                     | BinaryOp::BitAndAssign | BinaryOp::BitOrAssign | BinaryOp::BitXorAssign
                     | BinaryOp::ShlAssign | BinaryOp::ShrAssign => { self.infer_expr(right); rt }
+                    BinaryOp::Range => Type::Void,
                 }
             }
             Expr::Unary { operator, operand, .. } => {
@@ -357,13 +358,28 @@ impl TypeChecker {
                 }
             }
             Expr::RangeSlice { target, start, end, .. } => {
-                self.infer_expr(target);
+                let tt = self.infer_expr(target);
                 if let Some(s) = start { self.infer_expr(s); }
                 if let Some(e) = end { self.infer_expr(e); }
-                Type::List(Box::new(Type::I32))
+                match tt {
+                    Type::List(et) => Type::List(et),
+                    Type::Str => Type::Str,
+                    _ => Type::List(Box::new(Type::I32)),
+                }
             }
-            Expr::OptionalChain { target, .. } => {
-                self.infer_expr(target);
+            Expr::OptionalChain { target, property, .. } => {
+                let target_type = self.infer_expr(target);
+                if let Type::Option(inner) = &target_type {
+                    if let Type::Named(struct_name) = inner.as_ref() {
+                        if let Some(sym) = self.symbols.lookup(struct_name) {
+                            if let SymKind::Struct(s) = &sym.kind {
+                                if let Some(field) = s.fields.iter().find(|f| f.name == *property) {
+                                    return Type::Option(Box::new(self.resolve_ast_type(&field.type_)));
+                                }
+                            }
+                        }
+                    }
+                }
                 Type::Option(Box::new(Type::I32))
             }
             Expr::Loop { body, .. } => {
@@ -376,6 +392,65 @@ impl TypeChecker {
                     Type::Error(t) => *t,
                     _ => inner,
                 }
+            }
+            Expr::StringInterp { parts, .. } => {
+                for part in parts {
+                    self.infer_expr(part);
+                }
+                Type::Str
+            }
+            Expr::Ternary { cond, then_expr, else_expr, span } => {
+                let cond_type = self.infer_expr(cond);
+                if !matches!(cond_type, Type::Bool) {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001,
+                            format!("ternary condition must be bool, got {:?}", cond_type))
+                            .with_span(*span)
+                    );
+                }
+                let then_type = self.infer_expr(then_expr);
+                let else_type = self.infer_expr(else_expr);
+                if then_type != else_type {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001,
+                            format!("ternary branches must have same type, got {:?} and {:?}", then_type, else_type))
+                            .with_span(*span)
+                    );
+                }
+                then_type
+            }
+            Expr::MatchExpr { expression, arms, span } => {
+                self.infer_expr(expression);
+                let mut arm_types = Vec::new();
+                for arm in arms {
+                    self.symbols.push_scope();
+                    self.bind_pattern(&arm.pattern, None);
+                    if let Some(g) = &arm.guard { self.infer_expr(g); }
+                    self.check_block(&arm.body);
+                    // Last statement's expression type determines arm value type
+                    if let Some(last) = arm.body.statements.last() {
+                        if let Stmt::Expression(e) = last {
+                            arm_types.push(self.infer_expr(e));
+                        } else {
+                            arm_types.push(Type::Void);
+                        }
+                    } else {
+                        arm_types.push(Type::Void);
+                    }
+                    self.symbols.pop_scope();
+                }
+                // Unify all arm types
+                let result_type = arm_types.first().cloned().unwrap_or(Type::Void);
+                for at in &arm_types {
+                    if *at != result_type {
+                        self.reporter.report(
+                            Diagnostic::error(ErrorCode::E0001,
+                                format!("match arms must have same type, got {:?} and {:?}", result_type, at))
+                                .with_span(*span)
+                        );
+                    }
+                }
+                result_type
             }
         }
     }

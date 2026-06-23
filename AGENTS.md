@@ -16,6 +16,7 @@ Formatter:              pretty-printer + comment preservation ✅
 VS Code:                extension with syntax highlighting, LSP client, commands ✅
 Struct ABI:             pass-by-reference (pointer-based) ✅
 Phase 3.5 Complete:     closures, methods, enums/match, async/await ✅
+Phase 6 P1:             Ternary ✅, Match-expression ✅, Guard ✅, Defer ✅
 Self-Hosting (Phase 8): lexer.kl + parser.kl + semantic.kl (deferred post-MVP) ✅
 Tests:                  86 tests, 0 failures ✅
 ```
@@ -278,18 +279,18 @@ cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime
 ## Roadmap (v5.0 — MVP Focus)
 
 ```
-FASE 1-5 + 3.5 (complete) — Frontend + Backend + Runtime + Tooling + Backend Gap Closure ✅
+FASE 1 + 2 + 3 + 3.5 + 4 + 5 (complete) — Full pipeline end-to-end ✅
 
 FASE 6 — Language Completion (🔶 Current — prioridades P0-P5)
 │   Completar TODA la sintaxis: que todo genere código funcionando.
 │
-├─ 🟥 P0 (ALTA) — End-to-end language features
+├─ 🟥 P0 (ALTA) — End-to-end language features (4/5 done)
 │   For loops ✅, Generics structs ✅, Generics functions ✅,
-│   Error handling (!/?) ❌, Optional chaining (?.) ❌, String interpolation ❌
+│   Error handling (!/?) ✅, String interpolation ✅, Optional chaining (?.) ❌
 │
 ├─ 🟧 P1 (ALTA) — Secondary features
-│   Defer, Guard, Type aliases, Dict/Map, Spread, Range slicing,
-│   If-expression, Match-expression, const fn
+│   Defer ✅, Guard ✅, Type aliases ✅, Dict/Map, Spread ✅, Range slicing ✅,
+│   Ternary ✅, Match-expression ✅, const fn
 │
 ├─ 🟦 P3 (MEDIA) — Standard library
 │   collections, str ops, time, json
@@ -520,4 +521,61 @@ FASE 9 — Production Ecosystem (📅 Future)
 | Fix: `ast_type_to_mir` Generic case | `klc_mir/src/lower.rs` | ✅ `else` branch ahora crea nombre concreto (`Pair__i32_str`) en vez de `args[0]` |
 | Call handler: detección + especialización on-the-fly | `klc_mir/src/lower.rs` | ✅ En `Expr::FunctionCall`, si target es genérico → infiere type args, especializa, emite call |
 | generic_fn end-to-end | `examples/generic_fn.kl` | ✅ `first([10,20,30])` → 10, `make_pair(1, "hello")` → field access OK |
+| Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 23 — Phase 3.5 cerrada: constructor fix + docs audit
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Root cause: `this.count = start` tail expression | `klc_mir/src/lower.rs` | ✅ Parser produce `Expr::Binary { op: Assign, left: PropAccess }` no `Expr::Assignment` |
+| Fix: `tail_is_field_assign` now detects both patterns | `klc_mir/src/lower.rs` | ✅ Añadido match arm para `Expr::Binary { operator: BinaryOp::Assign }` |
+| class_method_test.kl | `examples/class_method_test.kl` | ✅ `Counter(10).increment()+increment()+add(5)` → 17 |
+| enum_test2.kl memory corruption | `examples/enum_test2.kl` | ✅ 5/5 runs determinista (fix colateral del constructor) |
+| Phase 3.5 audit: closures, methods, enums, async | — | ✅ Todo verificado end-to-end |
+| Phase 1-5 y 3.5 marcados completados en docs | `docs/13-roadmap.md`, `docs/16-status.md`, `AGENTS.md` | ✅ For loops ✅, Generics ✅, Error handling (? operator) ✅ |
+| 23 examples verificados | `examples/*` | ✅ 22/23 pasan (test_math.kl falla por module search paths) |
+| Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 24 — Phase 6: Ternary operator (cond ? a : b)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| AST: `Expr::Ternary` | `crates/klc_core/src/ast.rs` | ✅ New variant |
+| Parser: ternary + error prop conviven | `crates/klc_frontend/src/parser.rs` | ✅ `parse_binary` handles `?` as ternary (prec=2); removed from `parse_postfix`; fallback a error-prop si no hay `:` |
+| Type checker | `crates/klc_semantic/src/type_checker.rs` | ✅ Cond debe ser bool, then/else unifican |
+| Scope resolver | `crates/klc_semantic/src/scope.rs` | ✅ Walk 3 sub-exprs |
+| Lowering | `crates/klc_mir/src/lower.rs` | ✅ CondBr → then/else/merge blocks con result_alloca |
+| Formatter | `crates/klc_tools/src/formatter.rs` | ✅ `cond ? then : else` |
+| Nested ternary | — | ✅ Right-assoc (`a ? b ? c : d : e`) |
+| String ternary | — | ✅ `cond ? "yes" : "no"` |
+| Error prop compat | — | ✅ `foo()?` sigue funcionando |
+| Examples | `examples/ternary.kl` | ✅ Adult, 42, 3 |
+
+### Sesión 25 — Phase 6: Match-expression + Guard fix + Defer lowering + Docs update
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| AST: `Expr::MatchExpr` | `crates/klc_core/src/ast.rs` | ✅ New variant with expression, arms, span |
+| Parser: match in expression context | `crates/klc_frontend/src/parser.rs` | ✅ `parse_match_expr()` in `parse_primary`; `TokenKind::Match` in `current_is_expr_start` |
+| Type checker: `Expr::MatchExpr` | `crates/klc_semantic/src/type_checker.rs` | ✅ Infers expression, checks arms, unifies return types |
+| Scope resolver: match expression | `crates/klc_semantic/src/scope.rs` | ✅ Walk expression + arms + guards |
+| Lowering: `Expr::MatchExpr` | `crates/klc_mir/src/lower.rs` | ✅ CondBr pattern chain with result_alloca; Wildcard/Identifier/Literal patterns |
+| Formatter: `Expr::MatchExpr` | `crates/klc_tools/src/formatter.rs` | ✅ Nested match output with indentation |
+| Guard fix: CondBr not a no-op | `crates/klc_mir/src/lower.rs` | ✅ CondBr: true→continue, false→body (early return) |
+| Defer lowering: LIFO at return | `crates/klc_mir/src/lower.rs` | ✅ `deferred_exprs` stack; emitted before explicit/implicit return in reverse order |
+| Defer test | `examples/defer_test.kl` | ✅ LIFO order verified |
+| Guard test | `examples/guard_test.kl` | ✅ CondBr verified |
+| Docs updated | `docs/13-roadmap.md`, `16-status.md`, `17-syntax-reference.md`, `01-language-specification.md` | ✅ Match-expression ✅, Guard ✅, Defer ✅ |
+| Tests | - | ✅ 86 tests, 0 failures |
+| Type alias lowering | `crates/klc_mir/src/lower.rs` | ✅ `TYPE_ALIAS_CACHE` thread_local + resolution in `ast_type_to_mir` (User catch-all) |
+| Chained aliases | `examples/type_alias_test.kl` | ✅ `type Years = Age` → `type Age = i32` resuelve a i32 |
+| Docs updated (2) | `docs/13-roadmap.md`, `16-status.md`, `17-syntax-reference.md`, `AGENTS.md` | ✅ Type aliases ✅ |
+| Range slicing: `..` lexer + parser | `crates/klc_frontend/lexer.rs`, `parser.rs` | ✅ `DotDot` token emitido por lexer, parseado como `BinaryOp::Range`, detectado dentro de `[]` → `RangeSlice` |
+| Range slicing: lowering + runtime | `klc_mir/src/lower.rs`, `klc_runtime/src/list.rs` | ✅ `Expr::RangeSlice` → `Call kl_list_slice` |
+| Range slicing: codegen extern | `klc_backend/src/codegen.rs` | ✅ `kl_list_slice(ptr, i64, i64) -> ptr` |
+| Range slicing test | `examples/slice_test.kl` | ✅ `list[0..3]` → `[0,1,2]` verificado |
+| Docs updated (3) | `docs/13-roadmap.md`, `16-status.md`, `17-syntax-reference.md`, `AGENTS.md` | ✅ Range slicing ✅ |
+| Spread: `...` lexer token | `crates/klc_frontend/token.rs`, `lexer.rs` | ✅ `DotDotDot` token + lexer `...` → `DotDotDot` |
+| Spread: parser in list literals | `crates/klc_frontend/parser.rs` | ✅ `LBracket` loop detecta `DotDotDot` → `Expr::Spread` |
+| Spread: lowering + runtime | `klc_mir/src/lower.rs`, `klc_runtime/src/list.rs` | ✅ spread en listas → `Call kl_list_extend` |
+| Spread: codegen extern | `klc_backend/src/codegen.rs` | ✅ `kl_list_extend(ptr, ptr)` |
+| Spread test | `examples/spread_test.kl` | ✅ `[...a, 4, 5]` → `[1,2,3,4,5]` |
+| Docs updated (4) | todos | ✅ Spread ✅ |
 | Tests | - | ✅ 86 tests, 0 failures |

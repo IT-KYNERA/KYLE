@@ -291,6 +291,27 @@ impl ScopeResolver {
             Expr::OptionalChain { target, .. } => self.resolve_expr(target),
             Expr::Loop { body, .. } => self.resolve_block(body),
             Expr::ErrorProp { expression, .. } => self.resolve_expr(expression),
+            Expr::StringInterp { parts, .. } => {
+                for part in parts {
+                    self.resolve_expr(part);
+                }
+            }
+            Expr::Ternary { cond, then_expr, else_expr, .. } => {
+                self.resolve_expr(cond);
+                self.resolve_expr(then_expr);
+                self.resolve_expr(else_expr);
+            }
+            Expr::MatchExpr { expression, arms, .. } => {
+                self.resolve_expr(expression);
+                for arm in arms {
+                    self.resolve_expr(&Expr::Identifier { name: "_".to_string(), span: arm.span });
+                    // Walk pattern variables and guard
+                    if let Some(g) = &arm.guard {
+                        self.resolve_expr(g);
+                    }
+                    self.resolve_block(&arm.body);
+                }
+            }
         }
     }
 

@@ -163,7 +163,20 @@ impl Lexer {
                 else { Some(TokenKind::Caret) }
             }
             '~' => { self.advance(); Some(TokenKind::Tilde) }
-            '.' => { self.advance(); Some(TokenKind::Dot) }
+            '.' => {
+                self.advance();
+                if self.current() == '.' {
+                    self.advance();
+                    if self.current() == '.' {
+                        self.advance();
+                        Some(TokenKind::DotDotDot)
+                    } else {
+                        Some(TokenKind::DotDot)
+                    }
+                } else {
+                    Some(TokenKind::Dot)
+                }
+            }
             ',' => { self.advance(); Some(TokenKind::Comma) }
             ':' => { self.advance(); Some(TokenKind::Colon) }
             '?' => {

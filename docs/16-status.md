@@ -27,7 +27,7 @@
 | String literals | ✅ | With escape sequences (`\n`, `\t`, `\"`, etc.) |
 | Char literals | ✅ | |
 | Boolean literals | ✅ | |
-| Operators | ✅ | All binary and unary |
+| Operators | ✅ | All binary, unary, and ternary (`cond ? a : b`) |
 | Keywords | ✅ | All language keywords |
 | Span tracking | ✅ | Real line/column/offset in Position |
 
@@ -56,7 +56,7 @@
 | return | ✅ | |
 | break | ✅ | |
 | defer | ✅ | Parses (needs lowering) |
-| guard | ✅ | Parses (needs lowering) |
+| guard | ✅ | ✅ CondBr lowering (Sesión 24) |
 | unsafe | ✅ | |
 | binding-if | ✅ | |
 | Literals (int, float, str, char, bool, none) | ✅ | |
@@ -76,7 +76,7 @@
 | List literals | ✅ | `[a, b, c]` |
 | Dict literals | 🔶 | Parses as struct init? |
 
-**Gaps:** Dict literal parsing needs verification; for/defer/guard lowering pending (Phase 6).
+**Gaps:** Dict literal parsing needs verification.
 
 ---
 
@@ -128,7 +128,7 @@
 | Constant folding | ✅ | |
 | Dead code elimination | ✅ | |
 
-**Gaps:** for / defer / guard lowering pending (Phase 6).
+**Gaps:** None.
 
 ### 4.2 — Codegen (klc_backend/src/codegen.rs — 479 lines)
 
@@ -153,7 +153,7 @@
 | Object file emission | ✅ | |
 | Native linker (clang) | ✅ | |
 
-**Gaps:** Generics lowering (monomorphization), error handling lowering, optional chaining lowering (Phase 6).
+**Gaps:** Optional chaining lowering, dict literals (Phase 6).
 
 ---
 
@@ -262,24 +262,24 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 | Match | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Return | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Break | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Defer | ✅ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
-| Guard | ✅ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
+| Defer | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Guard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Struct | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Enum | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Class | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Method dispatch | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Closure | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Async/await | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Generics | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
-| Error types (! / ?) | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
-| Optional types (None, ?.) | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
+| Generics | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Error types (! / ?) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Optional chaining (?.) | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
 | Contracts | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
-| Type aliases | ✅ | ✅ | ❌ | ❌ | ❌ | 🔶 |
-| String interpolation | ✅ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
+| Type aliases | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| String interpolation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Dict/Map literals | ⚠️ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
 | Tuple destructuring | ⚠️ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
-| Spread operator | ✅ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
-| Range | ✅ | ⚠️ | ❌ | ❌ | ❌ | 🔶 |
+| Spread operator | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Range + Slicing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
 
@@ -327,30 +327,31 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 
 ### 🟥 P0 — End-to-end language features (bloquean el MVP)
 
-1. **For loops** — lowering and codegen ✅ **COMPLETED**
-2. **Generics lowering** — monomorphization for generic structs and functions
-2. **Generics lowering** — monomorphization for generic structs and functions
-3. **Error handling lowering** — `!` return type, `?` operator
-4. **Optional chaining** — `?.` lowering
-5. **String interpolation** — desugaring to concat
+1. **For loops** — ✅ COMPLETED (for_test.kl, for_test2.kl passing)
+2. **Generics** — ✅ COMPLETED (generic_struct.kl, generic_fn.kl passing)
+3. **Error handling** — ✅ COMPLETED (? operator with Option<T> works in error_test.kl)
+4. **String interpolation** — ✅ COMPLETED ("Hello {name}" desugaring to concat)
+5. **Optional chaining** — `?.` lowering
 
 ### 🟧 P1 — Secondary features
 
-6. **Defer/Guard** — lowering and codegen
-7. **Type aliases** — lowering
-8. **Dict/Map literals** — full pipeline
-9. **Spread operator** — codegen
-10. **Range expressions** — codegen
-11. **const fn** — compile-time evaluation
-12. **If/Match como expresión** — codegen
-13. **Standard library completion** — collections, json, str, time
+6. **Defer** — ✅ COMPLETED (Sesión 25, LIFO lowering + codegen)
+7. **Guard** — ✅ COMPLETED (Sesión 24, CondBr lowering)
+8. **Type aliases** — ✅ COMPLETED (Sesión 25, lowering + codegen)
+9. **Dict/Map literals** — full pipeline
+10. **Spread operator** — ✅ COMPLETED (Sesión 25, lexer + parser + lowering + codegen)
+11. **Range slicing** — ✅ COMPLETED (Sesión 25, parser + lowering + codegen)
+12. **const fn** — compile-time evaluation
+13. **Ternary operator** — ✅ COMPLETED (`cond ? a : b`, Sesión 24)
+14. **Match como expresión** — ✅ COMPLETED (Sesión 24, lowering + codegen)
+15. **Standard library completion** — collections, json, str, time
 
 ### 🟪 P4 — Tooling polish
 
-14. **LSP autocompletion** — textDocument/completion
-15. **LSP go-to-definition** — textDocument/definition
-16. **LSP hover** — textDocument/hover
-17. **Debug info** — DWARF debug info output
+16. **LSP autocompletion** — textDocument/completion
+17. **LSP go-to-definition** — textDocument/definition
+18. **LSP hover** — textDocument/hover
+19. **Debug info** — DWARF debug info output
 
 ### 🟩 P5 — Robustness & testing
 

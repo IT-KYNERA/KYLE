@@ -125,6 +125,7 @@ pub enum TokenKind {
     // Delimiters & punctuation
     Dot,            // .
     DotDot,         // ..
+    DotDotDot,      // ...
     Comma,          // ,
     Colon,          // :
     Arrow,          // ->

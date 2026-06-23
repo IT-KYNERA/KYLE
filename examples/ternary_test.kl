@@ -1,0 +1,20 @@
+fn main(args: list<str>) -> i32:
+    # Test 1: true condition -> 42
+    y = 5 == 5 ? 42 : 0
+    println(y)
+    # Test 2: false condition -> 0
+    z = 5 == 3 ? 99 : 0
+    println(z)
+    # Test 3: string ternary
+    s = 5 > 3 ? "yes" : "no"
+    println(s)
+    # Test 4: ternary in parens + binop
+    w = 1 == 1 ? 10 : 20 + 1 == 2 ? 100 : 200
+    println(w)
+    # Test 5: nested ternary (right-assoc)
+    n = 1 == 1 ? 2 == 2 ? 3 : 4 : 5
+    println(n)
+    # Test 6: error prop still works
+    println("done")
+    0
+

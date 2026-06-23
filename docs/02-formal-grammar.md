@@ -792,6 +792,7 @@ expression =
     | optional_chain
     | loop_expression
     | error_propagation
+    | ternary_expression
     | "(" expression ")"
 ;
 
@@ -897,6 +898,14 @@ binary_operator =
 error_propagation =
     expression
     "?"
+;
+
+ternary_expression =
+    expression
+    "?"
+    expression
+    ":"
+    expression
 ;
 ```
 
