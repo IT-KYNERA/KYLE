@@ -151,6 +151,12 @@ fn dest_of(inst: &MirInst) -> Option<usize> {
         MirInst::Call { dest: Some(d), .. } => Some(*d),
         MirInst::PtrOffset { dest, .. } => Some(*dest),
         MirInst::Cast { dest, .. } => Some(*dest),
+        MirInst::FieldPtr { dest, .. } => Some(*dest),
+        MirInst::Memcpy { dest_ptr_local, .. } => Some(*dest_ptr_local),
+        MirInst::FnAddr { dest, .. } => Some(*dest),
+        MirInst::CallIndirect { dest: Some(d), .. } => Some(*d),
+        MirInst::AsyncSpawn { dest, .. } => Some(*dest),
+        MirInst::AsyncAwait { dest, .. } => Some(*dest),
         _ => None,
     }
 }
@@ -179,6 +185,23 @@ fn srcs_of(inst: &MirInst) -> Vec<usize> {
         MirInst::Cast { value, .. } => {
             if let MirValue::Local(id) = value { vec![*id] } else { vec![] }
         }
-        _ => vec![],
+        MirInst::FieldPtr { ptr, .. } => vec![*ptr],
+        MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => vec![*dest_ptr_local, *src_alloca_local],
+        MirInst::FnAddr { .. } => vec![],
+        MirInst::CallIndirect { fn_ptr, args, .. } => {
+            let mut v = vec![*fn_ptr];
+            for arg in args {
+                if let MirValue::Local(id) = arg { v.push(*id); }
+            }
+            v
+        }
+        MirInst::AsyncSpawn { arg, .. } => {
+            if let MirValue::Local(id) = arg { vec![*id] } else { vec![] }
+        }
+        MirInst::AsyncAwait { handle, .. } => vec![*handle],
+        MirInst::Alloca { .. } => vec![],
+        MirInst::Store { value: MirValue::Param(_), .. } => vec![],
+        MirInst::Store { value: MirValue::Constant(_), .. } => vec![],
+
     }
 }

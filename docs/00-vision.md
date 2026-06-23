@@ -217,12 +217,15 @@ Performance of C
 
 ## Project Status
 
-Current phase: Phase 6 — Self-Hosting (in progress)
+Current phase: Phase 6 — Language Completion (sintaxis al 100%)
 
-Phases 1–5 are complete: the compiler produces working native binaries
-(verified end-to-end with `klc run examples/fibonacci.kl`), the RAII runtime,
-tooling (CLI, LSP, formatter, VS Code extension), and a package manager are
-all functional.
+Phases 0–5 and 3.5 (backend gap closure) are complete: the compiler produces
+working native binaries, includes closures, methods, enums, async/await,
+RAII runtime, standard library basics, and tooling (CLI, LSP, formatter,
+package manager, VS Code extension).
+
+Phase 7 (Cross-Platform), Phase 8 (Self-Hosting), and Phase 9 (Production
+Ecosystem) are deferred post-MVP.
 
 See `docs/13-roadmap.md` for the phase breakdown and `docs/16-status.md`
 for the verified feature matrix (what really generates code vs. what is
@@ -233,6 +236,6 @@ still a placeholder).
 ## Version
 
 ```text
-Kyle Vision Document v1.1
-Last updated: 2026-06-21
+Kyle Vision Document v1.2
+Last updated: 2026-06-22
 ```

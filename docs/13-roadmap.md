@@ -1,13 +1,24 @@
-# Kyle Language Roadmap v3.1 — RAII Memory Model
+# Kyle Language Roadmap v5.0 — MVP Focus
 
 ---
 
 ## Overview
 
-Kyle is developed in phases. Phases 1–5 (compiler pipeline, runtime,
-and tooling) are complete and verified — `klc run examples/fibonacci.kl`
-produces a working native binary. The current work is **Phase 3.5**
-(closing the codegen gap) which unblocks **Phase 6** (self-hosting).
+Kyle is developed in phases. Phases 0–5 (compiler pipeline, runtime,
+tooling, and backend gap closure) plus a fully functional **Phase 3.5**
+(closures, method dispatch, match/enum, async/await) are **complete**.
+
+The **current work is Phase 6 — Language Completion**: finish ALL syntax
+features so they generate working code end-to-end. No features "a medias".
+
+**Order of execution:**
+
+```
+Phase 6:  Language Completion    ← AHORA (sintaxis al 100%)
+Phase 7:  Cross-Platform         ← después (Windows + Linux + macOS)
+Phase 8:  Self-Hosting           ← después (compilador escrito en Kyle)
+Phase 9:  Production Ecosystem   ← futuro (registro, WASM, etc.)
+```
 
 **Memory model:** RAII + Compiler-Inferred Ownership (NO garbage collector).
 
@@ -20,7 +31,8 @@ what is still a placeholder, see **`docs/16-status.md`**.
 
 ### Status: Complete ✅
 
-All 16 specification documents are written and frozen. The language syntax, type system, memory model, and architecture are fully defined.
+All 17 specification documents are written. The language syntax, type
+system, memory model, and architecture are fully defined.
 
 ### Tasks
 
@@ -39,7 +51,7 @@ All 16 specification documents are written and frozen. The language syntax, type
 [x] Plan project structure
 [x] Design package manager
 [x] Create this roadmap
-[x] All 16 documents frozen, consistent, and finalized
+[x] All 17 documents frozen, consistent, and finalized
 ```
 
 ---
@@ -51,8 +63,8 @@ All 16 specification documents are written and frozen. The language syntax, type
 ### Deliverables
 
 ```text
-Lexer (427 lines, 69 tests) ✅
-Parser (812 lines, recursive descent, indent-based) ✅
+Lexer (809 lines, 69 tests) ✅
+Parser (1353 lines, recursive descent, indent-based) ✅
 AST with all node types (1076 lines) ✅
 CLI: klc parse <file.kl> → AST dump ✅
 ```
@@ -126,14 +138,12 @@ CLI: klc check <file.kl> → "No errors found" ✅
 ### Deliverables
 
 ```text
-MIR definition + lowering + optimizer (1093 lines, 2 tests) ✅
-LLVM codegen via inkwell 0.9 / LLVM 18.1 (310 lines) ✅
+MIR definition + lowering + optimizer (1800+ lines) ✅
+LLVM codegen via inkwell 0.9 / LLVM 18.1 ✅
 Native linker via clang ✅
 CLI: klc build <file.kl> → native binary ✅
 CLI: klc run <file.kl> → compile + execute ✅
 CLI: klc mir <file.kl> → MIR dump ✅
-All examples compile and run (hello, fibonacci, user) ✅
-118 tests passing (69 frontend + 47 semantic + 2 MIR) ✅
 ```
 
 ### Tasks
@@ -142,45 +152,29 @@ All examples compile and run (hello, fibonacci, user) ✅
 [x] MIR definition
     - MirValue, MirConstant, MirType, MirInst, MirTerminator
     - MirBasicBlock, MirFunction, MirModule
-    - Display impls for all MIR types (312 lines)
+    - Display impls for all MIR types
 [x] AST → MIR lowering
     - LowerCtx with locals, blocks, block_counter
-    - All statements: variable, return, if/elif/else, while, for, match, defer, guard, unsafe, break, binding-if, constant, typed-variable
-    - All expressions: literal, identifier, binary, unary, call, assignment, property access, optional chain, error prop, list, dict, tuple, closure, await, async, spread, range-slice, loop
-    - Constructor lowering for classes (601 lines)
+    - All statements and expressions
+    - Constructor lowering for classes
 [x] MIR optimizer
-    - Constant folding (int add/sub/mul)
-    - Dead code elimination (unused instructions)
+    - Constant folding
+    - Dead code elimination
     - Remove unreachable basic blocks
-    - 2 unit tests (180 lines)
 [x] LLVM codegen
-    - inkwell 0.9 integration, LLVM 18.1, opaque pointers
+    - inkwell integration, LLVM 18.1, opaque pointers
     - Type mapping (MIR → LLVM types)
     - Alloca/Store/Load for locals
-    - BinaryOp (add, sub, mul, div, rem, and, or, xor, shl, shr, comparisons)
-    - UnaryOp (neg, not, bitnot)
-    - Call with argument mapping
-    - Basic block building with terminators (br, condbr, ret, unreachable)
-    - TargetMachine for native object file emission (310 lines)
+    - Binary/Unary operations
+    - Call + argument mapping
+    - Basic block building with terminators
+    - TargetMachine for native object file emission
 [x] Native linker
     - clang-based linking of .o → binary
-    - Shared library support (link_shared)
+    - Shared library support
 [x] Pipeline orchestration
     - Source → MIR → LLVM → .o → binary (end-to-end)
     - Check + MIR + Build subcommands
-```
-
-### Remaining backend work (moved to Phase 4)
-
-```text
-[ ] RAII ownership inference pass (determine stack vs move vs refcount)
-[ ] Full struct codegen (LLVM struct types, field access, methods)
-[ ] Array/List codegen with runtime support
-[ ] String codegen with runtime support (ptr + len)
-[ ] Pattern matching codegen (switch + branch)
-[ ] Codegen for: Closure, Await, Async, PropertyAccess, OptionalChain, RangeSlice
-[ ] LLVM optimization passes (O0/O1/O2/O3)
-[ ] Debug info (DWARF)
 ```
 
 ---
@@ -189,23 +183,12 @@ All examples compile and run (hello, fibonacci, user) ✅
 
 ### Status: Complete ✅
 
-### Goal
-
-Build the RAII runtime and standard library so Kyle programs can do real I/O, use strings, math, collections, and async.
-
-### Milestone
-
-```text
-kl run examples/hello.kl   → "Hello, World!"     ✅
-klc run string_test.kl     → string ops work     ✅
-```
-
 ### Tasks
 
 #### 4.1 — Runtime (Rust)
 
 ```text
-[x] Implement core runtime crate (klc_runtime)
+[x] Core runtime crate (klc_runtime)
     - print/println wrappers (write to stdout) ✅
     - str representation (ptr + length, UTF-8) ✅
     - heap allocation wrappers (malloc/free for RAII) ✅
@@ -215,61 +198,42 @@ klc run string_test.kl     → string ops work     ✅
     - Char ops: char_at, is_digit, is_alpha, is_alnum, is_whitespace, is_upper, is_lower, ord ✅
     - File I/O: open, read_str, write_str, close ✅
     - Time: sleep(ms), now() -> i64 ✅
-[~] Link runtime with klc build
-    - Compile runtime as .a (static library) ✅
-    - Pass -L and -l flags to clang linker (manual: klc build --runtime) 🔶
+    - Thread spawn/join (kl_spawn_thread, kl_join_thread) ✅
+[x] Link runtime with klc build
 ```
 
 #### 4.2 — RAII Ownership Inference
 
 ```text
-[x] RAII ownership inference pass (klc_mir/src/ownership.rs) ✅
-    - Escape analysis: which values escape the current scope ✅
-    - Move inference: single-owner values use memcpy (zero-cost) ✅
-    - Refcount inference: shared values get Arc/Rc wrappers ✅
-    - Insert retain/release instructions at scope exits ✅
+[x] Ownership inference pass (klc_mir/src/ownership.rs) ✅
+    - Escape analysis ✅
+    - Move inference (memcpy for zero-cost) ✅
+    - Refcount inference (Arc/Rc wrappers) ✅
+    - Insert retain/release at scope exits ✅
 ```
 
 #### 4.3 — Compiler String/Char Support
 
 ```text
-[x] Builtin functions registered in symbol_table, lower, codegen ✅
-    - print, println, input, len, str, range, char_at ✅
-    - is_digit, is_alpha, is_alnum, is_whitespace, is_upper, is_lower, ord ✅
-    - contains, to_upper, to_lower, trim, replace ✅
-    - open, read_str, write_str, close ✅
-    - sleep, now ✅
-[x] String return from user functions (fn_returns map) ✅
+[x] Builtins in symbol_table, lower, codegen ✅
+[x] String return from user functions ✅
 [x] String concat result type (MirType::Str) ✅
 [x] str() cast i32→i64 before kl_i64_to_str ✅
 [x] len() returns I32 ✅
 [x] Inference variable type (local_types map) ✅
 ```
 
-#### 4.4 — Standard Library
-
-The runtime builtins (print, str, len, char ops, string ops, file I/O,
-time) are implemented in Rust inside `klc_runtime/` and work today.
-The **importable `std/*.kl` modules** (io, math, testing, core) are
-planned but not yet written — see `docs/16-status.md`.
+#### 4.4 — Async Runtime
 
 ```text
-[x] Runtime builtins (klc_runtime/) — print, str, len, char_at, etc. ✅
-[x] String ops, char ops, file I/O, time — all working ✅
-[~] std/core.kl, std/math.kl, std/io.kl, std/testing.kl — 🔶 not yet written
-[~] Collections (List, Map, Set) — runtime List works, Map/Set pending 🔶
-[~] Module resolution for stdlib paths — 🔶 pending
-```
-
-#### 4.5 — Async Runtime
-
-```text
-[x] Async runtime (klc_runtime/src/async_.rs) ✅
-    - Work-stealing thread pool ✅
-    - Task<T> with Future poll mechanism ✅
-    - Channel<T> with send/recv ✅
-    - Timer/sleep support ✅
-[~] Compiler async lowering — codegen pendiente 🔶
+[x] Work-stealing thread pool ✅
+[x] Task<T> with Future poll mechanism ✅
+[x] Channel<T> with send/recv ✅
+[x] Async/await lowering end-to-end ✅
+    - Expr::Async → spawn ✅
+    - Expr::Await → join ✅
+    - MirInst::AsyncSpawn / MirInst::AsyncAwait ✅
+    - Codegen: kl_spawn_thread / kl_join_thread FFI ✅
 ```
 
 ---
@@ -278,137 +242,248 @@ planned but not yet written — see `docs/16-status.md`.
 
 ### Status: Complete ✅
 
+```text
+[x] Package manager (klc_tools)
+    - kl new/init, add/remove, info, build/run/test ✅
+    - Manifest (kl.toml): serde + read/write ✅
+    - Lock file: serde + read/write ✅
+[x] Language server (LSP)
+    - documentSymbol, workspace/symbol, signatureHelp ✅
+    - findReferences, codeAction ✅
+[x] Code formatter
+    - AST pretty-printer (all nodes) ✅
+    - Comment preservation ✅
+    - klc fmt <file.kl> command ✅
+[x] VS Code extension
+    - Syntax highlighting (TextMate grammar) ✅
+    - Language config ✅
+    - LSP client ✅
+    - Commands: kl.run, kl.build, kl.check ✅
+```
+
+---
+
+## Phase 3.5: Backend Gap Closure
+
+### Status: Complete ✅
+
+Features that parsed and type-checked but generated no code were implemented:
+
+```text
+[x] StructLiteral + Method Dispatch + Ownership Fixes ✅
+[x] Match with enum variants + enum construction ✅
+[x] Closures end-to-end (FnAddr + CallIndirect) ✅
+[x] Async/await end-to-end (thread-based spawn/join) ✅
+[x] Struct pass-by-reference ABI ✅
+    → all generate working code
+```
+
+---
+
+## Phase 6: Language Completion 🔶 CURRENT
+
+### Status: 🔶 Current — Prioridad #1
+
 ### Goal
 
-Build developer tooling: package manager, LSP, formatter, debugger.
+**Que absolutamente TODA la sintaxis del lenguaje genere código funcionando.**
+Sin features "a medias". Sin "parsea pero no genera código".
+Que cualquier programa escrito en Kyle según la especificación compile y
+se ejecute correctamente.
+
+### Why this is first
+
+Sin las features completas, Kyle no sirve para proyectos reales.
+Multiplataforma y self-hosting se hacen después, cuando el lenguaje
+en sí mismo esté completo.
+
+### Tasks — Organized by Priority
+
+#### 🟥 P0 — End-to-End Language Features (bloquean el MVP)
+
+Estas características ya parsean y type-checkean, pero **no generan código**.
+Sin ellas, el lenguaje no es usable.
+
+```text
+[ ] For loops — `for x in list:`, `for i in range(n):`
+    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+
+[ ] Generics end-to-end — monomorphization en lowering + codegen
+    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+    - Sin genéricos: Option<T>, List<T>, Result<T,E>, colecciones no funcionan
+
+[ ] Error handling — `!` return type + `?` operator
+    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+
+[ ] Optional chaining — `?.`
+    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+
+[ ] String interpolation — `"Hello {name}"`
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+```
+
+#### 🟧 P1 — Language Features Secundarias
+
+También parsean pero no generan código. Importantes pero no bloquean el MVP.
+
+```text
+[ ] Defer — working lowering + codegen
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] Guard — working lowering + codegen
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] Type aliases — `type MyInt = i32`
+    - parser ✅ | type-checker ✅ | lowering: ❌ | codegen: ❌
+[ ] Dict/Map literals — `{ "key": value }`
+    - parser ⚠️ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] Spread operator — `[...list, new_elem]`
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] Range slicing — `items[0..3]`
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] If como expresión
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] Match como expresión
+    - parser ✅ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[ ] const fn — compile-time evaluation
+    - parser ✅ | type-checker ❌ | lowering: ❌ | codegen: ❌
+```
+
+#### 🟦 P3 — Standard Library
+
+```text
+[ ] std/core.kl — Option<T>, Result<T, E>, utility functions
+    - Prioridad: MEDIA (depende de genéricos P0)
+[ ] std/math.kl — abs, pow, sqrt, gcd ✅ (ya existe)
+[ ] std/io.kl — file I/O wrappers ✅ (ya existe)
+[ ] std/testing.kl — assert, assert_eq, assert_str ✅ (ya existe)
+[ ] std/collections.kl — HashMap, Set
+    - Prioridad: MEDIA (depende de genéricos P0)
+[ ] std/json.kl — JSON parser/generator
+    - Prioridad: BAJA
+[ ] std/str.kl — split, join, starts_with, etc.
+    - Prioridad: MEDIA
+[ ] std/time.kl — datetime, duration, formatting
+    - Prioridad: BAJA
+```
+
+#### 🟪 P4 — Tooling Polish
+
+```text
+[ ] LSP autocompletion (textDocument/completion)
+[ ] LSP go-to-definition (textDocument/definition)
+[ ] LSP hover documentation (textDocument/hover)
+[ ] Debugger support — DWARF debug info
+[ ] LLVM optimization levels (O0, O1, O2, O3)
+```
+
+#### 🟩 P5 — Robustness & Testing
+
+```text
+[ ] Fix LLVM verification errors for all programs
+    - Type mismatches (i64 vs i32, struct vs ptr)
+    - SSA dominance violations
+[ ] Proper error messages for lowering/codegen failures
+[ ] Lint warnings — unused variables, dead code
+[ ] 100+ integration tests (examples/*.kl run and verify output)
+[ ] Fuzz testing for lexer + parser
+[ ] Standard library test suite
+[ ] CI pipeline (GitHub Actions)
+```
 
 ### Milestone
 
 ```text
-kl new my-project       ← Q3 2026 ✅
-kl add json             ← Q3 2026 ✅
-IDE support (LSP)       ← Q3 2026 ✅
+kl run ANY_PROJECT.kl → works, no crashes
+kl test → full suite passes
+kl fmt → formats correctly
+All syntax features generate working code
 ```
+
+---
+
+## Phase 7: Cross-Platform Support
+
+### Status: ⏸️ Next — after Phase 6
+
+### Goal
+
+Kyle currently runs **only on macOS Apple Silicon (aarch64)**.
+Phase 7 makes it work on **Windows (x64)**, **Linux (x64 + ARM)**,
+and **macOS (Intel + Apple Silicon)**.
+
+### Why this is Phase 7 (not Phase 6)
+
+Phase 6 completes the language. Phase 7 ports it to other platforms.
+No tiene sentido portar un lenguaje incompleto.
 
 ### Tasks
 
 ```text
-[x] Package manager (klc_tools)
-    - kl new: project scaffolding ✅
-    - kl init: alias de new ✅
-    - kl add: add dependency @version ✅
-    - kl remove: remove dependency ✅
-    - kl info: show package info ✅
-    - kl build: compila src/main.kl desde proyecto ✅
-    - kl run: compila y ejecuta desde proyecto ✅
-    - kl test: ejecuta tests desde proyecto ✅
-    - Manifest (kl.toml): serde + read/write ✅
-    - Lock file: serde + read/write ✅
-    - Project helper: find_project_root, source paths ✅
-[x] Language server (LSP) — klc_tools/src/lsp.rs ✅
-    - textDocument/documentSymbol ✅
-    - workspace/symbol ✅
-    - textDocument/signatureHelp ✅
-    - textDocument/findReferences ✅
-    - textDocument/codeAction (E0009 → create var / import) ✅
-    - Server capabilities: references_provider + code_action_provider ✅
-[x] Code formatter — klc_tools/src/formatter.rs ✅
-    - AST pretty-printer (all nodes) ✅
-    - Comment preservation (via AST spans + last_comment_line) ✅
-    - klc fmt <file.kl> command ✅
-[x] IDE support
-    - VS Code extension (vscode-kl/) ✅
-    - Syntax highlighting (TextMate grammar) ✅
-    - Language config (comments, brackets, auto-closing, indentation) ✅
-    - LSP client (launches klc lsp) ✅
-    - Commands: kl.run, kl.build, kl.check ✅
-[ ] Debugger integration
-    - DWARF debug info generation 🔶
-    - LLDB / GDB support 🔶
-[ ] Documentation generator
-    - kl doc: generate HTML docs 🔶
-```
+[ ] Runtime I/O — abstraer POSIX syscalls
+    - Actual: klc_runtime/src/io.rs usa open/read/write/close/nanosleep POSIX ❌
+    - Solución: reemplazar con std::fs::File + std::io::{Read, Write}
+    - Rust stdlib es cross-platform, no requiere cambios de lógica
+    - Dificultad: BAJA (~100 líneas de reescritura localizada)
 
----
+[ ] Target triple — auto-detección
+    - Actual: pipeline.rs hardcodea "arm64-apple-macosx" / "aarch64-unknown-linux-gnu" ❌
+    - Solución: Target::initialize_all() + TargetMachine::get_default_triple()
+    - Dificultad: MUY BAJA (~5 líneas de cambio)
 
-## Phase 3.5: Complete the Backend (prerequisite for self-hosting)
+[ ] Linker — soporte multiplataforma
+    - Actual: linker.rs hardcodea "clang" + ".a" ❌
+    - Solución: detectar SO, usar clang.exe + .lib en Windows
+    - Dificultad: BAJA (~20 líneas con cfg!(windows))
 
-### Status: 🔶 Required next — blocking Phase 6
+[ ] CLI — extensión .exe
+    - Actual: main.rs produce binario sin extensión ❌
+    - Solución: usar std::env::consts::EXE_EXTENSION
+    - Dificultad: MUY BAJA (~3 líneas)
 
-### Goal
+[ ] LLVM paths — config por plataforma
+    - Actual: .cargo/config.toml solo tiene ruta Linux ❌
+    - Solución: agregar [target.'cfg(target_os = ...)'.env] secciones
+    - Dificultad: MUY BAJA (~10 líneas en config)
 
-Close the gap between the spec and the codegen. Several language
-features parse and type-check correctly but generate no functional
-code (the lowering is a placeholder that just evaluates sub-expressions
-and discards the result). These must be implemented for the
-self-hosting compiler to be writable in Kyle.
-
-### Why this blocks Phase 6
-
-A compiler written in Kyle will use closures (for visitor patterns),
-method dispatch (for AST node types), and match with enum variants.
-None of these currently lower to working code. Self-hosting is
-impossible until they do.
-
-### Tasks — see `docs/16-status.md` for the verified gap matrix
-
-```text
-[ ] Closures  ((x) => x*2)  — currently placeholder, no callable value
-[ ] Method dispatch real  (obj.method())  — currently hardcoded to list.add/pop
-[ ] Match with enum variants and data  (text(s): ...)  — only literal/wildcard
-[ ] Async/await state machines  — currently placeholder
-[ ] Tuples (creation + destructuring)  — currently placeholder
-[ ] Dict / object literals  — currently placeholder
-[ ] String interpolation  ("Hello {name}")  — not yet implemented
-[ ] Optional chaining  (user?.name)  — currently placeholder
-[ ] Error propagation  (?)  real lowering  — currently placeholder
-[ ] Class inheritance + vtables  — not yet implemented
+[ ] VS Code — detección Windows
+    - Actual: extension.ts busca "klc" sin extensión ❌
+    - Solución: detectar plataforma, probar klc.exe
+    - Dificultad: MUY BAJA (~5 líneas)
 ```
 
 ### Milestone
 
 ```text
-klc run examples/closures_test.kl   → works
-klc run examples/async_test.kl      → works
-klc run examples/match_enum.kl      → works
+klc build hello.kl → funciona en macOS (Intel + ARM), Linux (x64 + ARM), Windows (x64)
+klc run hello.kl → funciona en las 3 plataformas
+86 tests → pasan en todas las plataformas
+CI pipeline con macOS + Linux + Windows
 ```
 
 ---
 
-## Phase 6: Self-Hosting
+## Phase 8: Self-Hosting
 
-### Status: 🔄 In Progress (parser + lexer written, ~15% of the rewrite done)
+### Status: ⏸️ Deferred — after Phase 7
 
 ### Goal
 
-Rewrite the Kyle compiler in Kyle itself.
+Rewrite the Kyle compiler in Kyle itself, achieving self-hosting.
+Only after the language is complete AND multiplatform.
 
-### What is done
+### What is already done
 
 ```text
-[x] Lexer in Kyle  — examples/lexer.kl (461 lines, tokenizes real files) ✅
-[x] Parser in Kyle — examples/parser.kl (1509 lines, recursive AST) ✅
-[x] Bug fixes that unblocked self-hosting
-    - if_then block naming collision → fresh_block() ✅
-    - elif chain block collision → elif_cond_labels vector ✅
-    - string escape sequences → lex_string ✅
-    - string return from user functions → fn_returns map ✅
-    - string concat result type → MirType::Str ✅
-    - Stmt::Break lowering → Br(loop_end) via break_targets stack ✅
-    - char/int comparison + type widening ✅
-    - RAII alloc in all string runtime functions ✅
-    - SSA dominance fix for kl_release (crash in cleanup) ✅
-    - auto-declared variable type inference ✅
+[x] Lexer in Kyle — examples/lexer.kl (tokenizes real files) ✅
+[x] Parser in Kyle — examples/parser.kl (recursive AST) ✅
+[x] Semantic analyzer in Kyle — examples/semantic.kl (type-checks) ✅
 ```
 
-### What remains (after Phase 3.5 unblocks it)
+### What remains
 
 ```text
-[ ] Semantic analyzer in Kyle
-[ ] MIR lowering in Kyle
-[ ] Codegen in Kyle (this is the hardest part — needs LLVM FFI)
+[ ] MIR lowering in Kyle (~2200 lines of Rust to translate)
+[ ] Codegen in Kyle (~1100 lines to translate)
 [ ] Bootstrap: klc compiles itself
-[ ] Self-host complete
 ```
 
 ### Milestone
@@ -419,43 +494,62 @@ kl build klc   # compiler compiles itself
 
 ---
 
+## Phase 9: Production Ecosystem
+
+### Status: 📅 Future
+
+```text
+[ ] Package registry (kl publish / kl search)
+[ ] WASM compilation target
+[ ] Cross-compilation
+[ ] C FFI improvements
+[ ] Debugger (GDB/LLDB integration)
+[ ] Profiling tools
+[ ] Language server: refactors, code lens, inlay hints
+[ ] IDE extensions: JetBrains, Neovim, Helix
+[ ] Performance tuning
+[ ] Async: state-machine based (not thread-based)
+[ ] Macros / metaprogramming
+[ ] Error messages: Rust-level quality
+```
+
+---
+
 ## Timeline
 
 ```text
-Phase 0:   Language Design              — Complete
-Phase 1:   Compiler Frontend            — Complete
-Phase 2:   Semantic Analysis            — Complete
-Phase 3:   Compiler Backend             — Complete (core constructs)
-Phase 4:   Runtime + Builtins           — Complete (runtime in Rust)
-Phase 5:   Tooling & Ecosystem          — Complete
-Phase 3.5: Backend gap closure          — 🔶 Required next (blocks Phase 6)
-Phase 6:   Self-Hosting                 — 🔄 In progress (~15% done)
-Phase 7:   Stdlib + maturity            — Planned
+Phase 0:   Language Design              — Complete ✅
+Phase 1:   Compiler Frontend            — Complete ✅
+Phase 2:   Semantic Analysis            — Complete ✅
+Phase 3:   Compiler Backend             — Complete ✅
+Phase 4:   Runtime + Builtins           — Complete ✅
+Phase 5:   Tooling & Ecosystem          — Complete ✅
+Phase 3.5: Backend gap closure          — Complete ✅
+Phase 6:   Language Completion          — 🔶 Current (P0→P5)
+Phase 7:   Cross-Platform Support       — ⏸️ Next
+Phase 8:   Self-Hosting                 — ⏸️ Deferred
+Phase 9:   Production Ecosystem         — 📅 Future
 ```
-
-Note: earlier drafts of this document listed fixed future calendar dates
-per phase. Those were aspirational and have been removed — development
-proceeds at the pace the work allows, tracked by the checkboxes above.
 
 ---
 
 ## Release Milestones
 
-### v0.1.0 — Alpha (Complete ✅)
+### v0.1.0 — Alpha ✅
 
 ```text
 Lexer + Parser working
 AST dump available
 ```
 
-### v0.2.0 — Alpha (Complete ✅)
+### v0.2.0 — Alpha ✅
 
 ```text
 Type checker working
 Semantic analysis complete
 ```
 
-### v0.3.0 — Beta (Complete ✅)
+### v0.3.0 — Beta ✅
 
 ```text
 Code generation working
@@ -463,33 +557,54 @@ Native binaries produced
 klc build + klc run functional
 ```
 
-### v0.4.0 — Beta (Complete ✅)
+### v0.4.0 — Beta ✅
 
 ```text
-RAII runtime working ✅
-Standard library basics ✅
-Hello World → actual stdout output ✅
-String ops, char ops, file I/O, time ✅
+RAII runtime working
+Standard library basics
+Hello World → actual stdout output
+String ops, char ops, file I/O, time
 ```
 
-### v0.5.0 — Beta (Current 🔄)
+### v0.5.0 — Beta ✅
 
 ```text
-Async runtime working ✅
-Package manager working ✅
-Language server working ✅
-Code formatter working ✅
-VS Code extension working ✅
-Self-hosting preparation 🔄
+Async runtime working
+Package manager working
+Language server working
+Code formatter working
+VS Code extension working
+Closures, methods, enums, match working
+Struct pass-by-reference ABI
+```
+
+### v0.6.0 — RC (Phase 6 — Current 🔶)
+
+```text
+🟥 P0: For loops, Generics, Error handling, Optional chaining, String interpolation
+     → todas generan código end-to-end
+🟧 P1: Defer, Guard, Type aliases, Dict/Map, Spread, Range, const fn
+     → todas generan código end-to-end
+🟦 P3: Standard library complete (collections, str, time, json)
+🟪 P4: LSP completion + hover + go-to-definition
+🟩 P5: 100+ integration tests, no crashes, CI pipeline
+```
+
+### v0.7.0 — RC (Phase 7)
+
+```text
+Cross-platform: macOS (Intel+ARM) + Linux (x64+ARM) + Windows (x64)
+klc build + klc run funciona en las 3 plataformas
+CI pipeline con todas las plataformas
 ```
 
 ### v1.0.0 — Stable
 
 ```text
+Self-hosting: kl build klc
 Production-ready compiler
-Stable standard library
+Stable standard library API
 Full tooling support
-Self-hosting ready
 ```
 
 ---
@@ -509,6 +624,6 @@ Full test suite passing
 ## Version
 
 ```text
-Kyle Language Roadmap v3.1
-Last updated: 2026-06-21
+Kyle Language Roadmap v5.0 — MVP Focus
+Last updated: 2026-06-22
 ```

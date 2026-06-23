@@ -1,0 +1,18 @@
+enum Option<T>:
+    None
+    Some(T)
+
+fn get_value(should_fail: bool) -> Option<i32>:
+    if should_fail:
+        return Option.None
+    return Option.Some(42)
+
+fn test_propagation() -> Option<i32>:
+    result = get_value(false)?
+    return Option.Some(result)
+
+fn main() -> Option<i32>:
+    result = test_propagation()
+    x = result?
+    println(x)
+    return Option.Some(0)

@@ -84,7 +84,7 @@ async     🔶 planned
 
 The builtins above are sufficient to write real programs today
 (see `examples/fibonacci.kl`, `examples/lexer.kl`). The importable
-modules are Phase 6/7 work.
+modules are Phase 6 work (MVP Completion).
 
 ---
 

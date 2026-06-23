@@ -82,6 +82,10 @@ pub enum MirInst {
     FnAddr { dest: usize, name: String },
     /// Call through a function pointer.
     CallIndirect { dest: Option<usize>, fn_ptr: usize, ret_type: MirType, param_types: Vec<MirType>, args: Vec<MirValue> },
+    /// Spawn an async function on a thread: dest = kl_spawn_thread(func_name, arg).
+    AsyncSpawn { dest: usize, function_name: String, arg: MirValue },
+    /// Await (join) an async thread handle: dest = kl_join_thread(handle).
+    AsyncAwait { dest: usize, handle: usize },
 }
 
 /// How a basic block ends.
@@ -290,6 +294,12 @@ impl fmt::Display for MirInst {
                 } else {
                     write!(f, "  call_indirect %{}({})", fn_ptr, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
                 }
+            }
+            MirInst::AsyncSpawn { dest, function_name, arg } => {
+                write!(f, "  %{} = async_spawn {} ({})", dest, function_name, arg)
+            }
+            MirInst::AsyncAwait { dest, handle } => {
+                write!(f, "  %{} = async_await %{}", dest, handle)
             }
         }
     }

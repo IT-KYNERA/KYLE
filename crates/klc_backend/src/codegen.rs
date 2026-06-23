@@ -310,6 +310,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_init_args", ft, None);
         }
+        // i64 kl_spawn_thread(ptr, i64)  — spawn a thread running extern "C" fn(i64) -> i64
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_spawn_thread", ft, None);
+        }
+        // i64 kl_join_thread(i64)  — join a thread, return result
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_join_thread", ft, None);
+        }
     }
 
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
@@ -825,10 +837,8 @@ impl<'ctx> Codegen<'ctx> {
                                         .into()
                                 })
                                 .collect();
-                            let call_result = unsafe {
-                                self.builder.build_indirect_call(fn_ty, fn_ptr, &llvm_args, "_icl")
-                                    .map_err(|e| format!("indirect call: {}", e))?
-                            };
+                            let call_result = self.builder.build_indirect_call(fn_ty, fn_ptr, &llvm_args, "_icl")
+                                .map_err(|e| format!("indirect call: {}", e))?;
                             if let Some(d) = dest {
                                 if let inkwell::values::ValueKind::Basic(result) = call_result.try_as_basic_value() {
                                     if let Some(alloca) = self.alloca_map.get(*d).and_then(|p| *p) {
@@ -837,6 +847,44 @@ impl<'ctx> Codegen<'ctx> {
                                     }
                                     last_value_map.insert(*d, result);
                                 }
+                            }
+                        }
+                        MirInst::AsyncSpawn { dest, function_name, arg } => {
+                            let arg_val = self.value_to_llvm(arg, &last_value_map)?;
+                            let spawn_fn = self.module.get_function("kl_spawn_thread")
+                                .ok_or_else(|| "kl_spawn_thread not declared".to_string())?;
+                            // Get the function pointer of the async wrapper
+                            let fn_val = self.fn_value_map.get(function_name)
+                                .ok_or_else(|| format!("async function {} not found", function_name))?;
+                            let fn_global = fn_val.as_global_value();
+                            let fn_ptr = fn_global.as_pointer_value();
+                            let args_meta: Vec<inkwell::values::BasicMetadataValueEnum> = vec![
+                                fn_ptr.into(),
+                                arg_val.into(),
+                            ];
+                            let call_result = self.builder.build_call(spawn_fn, &args_meta, "_async_spawn")
+                                .map_err(|e| format!("async_spawn: {}", e))?;
+                            if let inkwell::values::ValueKind::Basic(ret_val) = call_result.try_as_basic_value() {
+                                if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    self.builder.build_store(alloca, ret_val)
+                                        .map_err(|e| format!("async_spawn store: {}", e))?;
+                                }
+                                last_value_map.insert(*dest, ret_val);
+                            }
+                        }
+                        MirInst::AsyncAwait { dest, handle } => {
+                            let handle_val = self.load_value(*handle, &last_value_map)?;
+                            let join_fn = self.module.get_function("kl_join_thread")
+                                .ok_or_else(|| "kl_join_thread not declared".to_string())?;
+                            let args_meta: Vec<inkwell::values::BasicMetadataValueEnum> = vec![handle_val.into()];
+                            let call_result = self.builder.build_call(join_fn, &args_meta, "_async_join")
+                                .map_err(|e| format!("async_join: {}", e))?;
+                            if let inkwell::values::ValueKind::Basic(ret_val) = call_result.try_as_basic_value() {
+                                if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    self.builder.build_store(alloca, ret_val)
+                                        .map_err(|e| format!("async_join store: {}", e))?;
+                                }
+                                last_value_map.insert(*dest, ret_val);
                             }
                         }
                     }

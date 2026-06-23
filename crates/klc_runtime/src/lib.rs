@@ -9,6 +9,7 @@ pub mod task;
 pub mod channel;
 pub mod error;
 pub mod panic;
+pub mod thread;
 
 pub use memory::{kl_alloc, kl_free, kl_retain, kl_release};
 pub use io::{kl_print, kl_println, kl_print_int, kl_println_int, kl_input, kl_open, kl_read_str, kl_write_str, kl_close, kl_sleep, kl_now};
@@ -20,3 +21,4 @@ pub use task::Task;
 pub use task::PollState;
 pub use channel::Channel;
 pub use error::KlError;
+pub use thread::{kl_spawn_thread, kl_join_thread};

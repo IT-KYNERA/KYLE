@@ -160,8 +160,16 @@ impl TypeChecker {
                 self.check_block(&w.body);
             }
             Stmt::For(f) => {
-                self.infer_expr(&f.iterable);
+                let iter_type = self.infer_expr(&f.iterable);
+                let var_type = match &iter_type {
+                    Type::List(inner) => inner.as_ref().clone(),
+                    _ => Type::I32,
+                };
+                self.symbols.push_scope();
+                let _ = self.symbols.insert(f.variable.clone(),
+                    crate::symbol_table::Symbol::new_var(f.variable.clone(), Some(var_type), false));
                 self.check_block(&f.body);
+                self.symbols.pop_scope();
                 if let Some(el) = &f.else_branch { self.check_block(el); }
             }
             Stmt::Match(m) => {

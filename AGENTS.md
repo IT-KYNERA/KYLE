@@ -1,4 +1,4 @@
-# Kyle Programming Language — Project Context v3.0
+# Kyle Programming Language — Project Context v4.0
 
 ## Overview
 
@@ -7,17 +7,17 @@ Kyle — compiled, statically-typed language combining Python readability (inden
 ## State — Resumen Ejecutivo
 
 ```
-Pipeline completo: Lexer → Parser → Semantic → MIR → Backend → Linker ✅
-Runtime:        RAII, async, file I/O, string ops, time, testing lib ✅
-Std Library:    core, math, io en Kyle ✅
-Package Mgr:    manifest, lock, add, remove, info, build, run, test ✅
-LSP:            document symbols, workspace symbols, signature help,
-                find references, code actions ✅
-Formatter:      pretty-printer + comment preservation ✅
-VS Code:        extension with syntax highlighting, LSP client, commands ✅
-Struct ABI:     pass-by-reference (pointer-based) ✅
-Semantic.kl:    tokeniza, parsea, y type-checks otros .kl ✅
-Tests:          86 tests, 0 failures ✅
+Pipeline completo:      Lexer → Parser → Semantic → MIR → Backend → Linker ✅
+Runtime + Std Library:  RAII, async, file I/O, string ops, char ops, threads ✅
+Package Manager:        manifest, lock, add, remove, info, build, run, test ✅
+LSP:                    document symbols, workspace symbols, signature help,
+                        find references, code actions ✅
+Formatter:              pretty-printer + comment preservation ✅
+VS Code:                extension with syntax highlighting, LSP client, commands ✅
+Struct ABI:             pass-by-reference (pointer-based) ✅
+Phase 3.5 Complete:     closures, methods, enums/match, async/await ✅
+Self-Hosting (Phase 8): lexer.kl + parser.kl + semantic.kl (deferred post-MVP) ✅
+Tests:                  86 tests, 0 failures ✅
 ```
 
 ## Session Log
@@ -272,68 +272,71 @@ cargo run --bin klc -- check <file.kl>     # Type-check ✅
 cargo run --bin klc -- mir   <file.kl>     # Parsear y dump MIR ✅
 cargo run --bin klc -- fmt   <file.kl>     # Formatear código ✅
 cargo run --bin klc -- help                 # Ayuda ✅
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_runtime -p klc_tools  # 84 tests, 0 failures ✅
+cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools  # 86 tests, 0 failures ✅
 ```
 
-## Roadmap (actualizado)
+## Roadmap (v5.0 — MVP Focus)
 
 ```
-FASE 1-2 (complete) — Frontend + Semantic Analysis ✅
-├── [x] Lexer (69 tests)
-├── [x] Parser (recursive descent, indent-based)
-├── [x] AST (all node types + Display)
-├── [x] Type checker Hindley-Milner (47 tests)
-├── [x] Generics, Contracts, Error types, Optionals
-│   Hito: kl check main.kl → No errors found
+FASE 1-5 + 3.5 (complete) — Frontend + Backend + Runtime + Tooling + Backend Gap Closure ✅
 
-FASE 3 — Compiler Backend (✅ Complete — build → binario nativo)
-├── [x] MIR definition (mir.rs — MirValue, MirInst, MirBasicBlock, MirFunction)
-├── [x] AST → MIR lowering (lower.rs — all stmts + exprs)
-├── [x] Optimizer (optimize.rs — constant folding, DCE, block removal)
-├── [x] inkwell integration (LLVM 18.1, opaque pointers)
-├── [x] LLVM codegen (codegen.rs — MIR → LLVM IR via TargetMachine)
-├── [x] Linker (linker.rs — clang-based native linking)
-│   Hito: kl build hello.kl → ./hello → exit 0
+FASE 6 — Language Completion (🔶 Current — prioridades P0-P5)
+│   Completar TODA la sintaxis: que todo genere código funcionando.
+│
+├─ 🟥 P0 (ALTA) — End-to-end language features
+│   For loops ✅, Generics structs ✅, Generics functions ✅,
+│   Error handling (!/?) ❌, Optional chaining (?.) ❌, String interpolation ❌
+│
+├─ 🟧 P1 (ALTA) — Secondary features
+│   Defer, Guard, Type aliases, Dict/Map, Spread, Range slicing,
+│   If-expression, Match-expression, const fn
+│
+├─ 🟦 P3 (MEDIA) — Standard library
+│   collections, str ops, time, json
+│
+├─ 🟪 P4 (BAJA) — Tooling polish
+│   LSP completion/hover/goto-def, debug info, optimization levels
+│
+└─ 🟩 P5 (BAJA) — Robustness & testing
+    LLVM verification, error messages, 100+ tests, CI pipeline
 
-FASE 4 — Std Library & Runtime (✅ Complete)
-├── [x] Implementar RAII runtime (destructores, refcount)
-├── [x] RAII ownership inference pass
-├── [x] Async runtime funcional
-├── [x] Standard library básica (core, math, io) in Kyle
-├── [x] Runtime: string ops (contains, to_upper, to_lower, trim, replace, input)
-├── [x] Runtime: file I/O (open, read_str, write_str, close)
-├── [x] Runtime: time (sleep, now)
-├── [x] std/testing.kl — assert, assert_eq, assert_str
-│   Hito: kl run hello.kl → "Hello, World!"
+│   Hito: kl run any_project.kl → works reliably
 
-FASE 5 — Tooling (✅ Complete)
-├── [x] Package manager: manifest module + kl add/remove/info commands
-├── [x] LSP: textDocument/documentSymbol, workspace/symbol, textDocument/signatureHelp
-├── [x] LSP: find references, code actions
-├── [x] Formatter: AST pretty-printer (all nodes)
-├── [x] Formatter: comment preservation (requires AST spans; lexer+parser span tracking fixed)
-├── [x] VS Code extension: syntax highlighting, LSP client, build/run/check commands
-│   Hito: klc fmt, klc lsp, kl run, kl build — todo funcional
+FASE 7 — Cross-Platform Support (⏸️ Next)
+│   Portar a Windows (x64), Linux (x64+ARM), macOS (Intel+ARM).
+│   5 cambios localizados, ~1-2 días de trabajo.
+│   Hito: klc build + klc run en las 3 plataformas
 
-FASE 6 — Self-Hosting (⏳ In Progress)
-├── [x] Runtime char ops + ord() builtin
-├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
-├── [x] Lexer escrito en Kyle (examples/lexer.kl) — tokeniza archivos reales ✅
-├── [x] Fix: char/int comparison + type widening en lowering
-├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
-├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
-├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-├── [x] Parser escrito en Kyle (examples/parser.kl) — BUILD + RUN exitoso ✅
-├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
-├── [x] Fix: SSA dominance violation en codegen (load_value siempre carga de alloca) ✅
-├── [x] Fix: str() result type MirType::Str (no I64) ✅
-├── [x] Fix: struct_defs two-pass + PropertyAccess lookup fallback para struct campos vacíos ✅
-├── [x] Semantic analyzer en Kyle (examples/semantic.kl) — necesita fix fuente (peek retorna char vs str) ⚠️
-├── [ ] MIR lowering en Kyle
-├── [ ] Codegen en Kyle
-├── [ ] Bootstrap y self-host completo
+FASE 8 — Self-Hosting (⏸️ Deferred)
 │   Hito: kl build klc
-```
+
+FASE 9 — Production Ecosystem (📅 Future)
+
+### Sesión 19 — Roadmap restructure: MVP focus, self-hosting deferred to Phase 7
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Roadmap rewritten | `docs/13-roadmap.md` | ✅ Phase 6 → MVP Completion, Phase 7 → Self-Hosting (deferred) |
+| Status doc rewritten | `docs/16-status.md` | ✅ Accurate gap analysis for MVP, explicit Phase 6 priorities |
+| Vision doc updated | `docs/00-vision.md` | ✅ "Current phase: Phase 6 — MVP Completion" |
+| Language spec updated | `docs/01-language-specification.md` | ✅ Roadmap section replaced with new phase table |
+| Std library doc updated | `docs/07-standard-library.md` | ✅ "Phase 6/7" → "Phase 6 (MVP Completion)" |
+| AGENTS.md updated | `AGENTS.md` | ✅ New roadmap, session log entry, v4.0 |
+| Self-hosting decision | — | ✅ **Self-hosting deferred to post-MVP.** Rewriting compiler in Kyle happens only after the language is stable and usable for real projects. Rust stays as implementation language. |
+
+### Sesión 19 — Cross-platform analysis + syntax reference + roadmap restructure
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Syntax reference (español) | `docs/17-syntax-reference.md` | ✅ 38 secciones, status marks (✅/🔶/❌/📄) |
+| Cross-platform audit | `linker.rs`, `pipeline.rs`, `io.rs`, `cli` | 🔶 Solo macOS ARM — ver plan P2 |
+| Roadmap actualizado con P0-P5 | `docs/13-roadmap.md` | ✅ Prioridades reales por estado de implementación |
+| AGENTS.md actualizado | `AGENTS.md` | ✅ Nuevo roadmap, docs table, hallazgos cross-platform |
+
+### Sesión 20 — Reestructuración de fases: Language Completion → Cross-Platform → Self-Hosting
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Nueva estructura de fases | `docs/13-roadmap.md` | ✅ Phase 6=Language Completion, Phase 7=Cross-Platform, Phase 8=Self-Hosting, Phase 9=Production |
+| Cross-platform como fase separada | `docs/13-roadmap.md` | ✅ Movido de P2 dentro de Phase 6 a Phase 7 independiente |
+| Self-hosting movido a Phase 8 | `docs/13-roadmap.md` | ✅ Eliminada toda urgencia de self-hosting |
 
 ### Phase 4/5 Bugfixes
 - `codegen.rs`: MirValue::Param(id) devolvía 0 siempre → ahora resuelve al parámetro LLVM real
@@ -370,7 +373,7 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 | Integer overflow | Panic en debug, wrapping en release |
 | Entry point | `fn main(args: [str]) -> i32` en `src/main.kl` |
 
-## Documentación (16 docs)
+## Documentación (17 docs)
 
 | # | Archivo | Contenido |
 |---|---------|-----------|
@@ -387,10 +390,11 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 | 10 | `compiler-architecture.md` | Pipeline de 9 etapas (296 líneas) |
 | 11 | `project-architecture.md` | Estructura del workspace (304 líneas) |
 | 12 | `package-manager.md` | Package manager CLI (446 líneas) |
-| 13 | `roadmap.md` | Roadmap de 6 fases (438 líneas) |
+| 13 | `roadmap.md` | Roadmap de 9 fases (MVP focus) |
 | 14 | `error-catalog.md` | Catálogo de errores E/W/L (395 líneas) |
 | 15 | `abi-specification.md` | ABI y FFI (168 líneas) |
 | 16 | `status.md` | **Estado verificado del implementation gap** (fuente de verdad) |
+| 17 | `syntax-reference.md` | **Sintaxis completa en español con marcas de estado** |
 
 ## Session Log (append)
 
@@ -463,4 +467,57 @@ FASE 6 — Self-Hosting (⏳ In Progress)
 | Fix: `try_as_basic_value()` incorrect API | `klc_backend/src/codegen.rs` | ✅ Usa `ValueKind::Basic(result)` pattern existente |
 | closure_test | `examples/closure_test.kl` | ✅ `(x) => x*2`, `double(21)` → 42 PASS |
 | closure_test2 | `examples/closure_test2.kl` | ✅ `(a,b) => a+b`, `add(100,1)` → 101 PASS |
-| Tests | - | ✅ 84 tests, 0 failures |
+| Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 18 — Phase 3.5: Async/Await end-to-end (thread-based)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Runtime FFI: `kl_spawn_thread` | `klc_runtime/src/thread.rs` | ✅ `extern "C" fn` que spawns `thread::spawn` con `extern "C" fn(i64)->i64` |
+| Runtime FFI: `kl_join_thread` | `klc_runtime/src/thread.rs` | ✅ Joins thread handle, retorna `i64` result |
+| MIR: `AsyncSpawn` instruction | `klc_mir/src/mir.rs` | ✅ `MirInst::AsyncSpawn { dest, function_name, arg }` |
+| MIR: `AsyncAwait` instruction | `klc_mir/src/mir.rs` | ✅ `MirInst::AsyncAwait { dest, handle }` |
+| Lowering: `Expr::Async` | `klc_mir/src/lower.rs` | ✅ Crea función `_async_N` + emite `AsyncSpawn` |
+| Lowering: `Expr::Await` | `klc_mir/src/lower.rs` | ✅ Emite `AsyncAwait` + cast a tipo esperado |
+| Codegen: extern decls | `klc_backend/src/codegen.rs` | ✅ `kl_spawn_thread(ptr, i64) -> i64`, `kl_join_thread(i64) -> i64` |
+| Codegen: `AsyncSpawn` | `klc_backend/src/codegen.rs` | ✅ Llama `kl_spawn_thread` con fn pointer + arg |
+| Codegen: `AsyncAwait` | `klc_backend/src/codegen.rs` | ✅ Llama `kl_join_thread` con handle |
+| Ownership + Optimizer | `klc_mir/src/ownership.rs`, `optimize.rs` | ✅ Match arms nuevos |
+| Fix: `p.len` field access vs `len(p)` | `klc_mir/src/lower.rs` | ✅ Type check antes de interceptar como `kl_list_len` |
+| Fix: `kl_alloc(64)` i32→i64 | `klc_mir/src/lower.rs` | ✅ `MirConstant::I64(64)` en vez de `I32(64)` |
+| Fix: LLVM module verification | `klc_driver/src/pipeline.rs` | ✅ `verify()` + dump IR en fallo |
+| async_test end-to-end | `examples/async_test.kl` | ✅ `async 42` → spawn → `await task` → join → `42` PASS |
+| parser.kl build | `examples/parser.kl` | ✅ Build exitoso post-fixes |
+| Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 21 — Phase 6: Generic structs lowering (monomorphization v1)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Root cause: generics parseados pero ignorados en semantic + lowering | — | ✅ `type_params` en FunctionDecl/StructDecl nunca se usaban; `ast_type_to_mir` para `AstType::Generic` solo manejaba `list` |
+| Lowerer: `generic_struct_templates` RefCell | `klc_mir/src/lower.rs` | ✅ Almacena StructDecl genéricos (con type_params no vacíos) para monomorfización tardía |
+| Pre-scan: structs genéricos saltados de `struct_defs` | `klc_mir/src/lower.rs` | ✅ Pass 1/2 del pre-scan omite structs con type_params |
+| Helper: `is_type_ref` | `klc_mir/src/lower.rs` | ✅ Detecta si un AstType referencia un type param específico |
+| Helper: `mir_type_to_string` | `klc_mir/src/lower.rs` | ✅ Serializa MirType para name mangling |
+| Helper: `make_concrete_name` | `klc_mir/src/lower.rs` | ✅ Crea nombre único: `Pair__i32_str` |
+| Helper: `ast_type_to_mir_with_subst` | `klc_mir/src/lower.rs` | ✅ Convierte AstType → MirType con sustitución de type params |
+| `Expr::StructLiteral`: monomorfización on-the-fly | `klc_mir/src/lower.rs` | ✅ Inferencia de type params desde field values, crea struct concreto, registra en struct_defs |
+| Fix: borrow closure en `generic_struct` check | `klc_mir/src/lower.rs` | ✅ `then()` clona StructDecl para liberar RefCell borrow |
+| generic_struct end-to-end | `examples/generic_struct.kl` | ✅ `Pair<i32,i32>`, `Pair<str,str>`, `Pair<i32,str>` → todos funcionan |
+| Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 22 — Phase 6: Generic functions monomorphization
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Root cause: generic functions skipped in lowering | `klc_mir/src/lower.rs` | ✅ `Decl::Function` con `type_params` se ignoraba completamente — sin especialización |
+| Lowerer: `generic_function_templates` + `specialized_mir_functions` | `klc_mir/src/lower.rs` | ✅ Almacena templates y funciones MIR especializadas |
+| Pre-scan: funciones genéricas saltadas de lowering directo | `klc_mir/src/lower.rs` | ✅ `lower_program` omite funciones con type_params, se especializan lazy |
+| Helper: `extract_generic_bindings` | `klc_mir/src/lower.rs` | ✅ Match de AstType param contra MirType arg para inferir type params |
+| Helper: `infer_function_type_params` | `klc_mir/src/lower.rs` | ✅ Infiere todos los type params de una llamada concreta |
+| Helper: `mir_type_to_ast_type` | `klc_mir/src/lower.rs` | ✅ Convierte MirType → AstType para sustitución en AST |
+| Helper: `substitute_ast_type` | `klc_mir/src/lower.rs` | ✅ Sustituye type params por AstTypes concretos en todo el árbol |
+| Helper: `clone_and_specialize_function` | `klc_mir/src/lower.rs` | ✅ Clona FunctionDecl sustituyendo params, return type, y body types |
+| Helper: `substitute_stmt_types` | `klc_mir/src/lower.rs` | ✅ Walk de statements para sustituir type params en variable declarations |
+| Helper: `pre_register_generic_type` | `klc_mir/src/lower.rs` | ✅ Pre-registra structs concretos en struct_defs ANTES de lower_function |
+| Fix: `ast_type_to_mir` Generic case | `klc_mir/src/lower.rs` | ✅ `else` branch ahora crea nombre concreto (`Pair__i32_str`) en vez de `args[0]` |
+| Call handler: detección + especialización on-the-fly | `klc_mir/src/lower.rs` | ✅ En `Expr::FunctionCall`, si target es genérico → infiere type args, especializa, emite call |
+| generic_fn end-to-end | `examples/generic_fn.kl` | ✅ `first([10,20,30])` → 10, `make_pair(1, "hello")` → field access OK |
+| Tests | - | ✅ 86 tests, 0 failures |

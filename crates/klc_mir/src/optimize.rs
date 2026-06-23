@@ -119,6 +119,14 @@ impl Optimizer {
                             Self::collect_value_refs(arg, &mut used);
                         }
                     }
+                    MirInst::AsyncSpawn { dest, arg, .. } => {
+                        used.insert(*dest);
+                        Self::collect_value_refs(arg, &mut used);
+                    }
+                    MirInst::AsyncAwait { dest, handle } => {
+                        used.insert(*dest);
+                        used.insert(*handle);
+                    }
                 }
             }
         }

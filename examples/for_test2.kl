@@ -1,0 +1,4 @@
+fn main():
+    names = ["Ana", "Juan", "Pepe"]
+    for name in names:
+        println(name)

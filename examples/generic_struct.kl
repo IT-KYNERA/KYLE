@@ -1,0 +1,14 @@
+struct Pair<T, U>:
+    first: T
+    second: U
+
+fn main():
+    p1 = Pair { first: 1, second: 2 }
+    p2 = Pair { first: "a", second: "b" }
+    p3 = Pair { first: 42, second: "answer" }
+    println(p1.first)
+    println(p1.second)
+    println(p2.first)
+    println(p2.second)
+    println(p3.first)
+    println(p3.second)

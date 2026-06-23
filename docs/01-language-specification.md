@@ -1610,44 +1610,22 @@ Predictable
 
 ---
 
-# Long-Term Roadmap
+# Implementation Status
 
-Phase 1
-
-```text
-Lexer
-Parser
-AST
-Type System
-```
-
-Phase 2
+Kyle is being developed in phases. See `docs/13-roadmap.md` for the full plan.
 
 ```text
-LLVM Backend
-Native Compilation
-```
-
-Phase 3
-
-```text
-Package Manager
-Standard Library
-```
-
-Phase 4
-
-```text
-IDE Support
-Language Server
-Debugger
-Formatter
-```
-
-Phase 5
-
-```text
-Self-Hosting Compiler
+Phase 0:  Language Design           — Complete
+Phase 1:  Compiler Frontend         — Complete (Lexer + Parser + AST)
+Phase 2:  Semantic Analysis         — Complete (Type checker, generics, contracts)
+Phase 3:  Compiler Backend          — Complete (MIR, LLVM codegen, linker)
+Phase 4:  Runtime + Std Library     — Complete (RAII, I/O, strings, async, math)
+Phase 5:  Tooling & Ecosystem       — Complete (Package mgr, LSP, formatter, VS Code)
+Phase 3.5:Backend Gap Closure       — Complete (Closures, methods, enums, async/await)
+Phase 6:  Language Completion       — Current (sintaxis al 100%)
+Phase 7:  Cross-Platform Support    — Next
+Phase 8:  Self-Hosting              — Deferred (post-MVP)
+Phase 9:  Production Ecosystem      — Future
 ```
 
 ---
@@ -1670,5 +1648,5 @@ Kyle
 
 ```text
 Kyle Programming Language Specification v2.0
-Last updated: 2026-11-19
+Last updated: 2026-06-22
 ```
