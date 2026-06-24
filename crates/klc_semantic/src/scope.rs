@@ -324,7 +324,23 @@ impl ScopeResolver {
                 self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
             }
             AstType::Generic { name, args, .. } => {
-                Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect())
+                match name.as_str() {
+                    "list" => {
+                        if let Some(inner) = args.first() {
+                            Type::List(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::List(Box::new(Type::I32))
+                        }
+                    }
+                    "Option" => {
+                        if let Some(inner) = args.first() {
+                            Type::Option(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::Option(Box::new(Type::Void))
+                        }
+                    }
+                    _ => Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect()),
+                }
             }
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),

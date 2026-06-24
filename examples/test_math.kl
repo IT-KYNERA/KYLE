@@ -3,10 +3,10 @@ import math
 fn main() -> i32:
     println(str(absolute(-5)))
     println(str(pow(2, 10)))
-    x = factorial(5)
+    x = gcd(12, 8)
     println(str(x))
-    y = fibonacci(10)
+    y = gcd(48, 18)
     println(str(y))
-    z = gcd(12, 8)
+    z = clamp(100, 0, 50)
     println(str(z))
     return 0

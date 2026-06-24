@@ -1,0 +1,18 @@
+fn main():
+    scores = {alice: 42, bob: 100}
+    # Test get
+    a = scores["alice"]
+    b = scores["bob"]
+    println(a)
+    println(b)
+    # Test set new key
+    scores["charlie"] = 200
+    c = scores["charlie"]
+    println(c)
+    # Test update existing key
+    scores["alice"] = 99
+    a2 = scores["alice"]
+    println(a2)
+    # Test len
+    l = len(scores)
+    println(l)

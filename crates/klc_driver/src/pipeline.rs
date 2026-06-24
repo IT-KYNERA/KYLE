@@ -138,6 +138,15 @@ impl Pipeline {
             return Err(format!("LLVM verification failed: {}", msg));
         }
 
+        // Debug: dump LLVM IR
+        {
+            let ir_path = output_path.with_extension("ll");
+            let ir_str = codegen.module().print_to_string().to_string();
+            if let Ok(mut f) = std::fs::File::create(&ir_path) {
+                let _ = write!(f, "{}", ir_str);
+            }
+        }
+
         let obj_path = output_path.with_extension("o");
         emit_object(codegen.module(), &obj_path)?;
 

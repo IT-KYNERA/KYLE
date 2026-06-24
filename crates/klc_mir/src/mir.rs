@@ -38,6 +38,8 @@ pub enum MirType {
     List(Box<MirType>),
     /// A struct type with name, field names, and field types.
     Struct(String, Vec<(String, MirType)>),
+    /// A dictionary/map type with key and value types.
+    Dict(Box<MirType>, Box<MirType>),
 }
 
 /// Binary operators in MIR.
@@ -188,6 +190,7 @@ impl fmt::Display for MirType {
                 }
                 write!(f, " }}")
             }
+            MirType::Dict(key, val) => write!(f, "Dict<{}, {}>", key, val),
         }
     }
 }

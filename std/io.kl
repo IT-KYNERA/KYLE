@@ -1,0 +1,17 @@
+fn read_file(path: str) -> str:
+    fd = open(path, 0)
+    if fd >= 0:
+        content = read_str(fd)
+        close(fd)
+        content
+    else:
+        ""
+
+fn write_file(path: str, content: str) -> i32:
+    fd = open(path, 1)
+    if fd >= 0:
+        result = write_str(fd, content)
+        close(fd)
+        result
+    else:
+        -1

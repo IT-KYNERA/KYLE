@@ -1,0 +1,41 @@
+fn list_sum(items: list<i32>) -> i32:
+    mut total = 0
+    mut i = 0
+    while i < len(items):
+        total = total + items[i]
+        i = i + 1
+    total
+
+fn list_product(items: list<i32>) -> i32:
+    mut result = 1
+    mut i = 0
+    while i < len(items):
+        result = result * items[i]
+        i = i + 1
+    result
+
+fn list_max(items: list<i32>) -> i32:
+    mut result = items[0]
+    mut i = 1
+    while i < len(items):
+        if items[i] > result:
+            result = items[i]
+        i = i + 1
+    result
+
+fn list_min(items: list<i32>) -> i32:
+    mut result = items[0]
+    mut i = 1
+    while i < len(items):
+        if items[i] < result:
+            result = items[i]
+        i = i + 1
+    result
+
+fn list_range(start: i32, end: i32) -> list<i32>:
+    mut result: list<i32> = []
+    mut i = start
+    while i < end:
+        result.add(i)
+        i = i + 1
+    result

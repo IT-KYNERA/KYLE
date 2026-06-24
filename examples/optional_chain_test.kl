@@ -22,9 +22,9 @@ fn test_some():
         println(val)
 
 fn test_none():
-    mut opt: Option<Person> = Option.None
+    opt = Option.None
     result = opt?.age
-    mut val = 0
+    val = 0
     match result:
         Option.Some(v):
             val = v
