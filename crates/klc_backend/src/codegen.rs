@@ -369,6 +369,47 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("kl_join_thread", ft, None);
         }
+        // ptr kl_dict_new()
+        {
+            let ft = ptr_ty.fn_type(&[], false);
+            self.module.add_function("kl_dict_new", ft, None);
+        }
+        // void kl_dict_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_free", ft, None);
+        }
+        // i64 kl_dict_get(ptr, ptr)  — get value by key (key is C string ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_get", ft, None);
+        }
+        // void kl_dict_set(ptr, ptr, i64)  — set key=value
+        {
+            let params = [ptr_ty.into(), ptr_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_set", ft, None);
+        }
+        // i64 kl_dict_len(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_len", ft, None);
+        }
+        // i32 kl_dict_contains(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_contains", ft, None);
+        }
+        // void kl_dict_remove(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_remove", ft, None);
+        }
     }
 
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
@@ -453,7 +494,12 @@ impl<'ctx> Codegen<'ctx> {
             for inst in &bb.insts {
                 if let MirInst::Alloca { dest, type_, .. } = inst {
                     let llvm_ty = self.llvm_type(type_);
-                    self.alloca_types.entry(*dest).or_insert(llvm_ty);
+                    let actual_ty = if let MirType::Ptr(inner) = type_ {
+                        self.llvm_type(inner)
+                    } else {
+                        llvm_ty
+                    };
+                    self.alloca_types.entry(*dest).or_insert(actual_ty);
                 }
             }
         }

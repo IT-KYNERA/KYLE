@@ -1,0 +1,24 @@
+enum Option<T>:
+    None
+    Some(T)
+
+fn unwrap_or<T>(opt: Option<T>, default: T) -> T:
+    match opt:
+        Option.Some(v):
+            v
+        Option.None:
+            default
+
+fn is_some<T>(opt: Option<T>) -> bool:
+    match opt:
+        Option.Some(_):
+            true
+        Option.None:
+            false
+
+fn is_none<T>(opt: Option<T>) -> bool:
+    match opt:
+        Option.Some(_):
+            false
+        Option.None:
+            true

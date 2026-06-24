@@ -81,9 +81,22 @@ impl TypeChecker {
         self.symbols.pop_scope();
     }
 
+    fn is_enum_value(&self, expr: &Expr) -> bool {
+        let obj = match expr {
+            Expr::PropertyAccess { object, .. } => object.as_ref(),
+            Expr::FunctionCall { target, .. } => target.as_ref(),
+            _ => return false,
+        };
+        if let Expr::Identifier { name, .. } = obj {
+            self.symbols.lookup(name).map(|s| matches!(s.kind, SymKind::Enum(_))).unwrap_or(false)
+        } else {
+            false
+        }
+    }
+
     fn check_variable(&mut self, v: &VariableDecl) {
         let is_uninit = matches!(v.value.as_ref(), Expr::Literal { value: Literal::None, .. });
-        let inferred = if is_uninit {
+        let inferred = if is_uninit || (self.is_enum_value(&v.value) && v.type_.is_some()) {
             if let Some(declared) = &v.type_ {
                 self.resolve_ast_type(declared)
             } else {
@@ -94,7 +107,7 @@ impl TypeChecker {
         };
         if let Some(declared) = &v.type_ {
             let declared_ty = self.resolve_ast_type(declared);
-            if !is_uninit && !self.types_match(&inferred, &declared_ty) {
+            if !is_uninit && !self.is_enum_value(&v.value) && !self.types_match(&inferred, &declared_ty) {
                 self.reporter.report(
                     Diagnostic::error(ErrorCode::E0001,
                         format!("type mismatch: expected '{}', found '{}'", declared_ty, inferred))
@@ -282,6 +295,17 @@ impl TypeChecker {
                 match fn_type {
                     Type::Function(ft) => *ft.return_,
                     _ => {
+                        if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
+                            if let Expr::Identifier { name, .. } = object.as_ref() {
+                                if let Some(sym) = self.symbols.lookup(name) {
+                                    if let SymKind::Enum(e) = &sym.kind {
+                                        if e.variants.iter().any(|v| v.name == *property) {
+                                            return Type::Named(e.name.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         if let Expr::Identifier { name, .. } = target.as_ref() {
                             match name.as_str() {
                                 "print" | "println" | "print_err" => Type::Void,
@@ -301,8 +325,18 @@ impl TypeChecker {
                     }
                 }
             }
-            Expr::PropertyAccess { object, .. } => {
-                self.infer_expr(object);
+            Expr::PropertyAccess { object, property, .. } => {
+                let obj_type = self.infer_expr(object);
+                // Detect enum variant construction: Option.None, Option.Some
+                if let Type::Named(name) = &obj_type {
+                    if let Some(sym) = self.symbols.lookup(name) {
+                        if let SymKind::Enum(e) = &sym.kind {
+                            if e.variants.iter().any(|v| v.name == *property) {
+                                return Type::Named(e.name.clone());
+                            }
+                        }
+                    }
+                }
                 Type::I32
             }
             Expr::List { elements, .. } => {
@@ -311,11 +345,16 @@ impl TypeChecker {
             }
             Expr::Dictionary { entries, .. } => {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }
+<<<<<<< HEAD
                 let first_type = self.infer_expr(&entries[0].1);
                 for (_, val) in entries.iter().skip(1) {
                     self.infer_expr(val);
                 }
                 Type::Dict(Box::new(Type::Str), Box::new(first_type))
+=======
+                let val_type = self.infer_expr(&entries[0].1);
+                Type::Dict(Box::new(Type::Str), Box::new(val_type))
+>>>>>>> origin/main
             }
             Expr::StructLiteral { struct_name, .. } => {
                 Type::Named(struct_name.clone())
@@ -358,6 +397,7 @@ impl TypeChecker {
                 match tt {
                     Type::List(et) => *et,
                     Type::Str => Type::Str,
+                    Type::Dict(_, vt) => *vt,
                     _ => Type::I32,
                 }
             }
@@ -468,7 +508,23 @@ impl TypeChecker {
                 self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
             }
             AstType::Generic { name, args, .. } => {
-                Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect())
+                match name.as_str() {
+                    "list" => {
+                        if let Some(inner) = args.first() {
+                            Type::List(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::List(Box::new(Type::I32))
+                        }
+                    }
+                    "Option" => {
+                        if let Some(inner) = args.first() {
+                            Type::Option(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::Option(Box::new(Type::Void))
+                        }
+                    }
+                    _ => Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect()),
+                }
             }
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
