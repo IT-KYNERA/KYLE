@@ -1,0 +1,11 @@
+name = "app-code"
+version = "0.1.0"
+edition = "1"
+authors = []
+license = "MIT"
+
+[compiler]
+optimization = "O2"
+target = "native"
+
+[dependencies]

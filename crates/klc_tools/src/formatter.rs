@@ -112,6 +112,13 @@ impl Formatter {
                 self.write_type(out, inner);
                 out.push('!');
             }
+            AstType::Dict { key, value, .. } => {
+                out.push_str("Dict<");
+                self.write_type(out, key);
+                out.push_str(", ");
+                self.write_type(out, value);
+                out.push('>');
+            }
         }
     }
 
@@ -144,7 +151,12 @@ impl Formatter {
 
     fn write_import(&mut self, out: &mut String, i: &Import, depth: usize) {
         self.indent(out, depth);
-        write!(out, "import {}", i.module_name).unwrap();
+        if i.relative {
+            write!(out, "import ~").unwrap();
+        } else {
+            write!(out, "import ").unwrap();
+        }
+        write!(out, "{}", i.module_name).unwrap();
         if let Some(alias) = &i.alias {
             write!(out, " as {}", alias).unwrap();
         }
@@ -153,7 +165,12 @@ impl Formatter {
 
     fn write_from_import(&mut self, out: &mut String, fi: &FromImport, depth: usize) {
         self.indent(out, depth);
-        writeln!(out, "from {} import {}", fi.module_name, fi.imported_name).unwrap();
+        if fi.relative {
+            write!(out, "from ~{} ", fi.module_name).unwrap();
+        } else {
+            write!(out, "from {} ", fi.module_name).unwrap();
+        }
+        writeln!(out, "import {}", fi.imported_name).unwrap();
     }
 
     fn write_variable(&mut self, out: &mut String, v: &VariableDecl, depth: usize) {

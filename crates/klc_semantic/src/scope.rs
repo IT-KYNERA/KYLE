@@ -42,7 +42,19 @@ impl ScopeResolver {
                 }
                 return;
             }
-            Decl::Import(_) | Decl::FromImport(_) | Decl::Variable(_) => return,
+            Decl::Import(i) => {
+                // Use alias if present, otherwise module name
+                let scope_name = i.alias.clone().unwrap_or_else(|| i.module_name.clone());
+                let sym = Symbol::new(scope_name.clone(), SymKind::Module(vec![]));
+                let _ = self.symbols.insert(scope_name, sym);
+                return;
+            }
+            Decl::FromImport(_) => {
+                // The actual declaration is inserted into the program by the pipeline
+                // and will be registered separately as its proper type (Function, Struct, etc.)
+                return;
+            }
+            Decl::Variable(_) => return,
         };
         let sym = Symbol::new(name.clone(), kind);
         if let Err(e) = self.symbols.insert(name, sym) {
@@ -328,6 +340,7 @@ impl ScopeResolver {
             }
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
+            AstType::Dict { key, value, .. } => Type::Dict(Box::new(self.resolve_ast_type(key)), Box::new(self.resolve_ast_type(value))),
         }
     }
 }

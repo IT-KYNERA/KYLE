@@ -17,6 +17,7 @@ VS Code:                extension with syntax highlighting, LSP client, commands
 Struct ABI:             pass-by-reference (pointer-based) ✅
 Phase 3.5 Complete:     closures, methods, enums/match, async/await ✅
 Phase 6 P1:             Ternary ✅, Match-expression ✅, Guard ✅, Defer ✅
+Dict/Map:               literals, indexing, .len() ✅
 Self-Hosting (Phase 8): lexer.kl + parser.kl + semantic.kl (deferred post-MVP) ✅
 Tests:                  86 tests, 0 failures ✅
 ```
@@ -246,7 +247,7 @@ kl/
 │
 ├── runtime/                ← Kyle runtime (Rust) ⏳
 ├── std/                    ← Standard library (Kyle) ⏳
-├── docs/                   ← 16 specification documents (mantener al día)
+├── docs/                   ← 18 specification + guide documents (mantener al día)
 ├── examples/               ← Example .kl programs
 ├── tests/                  ← Test suite ⏳
 ├── benchmarks/             ← Benchmarks ⏳
@@ -289,7 +290,7 @@ FASE 6 — Language Completion (🔶 Current — prioridades P0-P5)
 │   Error handling (!/?) ✅, String interpolation ✅, Optional chaining (?.) ❌
 │
 ├─ 🟧 P1 (ALTA) — Secondary features
-│   Defer ✅, Guard ✅, Type aliases ✅, Dict/Map, Spread ✅, Range slicing ✅,
+│   Defer ✅, Guard ✅, Type aliases ✅, Dict/Map ✅, Spread ✅, Range slicing ✅,
 │   Ternary ✅, Match-expression ✅, const fn
 │
 ├─ 🟦 P3 (MEDIA) — Standard library
@@ -396,6 +397,7 @@ FASE 9 — Production Ecosystem (📅 Future)
 | 15 | `abi-specification.md` | ABI y FFI (168 líneas) |
 | 16 | `status.md` | **Estado verificado del implementation gap** (fuente de verdad) |
 | 17 | `syntax-reference.md` | **Sintaxis completa en español con marcas de estado** |
+| 18 | `getting-started.md` | **Guía de inicio rápido — crear proyectos, ejemplos, features funcionales** |
 
 ## Session Log (append)
 
@@ -579,3 +581,24 @@ FASE 9 — Production Ecosystem (📅 Future)
 | Spread test | `examples/spread_test.kl` | ✅ `[...a, 4, 5]` → `[1,2,3,4,5]` |
 | Docs updated (4) | todos | ✅ Spread ✅ |
 | Tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 26 — Phase 6: Dict/Map literals + indexing + dict.len()
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Runtime: dict ops | `klc_runtime/src/dict.rs` | ✅ `kl_dict_new`, `kl_dict_set`, `kl_dict_get`, `kl_dict_len`, `kl_dict_free` |
+| MirType::Dict | `klc_mir/src/mir.rs` | ✅ `Dict(Box<K>, Box<V>)` variant + Display |
+| Expr::Dictionary lowering | `klc_mir/src/lower.rs` | ✅ `kl_dict_new` + `kl_dict_set` per entry; result type `Dict<str,T>` |
+| AstType::Dict | `klc_core/src/ast.rs` | ✅ `Dict { key, value, span }` for type annotations |
+| Type checker | `klc_semantic/src/type_checker.rs` | ✅ `Dict<str, inferred_value_type>` |
+| Type inference | `klc_core/src/types.rs` | ✅ `Type::from_ast_type` |
+| Scope / Formatter / LSP | klc_semantic/klc_tools | ✅ AstType::Dict matching arms |
+| Expr::Index: dict get | `klc_mir/src/lower.rs` | ✅ `d["key"]` → `kl_dict_get` (before list path) |
+| Dict index set (Binary path) | `klc_mir/src/lower.rs` | ✅ `d["key"]=val` → `kl_dict_set` (was going to list path) |
+| Dict `.len()` method | `klc_mir/src/lower.rs` | ✅ method shortcut in FunctionCall PropertyAccess dispatch |
+| Dict key parsing | `klc_frontend/src/parser.rs` | ✅ identifiers OR string literals as keys |
+| mir_type_to_ast_type Dict | `klc_mir/src/lower.rs` | ✅ recursive Dict key/value |
+| substitute_ast_type Dict | `klc_mir/src/lower.rs` | ✅ recursive Dict key/value |
+| Variable inference Dict | `klc_mir/src/lower.rs` | ✅ alongside List/Struct |
+| Codegen LLVM type | `klc_backend/src/codegen.rs` | ✅ Dict→opaque ptr; extern decls |
+| dict_test.kl | `examples/dict_test.kl` | ✅ create, index get/set, len, str values |
+| Existing tests | - | ✅ 86 tests, 0 failures |

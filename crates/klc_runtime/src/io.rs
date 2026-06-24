@@ -73,6 +73,18 @@ pub extern "C" fn kl_println_int(val: i64) {
 /// Caller must free with kl_free.
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_input() -> *mut u8 {
+    kl_input_with_prompt(std::ptr::null(), 0)
+}
+
+/// Read a line from stdin with an optional prompt.
+/// If prompt is non-null and prompt_len > 0, the prompt is printed first.
+/// Returns heap-allocated null-terminated string (caller must kl_free).
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_input_with_prompt(prompt: *const u8, prompt_len: i32) -> *mut u8 {
+    if !prompt.is_null() && prompt_len > 0 {
+        let slice = unsafe { std::slice::from_raw_parts(prompt, prompt_len as usize) };
+        write_stdout(slice);
+    }
     let mut line = String::new();
     match std::io::stdin().read_line(&mut line) {
         Ok(_) => {

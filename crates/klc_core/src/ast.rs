@@ -30,6 +30,7 @@ pub enum AstType {
     Generic { name: String, args: Vec<AstType>, span: Span },
     Optional { inner: Box<AstType>, span: Span },
     Error { inner: Box<AstType>, span: Span },
+    Dict { key: Box<AstType>, value: Box<AstType>, span: Span },
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ pub enum Pattern {
 pub struct Import {
     pub module_name: String,
     pub alias: Option<String>,
+    pub relative: bool,
     pub span: Span,
 }
 
@@ -60,6 +62,7 @@ pub struct Import {
 pub struct FromImport {
     pub module_name: String,
     pub imported_name: String,
+    pub relative: bool,
     pub span: Span,
 }
 
@@ -582,6 +585,9 @@ impl DisplayDepth for Import {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         write_indent(f, d)?;
         write!(f, "Import module=\"{}\"", self.module_name)?;
+        if self.relative {
+            write!(f, " relative")?;
+        }
         if let Some(alias) = &self.alias {
             write!(f, " as=\"{}\"", alias)?;
         }
@@ -592,7 +598,9 @@ impl DisplayDepth for Import {
 impl DisplayDepth for FromImport {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         write_indent(f, d)?;
-        writeln!(f, "FromImport module=\"{}\" name=\"{}\"", self.module_name, self.imported_name)
+        writeln!(f, "FromImport module=\"{}\" name=\"{}\"{}",
+            self.module_name, self.imported_name,
+            if self.relative { " relative" } else { "" })
     }
 }
 
@@ -1175,6 +1183,7 @@ impl fmt::Display for AstType {
             }
             AstType::Optional { inner, .. } => write!(f, "Option<{}>", inner),
             AstType::Error { inner, .. } => write!(f, "Result<{}>", inner),
+            AstType::Dict { key, value, .. } => write!(f, "Dict<{}, {}>", key, value),
         }
     }
 }

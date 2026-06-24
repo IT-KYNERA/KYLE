@@ -1,7 +1,15 @@
 // klc_semantic::module_resolver — Module resolution for imports
 //
-// Resolves `import X` and `from X import Y` declarations by finding
-// and parsing the corresponding .kl files.
+// Resolves `import X`, `from X import Y`, and relative `~X` imports
+// by finding and parsing the corresponding .kl files.
+//
+// Module path resolution rules:
+//   - Dots in module names map to directory separators:
+//     `import utils.helpers` → `utils/helpers.kl`
+//   - Relative `~` prefix resolves relative to the source file's directory
+//   - Absolute search resolves against search_paths
+//   - Public declarations (no `_`/`__` prefix) are returned for `import X`
+//   - Explicit `from X import Y` can import public or protected declarations
 
 use std::path::PathBuf;
 use std::fs;
@@ -19,10 +27,12 @@ pub struct ResolvedModule {
 
 /// Resolves import declarations by finding and parsing .kl files.
 pub struct ModuleResolver {
-    /// Search paths for module resolution.
+    /// Search paths for module resolution (used by absolute imports).
     pub search_paths: Vec<PathBuf>,
     /// Cache of already resolved modules (name -> module).
     pub cache: HashMap<String, ResolvedModule>,
+    /// Directory of the source file being compiled (for relative `~` imports).
+    pub source_dir: Option<PathBuf>,
 }
 
 impl ModuleResolver {
@@ -30,7 +40,13 @@ impl ModuleResolver {
         Self {
             search_paths: Vec::new(),
             cache: HashMap::new(),
+            source_dir: None,
         }
+    }
+
+    /// Set the source file directory for relative imports.
+    pub fn set_source_dir(&mut self, dir: PathBuf) {
+        self.source_dir = Some(dir);
     }
 
     /// Add a directory to search for modules.
@@ -41,13 +57,16 @@ impl ModuleResolver {
     }
 
     /// Resolve an `import X` declaration.
+    /// `relative` indicates whether this is a `~` relative import.
     /// Returns the parsed module and its declarations.
-    pub fn resolve_import(&mut self, module_name: &str) -> Result<&ResolvedModule, String> {
-        if self.cache.contains_key(module_name) {
-            return Ok(self.cache.get(module_name).unwrap());
+    pub fn resolve_import(&mut self, module_name: &str, relative: bool) -> Result<&ResolvedModule, String> {
+        // Build a unique cache key that includes whether it was relative
+        let cache_key = format!("{}{}", if relative { "~" } else { "" }, module_name);
+        if self.cache.contains_key(&cache_key) {
+            return Ok(self.cache.get(&cache_key).unwrap());
         }
 
-        let path = self.find_module_file(module_name)?;
+        let path = self.find_module_file(module_name, relative)?;
         let source = fs::read_to_string(&path)
             .map_err(|e| format!("cannot read module '{}': {}", module_name, e))?;
 
@@ -62,13 +81,32 @@ impl ModuleResolver {
             program,
             path,
         };
-        self.cache.insert(module_name.to_string(), module);
-        Ok(self.cache.get(module_name).unwrap())
+        self.cache.insert(cache_key.clone(), module);
+        Ok(self.cache.get(&cache_key).unwrap())
     }
 
-    /// Find a module file on the search paths.
-    fn find_module_file(&self, module_name: &str) -> Result<PathBuf, String> {
-        let file_name = format!("{}.kl", module_name);
+    /// Find a module file, using dotted path resolution.
+    /// - `relative=true`: resolve relative to source_dir
+    /// - `relative=false`: resolve against search_paths
+    /// Dots in module_name are converted to directory separators.
+    fn find_module_file(&self, module_name: &str, relative: bool) -> Result<PathBuf, String> {
+        // Convert dots to directory separators
+        let path_str = module_name.replace('.', "/");
+        let file_name = format!("{}.kl", path_str);
+
+        if relative {
+            // Resolve relative to source file directory
+            if let Some(ref source_dir) = self.source_dir {
+                let candidate = source_dir.join(&file_name);
+                if candidate.exists() {
+                    return Ok(candidate);
+                }
+                return Err(format!("relative module '{}' not found at {:?}", module_name, candidate));
+            }
+            return Err("no source directory set for relative import".to_string());
+        }
+
+        // Resolve against search paths
         for search_path in &self.search_paths {
             let candidate = search_path.join(&file_name);
             if candidate.exists() {
@@ -78,15 +116,45 @@ impl ModuleResolver {
         Err(format!("module '{}' not found in search paths", module_name))
     }
 
-    /// Get declarations from a module (for `import X` — all decls, module-qualified).
-    pub fn get_module_declarations(&mut self, module_name: &str) -> Result<Vec<Decl>, String> {
-        let module = self.resolve_import(module_name)?;
-        Ok(module.program.declarations.clone())
+    /// Check if a declaration name is public (no `_` or `__` prefix).
+    fn is_public(name: &str) -> bool {
+        !name.starts_with('_')
+    }
+
+    /// Check if a declaration name is at least protected (not `__` private).
+    fn is_not_private(name: &str) -> bool {
+        !name.starts_with("__")
+    }
+
+    /// Get public declarations from a module (for `import X` — only public names).
+    /// Private (`__`) and protected (`_`) names are excluded.
+    pub fn get_module_declarations(&mut self, module_name: &str, relative: bool) -> Result<Vec<Decl>, String> {
+        let module = self.resolve_import(module_name, relative)?;
+        let decls: Vec<Decl> = module.program.declarations.iter()
+            .filter(|decl| {
+                let name = match decl {
+                    Decl::Function(f) => &f.name,
+                    Decl::Variable(v) => &v.name,
+                    Decl::Constant(c) => &c.name,
+                    Decl::Class(c) => &c.name,
+                    Decl::AbstractClass(c) => &c.name,
+                    Decl::Struct(s) => &s.name,
+                    Decl::Enum(e) => &e.name,
+                    Decl::Contract(c) => &c.name,
+                    Decl::TypeAlias(t) => &t.name,
+                    Decl::Import(_) | Decl::FromImport(_) => return false,
+                };
+                Self::is_public(name)
+            })
+            .cloned()
+            .collect();
+        Ok(decls)
     }
 
     /// Get a specific declaration from a module (for `from X import Y`).
-    pub fn get_imported_declaration(&mut self, module_name: &str, name: &str) -> Result<Decl, String> {
-        let module = self.resolve_import(module_name)?;
+    /// Allows public and protected names, but not private (`__`) names.
+    pub fn get_imported_declaration(&mut self, module_name: &str, name: &str, relative: bool) -> Result<Decl, String> {
+        let module = self.resolve_import(module_name, relative)?;
         for decl in &module.program.declarations {
             let decl_name = match decl {
                 Decl::Function(f) => &f.name,
@@ -101,6 +169,9 @@ impl ModuleResolver {
                 Decl::Import(_) | Decl::FromImport(_) => continue,
             };
             if decl_name == name {
+                if !Self::is_not_private(name) {
+                    return Err(format!("'{}' is private and cannot be imported", name));
+                }
                 return Ok(decl.clone());
             }
         }

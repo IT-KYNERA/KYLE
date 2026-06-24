@@ -1,0 +1,15 @@
+struct Persona:
+    nombre: str
+    edad: i32
+
+fn crear(n: str, e: i32) -> Persona:
+    mut p: Persona
+    p.nombre = n
+    p.edad = e
+    return p
+
+fn _internal():
+    println("esto es protected - no visible en import X")
+
+fn __secret():
+    println("esto es private - no importable")

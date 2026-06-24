@@ -168,6 +168,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&[], false);
             self.module.add_function("kl_input", ft, None);
         }
+        // ptr kl_input_with_prompt(ptr, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_input_with_prompt", ft, None);
+        }
         // i32 kl_str_contains(ptr, ptr)
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
@@ -293,6 +299,35 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_list_extend", ft, None);
         }
+        // ptr kl_dict_new()
+        {
+            let ft = ptr_ty.fn_type(&[], false);
+            self.module.add_function("kl_dict_new", ft, None);
+        }
+        // void kl_dict_set(ptr, ptr, i64)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_set", ft, None);
+        }
+        // i64 kl_dict_get(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_get", ft, None);
+        }
+        // i64 kl_dict_len(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_len", ft, None);
+        }
+        // void kl_dict_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_dict_free", ft, None);
+        }
         // ptr kl_substr(ptr, i64, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
@@ -348,7 +383,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
             MirType::Char => self.context.i8_type().as_basic_type_enum(),
             MirType::Str => self.context.ptr_type(Default::default()).as_basic_type_enum(),
-            MirType::List(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
+            MirType::List(_) | MirType::Dict(_, _) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Void => self.context.i32_type().as_basic_type_enum(),
             MirType::Ptr(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Array(inner) => {

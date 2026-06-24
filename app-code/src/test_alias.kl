@@ -1,0 +1,6 @@
+import models.persona as per
+
+fn main():
+    p = per.crear("Carlos", 25)
+    println(p.nombre)
+    println(str(p.edad))

@@ -138,26 +138,49 @@ impl Parser {
         Err(format!("unexpected token at declaration start: {}", found))
     }
 
+    /// Read a dotted name: ident . ident . ident ...
+    fn read_dotted_name(&mut self) -> Result<String, String> {
+        let mut name = self.eat_identifier();
+        while self.at(TokenKind::Dot) {
+            self.advance(); // consume .
+            name.push('.');
+            name.push_str(&self.eat_identifier());
+        }
+        Ok(name)
+    }
+
     fn parse_import(&mut self) -> Result<Decl, String> {
         let start = self.pos;
         self.advance(); // import
-        let module_name = self.eat_identifier();
+        let relative = if self.at(TokenKind::Tilde) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        let module_name = self.read_dotted_name()?;
         let alias = if self.at(TokenKind::As) {
             self.advance();
             Some(self.eat_identifier())
         } else {
             None
         };
-        Ok(Decl::Import(Import { module_name, alias, span: self.span_from(start) }))
+        Ok(Decl::Import(Import { module_name, alias, relative, span: self.span_from(start) }))
     }
 
     fn parse_from_import(&mut self) -> Result<Decl, String> {
         let start = self.pos;
         self.advance(); // from
-        let module_name = self.eat_identifier();
+        let relative = if self.at(TokenKind::Tilde) {
+            self.advance();
+            true
+        } else {
+            false
+        };
+        let module_name = self.read_dotted_name()?;
         self.expect_keyword("import")?;
         let imported_name = self.eat_identifier();
-        Ok(Decl::FromImport(FromImport { module_name, imported_name, span: self.span_from(start) }))
+        Ok(Decl::FromImport(FromImport { module_name, imported_name, relative, span: self.span_from(start) }))
     }
 
     fn parse_type_alias(&mut self) -> Result<Decl, String> {
@@ -712,7 +735,12 @@ impl Parser {
                 self.advance();
                 let mut entries = Vec::new();
                 while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
-                    let key = self.eat_identifier();
+                    let key = if let Ok(tok) = self.current() {
+                        match &tok.kind {
+                            TokenKind::String(s) => { let val = s.clone(); self.advance(); val }
+                            _ => self.eat_identifier()
+                        }
+                    } else { String::new() };
                     self.expect(TokenKind::Colon)?;
                     let value = self.parse_expr()?;
                     entries.push((key, value));

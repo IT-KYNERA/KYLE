@@ -11,6 +11,7 @@ use klc_mir::optimize::Optimizer;
 use klc_mir::ownership::OwnershipPass;
 use klc_backend::codegen::Codegen;
 use klc_backend::linker::Linker;
+use klc_tools::package::find_project_root;
 use inkwell::context::Context;
 use inkwell::targets::{FileType, InitializationConfig, Target, TargetTriple};
 use inkwell::OptimizationLevel;
@@ -28,9 +29,24 @@ impl Pipeline {
         Ok(ParsedOutput { program })
     }
 
-    fn resolve_imports(program: &mut Program, base_dir: &PathBuf) -> Result<(), String> {
+    fn resolve_imports(program: &mut Program, file_name: &str) -> Result<(), String> {
+        let base_dir = PathBuf::from(file_name)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."));
+
         let mut resolver = ModuleResolver::new();
+        resolver.set_source_dir(base_dir.clone());
         resolver.add_search_path(base_dir.clone());
+
+        // If there's a project root (kl.toml), add `src/` as a search path
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let src_dir = project_root.join("src");
+            if src_dir.exists() && src_dir != base_dir {
+                resolver.add_search_path(src_dir);
+            }
+        }
+
         // Also search for std library relative to the workspace root or source
         if let Some(cwd) = std::env::current_dir().ok() {
             let std_path = cwd.join("std");
@@ -45,15 +61,22 @@ impl Pipeline {
         }
 
         let mut import_decls: Vec<(usize, Vec<klc_core::ast::Decl>)> = Vec::new();
+        // Track scopes to register for each import (alias -> module_name)
+        let mut scope_registrations: Vec<(String, String)> = Vec::new();
 
         for (i, decl) in program.declarations.iter().enumerate() {
             match decl {
                 klc_core::ast::Decl::Import(imp) => {
-                    let module_decls = resolver.get_module_declarations(&imp.module_name)?;
+                    let module_decls = resolver.get_module_declarations(&imp.module_name, imp.relative)?;
+                    // Determine the scope name: alias if present, otherwise module_name
+                    let scope_name = imp.alias.clone().unwrap_or_else(|| imp.module_name.clone());
+                    scope_registrations.push((scope_name, imp.module_name.clone()));
                     import_decls.push((i, module_decls));
                 }
                 klc_core::ast::Decl::FromImport(fi) => {
-                    let decl = resolver.get_imported_declaration(&fi.module_name, &fi.imported_name)?;
+                    let decl = resolver.get_imported_declaration(&fi.module_name, &fi.imported_name, fi.relative)?;
+                    // For from-import, the imported name itself is used (no alias support yet)
+                    scope_registrations.push((fi.imported_name.clone(), fi.module_name.clone()));
                     import_decls.push((i, vec![decl]));
                 }
                 _ => {}
@@ -75,11 +98,7 @@ impl Pipeline {
         let mut parser = Parser::new(tokens);
         let mut program = parser.parse()?;
 
-        let base_dir = PathBuf::from(file_name)
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| PathBuf::from("."));
-        Self::resolve_imports(&mut program, &base_dir)?;
+        Self::resolve_imports(&mut program, file_name)?;
 
         let mut source_map = SourceMap::new();
         let file_id = source_map.add(file_name.to_string(), source.to_string());

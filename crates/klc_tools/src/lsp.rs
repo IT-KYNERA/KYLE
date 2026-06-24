@@ -339,6 +339,7 @@ impl LanguageServer {
             }
             AstType::Optional { inner, .. } => format!("{}?", Self::fmt_type(inner)),
             AstType::Error { inner, .. } => format!("{}!", Self::fmt_type(inner)),
+            AstType::Dict { key, value, .. } => format!("Dict<{}, {}>", Self::fmt_type(key), Self::fmt_type(value)),
         }
     }
 

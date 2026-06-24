@@ -311,7 +311,11 @@ impl TypeChecker {
             }
             Expr::Dictionary { entries, .. } => {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }
-                Type::Dict(Box::new(Type::Str), Box::new(Type::I32))
+                let first_type = self.infer_expr(&entries[0].1);
+                for (_, val) in entries.iter().skip(1) {
+                    self.infer_expr(val);
+                }
+                Type::Dict(Box::new(Type::Str), Box::new(first_type))
             }
             Expr::StructLiteral { struct_name, .. } => {
                 Type::Named(struct_name.clone())
@@ -468,6 +472,7 @@ impl TypeChecker {
             }
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
+            AstType::Dict { key, value, .. } => Type::Dict(Box::new(self.resolve_ast_type(key)), Box::new(self.resolve_ast_type(value))),
         }
     }
 

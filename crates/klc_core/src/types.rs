@@ -43,6 +43,9 @@ impl Type {
             AstType::Error { inner, .. } => {
                 Type::Error(Box::new(Type::from_ast_type(inner)))
             }
+            AstType::Dict { key, value, .. } => {
+                Type::Dict(Box::new(Type::from_ast_type(key)), Box::new(Type::from_ast_type(value)))
+            }
         }
     }
 

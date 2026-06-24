@@ -1,0 +1,7 @@
+import model.animales as animales
+
+fn main():
+    p = animales.crear_perro("Firulais", 3)
+    println(p.nombre)
+    println(str(p.edad))
+    animales.ladrar()

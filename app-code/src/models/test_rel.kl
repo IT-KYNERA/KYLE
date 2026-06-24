@@ -1,0 +1,4 @@
+import utils
+
+fn main():
+    utils.sumar(3, 7)

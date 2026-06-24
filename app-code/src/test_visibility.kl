@@ -1,0 +1,5 @@
+import models.persona
+
+fn main():
+    p = crear("Luis", 35)
+    println(p.nombre)
