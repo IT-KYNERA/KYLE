@@ -52,13 +52,13 @@ pub extern "C" fn kl_json_parse(json: *const u8) -> *mut std::ffi::c_void {
     if json.is_null() {
         return std::ptr::null_mut();
     }
-    let s = unsafe { std::ffi::CStr::from_ptr(json as *const i8) }
+    let s = unsafe { std::ffi::CStr::from_ptr(json) }
         .to_str().unwrap_or("").trim().to_string();
     if s.is_empty() {
         return std::ptr::null_mut();
     }
     // Basic JSON object parser (handles {"key":123,"key2":456})
-    let map = Box::new(HashMap::<String, i64>::new());
+    let mut map = Box::new(HashMap::<String, i64>::new());
     if s.starts_with('{') && s.ends_with('}') {
         let inner = &s[1..s.len()-1];
         for part in inner.split(',') {

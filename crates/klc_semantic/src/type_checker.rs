@@ -10,6 +10,7 @@ pub struct TypeChecker {
     pub reporter: DiagnosticReporter,
     symbols: SymbolTable,
     pub fn_return_types: HashMap<String, Type>,
+    fn_const_flags: HashMap<String, bool>,
 }
 
 impl Default for TypeChecker {
@@ -24,6 +25,7 @@ impl TypeChecker {
             reporter: DiagnosticReporter::new(),
             symbols: SymbolTable::new(),
             fn_return_types: HashMap::new(),
+            fn_const_flags: HashMap::new(),
         }
     }
 
@@ -47,6 +49,7 @@ impl TypeChecker {
                     .map(|t| self.resolve_ast_type(t))
                     .unwrap_or(Type::Void);
                 self.fn_return_types.insert(f.name.clone(), ret);
+                self.fn_const_flags.insert(f.name.clone(), f.is_const);
             }
         }
 
@@ -76,9 +79,96 @@ impl TypeChecker {
                 Symbol::new_var(param.name.clone(), Some(ty), false));
         }
         if let Some(body) = &f.body {
-            self.check_block(body);
+            if f.is_const {
+                self.check_const_block(body, &f.name);
+            } else {
+                self.check_block(body);
+            }
         }
         self.symbols.pop_scope();
+    }
+
+    fn check_const_block(&mut self, block: &Block, fn_name: &str) {
+        for stmt in &block.statements {
+            match stmt {
+                Stmt::Expression(e) => self.check_const_expr(e, fn_name),
+                Stmt::Return(e) => { if let Some(e) = e { self.check_const_expr(e, fn_name); } }
+                Stmt::Variable(v) => { self.check_const_expr(&v.value, fn_name); }
+                Stmt::TypedVariable(v) => { self.check_const_expr(&v.value, fn_name); }
+                Stmt::If(s) => {
+                    self.check_const_expr(&s.condition, fn_name);
+                    self.check_const_block(&s.body, fn_name);
+                    for el in &s.elif_branches { self.check_const_block(&el.body, fn_name); }
+                    if let Some(el) = &s.else_branch { self.check_const_block(el, fn_name); }
+                }
+                Stmt::While(w) => {
+                    self.check_const_expr(&w.condition, fn_name);
+                    self.check_const_block(&w.body, fn_name);
+                }
+                Stmt::For(f) => {
+                    self.check_const_expr(&f.iterable, fn_name);
+                    self.check_const_block(&f.body, fn_name);
+                }
+                Stmt::Match(m) => {
+                    self.check_const_expr(&m.expression, fn_name);
+                    for arm in &m.arms {
+                        self.check_const_block(&arm.body, fn_name);
+                    }
+                }
+                _ => {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001, format!("const fn '{}' contains unsupported statement", fn_name))
+                    );
+                }
+            }
+        }
+    }
+
+    fn check_const_expr(&mut self, expr: &Expr, fn_name: &str) {
+        match expr {
+            Expr::Literal { .. } | Expr::Identifier { .. } => {}
+            Expr::Binary { left, right, .. } => {
+                self.check_const_expr(left, fn_name);
+                self.check_const_expr(right, fn_name);
+            }
+            Expr::Unary { operand, .. } => self.check_const_expr(operand, fn_name),
+            Expr::FunctionCall { target, arguments, .. } => {
+                // Allow calls to other const fns and pure builtins
+                let is_const_call = if let Expr::Identifier { name, .. } = target.as_ref() {
+                    let pure_builtins = ["len", "str"];
+                    pure_builtins.contains(&name.as_str())
+                        || self.fn_const_flags.get(name).copied().unwrap_or(false)
+                } else {
+                    false
+                };
+                if !is_const_call {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001, format!("const fn '{}' cannot call runtime function", fn_name))
+                    );
+                }
+                for arg in arguments {
+                    self.check_const_expr(arg, fn_name);
+                }
+            }
+            Expr::Ternary { cond, then_expr, else_expr, .. } => {
+                self.check_const_expr(cond, fn_name);
+                self.check_const_expr(then_expr, fn_name);
+                self.check_const_expr(else_expr, fn_name);
+            }
+            Expr::Assignment { target, value, .. } => {
+                self.check_const_expr(target, fn_name);
+                self.check_const_expr(value, fn_name);
+            }
+            Expr::List { elements, .. } => {
+                for e in elements { self.check_const_expr(e, fn_name); }
+            }
+            // Disallow all other expressions in const fn
+            _ => {
+                self.reporter.report(
+                    Diagnostic::error(ErrorCode::E0001, format!("const fn '{}' contains unsupported expression", fn_name))
+                );
+            }
+        }
     }
 
     fn is_enum_value(&self, expr: &Expr) -> bool {
@@ -128,15 +218,14 @@ impl TypeChecker {
     fn bind_pattern(&mut self, pattern: &Pattern, match_type: Option<&Type>) {
         match pattern {
             Pattern::Identifier { name, .. } => {
-                // For enum variant payloads, use I32 as default (payload is i64 in MIR).
-                // For standalone identifiers, leave type as None for inference.
-                let inferred = match_type.map(|_| Type::I32);
+                let inferred = match_type.cloned();
                 let _ = self.symbols.insert(name.clone(),
                     Symbol::new_var(name.clone(), inferred, false));
             }
             Pattern::EnumVariant { args, .. } => {
+                // Enum variant payload: each arg takes the type of the parent scrutinee
                 for arg in args {
-                    self.bind_pattern(arg, Some(&Type::I32));
+                    self.bind_pattern(arg, match_type);
                 }
             }
             _ => {}
@@ -186,10 +275,10 @@ impl TypeChecker {
                 if let Some(el) = &f.else_branch { self.check_block(el); }
             }
             Stmt::Match(m) => {
-                self.infer_expr(&m.expression);
+                let scrutinee_type = self.infer_expr(&m.expression);
                 for arm in &m.arms {
                     self.symbols.push_scope();
-                    self.bind_pattern(&arm.pattern, None);
+                    self.bind_pattern(&arm.pattern, Some(&scrutinee_type));
                     if let Some(g) = &arm.guard { self.infer_expr(g); }
                     self.check_block(&arm.body);
                     self.symbols.pop_scope();
@@ -317,6 +406,8 @@ impl TypeChecker {
                                 "sleep" => Type::Void,
                                 "now" => Type::I64,
                                 "assert" | "assert_eq" | "assert_str" => Type::Void,
+                                "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
+                                "json_stringify" => Type::Str,
                                 _ => Type::I32,
                             }
                         } else {
@@ -460,11 +551,11 @@ impl TypeChecker {
                 then_type
             }
             Expr::MatchExpr { expression, arms, span } => {
-                self.infer_expr(expression);
+                let scrutinee_type = self.infer_expr(expression);
                 let mut arm_types = Vec::new();
                 for arm in arms {
                     self.symbols.push_scope();
-                    self.bind_pattern(&arm.pattern, None);
+                    self.bind_pattern(&arm.pattern, Some(&scrutinee_type));
                     if let Some(g) = &arm.guard { self.infer_expr(g); }
                     self.check_block(&arm.body);
                     // Last statement's expression type determines arm value type

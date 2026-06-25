@@ -181,10 +181,10 @@ if value is not Admin:  # ✅ negado
     print("No es Admin")
 ```
 
-### Rango 🔶
+### Rango ✅
 
 ```kl
-rango = 0..10           # 🔶 parsea pero no genera código aún
+rango = 0..10           # ✅ genera código (for i in 0..10)
 ```
 
 ---

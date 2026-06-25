@@ -2233,8 +2233,16 @@ impl Lowerer {
                             ctx = self.lower_expr(ctx, arg);
                             args.push(MirValue::Local(ctx.next_local - 1));
                         }
-                        let ret_type = MirType::I32;
-                        let param_types = vec![MirType::I32; args.len()];
+                        // Infer param_types and ret_type from actual lowered arg types
+                        let param_types: Vec<MirType> = args.iter().map(|a| {
+                            match a {
+                                MirValue::Local(id) => ctx.local_types.get(id).cloned().unwrap_or(MirType::I32),
+                                _ => MirType::I32,
+                            }
+                        }).collect();
+                        let ret_type = param_types.first().map(|t| {
+                            if *t == MirType::Str { MirType::Str } else { MirType::I32 }
+                        }).unwrap_or(MirType::I32);
                         let dest = ctx.alloc_local("_ccall", ret_type.clone());
                         ctx.current_block.insts.push(MirInst::CallIndirect {
                             dest: Some(dest),
@@ -2540,7 +2548,7 @@ impl Lowerer {
                     name: resolved_name.clone(),
                     args,
                 });
-                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr") {
+                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify") {
                     ctx.string_locals.push(dest);
                 }
                 ctx
@@ -2840,78 +2848,38 @@ impl Lowerer {
                 });
 
                 // Access property on the inner struct
+                // Strategy: look for the inner struct either by name (mangled) or by field search
                 let result_payload = if let MirType::Struct(struct_name, _) = &target_type {
-                    // Extract inner struct name from "Option_Person" → "Person"
-                    let inner_name = struct_name.strip_prefix("Option_");
-                    if let Some(inner_name) = inner_name {
-                        if let Some(inner_fields) = ctx.struct_defs.get(inner_name) {
-                            if let Some(field_idx) = inner_fields.iter().position(|(n, _)| n == property)
-                            {
-                                let field_type = inner_fields[field_idx].1.clone();
-                                let inner_mir = MirType::Struct(inner_name.to_string(), inner_fields.clone());
-                                let struct_val = ctx.alloc_local("_och_s", inner_mir.clone());
-                                ctx.current_block.insts.push(MirInst::Cast {
-                                    dest: struct_val,
-                                    value: MirValue::Local(payload_val),
-                                    to_type: inner_mir.clone(),
-                                });
-                                let field_ptr = ctx.alloc_local("_och_fp", field_type.clone());
-                                ctx.current_block.insts.push(MirInst::FieldPtr {
-                                    dest: field_ptr,
-                                    ptr: struct_val,
-                                    field_index: field_idx,
-                                    struct_type: Box::new(inner_mir),
-                                });
-                                let field_val = ctx.alloc_local("_och_fv", field_type.clone());
-                                ctx.current_block.insts.push(MirInst::Load {
-                                    dest: field_val,
-                                    src: field_ptr,
-                                });
-                                if field_type == MirType::Str {
-                                    ctx.string_locals.push(field_val);
-                                }
-                                if field_type != MirType::I64 {
-                                    let casted = ctx.alloc_local("_och_c", MirType::I64);
-                                    ctx.current_block.insts.push(MirInst::Cast {
-                                        dest: casted,
-                                        value: MirValue::Local(field_val),
-                                        to_type: MirType::I64,
-                                    });
-                                    MirValue::Local(casted)
-                                } else {
-                                    MirValue::Local(field_val)
-                                }
-                            } else {
-                                MirValue::Local(payload_val)
-                            }
-                        } else {
-                            MirValue::Local(payload_val)
-                        }
-                    } else {
-                        MirValue::Local(payload_val)
-                    }
-                } else if let MirType::Struct(..) = &target_type {
-                    // For Struct target types (enum with {disc, payload}),
-                    // find the inner struct by looking for one that has this field.
-                    let inner_info = ctx.struct_defs.iter()
-                        .find(|(_, fields)| fields.iter().any(|(n, _)| n == property))
-                        .map(|(name, fields)| (name.clone(), fields.clone()));
-                    if let Some((struct_name, real_fields)) = inner_info {
-                        if let Some(field_idx) = real_fields.iter().position(|(n, _)| n == property) {
-                            let field_type = real_fields[field_idx].1.clone();
-                            let inner = MirType::Struct(struct_name, real_fields);
-                            let struct_val = ctx.alloc_local("_och_s", inner.clone());
+                    // Try mangled name first: "Option__Person" → "Person"
+                    let inner_by_name = struct_name.split("__").nth(1)
+                        .and_then(|n| ctx.struct_defs.get(n))
+                        .and_then(|fields| fields.iter().position(|(fn_, _)| fn_ == property))
+                        .map(|field_idx| (struct_name.split("__").nth(1).unwrap().to_string(), field_idx));
+
+                    // Try search-based approach: find any struct that has this field
+                    let inner_by_search = ctx.struct_defs.iter()
+                        .find(|(_, fields)| fields.iter().any(|(fn_, _)| fn_ == property))
+                        .and_then(|(name, fields)| {
+                            fields.iter().position(|(fn_, _)| fn_ == property)
+                                .map(|field_idx| (name.clone(), field_idx))
+                        });
+
+                    if let Some((inner_name, field_idx)) = inner_by_name.or(inner_by_search) {
+                        if let Some(inner_fields) = ctx.struct_defs.get(&inner_name) {
+                            let field_type = inner_fields[field_idx].1.clone();
+                            let inner_mir = MirType::Struct(inner_name, inner_fields.clone());
+                            let struct_val = ctx.alloc_local("_och_s", inner_mir.clone());
                             ctx.current_block.insts.push(MirInst::Cast {
                                 dest: struct_val,
                                 value: MirValue::Local(payload_val),
-                                to_type: inner.clone(),
+                                to_type: inner_mir.clone(),
                             });
                             let field_ptr = ctx.alloc_local("_och_fp", field_type.clone());
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: field_ptr,
                                 ptr: struct_val,
                                 field_index: field_idx,
-                                struct_type: Box::new(inner),
+                                struct_type: Box::new(inner_mir),
                             });
                             let field_val = ctx.alloc_local("_och_fv", field_type.clone());
                             ctx.current_block.insts.push(MirInst::Load {
@@ -3426,19 +3394,25 @@ impl Lowerer {
                 drop(counter);
 
                 let mut mir_func = MirFunction::new(&fn_name);
-                // All closure params are I32 by default (like type checker)
-                mir_func.params = params.iter().map(|_| MirType::I32).collect();
+                // Infer param types from body expression
+                let param_types: Vec<MirType> = params.iter()
+                    .map(|p| infer_closure_param_type(p, body))
+                    .collect();
+                mir_func.params = param_types.clone();
                 mir_func.return_type = MirType::I32; // default, will be inferred
 
                 let mut cctx = LowerCtx::new();
-                // Bind params to locals
+                // Bind params to locals with inferred types
                 for (i, pname) in params.iter().enumerate() {
-                    let local = cctx.alloc_local(pname, MirType::I32);
+                    let pt = param_types[i].clone();
+                    let local = cctx.alloc_local(pname, pt.clone());
                     cctx.current_block.insts.push(MirInst::Store {
                         dest: local,
                         value: MirValue::Param(i),
                     });
                     cctx.locals.insert(pname.clone(), local);
+                    // Record type for use in body lowering
+                    cctx.local_types.insert(local, pt.clone());
                 }
                 // Lower body expression
                 cctx = self.lower_expr(cctx, body);
@@ -3760,7 +3734,75 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "list_len" => Some(MirType::I64),
         "substr" => Some(MirType::Str),
         "eq_str" => Some(MirType::I32),
+        "json_parse" => Some(MirType::Dict(Box::new(MirType::Str), Box::new(MirType::I64))),
+        "json_stringify" => Some(MirType::Str),
         _ => None,
+    }
+}
+
+/// Infer a closure parameter's MIR type by analyzing how it's used in the body.
+/// Checks if the param participates in string concatenation (Str) or arithmetic (I32).
+fn infer_closure_param_type(param: &str, body: &Expr) -> MirType {
+    if let Some(t) = infer_expr_param_type(param, body) {
+        return t;
+    }
+    MirType::I32
+}
+
+fn infer_expr_param_type(param: &str, expr: &Expr) -> Option<MirType> {
+    match expr {
+        Expr::Binary { left, right, operator, .. } => {
+            if matches!(operator, BinaryOp::Add) {
+                if contains_param(param, left) && is_str_expr(right) {
+                    return Some(MirType::Str);
+                }
+                if contains_param(param, right) && is_str_expr(left) {
+                    return Some(MirType::Str);
+                }
+            }
+            if let Some(t) = infer_expr_param_type(param, left) { return Some(t); }
+            if let Some(t) = infer_expr_param_type(param, right) { return Some(t); }
+        }
+        Expr::Unary { operand, .. } => {
+            if let Some(t) = infer_expr_param_type(param, operand) { return Some(t); }
+        }
+        Expr::Ternary { then_expr, else_expr, .. } => {
+            if contains_param(param, then_expr) && !is_str_expr(then_expr) {
+                if let Some(t) = infer_expr_param_type(param, then_expr) { return Some(t); }
+            }
+            if let Some(t) = infer_expr_param_type(param, else_expr) { return Some(t); }
+        }
+        Expr::FunctionCall { arguments, .. } => {
+            for arg in arguments {
+                if let Some(t) = infer_expr_param_type(param, arg) { return Some(t); }
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+fn contains_param(param: &str, expr: &Expr) -> bool {
+    match expr {
+        Expr::Identifier { name, .. } => name == param,
+        Expr::Binary { left, right, .. } => contains_param(param, left) || contains_param(param, right),
+        Expr::Unary { operand, .. } => contains_param(param, operand),
+        Expr::Ternary { then_expr, else_expr, .. } => {
+            contains_param(param, then_expr) || contains_param(param, else_expr)
+        }
+        Expr::FunctionCall { arguments, .. } => arguments.iter().any(|a| contains_param(param, a)),
+        _ => false,
+    }
+}
+
+fn is_str_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::Literal { value, .. } => matches!(value, Literal::String(_)),
+        Expr::Binary { left, right, operator, .. } if matches!(operator, BinaryOp::Add) => {
+            is_str_expr(left) || is_str_expr(right)
+        }
+        Expr::Ternary { then_expr, else_expr, .. } => is_str_expr(then_expr) || is_str_expr(else_expr),
+        _ => false,
     }
 }
 

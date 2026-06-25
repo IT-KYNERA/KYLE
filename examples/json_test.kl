@@ -1,0 +1,10 @@
+fn main() -> i32:
+    data = { "count": 42, "value": 100 }
+    result = json_stringify(data)
+    println(result)
+    if contains(result, "\"count\":42") and contains(result, "\"value\":100"):
+        println("PASS")
+        0
+    else:
+        println("FAIL")
+        1

@@ -1,0 +1,3 @@
+fn is_valid(data: str) -> bool:
+    result = json_parse(data)
+    result != 0

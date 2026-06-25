@@ -192,14 +192,14 @@
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| std/core.kl | ✅ | Basic utilities |
-| std/math.kl | ✅ | abs, pow, sqrt, gcd |
+| std/core.kl | ✅ | Option<T>, unwrap_or, is_some, is_none |
+| std/math.kl | ✅ | abs, pow, sqrt, gcd, min, max, clamp |
 | std/io.kl | ✅ | File read/write wrappers |
-| std/testing.kl | ✅ | assert, assert_eq, assert_str |
-| std/str.kl | ⚠️ | starts_with, ends_with (runtime functions exist, need .kl wrapper) |
-| std/collections.kl | ❌ | HashMap, Set — Phase 6 P3 |
-| std/json.kl | ❌ | JSON — Phase 6 P3 |
-| std/time.kl | ❌ | datetime — Phase 6 P3 |
+| std/testing.kl | ✅ | assert, assert_eq, assert_str, assert_ne |
+| std/str.kl | ✅ | starts_with, ends_with, capitalize, repeat_str |
+| std/collections.kl | ✅ | list_sum, list_product, list_max, list_min, list_range |
+| std/json.kl | ✅ | json_parse + json_stringify (via runtime FFI) |
+| std/time.kl | ✅ | timestamp, sleep_ms, seconds_since |
 
 ---
 
@@ -225,9 +225,9 @@
 | textDocument/signatureHelp | ✅ | |
 | textDocument/findReferences | ✅ | |
 | textDocument/codeAction | ✅ | |
-| textDocument/completion | ❌ | Phase 8 — Distribution priority |
-| textDocument/definition | ❌ | Phase 8 |
-| textDocument/hover | ❌ | Phase 8 |
+| textDocument/completion | ✅ | Builtins + AST symbols + keywords |
+| textDocument/definition | ✅ | 8 declaration types supported |
+| textDocument/hover | ✅ | Function sigs + builtin docs + identifier info |
 
 ---
 
@@ -365,7 +365,7 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 | Metric | Value | Notes |
 |--------|-------|-------|
 | Unit tests | 86 | 0 failures |
-| Integration tests (examples/*.kl) | 20 | All pass (verified) |
+| Integration tests (examples/*.kl) | 49 | 49 compile, 48 run correctly (1 known crash: parser.kl list alignment) |
 | Standard library tests | 0 | Pending |
 | Fuzz tests | 0 | Pending |
 
@@ -391,7 +391,7 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 11. **Range slicing** — ✅
 12. **Ternary operator** — ✅
 13. **Match-expression** — ✅
-14. **const fn** — ❌ (not started)
+14. **const fn** — ✅ (type-checker validation + example)
 
 ### 🟦 P3 — Standard library
 
@@ -399,17 +399,19 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 16. **std/math.kl** — ✅
 17. **std/io.kl** — ✅
 18. **std/testing.kl** — ✅
-19. **std/str.kl** — ⚠️ (runtime exists, needs .kl wrapper)
-20. **std/collections.kl** — ❌
-21. **std/json.kl** — ❌
-22. **std/time.kl** — ❌
+19. **std/str.kl** — ✅ (starts_with, ends_with, capitalize, repeat_str)
+20. **std/collections.kl** — ✅ (list_sum, list_product, list_max, list_range)
+21. **std/json.kl** — ✅ (json_parse + json_stringify via runtime FFI)
+22. **std/time.kl** — ✅ (timestamp, sleep_ms, seconds_since)
 
 ### 🟪 P4 — LSP & debug (Phase 8)
 
-23. **LSP autocompletion** — ❌
-24. **LSP go-to-definition** — ❌
-25. **LSP hover** — ❌
+23. **LSP autocompletion** — ✅
+24. **LSP go-to-definition** — ✅
+25. **LSP hover** — ✅
 26. **Debug info (DWARF)** — ❌
+27. **LSP rename** — ❌
+28. **LSP formatting (via formatter)** — ❌
 
 ### 🟩 P5 — Robustness & testing
 

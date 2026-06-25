@@ -347,23 +347,24 @@ en sí mismo esté completo.
 
 ```text
 [x] std/core.kl — Option<T>, utility functions ✅
-[x] std/math.kl — abs, pow, sqrt, gcd ✅
+[x] std/math.kl — abs, pow, sqrt, gcd, min, max, clamp ✅
 [x] std/io.kl — file I/O wrappers ✅
-[x] std/testing.kl — assert, assert_eq, assert_str ✅
-[ ] std/collections.kl — HashMap, Set — PRIORIDAD: MEDIA
-[ ] std/json.kl — JSON parser/generator — PRIORIDAD: BAJA
-[ ] std/str.kl — split, join, starts_with, ends_with — PRIORIDAD: MEDIA
-    - starts_with, ends_with ya funcionan (en runtime)
-[ ] std/time.kl — datetime, duration formatting — PRIORIDAD: BAJA
+[x] std/testing.kl — assert, assert_eq, assert_str, assert_ne ✅
+[x] std/collections.kl — list_sum, list_product, list_max, list_min, list_range ✅
+[x] std/json.kl — json_parse + json_stringify (runtime FFI) ✅
+[x] std/str.kl — starts_with, ends_with, capitalize, repeat_str ✅
+[x] std/time.kl — timestamp, sleep_ms, seconds_since ✅
 ```
 
 #### 🟪 P4 — Tooling Polish
 
 ```text
-[ ] LSP autocompletion (textDocument/completion)
-[ ] LSP go-to-definition (textDocument/definition)
-[ ] LSP hover documentation (textDocument/hover)
+[x] LSP autocompletion (textDocument/completion) ✅
+[x] LSP go-to-definition (textDocument/definition) ✅
+[x] LSP hover documentation (textDocument/hover) ✅
 [ ] Debugger support — DWARF debug info
+[ ] LSP rename (textDocument/rename)
+[ ] LSP formatting integration
 [ ] LLVM optimization levels (O0, O1, O2, O3)
 ```
 
