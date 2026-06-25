@@ -20,6 +20,7 @@ pub struct Codegen<'ctx> {
     alloca_map: Vec<Option<PointerValue<'ctx>>>,
     alloca_types: HashMap<usize, BasicTypeEnum<'ctx>>,
     field_ptr_allocas: Vec<Option<PointerValue<'ctx>>>,
+    field_ptr_types: HashMap<usize, BasicTypeEnum<'ctx>>,
     needs_main_wrapper: bool,
     /// Local IDs holding struct values via pointer (pass-by-reference semantics).
     /// Maps local_id → the original LLVM struct type (used for GEP/load).
@@ -41,7 +42,8 @@ impl<'ctx> Codegen<'ctx> {
                     self.context.ptr_type(Default::default()),
                     field_ptr_alloca, "_fgepload"
                 ).map_err(|e| format!("load_value fptr {}: {}", id, e))?;
-                if let Some(pointee_type) = self.alloca_types.get(&id) {
+                let field_type = self.field_ptr_types.get(&id).or_else(|| self.alloca_types.get(&id));
+                if let Some(pointee_type) = field_type {
                     let loaded = self.builder.build_load(*pointee_type, gep.into_pointer_value(), "")
                         .map_err(|e| format!("load_value field {}: {}", id, e))?;
                     return Ok(loaded);
@@ -73,6 +75,7 @@ impl<'ctx> Codegen<'ctx> {
             alloca_map: Vec::new(),
             alloca_types: HashMap::new(),
             field_ptr_allocas: Vec::new(),
+            field_ptr_types: HashMap::new(),
             needs_main_wrapper: false,
             ref_param_struct_types: HashMap::new(),
         }
@@ -410,6 +413,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_dict_remove", ft, None);
         }
+        // ptr kl_json_parse(ptr) — parse JSON string into dict
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_json_parse", ft, None);
+        }
+        // ptr kl_json_stringify(ptr) — serialize dict to JSON string
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_json_stringify", ft, None);
+        }
     }
 
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
@@ -489,13 +504,14 @@ impl<'ctx> Codegen<'ctx> {
         self.alloca_types.clear();
         self.ref_param_struct_types.clear();
         self.field_ptr_allocas.clear();
+        self.field_ptr_types.clear();
         let ptr_ty = self.context.ptr_type(Default::default());
         for bb in &func.basic_blocks {
             for inst in &bb.insts {
                 if let MirInst::Alloca { dest, type_, .. } = inst {
                     let llvm_ty = self.llvm_type(type_);
-                    let actual_ty = if let MirType::Ptr(inner) = type_ {
-                        self.llvm_type(inner)
+                    let actual_ty = if let MirType::Ptr(_) = type_ {
+                        ptr_ty.as_basic_type_enum()
                     } else {
                         llvm_ty
                     };
@@ -597,7 +613,8 @@ impl<'ctx> Codegen<'ctx> {
                                         self.context.ptr_type(Default::default()), 
                                         field_ptr_alloca, "_fgepload"
                                     ).map_err(|e| format!("fptr load: {}", e))?;
-                                    if let Some(pointee_type) = self.alloca_types.get(src) {
+                                    let field_type = self.field_ptr_types.get(src).or_else(|| self.alloca_types.get(src));
+                                    if let Some(pointee_type) = field_type {
                                         let loaded = self.builder.build_load(*pointee_type, gep.into_pointer_value(), "")
                                             .map_err(|e| format!("field load: {}", e))?;
                                         if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
@@ -609,8 +626,23 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             } else if let Some(ptr) = self.alloca_map.get(*src).and_then(|p| *p) {
                                 if let Some(pointee_type) = self.alloca_types.get(src) {
-                                    let loaded = self.builder.build_load(*pointee_type, ptr, "")
-                                        .map_err(|e| format!("load: {}", e))?;
+                                    let loaded = if self.ref_param_struct_types.contains_key(src) {
+                                        // Ref param: alloca stores a pointer to the struct.
+                                        // Load the pointer from alloca, then load the struct from that pointer.
+                                        let struct_ptr = self.builder.build_load(
+                                            *pointee_type, ptr, "_ref_load"
+                                        ).map_err(|e| format!("ref load: {}", e))?;
+                                        if let Some(&orig_struct_type) = self.ref_param_struct_types.get(src) {
+                                            self.builder.build_load(
+                                                orig_struct_type, struct_ptr.into_pointer_value(), "_ref_val"
+                                            ).map_err(|e| format!("ref load val: {}", e))?
+                                        } else {
+                                            struct_ptr
+                                        }
+                                    } else {
+                                        self.builder.build_load(*pointee_type, ptr, "")
+                                            .map_err(|e| format!("load: {}", e))?
+                                    };
                                     // Store to dest alloca for cross-block reads
                                     if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                         self.builder.build_store(dest_ptr, loaded)
@@ -690,7 +722,26 @@ impl<'ctx> Codegen<'ctx> {
                             };
                             let result_val = result.as_basic_value_enum();
                             if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
-                                self.builder.build_store(dest_ptr, result_val)
+                                // Auto-extend i1 result to wider int if dest type is wider
+                                let extended = match (&result_val, &self.alloca_types.get(dest)) {
+                                    (BasicValueEnum::IntValue(iv), Some(BasicTypeEnum::IntType(dt))) => {
+                                        let rw = iv.get_type().get_bit_width();
+                                        let dw = dt.get_bit_width();
+                                        if rw != dw {
+                                            if rw == 1 && dw > 1 {
+                                                self.builder.build_int_z_extend(*iv, *dt, "")
+                                                    .map_err(|e| format!("binop-zext: {}", e))?
+                                                    .as_basic_value_enum()
+                                            } else {
+                                                self.builder.build_int_cast(*iv, *dt, "")
+                                                    .map_err(|e| format!("binop-cast: {}", e))?
+                                                    .as_basic_value_enum()
+                                            }
+                                        } else { result_val }
+                                    }
+                                    _ => result_val,
+                                };
+                                self.builder.build_store(dest_ptr, extended)
                                     .map_err(|e| format!("binop-store: {}", e))?;
                             }
                             last_value_map.insert(*dest, result_val);
@@ -741,6 +792,8 @@ impl<'ctx> Codegen<'ctx> {
                                 "list_get" => "kl_list_get",
                                 "list_set" => "kl_list_set",
                                 "list_len" => "kl_list_len",
+                                "json_parse" => "kl_json_parse",
+                                "json_stringify" => "kl_json_stringify",
                                 _ => name,
                             };
                             let callee = self.module.get_function(runtime_name);
@@ -814,8 +867,15 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             }
                         }
-                        MirInst::FieldPtr { dest, ptr, field_index, .. } => {
+                        MirInst::FieldPtr { dest, ptr, field_index, struct_type } => {
                             if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                                // Determine field type for later loads from this field pointer
+                                if let MirType::Struct(_, fields) = struct_type.as_ref() {
+                                    if let Some((_, field_mir_type)) = fields.get(*field_index) {
+                                        let field_llvm = self.llvm_type(field_mir_type);
+                                        self.field_ptr_types.insert(*dest, field_llvm);
+                                    }
+                                }
                                 // Ref param: alloca stores pointer-to-struct, load it first
                                 if let Some(&orig_struct_type) = self.ref_param_struct_types.get(ptr) {
                                     let struct_ptr = self.builder.build_load(
@@ -864,9 +924,16 @@ impl<'ctx> Codegen<'ctx> {
                             let target_type = self.llvm_type(to_type);
                             let result = match (&val, &target_type) {
                                 (BasicValueEnum::IntValue(int_val), BasicTypeEnum::IntType(t)) => {
-                                    self.builder.build_int_cast(*int_val, *t, "")
-                                        .map_err(|e| format!("cast: {}", e))?
-                                        .as_basic_value_enum()
+                                    let src_width = int_val.get_type().get_bit_width();
+                                    let dst_width = t.get_bit_width();
+                                    let result = if src_width == 1 && dst_width > 1 {
+                                        self.builder.build_int_z_extend(*int_val, *t, "")
+                                            .map_err(|e| format!("zext: {}", e))?
+                                    } else {
+                                        self.builder.build_int_cast(*int_val, *t, "")
+                                            .map_err(|e| format!("cast: {}", e))?
+                                    };
+                                    result.as_basic_value_enum()
                                 }
                                 (BasicValueEnum::PointerValue(ptr_val), BasicTypeEnum::IntType(t)) => {
                                     self.builder.build_ptr_to_int(*ptr_val, *t, "")
@@ -1011,10 +1078,19 @@ impl<'ctx> Codegen<'ctx> {
                                         self.builder.build_ptr_to_int(*pv, *it, "_retint")
                                             .map_err(|e| format!("ret ptrtoint: {}", e))?
                                             .as_basic_value_enum(),
-                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::IntType(it)) =>
-                                        self.builder.build_int_cast(*iv, *it, "")
-                                            .map_err(|e| format!("ret intcast: {}", e))?
-                                            .as_basic_value_enum(),
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::IntType(it)) => {
+                                        let sw = iv.get_type().get_bit_width();
+                                        let dw = it.get_bit_width();
+                                        if sw == 1 && dw > 1 {
+                                            self.builder.build_int_z_extend(*iv, *it, "")
+                                                .map_err(|e| format!("ret zext: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else {
+                                            self.builder.build_int_cast(*iv, *it, "")
+                                                .map_err(|e| format!("ret intcast: {}", e))?
+                                                .as_basic_value_enum()
+                                        }
+                                    }
                                     (BasicValueEnum::IntValue(iv), BasicTypeEnum::StructType(st)) => {
                                         // Heap pointer (i64) → dereference to struct value
                                         let ptr_ty = self.context.ptr_type(Default::default());

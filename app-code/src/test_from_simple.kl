@@ -1,5 +1,0 @@
-from utils import sumar
-
-fn main():
-    r = sumar(10, 20)
-    println(str(r))

@@ -128,6 +128,7 @@ pub struct MirFunction {
     pub params: Vec<MirType>,
     pub return_type: MirType,
     pub is_fallible: bool,
+    pub is_const: bool,
     pub basic_blocks: Vec<MirBasicBlock>,
     pub local_count: usize,
 }
@@ -139,6 +140,7 @@ impl MirFunction {
             params: Vec::new(),
             return_type: MirType::Void,
             is_fallible: false,
+            is_const: false,
             basic_blocks: Vec::new(),
             local_count: 0,
         }
@@ -323,6 +325,7 @@ impl fmt::Display for MirTerminator {
 
 impl fmt::Display for MirFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_const { write!(f, "const ")?; }
         write!(f, "fn {}({}) -> {}", self.name,
             self.params.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(", "),
             self.return_type)?;

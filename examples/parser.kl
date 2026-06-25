@@ -1257,9 +1257,7 @@ fn parse_expr(p: Parser, min_prec: i32) -> AstNode:
             prop_t = expect_identifier(p)
             left = make_node(ND_PROPERTY, prop_t.value, [left, make_leaf(ND_IDENTIFIER, prop_t.value, prop_t.line, prop_t.col)], 0, 0)
             continue
-        elif k == TOK_OPERATOR && v == "?" && p.pos + 1 < p.len && p.tokens[p.pos + 1].value == ".":
-            advance(p)
-            advance(p)
+        elif k == TOK_OPERATOR && v == "?.":
             left = make_node(ND_OPT_CHAIN, "?.", [left], 0, 0)
             continue
         elif k == TOK_OPERATOR && v == "!":

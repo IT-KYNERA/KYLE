@@ -1005,6 +1005,7 @@ impl Parser {
         let body = self.parse_block()?;
         let else_branch = if self.at(TokenKind::Else) {
             self.advance();
+            self.expect(TokenKind::Colon)?;
             Some(self.parse_block()?)
         } else { None };
         Ok(Stmt::BindingIf(BindingIf {
@@ -1020,6 +1021,7 @@ impl Parser {
         let body = self.parse_block()?;
         let else_branch = if self.at(TokenKind::Else) {
             self.advance();
+            self.expect(TokenKind::Colon)?;
             Some(self.parse_block()?)
         } else { None };
         Ok(Stmt::While(WhileStmt { condition: Box::new(condition), body, else_branch, span: self.span_from(start) }))
@@ -1035,6 +1037,7 @@ impl Parser {
         let body = self.parse_block()?;
         let else_branch = if self.at(TokenKind::Else) {
             self.advance();
+            self.expect(TokenKind::Colon)?;
             Some(self.parse_block()?)
         } else { None };
         Ok(Stmt::For(ForStmt { variable, iterable: Box::new(iterable), body, else_branch, span: self.span_from(start) }))

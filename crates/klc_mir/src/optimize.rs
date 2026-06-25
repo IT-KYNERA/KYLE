@@ -11,10 +11,282 @@ impl Optimizer {
 
     /// Run all optimization passes on a module.
     pub fn optimize(&self, module: &mut MirModule) {
+        // First, evaluate const fn calls (replaces them with constants)
+        self.const_eval(module);
         for func in &mut module.functions {
             self.constant_fold(func);
             self.dead_code_elim(func);
             self.remove_unreachable_blocks(func);
+        }
+    }
+
+    /// Evaluate const fn calls where all arguments are constants.
+    /// Replaces the call with a Store of the constant result.
+    fn const_eval(&self, module: &mut MirModule) {
+        // Build a map of const function name -> index in module
+        let const_fns: HashMap<String, usize> = module.functions.iter()
+            .enumerate()
+            .filter(|(_, f)| f.is_const)
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
+
+        if const_fns.is_empty() {
+            return;
+        }
+
+        let funcs = module.functions.clone(); // clone for borrow-free access
+        let func_indices: HashMap<String, usize> = module.functions.iter()
+            .enumerate()
+            .map(|(i, f)| (f.name.clone(), i))
+            .collect();
+
+        for func in &mut module.functions {
+            for bb in &mut func.basic_blocks {
+                let mut i = 0;
+                while i < bb.insts.len() {
+                    if let MirInst::Call { dest: Some(dest), name, args } = &bb.insts[i] {
+                        if const_fns.contains_key(name) {
+                            // Check if all args are constants
+                            let const_args: Vec<MirConstant> = args.iter()
+                                .filter_map(|a| match a {
+                                    MirValue::Constant(c) => Some(c.clone()),
+                                    _ => None,
+                                })
+                                .collect();
+                            if const_args.len() == args.len() {
+                                // Evaluate the const fn
+                                if let Some(func_idx) = func_indices.get(name) {
+                                    let callee = &funcs[*func_idx];
+                                    let result = Self::eval_mir_function(callee, &const_args, &funcs);
+                                    if let Some(result) = result {
+                                        bb.insts[i] = MirInst::Store {
+                                            dest: *dest,
+                                            value: MirValue::Constant(result),
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    i += 1;
+                }
+            }
+        }
+    }
+
+    /// Evaluate a MIR function with constant arguments.
+    /// Returns the constant result, or None if evaluation fails.
+    fn eval_mir_function(func: &MirFunction, args: &[MirConstant], all_funcs: &[MirFunction]) -> Option<MirConstant> {
+        use MirInst::*;
+
+        // Map local ID -> constant value
+        let mut locals: HashMap<usize, MirConstant> = HashMap::new();
+
+        // Initialize params from args
+        for (i, arg) in args.iter().enumerate() {
+            locals.insert(i, arg.clone());
+        }
+
+        // Track current block
+        let mut block_idx = 0;
+        let mut visited = HashSet::new();
+        let mut safety = 0;
+
+        loop {
+            safety += 1;
+            if safety > 10000 {
+                return None; // safety limit
+            }
+            if block_idx >= func.basic_blocks.len() || !visited.insert(block_idx) {
+                return None; // loop detected or out of bounds
+            }
+
+            let block = &func.basic_blocks[block_idx];
+
+            for inst in &block.insts {
+                match inst {
+                    Alloca { dest, .. } => {
+                        locals.entry(*dest).or_insert(MirConstant::I32(0));
+                    }
+                    Store { dest, value } => {
+                        if let Some(val) = Self::eval_mir_value(value, args, &locals) {
+                            locals.insert(*dest, val);
+                        } else {
+                            return None;
+                        }
+                    }
+                    Load { dest, src } => {
+                        if let Some(val) = locals.get(src).cloned() {
+                            locals.insert(*dest, val);
+                        } else if src < &args.len() {
+                            locals.insert(*dest, args[*src].clone());
+                        } else {
+                            return None;
+                        }
+                    }
+                    BinaryOp { dest, op, left, right } => {
+                        if let (Some(l), Some(r)) = (
+                            Self::eval_mir_value(left, args, &locals),
+                            Self::eval_mir_value(right, args, &locals),
+                        ) {
+                            locals.insert(*dest, Self::eval_const_binary(op, &l, &r));
+                        } else {
+                            return None;
+                        }
+                    }
+                    UnaryOp { dest, op, operand } => {
+                        if let Some(val) = Self::eval_mir_value(operand, args, &locals) {
+                            locals.insert(*dest, match op {
+                                MirUnaryOp::Neg => match val {
+                                    MirConstant::I32(n) => MirConstant::I32(n.wrapping_neg()),
+                                    MirConstant::I64(n) => MirConstant::I64(n.wrapping_neg()),
+                                    _ => return None,
+                                },
+                                MirUnaryOp::Not => match val {
+                                    MirConstant::Bool(b) => MirConstant::Bool(!b),
+                                    MirConstant::I32(n) => MirConstant::I32(!n),
+                                    MirConstant::I64(n) => MirConstant::I64(!n),
+                                    _ => return None,
+                                },
+                                MirUnaryOp::BitNot => match val {
+                                    MirConstant::I32(n) => MirConstant::I32(!n),
+                                    MirConstant::I64(n) => MirConstant::I64(!n),
+                                    _ => return None,
+                                },
+                            });
+                        } else {
+                            return None;
+                        }
+                    }
+                    Cast { dest, value, to_type } => {
+                        if let Some(val) = Self::eval_mir_value(value, args, &locals) {
+                            let result = match (val.clone(), to_type) {
+                                (MirConstant::I32(n), MirType::I64) => MirConstant::I64(n as i64),
+                                (MirConstant::I32(n), MirType::Bool) => MirConstant::Bool(n != 0),
+                                (MirConstant::I64(n), MirType::I32) => MirConstant::I32(n as i32),
+                                (MirConstant::Bool(b), MirType::I32) => MirConstant::I32(if b { 1 } else { 0 }),
+                                _ => val,
+                            };
+                            locals.insert(*dest, result);
+                        } else {
+                            return None;
+                        }
+                    }
+                    Call { dest: Some(d), name, args: call_args } => {
+                        // Recurse into const fn
+                        let const_args: Vec<MirConstant> = call_args.iter()
+                            .filter_map(|a| Self::eval_mir_value(a, args, &locals))
+                            .collect();
+                        if const_args.len() == call_args.len() {
+                            if let Some(callee) = all_funcs.iter().find(|f| f.name == *name) {
+                                if let Some(result) = Self::eval_mir_function(callee, &const_args, all_funcs) {
+                                    locals.insert(*d, result);
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                return None;
+                            }
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => {
+                        // Unsupported instruction in const fn (FieldPtr, PtrOffset, etc.)
+                        return None;
+                    }
+                }
+            }
+
+            // Handle terminator
+            match &block.terminator {
+                MirTerminator::Return(val) => {
+                    return Self::eval_mir_value(val, args, &locals);
+                }
+                MirTerminator::Br(label) => {
+                    block_idx = func.basic_blocks.iter().position(|b| &b.label == label)?;
+                }
+                MirTerminator::CondBr { cond, true_block, false_block } => {
+                    let cond_val = Self::eval_mir_value(cond, args, &locals)?;
+                    let take_true = match cond_val {
+                        MirConstant::Bool(b) => b,
+                        MirConstant::I32(n) => n != 0,
+                        _ => return None,
+                    };
+                    let target = if take_true { true_block } else { false_block };
+                    block_idx = func.basic_blocks.iter().position(|b| b.label == *target)?;
+                }
+                MirTerminator::Unreachable => {
+                    return None;
+                }
+            }
+        }
+    }
+
+    fn eval_mir_value(value: &MirValue, args: &[MirConstant], locals: &HashMap<usize, MirConstant>) -> Option<MirConstant> {
+        match value {
+            MirValue::Constant(c) => Some(c.clone()),
+            MirValue::Local(id) => locals.get(id).cloned(),
+            MirValue::Param(id) => args.get(*id).cloned(),
+        }
+    }
+
+    fn eval_const_binary(op: &MirBinaryOp, left: &MirConstant, right: &MirConstant) -> MirConstant {
+        match (left, right) {
+            (MirConstant::I32(l), MirConstant::I32(r)) => {
+                match op {
+                    MirBinaryOp::Add => MirConstant::I32(l.wrapping_add(*r)),
+                    MirBinaryOp::Sub => MirConstant::I32(l.wrapping_sub(*r)),
+                    MirBinaryOp::Mul => MirConstant::I32(l.wrapping_mul(*r)),
+                    MirBinaryOp::Div => if *r != 0 { MirConstant::I32(l.wrapping_div(*r)) } else { MirConstant::I32(0) },
+                    MirBinaryOp::Rem => if *r != 0 { MirConstant::I32(l.wrapping_rem(*r)) } else { MirConstant::I32(0) },
+                    MirBinaryOp::And => MirConstant::I32(l & r),
+                    MirBinaryOp::Or => MirConstant::I32(l | r),
+                    MirBinaryOp::Xor => MirConstant::I32(l ^ r),
+                    MirBinaryOp::Shl => MirConstant::I32(l.wrapping_shl(*r as u32)),
+                    MirBinaryOp::Shr => MirConstant::I32(l.wrapping_shr(*r as u32)),
+                    MirBinaryOp::Eq => MirConstant::Bool(l == r),
+                    MirBinaryOp::Neq => MirConstant::Bool(l != r),
+                    MirBinaryOp::Lt => MirConstant::Bool(l < r),
+                    MirBinaryOp::Gt => MirConstant::Bool(l > r),
+                    MirBinaryOp::Le => MirConstant::Bool(l <= r),
+                    MirBinaryOp::Ge => MirConstant::Bool(l >= r),
+                }
+            }
+            (MirConstant::I64(l), MirConstant::I64(r)) => {
+                match op {
+                    MirBinaryOp::Add => MirConstant::I64(l.wrapping_add(*r)),
+                    MirBinaryOp::Sub => MirConstant::I64(l.wrapping_sub(*r)),
+                    MirBinaryOp::Mul => MirConstant::I64(l.wrapping_mul(*r)),
+                    MirBinaryOp::Div => if *r != 0 { MirConstant::I64(l.wrapping_div(*r)) } else { MirConstant::I64(0) },
+                    MirBinaryOp::Rem => if *r != 0 { MirConstant::I64(l.wrapping_rem(*r)) } else { MirConstant::I64(0) },
+                    MirBinaryOp::And => MirConstant::I64(l & r),
+                    MirBinaryOp::Or => MirConstant::I64(l | r),
+                    MirBinaryOp::Xor => MirConstant::I64(l ^ r),
+                    MirBinaryOp::Shl => MirConstant::I64(l.wrapping_shl(*r as u32)),
+                    MirBinaryOp::Shr => MirConstant::I64(l.wrapping_shr(*r as u32)),
+                    MirBinaryOp::Eq => MirConstant::Bool(l == r),
+                    MirBinaryOp::Neq => MirConstant::Bool(l != r),
+                    MirBinaryOp::Lt => MirConstant::Bool(l < r),
+                    MirBinaryOp::Gt => MirConstant::Bool(l > r),
+                    MirBinaryOp::Le => MirConstant::Bool(l <= r),
+                    MirBinaryOp::Ge => MirConstant::Bool(l >= r),
+                }
+            }
+            (MirConstant::Bool(l), MirConstant::Bool(r)) => {
+                match op {
+                    MirBinaryOp::And => MirConstant::Bool(*l && *r),
+                    MirBinaryOp::Or => MirConstant::Bool(*l || *r),
+                    MirBinaryOp::Eq => MirConstant::Bool(l == r),
+                    MirBinaryOp::Neq => MirConstant::Bool(l != r),
+                    MirBinaryOp::Lt => MirConstant::Bool(!l && *r),
+                    MirBinaryOp::Gt => MirConstant::Bool(*l && !r),
+                    MirBinaryOp::Le => MirConstant::Bool(*l <= *r),
+                    MirBinaryOp::Ge => MirConstant::Bool(*l >= *r),
+                    _ => MirConstant::Bool(false),
+                }
+            }
+            _ => MirConstant::Void,
         }
     }
 

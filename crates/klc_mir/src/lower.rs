@@ -74,6 +74,8 @@ struct LowerCtx {
     /// Deferred call expressions (AST) to execute before function return.
     /// Stored in definition order; emitted in reverse (LIFO).
     deferred_exprs: Vec<Box<Expr>>,
+    /// When set, break instructions store `true` here before branching.
+    break_flag_local: Option<usize>,
 }
 
 impl LowerCtx {
@@ -93,6 +95,7 @@ impl LowerCtx {
             match_result_local: None,
             is_fallible: false,
             deferred_exprs: Vec::new(),
+            break_flag_local: None,
         }
     }
 
@@ -542,6 +545,7 @@ impl Lowerer {
             .unwrap_or(MirType::Void);
         let is_fallible = f.return_type.as_ref().map_or(false, |rt| matches!(rt, AstType::Error { .. }));
         mir_func.is_fallible = is_fallible;
+        mir_func.is_const = f.is_const;
 
         let mut ctx = LowerCtx::new();
         ctx.struct_defs = self.struct_defs.borrow().clone();
@@ -919,175 +923,405 @@ impl Lowerer {
                 ctx
             }
             Stmt::While(s) => {
+                let has_else = s.else_branch.is_some();
                 let cond_label = ctx.fresh_block();
                 let body_label = ctx.fresh_block();
-                let end_label = ctx.fresh_block();
-                let cond_label2 = cond_label.clone();
+                let exit_label = ctx.fresh_block();
+                let else_label = ctx.fresh_block();
+                let skip_else_label = ctx.fresh_block();
+                let merge_label = ctx.fresh_block();
 
-                ctx.finish_block(MirTerminator::Br(cond_label2.clone()));
-                ctx.current_block = MirBasicBlock::new(cond_label);
+                let flag_local = if has_else {
+                    let f = ctx.alloc_local("_loop_break", MirType::Bool);
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: f,
+                        value: MirValue::Constant(MirConstant::Bool(false)),
+                    });
+                    Some(f)
+                } else {
+                    None
+                };
+
+                ctx.finish_block(MirTerminator::Br(cond_label.clone()));
+                ctx.current_block = MirBasicBlock::new(cond_label.clone());
                 let cond_ctx = self.lower_expr(ctx, &s.condition);
                 ctx = cond_ctx;
                 let cond_val = MirValue::Local(ctx.next_local - 1);
+
+                let false_target = if has_else { else_label.clone() } else { exit_label.clone() };
                 ctx.finish_block(MirTerminator::CondBr {
                     cond: cond_val,
                     true_block: body_label.clone(),
-                    false_block: end_label.clone(),
+                    false_block: false_target,
                 });
 
+                // Body block
                 ctx.current_block = MirBasicBlock::new(body_label);
-                ctx.break_targets.push(end_label.clone());
-                ctx.continue_targets.push(cond_label2.clone());
+                let break_target = if has_else { else_label.clone() } else { exit_label.clone() };
+                ctx.break_targets.push(break_target);
+                ctx.continue_targets.push(cond_label.clone());
+                if has_else { ctx.break_flag_local = flag_local; }
                 for stmt in &s.body.statements {
                     ctx = self.lower_stmt(ctx, stmt);
                 }
+                ctx.break_flag_local = None;
                 ctx.break_targets.pop();
                 ctx.continue_targets.pop();
-                ctx.finish_block(MirTerminator::Br(cond_label2.clone()));
+                ctx.finish_block(MirTerminator::Br(cond_label.clone()));
 
-                ctx.current_block = MirBasicBlock::new(end_label);
+                if has_else {
+                    // else_label: check flag → execute else or skip
+                    ctx.current_block = MirBasicBlock::new(else_label);
+                    let f_load = ctx.alloc_local("_flag_v", MirType::Bool);
+                    ctx.current_block.insts.push(MirInst::Load { dest: f_load, src: flag_local.unwrap() });
+                    ctx.finish_block(MirTerminator::CondBr {
+                        cond: MirValue::Local(f_load),
+                        true_block: skip_else_label.clone(),
+                        false_block: exit_label.clone(),
+                    });
+
+                    // exit_label: else body
+                    ctx.current_block = MirBasicBlock::new(exit_label);
+                    if let Some(eb) = &s.else_branch {
+                        for stmt in &eb.statements {
+                            ctx = self.lower_stmt(ctx, stmt);
+                        }
+                    }
+                    ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                    // skip_else_label
+                    ctx.current_block = MirBasicBlock::new(skip_else_label);
+                    ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                    ctx.current_block = MirBasicBlock::new(merge_label);
+                } else {
+                    ctx.current_block = MirBasicBlock::new(exit_label);
+                }
                 ctx
             }
             Stmt::For(s) => {
-                let cond_label = ctx.fresh_block();
-                let body_label = ctx.fresh_block();
-                let end_label = ctx.fresh_block();
+                // Check if iterable is a range expression (for i in 0..10)
+                if let Expr::Binary { operator: BinaryOp::Range, left, right, .. } = &*s.iterable {
+                    // === RANGE-BASED FOR LOOP ===
+                    let cond_label = ctx.fresh_block();
+                    let body_label = ctx.fresh_block();
+                    let inc_label = ctx.fresh_block();
+                    let check_label = ctx.fresh_block();
+                    let else_label = ctx.fresh_block();
+                    let skip_else_label = ctx.fresh_block();
+                    let merge_label = ctx.fresh_block();
 
-                // 1. Lower the iterable expression
-                ctx = self.lower_expr(ctx, &s.iterable);
-                let iter_val = ctx.next_local - 1;
+                    let has_else = s.else_branch.is_some();
 
-                // Determine element type from the list type
-                let elem_type = match ctx.local_types.get(&iter_val) {
-                    Some(MirType::List(inner)) => inner.as_ref().clone(),
-                    _ => MirType::I64,
-                };
+                    let flag_local = if has_else {
+                        let f = ctx.alloc_local("_loop_break", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: f,
+                            value: MirValue::Constant(MirConstant::Bool(false)),
+                        });
+                        Some(f)
+                    } else {
+                        None
+                    };
 
-                // Allocate loop variable with proper type
-                let var_local = ctx.alloc_local(&s.variable, elem_type.clone());
-                ctx.locals.insert(s.variable.clone(), var_local);
-                if elem_type == MirType::Str {
-                    ctx.string_locals.push(var_local);
-                }
+                    // 1. Lower start and end expressions
+                    ctx = self.lower_expr(ctx, left);
+                    let start_val = ctx.next_local - 1;
+                    ctx = self.lower_expr(ctx, right);
+                    let end_val = ctx.next_local - 1;
 
-                // Store list pointer in alloca for cross-block access
-                let list_alloca = ctx.alloc_local("_for_list", MirType::List(Box::new(elem_type.clone())));
-                ctx.current_block.insts.push(MirInst::Store {
-                    dest: list_alloca,
-                    value: MirValue::Local(iter_val),
-                });
+                    // Allocate loop variable as I32
+                    let var_local = ctx.alloc_local(&s.variable, MirType::I32);
+                    ctx.locals.insert(s.variable.clone(), var_local);
 
-                // Allocate and init index to 0
-                let idx_local = ctx.alloc_local("_for_idx", MirType::I32);
-                ctx.current_block.insts.push(MirInst::Store {
-                    dest: idx_local,
-                    value: MirValue::Constant(MirConstant::I32(0)),
-                });
-
-                // Load list ptr and call kl_list_len
-                let list_tmp = ctx.alloc_local("_for_lt", MirType::List(Box::new(elem_type.clone())));
-                ctx.current_block.insts.push(MirInst::Load { dest: list_tmp, src: list_alloca });
-                let len_local = ctx.alloc_local("_for_len", MirType::I64);
-                ctx.current_block.insts.push(MirInst::Call {
-                    dest: Some(len_local),
-                    name: "kl_list_len".to_string(),
-                    args: vec![MirValue::Local(list_tmp)],
-                });
-
-                ctx.finish_block(MirTerminator::Br(cond_label.clone()));
-
-                // 2. Cond block: load index, compare with len
-                ctx.current_block = MirBasicBlock::new(cond_label.clone());
-
-                // Load index
-                let idx = ctx.alloc_local("_for_i", MirType::I32);
-                ctx.current_block.insts.push(MirInst::Load { dest: idx, src: idx_local });
-
-                // Load and cast len i64→i32
-                let len_val = ctx.alloc_local("_for_lv", MirType::I64);
-                ctx.current_block.insts.push(MirInst::Load { dest: len_val, src: len_local });
-                let len32 = ctx.alloc_local("_for_len32", MirType::I32);
-                ctx.current_block.insts.push(MirInst::Cast {
-                    dest: len32, value: MirValue::Local(len_val), to_type: MirType::I32,
-                });
-
-                // Compare idx < len
-                let cmp = ctx.alloc_local("_for_cmp", MirType::Bool);
-                ctx.current_block.insts.push(MirInst::BinaryOp {
-                    dest: cmp, op: MirBinaryOp::Lt,
-                    left: MirValue::Local(idx), right: MirValue::Local(len32),
-                });
-
-                ctx.finish_block(MirTerminator::CondBr {
-                    cond: MirValue::Local(cmp),
-                    true_block: body_label.clone(),
-                    false_block: end_label.clone(),
-                });
-
-                // 3. Body block
-                ctx.current_block = MirBasicBlock::new(body_label.clone());
-                ctx.break_targets.push(end_label.clone());
-                ctx.continue_targets.push(cond_label.clone());
-
-                // Load current index
-                let idx2 = ctx.alloc_local("_for_i2", MirType::I32);
-                ctx.current_block.insts.push(MirInst::Load { dest: idx2, src: idx_local });
-
-                // Cast index to i64 for kl_list_get
-                let idx2_64 = ctx.alloc_local("_for_i64", MirType::I64);
-                ctx.current_block.insts.push(MirInst::Cast {
-                    dest: idx2_64, value: MirValue::Local(idx2), to_type: MirType::I64,
-                });
-
-                // Load list pointer
-                let list_tmp2 = ctx.alloc_local("_for_lt2", MirType::List(Box::new(elem_type.clone())));
-                ctx.current_block.insts.push(MirInst::Load { dest: list_tmp2, src: list_alloca });
-
-                // Call kl_list_get
-                let elem_raw = ctx.alloc_local("_for_elem", MirType::I64);
-                ctx.current_block.insts.push(MirInst::Call {
-                    dest: Some(elem_raw),
-                    name: "kl_list_get".to_string(),
-                    args: vec![MirValue::Local(list_tmp2), MirValue::Local(idx2_64)],
-                });
-
-                // Store element into loop variable with correct type
-                if elem_type == MirType::Str {
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest: var_local, value: MirValue::Local(elem_raw), to_type: MirType::Str,
-                    });
-                } else if elem_type != MirType::I64 {
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest: var_local, value: MirValue::Local(elem_raw), to_type: elem_type.clone(),
-                    });
-                } else {
+                    // Store start value in loop variable
                     ctx.current_block.insts.push(MirInst::Store {
-                        dest: var_local, value: MirValue::Local(elem_raw),
+                        dest: var_local,
+                        value: MirValue::Local(start_val),
                     });
+
+                    // Store end value in alloca for cross-block access
+                    let end_alloca = ctx.alloc_local("_for_end", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: end_alloca,
+                        value: MirValue::Local(end_val),
+                    });
+
+                    ctx.finish_block(MirTerminator::Br(cond_label.clone()));
+
+                    // 2. Cond block: load i, compare i < end
+                    ctx.current_block = MirBasicBlock::new(cond_label.clone());
+
+                    let i_val = ctx.alloc_local("_for_i", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: i_val, src: var_local });
+                    let end_loaded = ctx.alloc_local("_for_el", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: end_loaded, src: end_alloca });
+
+                    let cmp = ctx.alloc_local("_for_cmp", MirType::Bool);
+                    ctx.current_block.insts.push(MirInst::BinaryOp {
+                        dest: cmp, op: MirBinaryOp::Lt,
+                        left: MirValue::Local(i_val), right: MirValue::Local(end_loaded),
+                    });
+
+                    let false_target = if has_else { else_label.clone() } else { check_label.clone() };
+                    ctx.finish_block(MirTerminator::CondBr {
+                        cond: MirValue::Local(cmp),
+                        true_block: body_label.clone(),
+                        false_block: false_target.clone(),
+                    });
+
+                    // 3. Body block
+                    ctx.current_block = MirBasicBlock::new(body_label.clone());
+                    ctx.break_targets.push(false_target);
+                    ctx.continue_targets.push(inc_label.clone());
+                    if has_else { ctx.break_flag_local = flag_local; }
+
+                    // Lower body statements
+                    for stmt in &s.body.statements {
+                        ctx = self.lower_stmt(ctx, stmt);
+                    }
+                    ctx.break_flag_local = None;
+                    ctx.break_targets.pop();
+                    ctx.continue_targets.pop();
+
+                    // Fall through to inc block
+                    ctx.finish_block(MirTerminator::Br(inc_label.clone()));
+
+                    // 4. Increment block: i += 1, then goto cond
+                    ctx.current_block = MirBasicBlock::new(inc_label.clone());
+                    let iv2 = ctx.alloc_local("_for_iv2", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: iv2, src: var_local });
+                    let iv3 = ctx.alloc_local("_for_iv3", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::BinaryOp {
+                        dest: iv3, op: MirBinaryOp::Add,
+                        left: MirValue::Local(iv2), right: MirValue::Constant(MirConstant::I32(1)),
+                    });
+                    ctx.current_block.insts.push(MirInst::Store { dest: var_local, value: MirValue::Local(iv3) });
+
+                    ctx.finish_block(MirTerminator::Br(cond_label.clone()));
+
+                    if has_else {
+                        // 5a. Else-label: check flag → execute else or skip
+                        ctx.current_block = MirBasicBlock::new(else_label.clone());
+                        let f_load = ctx.alloc_local("_flag_v", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::Load { dest: f_load, src: flag_local.unwrap() });
+                        ctx.finish_block(MirTerminator::CondBr {
+                            cond: MirValue::Local(f_load),
+                            true_block: skip_else_label.clone(),
+                            false_block: check_label.clone(),
+                        });
+
+                        // 5b. Check-label: execute else body
+                        ctx.current_block = MirBasicBlock::new(check_label.clone());
+                        if let Some(eb) = &s.else_branch {
+                            for stmt in &eb.statements {
+                                ctx = self.lower_stmt(ctx, stmt);
+                            }
+                        }
+                        ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                        // 5c. Skip else
+                        ctx.current_block = MirBasicBlock::new(skip_else_label);
+                        ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                        ctx.current_block = MirBasicBlock::new(merge_label);
+                    } else {
+                        // 5. End block
+                        ctx.current_block = MirBasicBlock::new(check_label);
+                    }
+                    ctx
+                } else {
+                    // === LIST-BASED FOR LOOP ===
+                    let cond_label = ctx.fresh_block();
+                    let body_label = ctx.fresh_block();
+                    let inc_label = ctx.fresh_block();
+                    let check_label = ctx.fresh_block();
+                    let else_label = ctx.fresh_block();
+                    let skip_else_label = ctx.fresh_block();
+                    let merge_label = ctx.fresh_block();
+
+                    let has_else = s.else_branch.is_some();
+
+                    let flag_local = if has_else {
+                        let f = ctx.alloc_local("_loop_break", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: f,
+                            value: MirValue::Constant(MirConstant::Bool(false)),
+                        });
+                        Some(f)
+                    } else {
+                        None
+                    };
+
+                    // 1. Lower the iterable expression
+                    ctx = self.lower_expr(ctx, &s.iterable);
+                    let iter_val = ctx.next_local - 1;
+
+                    // Determine element type from the list type
+                    let elem_type = match ctx.local_types.get(&iter_val) {
+                        Some(MirType::List(inner)) => inner.as_ref().clone(),
+                        _ => MirType::I64,
+                    };
+
+                    // Allocate loop variable with proper type
+                    let var_local = ctx.alloc_local(&s.variable, elem_type.clone());
+                    ctx.locals.insert(s.variable.clone(), var_local);
+                    if elem_type == MirType::Str {
+                        ctx.string_locals.push(var_local);
+                    }
+
+                    // Store list pointer in alloca for cross-block access
+                    let list_alloca = ctx.alloc_local("_for_list", MirType::List(Box::new(elem_type.clone())));
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: list_alloca,
+                        value: MirValue::Local(iter_val),
+                    });
+
+                    // Allocate and init index to 0
+                    let idx_local = ctx.alloc_local("_for_idx", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: idx_local,
+                        value: MirValue::Constant(MirConstant::I32(0)),
+                    });
+
+                    // Load list ptr and call kl_list_len
+                    let list_tmp = ctx.alloc_local("_for_lt", MirType::List(Box::new(elem_type.clone())));
+                    ctx.current_block.insts.push(MirInst::Load { dest: list_tmp, src: list_alloca });
+                    let len_local = ctx.alloc_local("_for_len", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(len_local),
+                        name: "kl_list_len".to_string(),
+                        args: vec![MirValue::Local(list_tmp)],
+                    });
+
+                    ctx.finish_block(MirTerminator::Br(cond_label.clone()));
+
+                    // 2. Cond block: load index, compare with len
+                    ctx.current_block = MirBasicBlock::new(cond_label.clone());
+
+                    // Load index
+                    let idx = ctx.alloc_local("_for_i", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: idx, src: idx_local });
+
+                    // Load and cast len i64→i32
+                    let len_val = ctx.alloc_local("_for_lv", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Load { dest: len_val, src: len_local });
+                    let len32 = ctx.alloc_local("_for_len32", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: len32, value: MirValue::Local(len_val), to_type: MirType::I32,
+                    });
+
+                    // Compare idx < len
+                    let cmp = ctx.alloc_local("_for_cmp", MirType::Bool);
+                    ctx.current_block.insts.push(MirInst::BinaryOp {
+                        dest: cmp, op: MirBinaryOp::Lt,
+                        left: MirValue::Local(idx), right: MirValue::Local(len32),
+                    });
+
+                    let false_target = if has_else { else_label.clone() } else { check_label.clone() };
+                    ctx.finish_block(MirTerminator::CondBr {
+                        cond: MirValue::Local(cmp),
+                        true_block: body_label.clone(),
+                        false_block: false_target.clone(),
+                    });
+
+                    // 3. Body block
+                    ctx.current_block = MirBasicBlock::new(body_label.clone());
+                    ctx.break_targets.push(false_target);
+                    ctx.continue_targets.push(inc_label.clone());
+                    if has_else { ctx.break_flag_local = flag_local; }
+
+                    // Load current index
+                    let idx2 = ctx.alloc_local("_for_i2", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: idx2, src: idx_local });
+
+                    // Cast index to i64 for kl_list_get
+                    let idx2_64 = ctx.alloc_local("_for_i64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: idx2_64, value: MirValue::Local(idx2), to_type: MirType::I64,
+                    });
+
+                    // Load list pointer
+                    let list_tmp2 = ctx.alloc_local("_for_lt2", MirType::List(Box::new(elem_type.clone())));
+                    ctx.current_block.insts.push(MirInst::Load { dest: list_tmp2, src: list_alloca });
+
+                    // Call kl_list_get
+                    let elem_raw = ctx.alloc_local("_for_elem", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(elem_raw),
+                        name: "kl_list_get".to_string(),
+                        args: vec![MirValue::Local(list_tmp2), MirValue::Local(idx2_64)],
+                    });
+
+                    // Store element into loop variable with correct type
+                    if elem_type == MirType::Str {
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: var_local, value: MirValue::Local(elem_raw), to_type: MirType::Str,
+                        });
+                    } else if elem_type != MirType::I64 {
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: var_local, value: MirValue::Local(elem_raw), to_type: elem_type.clone(),
+                        });
+                    } else {
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: var_local, value: MirValue::Local(elem_raw),
+                        });
+                    }
+
+                    // Lower body statements
+                    for stmt in &s.body.statements {
+                        ctx = self.lower_stmt(ctx, stmt);
+                    }
+                    ctx.break_flag_local = None;
+                    ctx.break_targets.pop();
+                    ctx.continue_targets.pop();
+
+                    ctx.finish_block(MirTerminator::Br(inc_label.clone()));
+
+                    // 4. Increment block: idx += 1, then goto cond
+                    ctx.current_block = MirBasicBlock::new(inc_label.clone());
+                    let idx3 = ctx.alloc_local("_for_i3", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Load { dest: idx3, src: idx_local });
+                    let idx4 = ctx.alloc_local("_for_i4", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::BinaryOp {
+                        dest: idx4, op: MirBinaryOp::Add,
+                        left: MirValue::Local(idx3), right: MirValue::Constant(MirConstant::I32(1)),
+                    });
+                    ctx.current_block.insts.push(MirInst::Store { dest: idx_local, value: MirValue::Local(idx4) });
+
+                    ctx.finish_block(MirTerminator::Br(cond_label.clone()));
+
+                    if has_else {
+                        // 5a. Else-label: check flag → execute else or skip
+                        ctx.current_block = MirBasicBlock::new(else_label.clone());
+                        let f_load = ctx.alloc_local("_flag_v", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::Load { dest: f_load, src: flag_local.unwrap() });
+                        ctx.finish_block(MirTerminator::CondBr {
+                            cond: MirValue::Local(f_load),
+                            true_block: skip_else_label.clone(),
+                            false_block: check_label.clone(),
+                        });
+
+                        // 5b. Check-label: execute else body
+                        ctx.current_block = MirBasicBlock::new(check_label.clone());
+                        if let Some(eb) = &s.else_branch {
+                            for stmt in &eb.statements {
+                                ctx = self.lower_stmt(ctx, stmt);
+                            }
+                        }
+                        ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                        // 5c. Skip else
+                        ctx.current_block = MirBasicBlock::new(skip_else_label);
+                        ctx.finish_block(MirTerminator::Br(merge_label.clone()));
+
+                        ctx.current_block = MirBasicBlock::new(merge_label);
+                    } else {
+                        // 5. End block
+                        ctx.current_block = MirBasicBlock::new(check_label);
+                    }
+                    ctx
                 }
-
-                // Lower body statements
-                for stmt in &s.body.statements {
-                    ctx = self.lower_stmt(ctx, stmt);
-                }
-                ctx.break_targets.pop();
-                ctx.continue_targets.pop();
-
-                // Increment index
-                let idx3 = ctx.alloc_local("_for_i3", MirType::I32);
-                ctx.current_block.insts.push(MirInst::Load { dest: idx3, src: idx_local });
-                let idx4 = ctx.alloc_local("_for_i4", MirType::I32);
-                ctx.current_block.insts.push(MirInst::BinaryOp {
-                    dest: idx4, op: MirBinaryOp::Add,
-                    left: MirValue::Local(idx3), right: MirValue::Constant(MirConstant::I32(1)),
-                });
-                ctx.current_block.insts.push(MirInst::Store { dest: idx_local, value: MirValue::Local(idx4) });
-
-                ctx.finish_block(MirTerminator::Br(cond_label.clone()));
-
-                // 4. End block (for-else skipped for now)
-                ctx.current_block = MirBasicBlock::new(end_label);
-                ctx
             }
             Stmt::Match(s) => {
                 let end_label = ctx.fresh_block();
@@ -1362,6 +1596,12 @@ impl Lowerer {
                 ctx
             }
             Stmt::Break(_) => {
+                if let Some(flag) = ctx.break_flag_local {
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: flag,
+                        value: MirValue::Constant(MirConstant::Bool(true)),
+                    });
+                }
                 if let Some(target) = ctx.break_targets.last().cloned() {
                     ctx.finish_block(MirTerminator::Br(target));
                 } else {
@@ -1712,7 +1952,7 @@ impl Lowerer {
                         if let Some(variants) = ev_map.get(enum_name) {
                             if let Some(&variant_idx) = variants.get(property) {
                                 // Determine inner type name for Option-like enums
-                                let inner_name = if arguments.len() == 1 {
+                                let _inner_name = if arguments.len() == 1 {
                                     match &arguments[0] {
                                         Expr::Identifier { name, .. } => {
                                             if let Some(&local) = ctx.locals.get(name) {
@@ -1733,11 +1973,11 @@ impl Lowerer {
                                 } else {
                                     None
                                 };
-                                let concrete_name = if let Some(iname) = &inner_name {
-                                    format!("{}_{}", enum_name, iname)
-                                } else {
-                                    enum_name.clone()
-                                };
+                                // All enum variant types share the same tagged-union layout
+                                // { disc: i32, payload: i64 } regardless of type parameters.
+                                // Use the base enum name to match ast_type_to_mir resolution
+                                // and function return types.
+                                let concrete_name = enum_name.clone();
                                 let struct_type = MirType::Struct(concrete_name.clone(), vec![
                                     ("disc".to_string(), MirType::I32),
                                     ("payload".to_string(), MirType::I64),

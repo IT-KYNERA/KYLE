@@ -1,4 +1,0 @@
-import ~utils
-
-fn main():
-    utils.sumar(5, 5)

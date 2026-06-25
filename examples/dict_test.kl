@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # dict_test.kl — Dictionary literal + indexing + assignment end-to-end
 
 fn main():
@@ -18,29 +17,19 @@ fn main():
     println("len: ")
     println(d.len())
 
+    # Set new key
+    d["charlie"] = 200
+    println("charlie: ")
+    println(d["charlie"])
+
+    # Update existing key
+    d["alice"] = 99
+    println("alice after update: ")
+    println(d["alice"])
+
     # Dict with str values
     names = {"a": "Alice", "b": "Bob", "c": "Charlie"}
     println(names["a"])
     println(names["c"])
 
     println("dict test passed")
-=======
-fn main():
-    scores = {alice: 42, bob: 100}
-    # Test get
-    a = scores["alice"]
-    b = scores["bob"]
-    println(a)
-    println(b)
-    # Test set new key
-    scores["charlie"] = 200
-    c = scores["charlie"]
-    println(c)
-    # Test update existing key
-    scores["alice"] = 99
-    a2 = scores["alice"]
-    println(a2)
-    # Test len
-    l = len(scores)
-    println(l)
->>>>>>> origin/main

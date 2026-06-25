@@ -1,23 +1,25 @@
-# Kyle Language Roadmap v5.0 — MVP Focus
+# Kyle Language Roadmap v6.0 — MVP & Distribution Focus
 
 ---
 
 ## Overview
 
-Kyle is developed in phases. Phases 0–5 (compiler pipeline, runtime,
-tooling, and backend gap closure) plus a fully functional **Phase 3.5**
-(closures, method dispatch, match/enum, async/await) are **complete**.
+Kyle is developed in phases. **Phases 0–5 and 3.5** are complete: full compiler
+pipeline (lexer → parser → semantic → MIR → LLVM → native binary), runtime
+(RAII, async, string ops, file I/O), standard library basics, and tooling
+(CLI, LSP, formatter, package manager, VS Code extension).
 
-The **current work is Phase 6 — Language Completion**: finish ALL syntax
-features so they generate working code end-to-end. No features "a medias".
+**Phase 6 — Language Completion** is the current priority: finish ALL syntax
+features so they generate working code end-to-end.
 
-**Order of execution:**
+After Phase 6, the order is: **Cross-Platform → Distribution → Self-Hosting → Production**.
 
 ```
-Phase 6:  Language Completion    ← AHORA (sintaxis al 100%)
-Phase 7:  Cross-Platform         ← después (Windows + Linux + macOS)
-Phase 8:  Self-Hosting           ← después (compilador escrito en Kyle)
-Phase 9:  Production Ecosystem   ← futuro (registro, WASM, etc.)
+Phase 6:  Language Completion     ← 🔶 CURRENT
+Phase 7:  Cross-Platform Support   ← ⏸️ next
+Phase 8:  Distribution & Tooling   ← ⏸️ after cross-platform
+Phase 9:  Self-Hosting             ← ⏸️ deferred
+Phase 10: Production Ecosystem     ← 📅 future
 ```
 
 **Memory model:** RAII + Compiler-Inferred Ownership (NO garbage collector).
@@ -51,7 +53,7 @@ system, memory model, and architecture are fully defined.
 [x] Plan project structure
 [x] Design package manager
 [x] Create this roadmap
-[x] All 17 documents frozen, consistent, and finalized
+[x] All documents frozen, consistent, and finalized
 ```
 
 ---
@@ -282,7 +284,7 @@ Features that parsed and type-checked but generated no code were implemented:
 
 ## Phase 6: Language Completion 🔶 CURRENT
 
-### Status: 🔶 Current — Prioridad #1
+### Status: 🔶 Current — Priority #1
 
 ### Goal
 
@@ -294,79 +296,65 @@ se ejecute correctamente.
 ### Why this is first
 
 Sin las features completas, Kyle no sirve para proyectos reales.
-Multiplataforma y self-hosting se hacen después, cuando el lenguaje
+Multiplataforma y distribución se hacen después, cuando el lenguaje
 en sí mismo esté completo.
 
 ### Tasks — Organized by Priority
 
 #### 🟥 P0 — End-to-End Language Features (bloquean el MVP)
 
-Estas características ya parsean y type-checkean, pero **no generan código**.
-Sin ellas, el lenguaje no es usable.
-
 ```text
-[x] For loops — `for x in list:`, `for i in range(n):` ✅ COMPLETED
+[x] For loops — `for x in list:`, `for i in 0..10:` ✅
     - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
+    - For-Else / While-Else ✅
 
-[x] Generics end-to-end — monomorphization en lowering + codegen ✅ COMPLETED
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
+[x] Generics — monomorphization en lowering + codegen ✅
     - Generic structs (Pair<T,U>) + generic functions (first<T>, make_pair<T,U>)
 
-[x] Error handling — `!` return type + `?` operator ✅ COMPLETED
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
-    - `?` operator con Option<T> funciona (error_test.kl → 42)
-    - `!` return type syntax parsea pero falta testing end-to-end
+[x] Error handling — `!` return type + `?` operator ✅
+    - ? operator con Option<T> funciona (error_test.kl → 42)
+    - ! return type syntax parsea + lowering
 
-[x] String interpolation — `"Hello {name}"` ✅ COMPLETED
+[x] String interpolation — `"Hello {name}"` ✅
     - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
 
-[x] Optional chaining — `?.` ⚠️ PARCIAL
-    - parser ✅ | type-checker ✅ | lowering ✅ (propagación Some/None) | codegen ✅
-    - Falta: property access en el payload struct (requiere info de tipo genérico)
+[x] Range for loop — `for i in 0..10` ✅
+    - Counter loop lowering (sin heap allocation)
+    - Continue sin saltar incremento (inc_label block)
+
+[x] For-Else / While-Else ✅
+    - Python-style break-flag implementation
 ```
 
 #### 🟧 P1 — Language Features Secundarias
 
-También parsean pero no generan código. Importantes pero no bloquean el MVP.
-
 ```text
-[x] Defer — lowering + codegen ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
-[x] Guard — lowering + codegen ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
-[x] Type aliases — `type MyInt = i32` (lowering) ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
-[ ] Dict/Map literals — `{ "key": value }`
-    - parser ⚠️ | type-checker ⚠️ | lowering: ❌ | codegen: ❌
+[x] Defer — lowering + codegen ✅ (LIFO order)
+[x] Guard — lowering + codegen ✅ (CondBr)
+[x] Type aliases — `type MyInt = i32` ✅ (lowering + codegen)
+[x] Dict/Map literals — `{ "key": value }` ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅ | runtime ✅
 [x] Spread operator — `[...list, new_elem]` ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
 [x] Range slicing — `items[0..3]` ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
-[ ] Ternary operator ✅ — `cond ? a : b` (cubre el caso simple de if-como-expresión)
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
-[ ] If-como-expresión (bloques indentados) — diferido; ternary cubre el 90% de casos
+[x] Ternary operator — `cond ? a : b` ✅
 [x] Match como expresión ✅
-    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
+[x] Optional chaining — `?.` ✅ (property access en Option payload)
 [ ] const fn — compile-time evaluation
-    - parser ✅ | type-checker ❌ | lowering: ❌ | codegen: ❌
+    - parser ✅ | type-checker ❌ | lowering ❌ | codegen ❌
 ```
 
 #### 🟦 P3 — Standard Library
 
 ```text
-[ ] std/core.kl — Option<T>, Result<T, E>, utility functions
-    - Prioridad: MEDIA (depende de genéricos P0)
-[ ] std/math.kl — abs, pow, sqrt, gcd ✅ (ya existe)
-[ ] std/io.kl — file I/O wrappers ✅ (ya existe)
-[ ] std/testing.kl — assert, assert_eq, assert_str ✅ (ya existe)
-[ ] std/collections.kl — HashMap, Set
-    - Prioridad: MEDIA (depende de genéricos P0)
-[ ] std/json.kl — JSON parser/generator
-    - Prioridad: BAJA
-[ ] std/str.kl — split, join, starts_with, etc.
-    - Prioridad: MEDIA
-[ ] std/time.kl — datetime, duration, formatting
-    - Prioridad: BAJA
+[x] std/core.kl — Option<T>, utility functions ✅
+[x] std/math.kl — abs, pow, sqrt, gcd ✅
+[x] std/io.kl — file I/O wrappers ✅
+[x] std/testing.kl — assert, assert_eq, assert_str ✅
+[ ] std/collections.kl — HashMap, Set — PRIORIDAD: MEDIA
+[ ] std/json.kl — JSON parser/generator — PRIORIDAD: BAJA
+[ ] std/str.kl — split, join, starts_with, ends_with — PRIORIDAD: MEDIA
+    - starts_with, ends_with ya funcionan (en runtime)
+[ ] std/time.kl — datetime, duration formatting — PRIORIDAD: BAJA
 ```
 
 #### 🟪 P4 — Tooling Polish
@@ -383,8 +371,6 @@ También parsean pero no generan código. Importantes pero no bloquean el MVP.
 
 ```text
 [ ] Fix LLVM verification errors for all programs
-    - Type mismatches (i64 vs i32, struct vs ptr)
-    - SSA dominance violations
 [ ] Proper error messages for lowering/codegen failures
 [ ] Lint warnings — unused variables, dead code
 [ ] 100+ integration tests (examples/*.kl run and verify output)
@@ -396,22 +382,22 @@ También parsean pero no generan código. Importantes pero no bloquean el MVP.
 ### Milestone
 
 ```text
-kl run ANY_PROJECT.kl → works, no crashes
-kl test → full suite passes
-kl fmt → formats correctly
+klc run ANY_PROJECT.kl → works, no crashes
+klc test → full suite passes
+klc fmt → formats correctly
 All syntax features generate working code
 ```
 
 ---
 
-## Phase 7: Cross-Platform Support
+## Phase 7: Cross-Platform Support ⏸️ NEXT
 
 ### Status: ⏸️ Next — after Phase 6
 
 ### Goal
 
 Kyle currently runs **only on macOS Apple Silicon (aarch64)**.
-Phase 7 makes it work on **Windows (x64)**, **Linux (x64 + ARM)**,
+Phase 7 makes it work on **Linux (x64 + ARM)**, **Windows (x64 + ARM)**,
 and **macOS (Intel + Apple Silicon)**.
 
 ### Why this is Phase 7 (not Phase 6)
@@ -419,39 +405,63 @@ and **macOS (Intel + Apple Silicon)**.
 Phase 6 completes the language. Phase 7 ports it to other platforms.
 No tiene sentido portar un lenguaje incompleto.
 
+### Cross-Platform Strategy
+
+Kyle is written in Rust + LLVM — **both are inherently cross-platform**.
+No se necesita reescribir el compilador para cada plataforma. Solo
+hay que adaptar ~5 puntos localizados:
+
+| Componente | Cambio necesario | Dificultad |
+|------------|-----------------|------------|
+| Runtime I/O | Reemplazar POSIX raw syscalls por `std::fs::File` + `std::io` | Baja (~100 líneas) |
+| Target triple | Usar `TargetMachine::get_default_triple()` en vez de hardcodear | Muy baja (~5 líneas) |
+| Linker | Detectar SO con `cfg!(windows)` y usar linker/platform correcto | Baja (~20 líneas) |
+| Extensión .exe | Usar `std::env::consts::EXE_EXTENSION` | Muy baja (~3 líneas) |
+| LLVM paths | Configurar rutas de LLVM por plataforma en `.cargo/config.toml` | Muy baja (~10 líneas) |
+| VS Code path | Buscar `klc.exe` en Windows | Muy baja (~5 líneas) |
+
+**Platformas target (6 targets):**
+
+| Platforma | Triple Rust | Prioridad |
+|-----------|-------------|-----------|
+| macOS Apple Silicon | `aarch64-apple-darwin` | ✅ Already works |
+| macOS Intel | `x86_64-apple-darwin` | Alta |
+| Linux x64 | `x86_64-unknown-linux-gnu` | Alta |
+| Linux ARM | `aarch64-unknown-linux-gnu` | Media |
+| Windows x64 | `x86_64-pc-windows-msvc` | Alta |
+| Windows ARM | `aarch64-pc-windows-msvc` | Baja |
+
 ### Tasks
 
 ```text
 [ ] Runtime I/O — abstraer POSIX syscalls
-    - Actual: klc_runtime/src/io.rs usa open/read/write/close/nanosleep POSIX ❌
+    - Actual: klc_runtime/src/io.rs usa open/read/write/close/nanosleep POSIX
     - Solución: reemplazar con std::fs::File + std::io::{Read, Write}
     - Rust stdlib es cross-platform, no requiere cambios de lógica
-    - Dificultad: BAJA (~100 líneas de reescritura localizada)
 
 [ ] Target triple — auto-detección
-    - Actual: pipeline.rs hardcodea "arm64-apple-macosx" / "aarch64-unknown-linux-gnu" ❌
-    - Solución: Target::initialize_all() + TargetMachine::get_default_triple()
-    - Dificultad: MUY BAJA (~5 líneas de cambio)
+    - Actual: pipeline.rs hardcodea "arm64-apple-macosx"
+    - Solución: Target::initialize_all() + get_default_triple()
 
 [ ] Linker — soporte multiplataforma
-    - Actual: linker.rs hardcodea "clang" + ".a" ❌
-    - Solución: detectar SO, usar clang.exe + .lib en Windows
-    - Dificultad: BAJA (~20 líneas con cfg!(windows))
+    - Actual: hardcodea "clang" + nombre de archivo sin extensión
+    - Solución: detectar SO, usar link.exe en Windows
 
 [ ] CLI — extensión .exe
-    - Actual: main.rs produce binario sin extensión ❌
+    - Actual: produce binario sin extensión
     - Solución: usar std::env::consts::EXE_EXTENSION
-    - Dificultad: MUY BAJA (~3 líneas)
 
 [ ] LLVM paths — config por plataforma
-    - Actual: .cargo/config.toml solo tiene ruta Linux ❌
-    - Solución: agregar [target.'cfg(target_os = ...)'.env] secciones
-    - Dificultad: MUY BAJA (~10 líneas en config)
+    - Actual: .cargo/config.toml solo tiene ruta Linux aarch64
+    - Solución: agregar secciones condicionales por target
 
 [ ] VS Code — detección Windows
-    - Actual: extension.ts busca "klc" sin extensión ❌
+    - Actual: extension.ts busca "klc" sin extensión
     - Solución: detectar plataforma, probar klc.exe
-    - Dificultad: MUY BAJA (~5 líneas)
+
+[ ] Test en Linux x64 (CI)
+[ ] Test en Windows x64 (CI)
+[ ] Test en macOS Intel (CI)
 ```
 
 ### Milestone
@@ -459,20 +469,142 @@ No tiene sentido portar un lenguaje incompleto.
 ```text
 klc build hello.kl → funciona en macOS (Intel + ARM), Linux (x64 + ARM), Windows (x64)
 klc run hello.kl → funciona en las 3 plataformas
-86 tests → pasan en todas las plataformas
+All tests → pasan en todas las plataformas
 CI pipeline con macOS + Linux + Windows
 ```
 
 ---
 
-## Phase 8: Self-Hosting
+## Phase 8: Distribution & Tooling ⏸️ NEXT
 
-### Status: ⏸️ Deferred — after Phase 7
+### Status: ⏸️ Next — after Cross-Platform
+
+### Goal
+
+Que Kyle sea **instalable y usable por cualquier desarrollador** con un solo
+comando. Incluye: instalador curl, web oficial, empaquetado VS Code,
+autocompletado LSP, CI/CD de releases, y branding completo (logo, colores).
+
+### Why separate from Cross-Platform
+
+Phase 7 habilita la compilación en cada plataforma.
+Phase 8 empaqueta y distribuye esos binarios para que los usuarios
+los descarguen e instalen sin esfuerzo.
+
+### 8.1 — Installer
+
+```text
+[ ] Script install.sh (curl | sh)
+    - Detecta OS + arquitectura automáticamente
+    - Descarga binario precompilado desde GitHub Releases
+    - Instala en /usr/local/bin/klc (o ~/.kl/bin/)
+    - Agrega al PATH si es necesario
+    - Compatible con: macOS, Linux, Windows (Git Bash / WSL)
+    - Verificación de checksum SHA-256
+
+[ ] GitHub Actions release workflow
+    - Compilar klc para los 6 targets
+    - Generar .tar.gz / .zip por plataforma
+    - Publicar en GitHub Releases con notas de versión
+    - Etiquetado semántico (v0.6.0, v0.7.0, etc.)
+
+[ ] Homebrew tap (macOS)
+[ ] Windows: winget / scoop manifest (opcional)
+```
+
+### 8.2 — Website (kl-lang.org)
+
+```text
+[ ] Landing page (1-page)
+    - Hero: "Kyle — Readable like Python, Fast like C"
+    - Comando de instalación: curl -fsSL https://kl-lang.org/install.sh | sh
+    - "Hello, World!" example
+    - Feature highlights (6 tarjetas)
+    - Call to action: "Get Started" → docs
+
+[ ] Documentation section
+    - Getting started guide
+    - Language reference (syntax, types, builtins)
+    - Standard library API
+    - Examples gallery
+    - FAQ
+
+[ ] Download section
+    - Pre-compiled binaries for all platforms
+    - VS Code extension (.vsix)
+    - Source code (GitHub)
+
+[ ] Blog (opcional)
+    - Release announcements
+    - Tutorials
+```
+
+### 8.3 — VS Code Extension
+
+```text
+[ ] Empaquetar como .vsix
+    - vsce package en el CI
+    - Publicar en VS Code Marketplace (opcional)
+    - Hostear .vsix en kl-lang.org como alternativa
+
+[ ] Compile on save
+    - Auto-detect .kl files and compile on save
+
+[ ] Error squiggles
+    - Mostrar errores en el editor via LSP diagnostics
+```
+
+### 8.4 — LSP Completion
+
+```text
+[ ] textDocument/completion
+    - Keywords: fn, mut, if, while, for, return, class, etc.
+    - Types: i32, i64, str, bool, f64, Option, etc.
+    - Builtins: println, len, str, input, etc.
+    - Project symbols: functions, variables, structs, enums
+```
+
+### 8.5 — Branding
+
+```text
+[ ] Logo oficial (SVG)
+    - Usado en web, VS Code, docs, GitHub
+[ ] Color palette
+[ ] Typography
+[ ] Icon theme for VS Code (ya existe parcialmente)
+```
+
+### 8.6 — CI/CD
+
+```text
+[ ] GitHub Actions workflow completo
+    - Build + test en macOS, Linux, Windows
+    - Release workflow (build all targets + publish)
+    - Lint (clippy, fmt)
+    - VS Code extension packaging
+```
+
+### Milestone
+
+```text
+curl -fsSL https://kl-lang.org/install.sh | sh  # instala klc
+klc --version                                     # funciona
+klc new myproject                                 # crea proyecto
+klc run myproject/src/main.kl                     # compila y ejecuta
+VS Code extension con syntax highlight + LSP + autocompletado
+kl-lang.org con documentación, ejemplos, descargas
+```
+
+---
+
+## Phase 9: Self-Hosting ⏸️ DEFERRED
+
+### Status: ⏸️ Deferred — after Distribution
 
 ### Goal
 
 Rewrite the Kyle compiler in Kyle itself, achieving self-hosting.
-Only after the language is complete AND multiplatform.
+Only after the language is complete, multiplatform, AND distributable.
 
 ### What is already done
 
@@ -498,7 +630,7 @@ kl build klc   # compiler compiles itself
 
 ---
 
-## Phase 9: Production Ecosystem
+## Phase 10: Production Ecosystem 📅 FUTURE
 
 ### Status: 📅 Future
 
@@ -531,8 +663,9 @@ Phase 5:   Tooling & Ecosystem          — Complete ✅
 Phase 3.5: Backend gap closure          — Complete ✅
 Phase 6:   Language Completion          — 🔶 Current (P0→P5)
 Phase 7:   Cross-Platform Support       — ⏸️ Next
-Phase 8:   Self-Hosting                 — ⏸️ Deferred
-Phase 9:   Production Ecosystem         — 📅 Future
+Phase 8:   Distribution & Tooling       — ⏸️ Next
+Phase 9:   Self-Hosting                 — ⏸️ Deferred
+Phase 10:  Production Ecosystem         — 📅 Future
 ```
 
 ---
@@ -585,16 +718,16 @@ Struct pass-by-reference ABI
 ### v0.6.0 — RC (Phase 6 — Current 🔶)
 
 ```text
-🟥 P0: For loops, Generics, Error handling, Optional chaining, String interpolation
-     → todas generan código end-to-end
-🟧 P1: Defer, Guard, Type aliases, Dict/Map, Spread, Range, const fn
-     → todas generan código end-to-end
-🟦 P3: Standard library complete (collections, str, time, json)
-🟪 P4: LSP completion + hover + go-to-definition
-🟩 P5: 100+ integration tests, no crashes, CI pipeline
+🟥 P0: For loops, Generics, Error handling, Optional chaining, String interpolation,
+       Range for loop, For-Else/While-Else — todas generan código
+🟧 P1: Defer, Guard, Type aliases, Dict/Map, Spread, Range slicing,
+       Ternary, Match-expression — todas generan código
+🟦 P3: Standard library core + math + io + testing
+🟪 P4: LSP completion + hover + go-to-definition (in progress)
+🟩 P5: 100+ integration tests, no crashes
 ```
 
-### v0.7.0 — RC (Phase 7)
+### v0.7.0 — RC (Phase 7 — Cross-Platform)
 
 ```text
 Cross-platform: macOS (Intel+ARM) + Linux (x64+ARM) + Windows (x64)
@@ -602,7 +735,17 @@ klc build + klc run funciona en las 3 plataformas
 CI pipeline con todas las plataformas
 ```
 
-### v1.0.0 — Stable
+### v0.8.0 — RC (Phase 8 — Distribution)
+
+```text
+curl -fsSL https://kl-lang.org/install.sh | sh  → instala klc
+kl-lang.org con documentación, ejemplos, descargas
+VS Code extension .vsix publicada
+LSP autocompletado funcional
+GitHub Actions CI/CD con releases automáticos
+```
+
+### v1.0.0 — Stable (Phase 9 — Self-Hosting)
 
 ```text
 Self-hosting: kl build klc
@@ -621,6 +764,8 @@ Within 2x of C performance for compute
 Within 1.5x of Go for compile times
 Zero runtime crashes for typed code
 Full test suite passing
+One-command install
+Works on all major platforms
 ```
 
 ---
@@ -628,6 +773,6 @@ Full test suite passing
 ## Version
 
 ```text
-Kyle Language Roadmap v5.0 — MVP Focus
-Last updated: 2026-06-22
+Kyle Language Roadmap v6.0 — MVP & Distribution Focus
+Last updated: 2026-06-25
 ```

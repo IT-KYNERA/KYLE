@@ -217,15 +217,19 @@ Performance of C
 
 ## Project Status
 
-Current phase: Phase 6 — Language Completion (sintaxis al 100%)
+Current phase: **Phase 6 — Language Completion** (prácticamente terminado)
 
-Phases 0–5 and 3.5 (backend gap closure) are complete: the compiler produces
-working native binaries, includes closures, methods, enums, async/await,
-RAII runtime, standard library basics, and tooling (CLI, LSP, formatter,
-package manager, VS Code extension).
+Phase 6 está casi completo: todas las features de sintaxis generan código
+funcionando (for, generics, error handling, optional chaining, string
+interpolation, defer, guard, type aliases, dict/map, spread, range slicing,
+ternary, match-expression, for-else/while-else).
 
-Phase 7 (Cross-Platform), Phase 8 (Self-Hosting), and Phase 9 (Production
-Ecosystem) are deferred post-MVP.
+Próximas fases:
+- **Phase 7 — Cross-Platform Support**: portar a Linux y Windows
+- **Phase 8 — Distribution & Tooling**: instalador curl, web oficial,
+  autocompletado LSP, empaquetado VS Code, CI/CD
+- **Phase 9 — Self-Hosting**: compilador escrito en Kyle
+- **Phase 10 — Production Ecosystem**: registry, WASM, etc.
 
 See `docs/13-roadmap.md` for the phase breakdown and `docs/16-status.md`
 for the verified feature matrix (what really generates code vs. what is
