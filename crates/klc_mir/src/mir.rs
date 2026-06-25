@@ -36,7 +36,6 @@ pub enum MirType {
     Ptr(Box<MirType>),
     Array(Box<MirType>),
     List(Box<MirType>),
-    Dict(Box<MirType>, Box<MirType>),
     /// A struct type with name, field names, and field types.
     Struct(String, Vec<(String, MirType)>),
     /// A dictionary/map type with key and value types.
@@ -183,7 +182,6 @@ impl fmt::Display for MirType {
             MirType::Ptr(inner) => write!(f, "{}*", inner),
             MirType::Array(inner) => write!(f, "[{}]", inner),
             MirType::List(inner) => write!(f, "list<{}>", inner),
-            MirType::Dict(k, v) => write!(f, "Dict<{}, {}>", k, v),
             MirType::Struct(name, fields) => {
                 write!(f, "{} {{ ", name)?;
                 for (i, (fname, t)) in fields.iter().enumerate() {

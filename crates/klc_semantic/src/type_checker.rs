@@ -345,16 +345,12 @@ impl TypeChecker {
             }
             Expr::Dictionary { entries, .. } => {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }
-<<<<<<< HEAD
                 let first_type = self.infer_expr(&entries[0].1);
                 for (_, val) in entries.iter().skip(1) {
                     self.infer_expr(val);
                 }
                 Type::Dict(Box::new(Type::Str), Box::new(first_type))
-=======
-                let val_type = self.infer_expr(&entries[0].1);
-                Type::Dict(Box::new(Type::Str), Box::new(val_type))
->>>>>>> origin/main
+
             }
             Expr::StructLiteral { struct_name, .. } => {
                 Type::Named(struct_name.clone())

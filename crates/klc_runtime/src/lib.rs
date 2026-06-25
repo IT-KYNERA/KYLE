@@ -23,4 +23,4 @@ pub use task::PollState;
 pub use channel::Channel;
 pub use error::KlError;
 pub use thread::{kl_spawn_thread, kl_join_thread};
-pub use dict::{kl_dict_new, kl_dict_free, kl_dict_get, kl_dict_set, kl_dict_len, kl_dict_contains, kl_dict_remove};
+pub use dict::{kl_dict_new, kl_dict_free, kl_dict_get, kl_dict_set, kl_dict_len};
