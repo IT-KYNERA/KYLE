@@ -26,5 +26,10 @@ Cargo.lock
 tmp/
 *.log
 
+# VS Code extension artifacts
+vscode-kl/node_modules/
+vscode-kl/package-lock.json
+*.vsix
+
 # Environment / secrets
 .env

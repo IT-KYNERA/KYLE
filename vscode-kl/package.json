@@ -4,6 +4,10 @@
   "description": "Kyle programming language — syntax highlighting, LSP, snippets, and language support",
   "version": "0.2.0",
   "publisher": "kynera",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IT-KYNERA/KYLE.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -12,6 +16,14 @@
     "Linters"
   ],
   "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "echo 'Using pre-built JS'",
+    "package": "npx @vscode/vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
   "activationEvents": [
     "onLanguage:kl",
     "onCommand:kl.run",

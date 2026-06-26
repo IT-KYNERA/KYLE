@@ -1,6 +1,6 @@
 // KL Language Support — LSP client + commands
 const vscode = require('vscode');
-const cp = require('child_process');
+const { LanguageClient } = require('vscode-languageclient/node');
 
 let client = null;
 
@@ -39,7 +39,7 @@ function startLanguageClient(context, klcPath) {
         },
     };
 
-    const lspClient = new (vscode.languageclient || (vscode).LanguageClient)(
+    const lspClient = new LanguageClient(
         'klLanguageServer',
         'KL Language Server',
         serverOptions,

@@ -340,6 +340,30 @@ cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime
 
 ---
 
+## VS Code Extension
+
+Syntax highlighting, LSP autocompletion, snippets, and commands (`kl.run`, `kl.build`, `kl.check`).
+
+### Install from release
+
+```console
+# Download the .vsix from the latest release
+curl -fsSL -o vscode-kl.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/vscode-kl-0.2.0.vsix
+code --install-extension vscode-kl.vsix
+```
+
+### Build from source
+
+```console
+cd vscode-kl
+npm install && npx @vscode/vsce package
+code --install-extension vscode-kl-*.vsix
+```
+
+The extension requires the `klc` binary (installed via `install.sh`) and works with any `.kl` file.
+
+---
+
 ## License
 
 MIT
