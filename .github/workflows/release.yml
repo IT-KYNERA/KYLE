@@ -28,6 +28,7 @@ jobs:
           cp target/release/klc dist/klc/
           cp target/release/libklc_runtime.a dist/klc/lib/
           cp install.sh uninstall.sh dist/klc/
+          chmod +x dist/klc/install.sh dist/klc/uninstall.sh
           cd dist
           tar czf klc-${{ github.ref_name }}-macos-arm64.tar.gz klc/
 
