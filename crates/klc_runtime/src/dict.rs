@@ -52,8 +52,8 @@ pub extern "C" fn kl_json_parse(json: *const u8) -> *mut std::ffi::c_void {
     if json.is_null() {
         return std::ptr::null_mut();
     }
-    let s = unsafe { std::ffi::CStr::from_ptr(json) }
-        .to_str().unwrap_or("").trim().to_string();
+    let raw = unsafe { std::ffi::CStr::from_ptr(json as *const std::os::raw::c_char) };
+    let s = raw.to_str().unwrap_or("").trim().to_string();
     if s.is_empty() {
         return std::ptr::null_mut();
     }
@@ -64,9 +64,9 @@ pub extern "C" fn kl_json_parse(json: *const u8) -> *mut std::ffi::c_void {
         for part in inner.split(',') {
             let part = part.trim();
             if part.is_empty() { continue; }
-            if let Some(eq_pos) = part.find(':') {
-                let key_part = part[..eq_pos].trim().trim_matches('"');
-                let val_part = part[eq_pos+1..].trim();
+            if let Some(col_pos) = part.find(':') {
+                let key_part = part[..col_pos].trim().trim_matches('"');
+                let val_part = part[col_pos+1..].trim();
                 if let Ok(val) = val_part.parse::<i64>() {
                     map.insert(key_part.to_string(), val);
                 }

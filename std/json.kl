@@ -1,3 +1,5 @@
-fn is_valid(data: str) -> bool:
-    result = json_parse(data)
-    result != 0
+fn parse(json_str: str) -> Dict<str, i64>:
+    json_parse(json_str)
+
+fn stringify(d: Dict<str, i64>) -> str:
+    json_stringify(d)

@@ -180,15 +180,12 @@ impl Pipeline {
 
 /// Emit a native object file from an LLVM module using TargetMachine.
 fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), String> {
-    Target::initialize_aarch64(&InitializationConfig::default());
+    Target::initialize_all(&InitializationConfig::default());
 
-    let triple = TargetTriple::create(if cfg!(target_os = "macos") {
-        "arm64-apple-macosx"
-    } else {
-        "aarch64-unknown-linux-gnu"
-    });
+    let triple_str = host_target_triple();
+    let triple = TargetTriple::create(triple_str);
     let target = Target::from_triple(&triple)
-        .map_err(|e| format!("Failed to get target: {}", e))?;
+        .map_err(|e| format!("Failed to get target '{}': {}", triple_str, e))?;
     let target_machine = target.create_target_machine(
         &triple,
         "generic",
@@ -200,6 +197,23 @@ fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), Stri
 
     target_machine.write_to_file(module, FileType::Object, path)
         .map_err(|e| format!("Failed to emit object file: {}", e))
+}
+
+/// Return the host target triple string at compile time.
+fn host_target_triple() -> &'static str {
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        "arm64-apple-macosx"
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        "x86_64-apple-macosx"
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        "aarch64-unknown-linux-gnu"
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        "x86_64-unknown-linux-gnu"
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "x86_64-pc-windows-msvc"
+    } else {
+        "x86_64-unknown-linux-gnu" // fallback genérico
+    }
 }
 
 pub struct ParsedOutput {

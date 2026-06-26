@@ -1,21 +1,10 @@
-#[repr(C)]
-struct timespec {
-    tv_sec: i64,
-    tv_nsec: i64,
-}
-
-unsafe extern "C" {
-    fn write(fd: i64, buf: *const u8, count: i64) -> i64;
-    fn read(fd: i32, buf: *mut u8, count: i64) -> i64;
-    fn open(path: *const u8, flags: i32, mode: i32) -> i32;
-    fn close(fd: i32) -> i32;
-    fn nanosleep(req: *const timespec, rem: *mut timespec) -> i32;
-}
+use std::io::Write;
 
 fn write_stdout(buf: &[u8]) {
-    unsafe {
-        write(1, buf.as_ptr(), buf.len() as i64);
-    }
+    use std::io::Write;
+    let mut stdout = std::io::stdout();
+    let _ = stdout.write_all(buf);
+    let _ = stdout.flush();
 }
 
 fn write_int(val: i64) {
@@ -103,31 +92,65 @@ pub extern "C" fn kl_input_with_prompt(prompt: *const u8, prompt_len: i32) -> *m
     }
 }
 
-// open flags
-const O_RDONLY: i32 = 0;
-const O_WRONLY: i32 = 1;
-const O_RDWR: i32 = 2;
-const O_CREAT: i32 = 64;
-const O_TRUNC: i32 = 512;
-const O_APPEND: i32 = 1024;
+// Platform-specific constants for open flags
+#[cfg(unix)]
+mod platform {
+    pub const O_RDONLY: i32 = 0;
+    pub const O_WRONLY: i32 = 1;
+    pub const O_RDWR: i32 = 2;
+    pub const O_CREAT: i32 = 64;
+    pub const O_TRUNC: i32 = 512;
+    pub const O_APPEND: i32 = 1024;
+
+    pub fn open_file(path: *const u8, flags: i32, mode: i32) -> i32 {
+        unsafe {
+            libc::open(path as *const libc::c_char, flags, mode as libc::c_int)
+        }
+    }
+
+    pub fn read_fd(fd: i32, buf: *mut u8, count: i64) -> i64 {
+        unsafe {
+            libc::read(fd, buf as *mut libc::c_void, count as usize) as i64
+        }
+    }
+
+    pub fn write_fd(fd: i64, buf: *const u8, count: i64) -> i64 {
+        unsafe {
+            libc::write(fd as i32, buf as *const libc::c_void, count as usize) as i64
+        }
+    }
+
+    pub fn close_fd(fd: i32) -> i32 {
+        unsafe { libc::close(fd) }
+    }
+}
+
+#[cfg(windows)]
+mod platform {
+    // Windows implementation — placeholder for Phase 7 Windows port
+    pub fn open_file(_path: *const u8, _flags: i32, _mode: i32) -> i32 { -1 }
+    pub fn read_fd(_fd: i32, _buf: *mut u8, _count: i64) -> i64 { -1 }
+    pub fn write_fd(_fd: i64, _buf: *const u8, _count: i64) -> i64 { -1 }
+    pub fn close_fd(_fd: i32) -> i32 { -1 }
+}
 
 fn mode_from_string(mode: *const u8) -> i32 {
-    if mode.is_null() { return O_RDONLY; }
+    if mode.is_null() { return platform::O_RDONLY; }
     let c = unsafe { *mode };
     match c {
         b'r' => {
             let c2 = unsafe { *mode.add(1) };
-            if c2 == b'+' { O_RDWR } else { O_RDONLY }
+            if c2 == b'+' { platform::O_RDWR } else { platform::O_RDONLY }
         }
         b'w' => {
             let c2 = unsafe { *mode.add(1) };
-            if c2 == b'+' { O_RDWR | O_CREAT | O_TRUNC } else { O_WRONLY | O_CREAT | O_TRUNC }
+            if c2 == b'+' { platform::O_RDWR | platform::O_CREAT | platform::O_TRUNC } else { platform::O_WRONLY | platform::O_CREAT | platform::O_TRUNC }
         }
         b'a' => {
             let c2 = unsafe { *mode.add(1) };
-            if c2 == b'+' { O_RDWR | O_CREAT | O_APPEND } else { O_WRONLY | O_CREAT | O_APPEND }
+            if c2 == b'+' { platform::O_RDWR | platform::O_CREAT | platform::O_APPEND } else { platform::O_WRONLY | platform::O_CREAT | platform::O_APPEND }
         }
-        _ => O_RDONLY,
+        _ => platform::O_RDONLY,
     }
 }
 
@@ -136,7 +159,7 @@ fn mode_from_string(mode: *const u8) -> i32 {
 pub extern "C" fn kl_open(path: *const u8, mode: *const u8) -> i32 {
     if path.is_null() { return -1; }
     let flags = mode_from_string(mode);
-    unsafe { open(path, flags, 0o644) }
+    platform::open_file(path, flags, 0o644)
 }
 
 /// Read from a file descriptor into a heap-allocated null-terminated string.
@@ -147,7 +170,7 @@ pub extern "C" fn kl_read_str(fd: i32, count: i32) -> *mut u8 {
     if count <= 0 { return std::ptr::null_mut(); }
     let ptr = crate::kl_alloc(count as i64);
     if ptr.is_null() { return std::ptr::null_mut(); }
-    let n = unsafe { read(fd, ptr, count as i64) };
+    let n = platform::read_fd(fd, ptr, count as i64);
     if n < 0 {
         crate::kl_free(ptr);
         return std::ptr::null_mut();
@@ -163,25 +186,21 @@ pub extern "C" fn kl_write_str(fd: i32, buf: *const u8) -> i32 {
     if buf.is_null() { return -1; }
     let mut len: i64 = 0;
     while unsafe { *buf.add(len as usize) } != 0 { len += 1; }
-    let result = unsafe { write(fd as i64, buf, len) };
+    let result = platform::write_fd(fd as i64, buf, len);
     result as i32
 }
 
 /// Close a file descriptor. Returns 0 on success, -1 on error.
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_close(fd: i32) -> i32 {
-    unsafe { close(fd) }
+    platform::close_fd(fd)
 }
 
 /// Sleep for a given number of milliseconds.
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_sleep(ms: i32) {
     if ms <= 0 { return; }
-    let ts = timespec {
-        tv_sec: (ms as i64) / 1000,
-        tv_nsec: ((ms as i64) % 1000) * 1_000_000,
-    };
-    unsafe { nanosleep(&ts, std::ptr::null_mut()); }
+    std::thread::sleep(std::time::Duration::from_millis(ms as u64));
 }
 
 /// Get current time in milliseconds since epoch.

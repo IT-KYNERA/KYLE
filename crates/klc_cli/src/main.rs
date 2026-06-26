@@ -21,8 +21,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
+/// Return the output binary path with the correct platform extension.
+fn exe_path(path: &Path) -> PathBuf {
+    let ext = std::env::consts::EXE_EXTENSION;
+    if ext.is_empty() { path.to_path_buf() } else { path.with_extension(ext) }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
+
 
     if args.len() < 2 {
         print_usage();
@@ -185,7 +192,7 @@ fn cmd_build(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                let output = project_root.join("target").join(if release { "main-release" } else { "main" });
+                let output = exe_path(&project_root.join("target").join(if release { "main-release" } else { "main" }));
                 if let Some(parent) = output.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
@@ -217,7 +224,7 @@ fn cmd_build(args: &[String]) {
     }
     let source = load_source(args, 2);
     let file = &args[2];
-    let output = std::path::Path::new(file).with_extension("");
+    let output = exe_path(&std::path::Path::new(file).with_extension(""));
     match klc_driver::pipeline::Pipeline::build_source(&source, file, &output) {
         Ok(()) => {
             println!("Build complete: {}", output.display());
@@ -239,7 +246,7 @@ fn cmd_run(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                let output = project_root.join("target").join("main");
+                let output = exe_path(&project_root.join("target").join("main"));
                 if let Some(parent) = output.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
@@ -270,7 +277,7 @@ fn cmd_run(args: &[String]) {
     }
     let source = load_source(args, 2);
     let file = &args[2];
-    let output = std::path::Path::new(file).with_extension("");
+    let output = exe_path(&std::path::Path::new(file).with_extension(""));
     match klc_driver::pipeline::Pipeline::build_source(&source, file, &output) {
         Ok(()) => {
             let mut cmd = std::process::Command::new(&output);

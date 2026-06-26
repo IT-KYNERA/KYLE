@@ -589,11 +589,17 @@ impl Lowerer {
             }
             if last_is_tail {
                 let val_local = ctx.next_local - 1;
-                ctx.emit_return(MirValue::Local(val_local));
-                // Infer return type from the tail expression when no explicit type given
-                if mir_func.return_type == MirType::Void {
-                    if let Some(actual_type) = ctx.local_types.get(&val_local) {
-                        mir_func.return_type = actual_type.clone();
+                // If the tail expression is a void call (e.g., print()), return Void
+                let is_void = ctx.local_types.get(&val_local).map_or(false, |t| *t == MirType::Void);
+                if is_void {
+                    ctx.emit_return(MirValue::Constant(MirConstant::Void));
+                } else {
+                    ctx.emit_return(MirValue::Local(val_local));
+                    // Infer return type from the tail expression when no explicit type given
+                    if mir_func.return_type == MirType::Void {
+                        if let Some(actual_type) = ctx.local_types.get(&val_local) {
+                            mir_func.return_type = actual_type.clone();
+                        }
                     }
                 }
             } else if last_is_match_tail {
@@ -2378,7 +2384,7 @@ impl Lowerer {
                 // Special case: print/println with string literal argument
                 if (name == "print" || name == "println") && arguments.len() == 1 {
                     if let Expr::Literal { value: Literal::String(s), .. } = &arguments[0] {
-                        let dest = ctx.alloc_local("_call", MirType::I32);
+                        let dest = ctx.alloc_local("_call", MirType::Void);
                         let call_name = if name == "println" { "kl_println" } else { "kl_print" };
                         ctx.current_block.insts.push(MirInst::Call {
                             dest: Some(dest),
@@ -3720,6 +3726,7 @@ fn is_string_builtin_name(name: &str) -> bool {
 /// Return the MIR type for known builtin functions, or None for generic functions.
 fn builtin_return_type(name: &str) -> Option<MirType> {
     match name {
+        "print" | "println" | "print_int" | "println_int" => Some(MirType::Void),
         "contains" => Some(MirType::I32),
         "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" => Some(MirType::Str),
         "open" | "close" | "write_str" => Some(MirType::I32),
