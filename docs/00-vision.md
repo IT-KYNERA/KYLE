@@ -217,17 +217,18 @@ Performance of C
 
 ## Project Status
 
-Current phase: **Phase 6 — Language Completion** (prácticamente terminado)
+Current phase: **Phase 8 — Distribution & Tooling Polish**
 
-Phase 6 está casi completo: todas las features de sintaxis generan código
-funcionando (for, generics, error handling, optional chaining, string
-interpolation, defer, guard, type aliases, dict/map, spread, range slicing,
-ternary, match-expression, for-else/while-else).
+Phase 6 (Language Completion) y Phase 7 (Cross-Platform + Distribution)
+están completas. Todas las features de sintaxis generan código funcionando,
+el pipeline de distribución (GitHub Actions, install.sh, repo público)
+está operativo, y el runtime es cross-platform.
+
+Fase actual:
+- **Phase 8 — Distribution & Tooling Polish**: VS Code extension pulida,
+  LSP autocompletado, build output limpio, logo/branding, snippets, website.
 
 Próximas fases:
-- **Phase 7 — Cross-Platform Support**: portar a Linux y Windows
-- **Phase 8 — Distribution & Tooling**: instalador curl, web oficial,
-  autocompletado LSP, empaquetado VS Code, CI/CD
 - **Phase 9 — Self-Hosting**: compilador escrito en Kyle
 - **Phase 10 — Production Ecosystem**: registry, WASM, etc.
 

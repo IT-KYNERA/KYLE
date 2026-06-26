@@ -1,8 +1,8 @@
 {
   "name": "vscode-kl",
   "displayName": "KL Language Support",
-  "description": "KL (Kynera Language) — syntax highlighting, LSP, and language support",
-  "version": "0.1.0",
+  "description": "Kyle programming language — syntax highlighting, LSP, snippets, and language support",
+  "version": "0.2.0",
   "publisher": "kynera",
   "engines": {
     "vscode": "^1.85.0"
@@ -22,9 +22,13 @@
     "languages": [
       {
         "id": "kl",
-        "aliases": ["KL", "kynera"],
+        "aliases": ["Kyle", "kl"],
         "extensions": [".kl"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/kl.png",
+          "dark": "./icons/kl.png"
+        }
       }
     ],
     "grammars": [
@@ -48,12 +52,21 @@
         "title": "KL: Type-check current file"
       }
     ],
-    "iconThemes": [
+    "snippets": [
       {
-        "id": "kl-icon-theme",
-        "label": "KL Language Icons",
-        "path": "./icons/kl-icon-theme.json"
+        "language": "kl",
+        "path": "./snippets/kl.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "KL",
+      "properties": {
+        "kl.klcPath": {
+          "type": "string",
+          "default": "klc",
+          "description": "Path to the klc compiler binary"
+        }
+      }
+    }
   }
 }

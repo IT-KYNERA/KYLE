@@ -186,70 +186,161 @@ impl LanguageServer {
         let params: CompletionParams = serde_json::from_value(req.params).unwrap();
         let uri = params.text_document_position.text_document.uri.to_string();
         let source = self.sources.get(&uri).cloned().unwrap_or_default();
+        let pos = params.text_document_position.position;
 
-        let mut items = Vec::new();
+        let prefix = self.word_at(&source, pos.line as usize, pos.character as usize);
+        let prefix_lower = prefix.to_lowercase();
 
-        // Built-in functions
-        for (label, detail) in &[
-            ("print", "print(value)"),
-            ("println", "println(value)"),
+        let mut items: Vec<CompletionItem> = Vec::new();
+
+        // Built-in functions (28 total)
+        let builtins: &[(&str, &str)] = &[
+            ("print", "print(value) — Print to stdout"),
+            ("println", "println(value) — Print with newline"),
+            ("print_int", "print_int(n) — Print integer"),
+            ("println_int", "println_int(n) — Print integer with newline"),
+            ("print_err", "print_err(value) — Print to stderr"),
             ("str", "str(value) — Convert to string"),
             ("len", "len(value) — Get length"),
             ("int", "int(value) — Convert to integer"),
             ("float", "float(value) — Convert to float"),
             ("bool", "bool(value) — Convert to boolean"),
-        ] {
-            items.push(self.completion_item(label, CompletionItemKind::FUNCTION, detail));
+            ("input", "input() — Read line from stdin"),
+            ("open", "open(path) -> i64 — Open file"),
+            ("read_str", "read_str(fd) -> str — Read file content"),
+            ("write_str", "write_str(fd, str) — Write to file"),
+            ("close", "close(fd) — Close file"),
+            ("sleep", "sleep(ms) — Sleep in milliseconds"),
+            ("now", "now() -> i64 — Current timestamp"),
+            ("contains", "contains(str, substr) -> bool"),
+            ("to_upper", "to_upper(str) -> str"),
+            ("to_lower", "to_lower(str) -> str"),
+            ("trim", "trim(str) -> str"),
+            ("replace", "replace(str, from, to) -> str"),
+            ("substr", "substr(str, start, len) -> str"),
+            ("char_at", "char_at(str, index) -> char"),
+            ("ord", "ord(c) -> i32 — Char to ASCII code"),
+            ("is_digit", "is_digit(c) -> bool"),
+            ("is_alpha", "is_alpha(c) -> bool"),
+            ("is_alnum", "is_alnum(c) -> bool"),
+            ("is_whitespace", "is_whitespace(c) -> bool"),
+            ("is_upper", "is_upper(c) -> bool"),
+            ("is_lower", "is_lower(c) -> bool"),
+            ("assert", "assert(condition)"),
+            ("assert_eq", "assert_eq(a, b)"),
+            ("assert_str", "assert_str(a, b)"),
+            ("assert_ne", "assert_ne(a, b)"),
+            ("range", "range(start, end) -> [i32]"),
+            ("json_parse", "json_parse(str) -> i64"),
+            ("json_stringify", "json_stringify(value) -> str"),
+            ("list_push", "list_push(list, value)"),
+            ("list_pop", "list_pop(list) -> i64"),
+            ("list_len", "list_len(list) -> i32"),
+            ("ceil", "ceil(f64) -> f64"),
+            ("floor", "floor(f64) -> f64"),
+            ("round", "round(f64) -> f64"),
+        ];
+        for (label, detail) in builtins {
+            if prefix.is_empty() || label.starts_with(&prefix) || label.to_lowercase().starts_with(&prefix_lower) {
+                items.push(CompletionItem {
+                    label: label.to_string(),
+                    kind: Some(CompletionItemKind::FUNCTION),
+                    detail: Some(detail.to_string()),
+                    insert_text: Some(label.to_string()),
+                    sort_text: Some(format!("1{}", label)),
+                    ..Default::default()
+                });
+            }
         }
 
-        // Identifiers from source
+        // Project symbols — parse source and extract all declarations
         let mut lexer = klc_frontend::lexer::Lexer::new(&source);
         let tokens = lexer.tokenize();
         let mut parser = klc_frontend::parser::Parser::new(tokens);
         if let Ok(prog) = parser.parse() {
             for decl in &prog.declarations {
-                match decl {
+                let (name, kind, detail): (String, CompletionItemKind, String) = match decl {
                     Decl::Function(f) => {
-                        items.push(self.completion_item(&f.name, CompletionItemKind::FUNCTION, &f.name));
+                        let params: Vec<String> = f.params.iter().map(|p| format!("{}: {}", p.name, Self::fmt_type(&p.type_))).collect();
+                        let sig = format!("fn {}({})", f.name, params.join(", "));
+                        (f.name.clone(), CompletionItemKind::FUNCTION, sig)
                     }
-                    Decl::Variable(v) => {
-                        items.push(self.completion_item(&v.name, CompletionItemKind::VARIABLE, &v.name));
-                    }
-                    Decl::Constant(c) => {
-                        items.push(self.completion_item(&c.name, CompletionItemKind::CONSTANT, &c.name));
-                    }
-                    Decl::Class(c) => {
-                        items.push(self.completion_item(&c.name, CompletionItemKind::CLASS, &c.name));
-                    }
-                    _ => {}
+                    Decl::Variable(v) => (v.name.clone(), CompletionItemKind::VARIABLE, format!("var {}", v.name)),
+                    Decl::Constant(c) => (c.name.clone(), CompletionItemKind::CONSTANT, c.name.clone()),
+                    Decl::Class(c) => (c.name.clone(), CompletionItemKind::CLASS, format!("class {}", c.name)),
+                    Decl::Struct(s) => (s.name.clone(), CompletionItemKind::STRUCT, format!("struct {}", s.name)),
+                    Decl::Enum(e) => (e.name.clone(), CompletionItemKind::ENUM, format!("enum {}", e.name)),
+                    Decl::Contract(c) => (c.name.clone(), CompletionItemKind::INTERFACE, format!("contract {}", c.name)),
+                    Decl::TypeAlias(t) => (t.name.clone(), CompletionItemKind::TYPE_PARAMETER, format!("type {}", t.name)),
+                    Decl::AbstractClass(c) => (c.name.clone(), CompletionItemKind::CLASS, format!("abstract class {}", c.name)),
+                    _ => continue,
+                };
+                if prefix.is_empty() || name.starts_with(&prefix) || name.to_lowercase().starts_with(&prefix_lower) {
+                    items.push(CompletionItem {
+                        label: name.clone(),
+                        kind: Some(kind),
+                        detail: Some(detail),
+                        insert_text: None,
+                        sort_text: Some(format!("2{}", &name)),
+                        ..Default::default()
+                    });
                 }
             }
         }
 
         // Keywords
-        for kw in &[
-            "if", "elif", "else", "while", "for", "in", "match", "return",
-            "fn", "mut", "class", "struct", "enum", "contract",
-            "import", "from", "true", "false", "None", "break",
-            "defer", "guard", "unsafe", "async", "await", "loop",
-            "const", "type", "abs",
-        ] {
-            items.push(self.completion_item(kw, CompletionItemKind::KEYWORD, kw));
+        let keywords = [
+            ("if", "if condition:"),
+            ("elif", "elif condition:"),
+            ("else", "else:"),
+            ("while", "while condition:"),
+            ("for", "for item in list:"),
+            ("in", "in"),
+            ("match", "match value:"),
+            ("return", "return value"),
+            ("fn", "fn name(params):"),
+            ("mut", "mut variable"),
+            ("class", "class Name:"),
+            ("struct", "struct Name:"),
+            ("enum", "enum Name:"),
+            ("contract", "contract Name:"),
+            ("import", "import module"),
+            ("from", "from module import name"),
+            ("as", "as alias"),
+            ("type", "type Alias = Type"),
+            ("const", "const NAME = value"),
+            ("abs", "abstract — abs class/fn"),
+            ("async", "async expression"),
+            ("await", "await expression"),
+            ("defer", "defer expression"),
+            ("guard", "guard condition"),
+            ("loop", "loop:"),
+            ("unsafe", "unsafe:"),
+            ("break", "break"),
+            ("true", "true"),
+            ("false", "false"),
+            ("None", "None"),
+            ("ok", "ok(value)"),
+            ("error", "error(message)"),
+            ("this", "this.field"),
+            ("next", "next (loop iteration)"),
+        ];
+        for (kw, detail) in &keywords {
+            if prefix.is_empty() || kw.starts_with(&prefix) {
+                items.push(CompletionItem {
+                    label: kw.to_string(),
+                    kind: Some(CompletionItemKind::KEYWORD),
+                    detail: Some(detail.to_string()),
+                    insert_text: None,
+                    sort_text: Some(format!("3{}", kw)),
+                    ..Default::default()
+                });
+            }
         }
 
         let result = CompletionResponse::Array(items);
         let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
         let _ = self.connection.sender.send(Message::Response(resp));
-    }
-
-    fn completion_item(&self, label: &str, kind: CompletionItemKind, detail: &str) -> CompletionItem {
-        CompletionItem {
-            label: label.to_string(),
-            kind: Some(kind),
-            detail: Some(detail.to_string()),
-            insert_text: Some(label.to_string()),
-            ..Default::default()
-        }
     }
 
     fn handle_hover(&mut self, req: Request) {

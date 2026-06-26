@@ -5,10 +5,12 @@
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
+    { "include": "#char_literals" },
     { "include": "#numbers" },
     { "include": "#keywords" },
     { "include": "#types" },
     { "include": "#builtins" },
+    { "include": "#constants" },
     { "include": "#operators" }
   ],
   "repository": {
@@ -22,7 +24,19 @@
       "begin": "\"",
       "end": "\"",
       "patterns": [
-        { "name": "constant.character.escape.kl", "match": "\\\\." }
+        { "name": "constant.character.escape.kl", "match": "\\\\[nrt0\"'\\\\]" },
+        { "name": "constant.character.escape.kl", "match": "\\\\x[0-9a-fA-F]{2}" },
+        { "name": "constant.character.escape.kl", "match": "\\\\u[0-9a-fA-F]{4}" }
+      ]
+    },
+    "char_literals": {
+      "name": "string.quoted.single.kl",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        { "name": "constant.character.escape.kl", "match": "\\\\[nrt0\"'\\\\]" },
+        { "name": "constant.character.escape.kl", "match": "\\\\x[0-9a-fA-F]{2}" },
+        { "name": "constant.character.escape.kl", "match": "\\\\u[0-9a-fA-F]{4}" }
       ]
     },
     "numbers": {
@@ -33,21 +47,25 @@
       "patterns": [
         { "name": "keyword.control.kl", "match": "\\b(if|elif|else|while|for|in|match|return|break|continue|loop|defer|guard|unsafe|async|await)\\b" },
         { "name": "keyword.declaration.kl", "match": "\\b(fn|mut|class|struct|enum|contract|import|from|as|type|abs|const|pub|override|static|abstract|impl)\\b" },
-        { "name": "keyword.operator.kl", "match": "\\b(and|or|not)\\b" },
+        { "name": "keyword.operator.kl", "match": "\\b(and|or|not|is)\\b" },
         { "name": "keyword.other.kl", "match": "\\b(true|false|None|ok|error|this|next)\\b" }
       ]
     },
     "types": {
       "name": "storage.type.kl",
-      "match": "\\b(i32|i64|f32|f64|bool|str|char|void|Option|Result|any|list)\\b"
+      "match": "\\b(i32|i64|f32|f64|bool|str|char|void|Option|Result|any|list|Map|Set)\\b"
     },
     "builtins": {
       "name": "support.function.kl",
-      "match": "\\b(print|println|str|len|int|float|bool|input|open|read_str|write_str|close|sleep|now|contains|to_upper|to_lower|trim|replace|substr|char_at|ord|is_digit|is_alpha|is_alnum|is_whitespace|is_upper|is_lower|assert|assert_eq|assert_str|range)\\b"
+      "match": "\\b(print|println|print_int|println_int|print_err|str|len|int|float|bool|input|open|read_str|write_str|close|sleep|now|contains|to_upper|to_lower|trim|replace|substr|char_at|ord|is_digit|is_alpha|is_alnum|is_whitespace|is_upper|is_lower|assert|assert_eq|assert_str|assert_ne|range|json_parse|json_stringify|list_push|list_pop|list_len|ceil|floor|round)\\b"
+    },
+    "constants": {
+      "name": "variable.other.constant.kl",
+      "match": "\\b[A-Z][A-Z0-9_]+\\b"
     },
     "operators": {
       "name": "keyword.operator.kl",
-      "match": "(==|!=|<=|>=|&&|\\|\\||\\+\\+|--|->|=>|\\?|\\.\\.|\\+%|-%|\\*%|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=|<<|>>|\\+|-|\\*|/|%|&|\\||\\^|~|=|<|>|!)"
+      "match": "(==|!=|<=|>=|&&|\\|\\||\\+\\+|--|->|=>|\\?|\\.\\.\\.|\\.\\.|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=|<<|>>|\\+|-|\\*|/|%|&|\\||\\^|~|=|<|>|!)"
     }
   }
 }

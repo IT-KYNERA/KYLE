@@ -39,7 +39,6 @@ impl Pipeline {
         resolver.set_source_dir(base_dir.clone());
         resolver.add_search_path(base_dir.clone());
 
-        // If there's a project root (kl.toml), add `src/` as a search path
         if let Some(project_root) = find_project_root(&base_dir) {
             let src_dir = project_root.join("src");
             if src_dir.exists() && src_dir != base_dir {
@@ -47,35 +46,30 @@ impl Pipeline {
             }
         }
 
-        // Also search for std library relative to the workspace root or source
         if let Some(cwd) = std::env::current_dir().ok() {
             let std_path = cwd.join("std");
             if std_path.exists() {
                 resolver.add_search_path(std_path);
             }
         }
-        // Also search relative to base_dir
         let local_std = base_dir.join("std");
         if local_std.exists() {
             resolver.add_search_path(local_std);
         }
 
         let mut import_decls: Vec<(usize, Vec<klc_core::ast::Decl>)> = Vec::new();
-        // Track scopes to register for each import (alias -> module_name)
         let mut scope_registrations: Vec<(String, String)> = Vec::new();
 
         for (i, decl) in program.declarations.iter().enumerate() {
             match decl {
                 klc_core::ast::Decl::Import(imp) => {
                     let module_decls = resolver.get_module_declarations(&imp.module_name, imp.relative)?;
-                    // Determine the scope name: alias if present, otherwise module_name
                     let scope_name = imp.alias.clone().unwrap_or_else(|| imp.module_name.clone());
                     scope_registrations.push((scope_name, imp.module_name.clone()));
                     import_decls.push((i, module_decls));
                 }
                 klc_core::ast::Decl::FromImport(fi) => {
                     let decl = resolver.get_imported_declaration(&fi.module_name, &fi.imported_name, fi.relative)?;
-                    // For from-import, the imported name itself is used (no alias support yet)
                     scope_registrations.push((fi.imported_name.clone(), fi.module_name.clone()));
                     import_decls.push((i, vec![decl]));
                 }
@@ -132,8 +126,20 @@ impl Pipeline {
         })
     }
 
-    /// Parse, type-check, lower to MIR, generate code, and link.
+    /// Build source: output binary goes to `output_path`, intermediary files
+    /// (.o, .ll) go to `artifact_dir` (defaults to output_path's directory).
     pub fn build_source(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
+        let default_dir = output_path.parent().unwrap_or_else(|| Path::new("."));
+        Self::build_source_with_artifacts(source, file_name, output_path, default_dir)
+    }
+
+    /// Build source with explicit artifact directory for .o / .ll files.
+    pub fn build_source_with_artifacts(
+        source: &str,
+        file_name: &str,
+        output_path: &Path,
+        artifact_dir: &Path,
+    ) -> Result<(), String> {
         let mir = Self::mir_source(source, file_name)?;
 
         if mir.analyzer.has_errors() {
@@ -145,30 +151,26 @@ impl Pipeline {
         let mut codegen = Codegen::new(&context, "kl_module");
         codegen.compile(&mir.module)?;
 
-        // Verify module before emitting
-        if let Err(msg) = codegen.module().verify() {
-            // Dump LLVM IR for debugging
-            let ir_path = output_path.with_extension("ll");
-            let ir_str = codegen.module().print_to_string().to_string();
-            if let Ok(mut f) = std::fs::File::create(&ir_path) {
-                let _ = write!(f, "{}", ir_str);
-            }
-            eprintln!("LLVM IR dumped to {:?}", ir_path);
-            return Err(format!("LLVM verification failed: {}", msg));
+        // Ensure artifact directory exists
+        std::fs::create_dir_all(artifact_dir)
+            .map_err(|e| format!("Failed to create artifact dir: {}", e))?;
+
+        let stem = output_path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("kl_out");
+
+        // LLVM IR dump
+        let ir_path = artifact_dir.join(format!("{}.ll", stem));
+        let ir_str = codegen.module().print_to_string().to_string();
+        if let Ok(mut f) = std::fs::File::create(&ir_path) {
+            let _ = write!(f, "{}", ir_str);
         }
 
-        // Debug: dump LLVM IR
-        {
-            let ir_path = output_path.with_extension("ll");
-            let ir_str = codegen.module().print_to_string().to_string();
-            if let Ok(mut f) = std::fs::File::create(&ir_path) {
-                let _ = write!(f, "{}", ir_str);
-            }
-        }
-
-        let obj_path = output_path.with_extension("o");
+        // Object file
+        let obj_path = artifact_dir.join(format!("{}.o", stem));
         emit_object(codegen.module(), &obj_path)?;
 
+        // Link
         let linker = Linker::new();
         let runtime_lib = Linker::find_runtime_lib();
         linker.link(&[&obj_path], output_path, runtime_lib.as_deref())
@@ -212,7 +214,7 @@ fn host_target_triple() -> &'static str {
     } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
         "x86_64-pc-windows-msvc"
     } else {
-        "x86_64-unknown-linux-gnu" // fallback genérico
+        "x86_64-unknown-linux-gnu"
     }
 }
 

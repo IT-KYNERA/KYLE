@@ -1,0 +1,92 @@
+{
+  "Function": {
+    "prefix": "fn",
+    "body": "fn ${1:name}(${2:params}):\n\t${3:body}",
+    "description": "Define a function"
+  },
+  "Main function": {
+    "prefix": "main",
+    "body": "fn main():\n\t${1:println(\"Hello, World!\")}",
+    "description": "Define the main entry point"
+  },
+  "If": {
+    "prefix": "if",
+    "body": "if ${1:condition}:\n\t${2:body}",
+    "description": "If statement"
+  },
+  "If-else": {
+    "prefix": "ifelse",
+    "body": "if ${1:condition}:\n\t${2:body}\nelse:\n\t${3:body}",
+    "description": "If-else statement"
+  },
+  "While": {
+    "prefix": "while",
+    "body": "while ${1:condition}:\n\t${2:body}",
+    "description": "While loop"
+  },
+  "For range": {
+    "prefix": "for",
+    "body": "for ${1:i} in 0..${2:10}:\n\t${3:body}",
+    "description": "For loop with range"
+  },
+  "For list": {
+    "prefix": "forin",
+    "body": "for ${1:item} in ${2:list}:\n\t${3:body}",
+    "description": "For loop over list"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": "match ${1:value}:\n\t${2:pattern}:\n\t\t${3:body}",
+    "description": "Match statement"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": "class ${1:Name}:\n\t${2:field}: ${3:type}\n\n\t${1}(${4:params}):\n\t\tthis.${2} = ${4}\n\n\tfn ${5:method}()${6: -> type}:\n\t\t${7:body}",
+    "description": "Define a class"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": "struct ${1:Name}:\n\t${2:field}: ${3:type}",
+    "description": "Define a struct"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": "enum ${1:Name}:\n\t${2:Variant1}(${3:type})\n\t${4:Variant2}",
+    "description": "Define an enum"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": "import ${1:module}",
+    "description": "Import a module"
+  },
+  "Defer": {
+    "prefix": "defer",
+    "body": "defer ${1:function()}",
+    "description": "Defer a function call"
+  },
+  "Println": {
+    "prefix": "println",
+    "body": "println(\"${1:text}\")",
+    "description": "Print with newline"
+  },
+  "Print": {
+    "prefix": "print",
+    "body": "print(\"${1:text}\")",
+    "description": "Print without newline"
+  },
+  "Ternary": {
+    "prefix": "ternary",
+    "body": "${1:condition} ? ${2:true_value} : ${3:false_value}",
+    "description": "Ternary expression"
+  },
+  "Async": {
+    "prefix": "async",
+    "body": "${1:task} = async ${2:function(${3:args})}",
+    "description": "Spawn an async task"
+  },
+  "Await": {
+    "prefix": "await",
+    "body": "${1:result} = await ${2:task}",
+    "description": "Await an async task"
+  }
+}

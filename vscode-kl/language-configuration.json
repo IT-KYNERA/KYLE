@@ -10,15 +10,40 @@
   "autoClosingPairs": [
     { "open": "(", "close": ")" },
     { "open": "[", "close": "]" },
-    { "open": "\"", "close": "\"", "notIn": ["string"] }
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "'", "close": "'", "notIn": ["string", "comment"] }
   ],
   "surroundingPairs": [
     { "open": "(", "close": ")" },
     { "open": "[", "close": "]" },
-    { "open": "\"", "close": "\"" }
+    { "open": "\"", "close": "\"" },
+    { "open": "'", "close": "'" }
+  ],
+  "autoCloseBefore": ";:.,=}])> \n\t",
+  "onEnterRules": [
+    {
+      "beforeText": "^.*:\\s*$",
+      "action": { "indent": "indent" }
+    },
+    {
+      "beforeText": "^.*\\{[^}]*$",
+      "action": { "indent": "indent" }
+    },
+    {
+      "beforeText": "^\\s*(return|break|continue|next)\\b",
+      "action": { "indent": "outdent" }
+    }
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^(\\s*|.*:\\s*)$",
-    "decreaseIndentPattern": "^\\s*(return|break)\\b"
-  }
+    "increaseIndentPattern": "^.*:\\s*$",
+    "decreaseIndentPattern": "^\\s*(return|break|continue|next)\\b"
+  },
+  "folding": {
+    "markers": {
+      "start": "^\\s*#\\s*region\\b",
+      "end": "^\\s*#\\s*endregion\\b"
+    },
+    "offSide": true
+  },
+  "wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)"
 }

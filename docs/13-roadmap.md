@@ -1,25 +1,29 @@
-# Kyle Language Roadmap v6.0 — MVP & Distribution Focus
+# Kyle Language Roadmap v7.0 — Production Polish
 
 ---
 
 ## Overview
 
-Kyle is developed in phases. **Phases 0–5 and 3.5** are complete: full compiler
+Kyle is developed in phases. **Phases 0–6 and 3.5** are complete: full compiler
 pipeline (lexer → parser → semantic → MIR → LLVM → native binary), runtime
-(RAII, async, string ops, file I/O), standard library basics, and tooling
-(CLI, LSP, formatter, package manager, VS Code extension).
+(RAII, async, string ops, file I/O), standard library basics, tooling
+(CLI, LSP, formatter, package manager, VS Code extension), AND all syntax
+features generate working code end-to-end.
 
-**Phase 6 — Language Completion** is the current priority: finish ALL syntax
-features so they generate working code end-to-end.
+**Phase 7 — Cross-Platform Support** was completed earlier, making the runtime
+I/O cross-platform and the target triple auto-detectable. Distribution pipeline
+(GitHub Actions release, install.sh, public repo) is also done.
 
-After Phase 6, the order is: **Cross-Platform → Distribution → Self-Hosting → Production**.
+**Phase 8 — Distribution & Tooling Polish** is the current priority: make Kyle
+feel like a professional language — better VS Code experience, proper build
+output, LSP autocompletion, logo/branding, snippets, and website.
 
 ```
-Phase 6:  Language Completion     ← 🔶 CURRENT
-Phase 7:  Cross-Platform Support   ← ⏸️ next
-Phase 8:  Distribution & Tooling   ← ⏸️ after cross-platform
-Phase 9:  Self-Hosting             ← ⏸️ deferred
-Phase 10: Production Ecosystem     ← 📅 future
+Phase 6:  Language Completion           ← ✅ Complete
+Phase 7:  Cross-Platform + Distribution ← ✅ Complete
+Phase 8:  Distribution & Tooling Polish ← 🔶 CURRENT
+Phase 9:  Self-Hosting                  ← ⏸️ deferred
+Phase 10: Production Ecosystem          ← 📅 future
 ```
 
 **Memory model:** RAII + Compiler-Inferred Ownership (NO garbage collector).
@@ -476,124 +480,89 @@ CI pipeline con macOS + Linux + Windows
 
 ---
 
-## Phase 8: Distribution & Tooling ⏸️ NEXT
+## Phase 8: Distribution & Tooling Polish 🔶 CURRENT
 
-### Status: ⏸️ Next — after Cross-Platform
+### Status: 🔶 Current — Priority #1
 
 ### Goal
 
-Que Kyle sea **instalable y usable por cualquier desarrollador** con un solo
-comando. Incluye: instalador curl, web oficial, empaquetado VS Code,
-autocompletado LSP, CI/CD de releases, y branding completo (logo, colores).
+Hacer que Kyle se sienta como un **lenguaje de programación profesional**:
+VS Code extension con highlighting completo, autocompletado LSP inteligente,
+build output limpio, logo y branding, snippets, y documentación clara.
 
-### Why separate from Cross-Platform
+### Why this is important now
 
-Phase 7 habilita la compilación en cada plataforma.
-Phase 8 empaqueta y distribuye esos binarios para que los usuarios
-los descarguen e instalen sin esfuerzo.
+El lenguaje ya compila y ejecuta código. Lo que falta es la **experiencia de
+usuario**: que al abrir un archivo .kl en VS Code se vea colorizado con
+precisión, que al escribir aparezcan sugerencias útiles, que al construir
+un proyecto los archivos binarios no ensucien el source, y que el lenguaje
+tenga una identidad visual profesional.
 
-### 8.1 — Installer
+### Tasks — Organized by Priority
+
+#### 🟥 P0 — VS Code Extension Polish
 
 ```text
-[ ] Script install.sh (curl | sh)
-    - Detecta OS + arquitectura automáticamente
-    - Descarga binario precompilado desde GitHub Releases
-    - Instala en /usr/local/bin/klc (o ~/.kl/bin/)
-    - Agrega al PATH si es necesario
-    - Compatible con: macOS, Linux, Windows (Git Bash / WSL)
-    - Verificación de checksum SHA-256
-
-[ ] GitHub Actions release workflow
-    - Compilar klc para los 6 targets
-    - Generar .tar.gz / .zip por plataforma
-    - Publicar en GitHub Releases con notas de versión
-    - Etiquetado semántico (v0.6.0, v0.7.0, etc.)
-
-[ ] Homebrew tap (macOS)
-[ ] Windows: winget / scoop manifest (opcional)
+[x] Syntax highlighting: keywords, types, builtins, operators ✅
+[x] Char literal highlighting ('a', '\n') ✅
+[x] String escape sequences (\n, \t, \x00, \u0000) ✅
+[x] UPPERCASE constant highlighting ✅
+[x] Language configuration: comments, brackets, auto-closing ✅
+[x] Indentation rules (onEnter after `:`) ✅
+[x] Folding support (region markers) ✅
+[x] Word pattern for selection/double-click ✅
+[x] Code snippets: fn, class, enum, match, for, if, while, import, defer, async/await ✅
+[x] Extension icon for file type ✅
+[x] Settings: kl.klcPath configuration ✅
+[x] out/extension.js synced with source TypeScript (LSP client works) ✅
 ```
 
-### 8.2 — Website (kl-lang.org)
+#### 🟧 P1 — LSP Autocompletion
 
 ```text
-[ ] Landing page (1-page)
-    - Hero: "Kyle — Readable like Python, Fast like C"
-    - Comando de instalación: curl -fsSL https://kl-lang.org/install.sh | sh
-    - "Hello, World!" example
-    - Feature highlights (6 tarjetas)
-    - Call to action: "Get Started" → docs
-
-[ ] Documentation section
-    - Getting started guide
-    - Language reference (syntax, types, builtins)
-    - Standard library API
-    - Examples gallery
-    - FAQ
-
-[ ] Download section
-    - Pre-compiled binaries for all platforms
-    - VS Code extension (.vsix)
-    - Source code (GitHub)
-
-[ ] Blog (opcional)
-    - Release announcements
-    - Tutorials
+[x] All 44 builtins (print, str, len, contains, etc.) ✅
+[x] All 8 Decl variants (functions, variables, constants, classes, structs, enums, contracts, type aliases) ✅
+[x] 33 keywords with context detail ✅
+[x] Prefix filtering (only show matching completions) ✅
+[x] Sort ordering (builtins first, then project symbols, then keywords) ✅
+[ ] Dot-triggered struct field / method completions
+[ ] Scope-aware completions (inner functions, variables)
+[ ] Completion resolve provider (documentation on demand)
 ```
 
-### 8.3 — VS Code Extension
+#### 🟦 P2 — Build Output Structure
 
 ```text
-[ ] Empaquetar como .vsix
-    - vsce package en el CI
-    - Publicar en VS Code Marketplace (opcional)
-    - Hostear .vsix en kl-lang.org como alternativa
-
-[ ] Compile on save
-    - Auto-detect .kl files and compile on save
-
-[ ] Error squiggles
-    - Mostrar errores en el editor via LSP diagnostics
+[ ] Project build → target/debug/main (or target/release/main) ✅
+[x] Single-file build → binary next to source, artifacts in .klc-build/ ✅
+[x] Proper .gitignore (target/, *.o, *.ll, .klc-build/) ✅
 ```
 
-### 8.4 — LSP Completion
+#### 🟪 P3 — Branding & Logo
 
 ```text
-[ ] textDocument/completion
-    - Keywords: fn, mut, if, while, for, return, class, etc.
-    - Types: i32, i64, str, bool, f64, Option, etc.
-    - Builtins: println, len, str, input, etc.
-    - Project symbols: functions, variables, structs, enums
+[x] SVG logo (purple "K" on rounded square) ✅
+[x] Color palette (purple #6C3FC5, dark #1A1A2E) defined in docs ✅
+[ ] PNG icons (128x128 for VS Code marketplace, 16x16 for file icons)
+[ ] Logo in VS Code extension (language icon)
 ```
 
-### 8.5 — Branding
+#### 🟩 P4 — Website (kl-lang.org)
 
 ```text
-[ ] Logo oficial (SVG)
-    - Usado en web, VS Code, docs, GitHub
-[ ] Color palette
-[ ] Typography
-[ ] Icon theme for VS Code (ya existe parcialmente)
-```
-
-### 8.6 — CI/CD
-
-```text
-[ ] GitHub Actions workflow completo
-    - Build + test en macOS, Linux, Windows
-    - Release workflow (build all targets + publish)
-    - Lint (clippy, fmt)
-    - VS Code extension packaging
+[ ] Landing page with hero, install command, hello world
+[ ] Documentation section (language reference, std lib API)
+[ ] Downloads page (binaries + VS Code extension)
 ```
 
 ### Milestone
 
 ```text
-curl -fsSL https://kl-lang.org/install.sh | sh  # instala klc
-klc --version                                     # funciona
-klc new myproject                                 # crea proyecto
-klc run myproject/src/main.kl                     # compila y ejecuta
-VS Code extension con syntax highlight + LSP + autocompletado
-kl-lang.org con documentación, ejemplos, descargas
+klc run ANY_PROJECT.kl → works, no crashes
+VS Code extension → syntax highlighting + LSP + autocompletado + snippets
+Build output → target/debug/ y .klc-build/ sin ensuciar source
+Logo y branding → identidad visual profesional
+kl-lang.org → documentación y descargas
 ```
 
 ---
@@ -655,18 +624,18 @@ kl build klc   # compiler compiles itself
 ## Timeline
 
 ```text
-Phase 0:   Language Design              — Complete ✅
-Phase 1:   Compiler Frontend            — Complete ✅
-Phase 2:   Semantic Analysis            — Complete ✅
-Phase 3:   Compiler Backend             — Complete ✅
-Phase 4:   Runtime + Builtins           — Complete ✅
-Phase 5:   Tooling & Ecosystem          — Complete ✅
-Phase 3.5: Backend gap closure          — Complete ✅
-Phase 6:   Language Completion          — 🔶 Current (P0→P5)
-Phase 7:   Cross-Platform Support       — ⏸️ Next
-Phase 8:   Distribution & Tooling       — ⏸️ Next
-Phase 9:   Self-Hosting                 — ⏸️ Deferred
-Phase 10:  Production Ecosystem         — 📅 Future
+Phase 0:   Language Design                      — Complete ✅
+Phase 1:   Compiler Frontend                    — Complete ✅
+Phase 2:   Semantic Analysis                    — Complete ✅
+Phase 3:   Compiler Backend                     — Complete ✅
+Phase 4:   Runtime + Builtins                   — Complete ✅
+Phase 5:   Tooling & Ecosystem                  — Complete ✅
+Phase 3.5: Backend gap closure                  — Complete ✅
+Phase 6:   Language Completion                  — Complete ✅
+Phase 7:   Cross-Platform + Distribution        — Complete ✅
+Phase 8:   Distribution & Tooling Polish        — 🔶 Current
+Phase 9:   Self-Hosting                         — ⏸️ Deferred
+Phase 10:  Production Ecosystem                 — 📅 Future
 ```
 
 ---
@@ -716,7 +685,19 @@ Closures, methods, enums, match working
 Struct pass-by-reference ABI
 ```
 
-### v0.6.0 — RC (Phase 6 — Current 🔶)
+### v0.1.0 — Alpha ✅
+
+```text
+Full compiler pipeline (lexer → parser → semantic → MIR → LLVM → binary)
+RAII runtime + async + string ops + file I/O
+Package manager + LSP + formatter + VS Code extension
+All syntax features generate working code
+53 example programs + 86 unit tests
+Public repo + GitHub Actions release workflow
+install.sh (curl | sh) installer
+```
+
+### v0.8.0 — Beta (Phase 8 — Current 🔶)
 
 ```text
 🟥 P0: For loops, Generics, Error handling, Optional chaining, String interpolation,
@@ -728,25 +709,18 @@ Struct pass-by-reference ABI
 🟩 P5: 100+ integration tests, no crashes
 ```
 
-### v0.7.0 — RC (Phase 7 — Cross-Platform)
+### v1.0.0 — Stable (Phase 9 — Self-Hosting)
 
 ```text
-Cross-platform: macOS (Intel+ARM) + Linux (x64+ARM) + Windows (x64)
-klc build + klc run funciona en las 3 plataformas
-CI pipeline con todas las plataformas
-```
-
-### v0.8.0 — RC (Phase 8 — Distribution)
-
-```text
-curl -fsSL https://kl-lang.org/install.sh | sh  → instala klc
+Self-hosting: kl build klc
+Production-ready compiler
+Stable standard library API
+Full tooling support
 kl-lang.org con documentación, ejemplos, descargas
 VS Code extension .vsix publicada
-LSP autocompletado funcional
-GitHub Actions CI/CD con releases automáticos
+LSP autocompletado completo
+Multiplataforma (macOS, Linux, Windows)
 ```
-
-### v1.0.0 — Stable (Phase 9 — Self-Hosting)
 
 ```text
 Self-hosting: kl build klc

@@ -181,10 +181,9 @@ fn print_usage() {
 }
 
 fn cmd_build(args: &[String]) {
-    // Check for --release flag
     let release = args.iter().any(|a| a == "--release");
     if args.len() < 3 || args[2].starts_with("--") {
-        // No file specified — try project context
+        // Project mode
         if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
             if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
                 let source = fs::read_to_string(&source_path).unwrap_or_else(|e| {
@@ -192,14 +191,12 @@ fn cmd_build(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                let output = exe_path(&project_root.join("target").join(if release { "main-release" } else { "main" }));
-                if let Some(parent) = output.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                match klc_driver::pipeline::Pipeline::build_source(&source, &file, &output) {
+                let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
+                let output = exe_path(&build_dir.join("main"));
+                let _ = fs::create_dir_all(&build_dir);
+                match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir) {
                     Ok(()) => {
                         println!("Build complete: {}", output.display());
-                        // Write lock file after successful build
                         let lock_path = project_root.join("kl.lock");
                         let manifest = klc_tools::package::Manifest::find_in_directory(&project_root).ok();
                         if let Some(m) = manifest {
@@ -222,10 +219,13 @@ fn cmd_build(args: &[String]) {
         }
         return;
     }
+    // Single-file mode
     let source = load_source(args, 2);
     let file = &args[2];
     let output = exe_path(&std::path::Path::new(file).with_extension(""));
-    match klc_driver::pipeline::Pipeline::build_source(&source, file, &output) {
+    let artifact_dir = std::path::Path::new(".klc-build");
+    let _ = fs::create_dir_all(artifact_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, artifact_dir) {
         Ok(()) => {
             println!("Build complete: {}", output.display());
         }
@@ -238,7 +238,7 @@ fn cmd_build(args: &[String]) {
 
 fn cmd_run(args: &[String]) {
     if args.len() < 3 {
-        // No file specified — try project context
+        // Project mode
         if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
             if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
                 let source = fs::read_to_string(&source_path).unwrap_or_else(|e| {
@@ -246,18 +246,14 @@ fn cmd_run(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                let output = exe_path(&project_root.join("target").join("main"));
-                if let Some(parent) = output.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                match klc_driver::pipeline::Pipeline::build_source(&source, &file, &output) {
+                let build_dir = project_root.join("target").join("debug");
+                let output = exe_path(&build_dir.join("main"));
+                let _ = fs::create_dir_all(&build_dir);
+                match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir) {
                     Ok(()) => {
-                        let mut cmd = std::process::Command::new(&output);
-                        // Forward remaining CLI args to the compiled program
-                        for extra_arg in args.iter().skip(2) {
-                            cmd.arg(extra_arg);
-                        }
-                        let status = cmd.status()
+                        let status = std::process::Command::new(&output)
+                            .args(args.iter().skip(2))
+                            .status()
                             .expect("Failed to execute binary");
                         if !status.success() {
                             process::exit(status.code().unwrap_or(1));
@@ -275,17 +271,17 @@ fn cmd_run(args: &[String]) {
         }
         return;
     }
+    // Single-file mode
     let source = load_source(args, 2);
     let file = &args[2];
     let output = exe_path(&std::path::Path::new(file).with_extension(""));
-    match klc_driver::pipeline::Pipeline::build_source(&source, file, &output) {
+    let artifact_dir = std::path::Path::new(".klc-build");
+    let _ = fs::create_dir_all(artifact_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, artifact_dir) {
         Ok(()) => {
-            let mut cmd = std::process::Command::new(&output);
-            // Forward remaining CLI args to the compiled program (args[3..])
-            for extra_arg in args.iter().skip(3) {
-                cmd.arg(extra_arg);
-            }
-            let status = cmd.status()
+            let status = std::process::Command::new(&output)
+                .args(args.iter().skip(3))
+                .status()
                 .expect("Failed to execute binary");
             if !status.success() {
                 process::exit(status.code().unwrap_or(1));
