@@ -34,6 +34,10 @@ impl TypeChecker {
         self
     }
 
+    pub fn symbols(&self) -> &SymbolTable {
+        &self.symbols
+    }
+
     pub fn has_errors(&self) -> bool {
         self.reporter.has_errors()
     }

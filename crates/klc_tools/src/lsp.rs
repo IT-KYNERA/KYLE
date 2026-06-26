@@ -3,7 +3,9 @@ use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::*;
 use klc_core::ast::*;
 use klc_core::span::Span;
+use klc_core::types::Type;
 use klc_frontend::token::TokenKind;
+use klc_semantic::symbol_table::{Symbol, SymKind, SymbolTable};
 
 /// KL Language Server — provides diagnostics, completion, hover, and
 /// go-to-definition via the Language Server Protocol.
@@ -188,6 +190,20 @@ impl LanguageServer {
         let source = self.sources.get(&uri).cloned().unwrap_or_default();
         let pos = params.text_document_position.position;
 
+        // Check if this is a dot-triggered completion (user typed "expr.")
+        let is_dot = self.is_after_dot(&source, pos.line as usize, pos.character as usize, &params);
+        if is_dot {
+            let expr = self.word_before_dot(&source, pos.line as usize, pos.character as usize);
+            if !expr.is_empty() {
+                if let Some(items) = self.dot_completions(&source, &expr, pos.line as usize, pos.character as usize) {
+                    let result = CompletionResponse::Array(items);
+                    let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
+                    let _ = self.connection.sender.send(Message::Response(resp));
+                    return;
+                }
+            }
+        }
+
         let prefix = self.word_at(&source, pos.line as usize, pos.character as usize);
         let prefix_lower = prefix.to_lowercase();
 
@@ -261,7 +277,7 @@ impl LanguageServer {
             for decl in &prog.declarations {
                 let (name, kind, detail): (String, CompletionItemKind, String) = match decl {
                     Decl::Function(f) => {
-                        let params: Vec<String> = f.params.iter().map(|p| format!("{}: {}", p.name, Self::fmt_type(&p.type_))).collect();
+                        let params: Vec<String> = f.params.iter().map(|p| format!("{}: {}", p.name, Self::fmt_ast_type(&p.type_))).collect();
                         let sig = format!("fn {}({})", f.name, params.join(", "));
                         (f.name.clone(), CompletionItemKind::FUNCTION, sig)
                     }
@@ -372,7 +388,7 @@ impl LanguageServer {
                         if (l1 <= line + 1 && line + 1 <= l2) || l1 == line + 1 {
                             let mut info = format!("**fn {}**", f.name);
                             if let Some(rt) = &f.return_type {
-                                info.push_str(&format!(" -> {}", Self::fmt_type(rt)));
+                                info.push_str(&format!(" -> {}", Self::fmt_ast_type(rt)));
                             }
                             return info;
                         }
@@ -420,17 +436,342 @@ impl LanguageServer {
         String::new()
     }
 
-    fn fmt_type(t: &AstType) -> String {
+    /// Check if the cursor is right after a `.` (either triggered by the
+    /// character itself or invoked manually while positioned after one).
+    fn is_after_dot(&self, source: &str, line: usize, col: usize, params: &CompletionParams) -> bool {
+        if let Some(ctx) = &params.context {
+            if ctx.trigger_kind == CompletionTriggerKind::TRIGGER_CHARACTER
+                && ctx.trigger_character.as_deref() == Some(".")
+            {
+                return true;
+            }
+        }
+        // Manual invocation — check if char before cursor is '.'
+        for (i, l) in source.lines().enumerate() {
+            if i == line && col > 0 {
+                let chars: Vec<char> = l.chars().collect();
+                if col - 1 < chars.len() && chars[col - 1] == '.' {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Extract the identifier immediately before a `.` at the cursor.
+    /// Cursor position (`col`) is *after* the dot, so we look at `col - 2 ..`.
+    fn word_before_dot(&self, source: &str, line: usize, col: usize) -> String {
+        for (i, l) in source.lines().enumerate() {
+            if i == line {
+                let chars: Vec<char> = l.chars().collect();
+                if col == 0 {
+                    return String::new();
+                }
+                let dot_idx = col.saturating_sub(1);
+                if dot_idx >= chars.len() || chars[dot_idx] != '.' {
+                    return String::new();
+                }
+                let mut start = dot_idx;
+                while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+                    start -= 1;
+                }
+                return chars[start..dot_idx].iter().collect();
+            }
+        }
+        String::new()
+    }
+
+    /// Resolve dot completions for an expression by running the semantic
+    /// pipeline and looking up the expression's type in the symbol table.
+    /// `line`/`col` are the cursor position (after the dot) used to find the
+    /// enclosing function for local variable resolution.
+    fn dot_completions(&self, source: &str, expr: &str, line: usize, col: usize) -> Option<Vec<CompletionItem>> {
+        let mut lexer = klc_frontend::lexer::Lexer::new(source);
+        let tokens = lexer.tokenize();
+        let mut parser = klc_frontend::parser::Parser::new(tokens);
+        let program = parser.parse().ok()?;
+
+        let mut source_map = klc_core::source_map::SourceMap::new();
+        let _file_id = source_map.add("input.kl".to_string(), source.to_string());
+        let mut analyzer = klc_semantic::analyzer::SemanticAnalyzer::new()
+            .with_source(source_map, "input.kl".to_string());
+        analyzer.analyze(&program);
+
+        let symbols = analyzer.type_checker.symbols();
+
+        // First, try global symbol table
+        if let Some(sym) = symbols.lookup(expr) {
+            return Self::completions_for_sym(sym, symbols);
+        }
+
+        // Not found in globals — try local variables from the enclosing function
+        let local_types = Self::build_local_scope(&program, line, col);
+        if let Some(type_name) = local_types.get(expr) {
+            // Look up the type name in the symbol table
+            if let Some(sym) = symbols.lookup(type_name) {
+                return Self::completions_for_sym(sym, symbols);
+            }
+            // Check primitive/known types by name
+            match type_name.as_str() {
+                "str" => return Self::completions_for_type(&Type::Str, symbols),
+                "list" => return Self::completions_for_type(&Type::List(Box::new(Type::TypeVar(0))), symbols),
+                "dict" => return Self::completions_for_type(&Type::Dict(Box::new(Type::Str), Box::new(Type::TypeVar(0))), symbols),
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    /// Walk the program AST to build a map of local variable names to their
+    /// type names, scoped to the function containing `(line, col)`.
+    fn build_local_scope(program: &Program, line: usize, _col: usize) -> HashMap<String, String> {
+        let mut vars: HashMap<String, String> = HashMap::new();
+        for decl in &program.declarations {
+            if let Decl::Function(f) = decl {
+                let l1 = f.span.start.line;
+                let l2 = f.span.end.line;
+                // KL spans are 1-indexed; cursor is 0-indexed
+                if l1 <= line + 1 && line + 1 <= l2 {
+                    // Register params
+                    for param in &f.params {
+                        if param.name == "this" { continue; }
+                        let tn = Self::ast_type_name(&param.type_);
+                        if !tn.is_empty() {
+                            vars.insert(param.name.clone(), tn);
+                        }
+                    }
+                    // Walk function body
+                    if let Some(body) = &f.body {
+                        Self::walk_block_for_vars(body, &mut vars);
+                    }
+                }
+            }
+        }
+        vars
+    }
+
+    /// Walk a block to collect variable declarations with their types.
+    fn walk_block_for_vars(block: &Block, vars: &mut HashMap<String, String>) {
+        for stmt in &block.statements {
+            match stmt {
+                Stmt::Variable(vd) | Stmt::TypedVariable(vd) => {
+                    if let Some(t) = &vd.type_ {
+                        let tn = Self::ast_type_name(t);
+                        if !tn.is_empty() {
+                            vars.insert(vd.name.clone(), tn);
+                        }
+                    } else {
+                        let val = &vd.value;
+                        if let Some(tn) = Self::infer_type_from_expr(val) {
+                            vars.insert(vd.name.clone(), tn);
+                        }
+                    }
+                }
+                Stmt::For(fs) => {
+                    vars.insert(fs.variable.clone(), "i32".to_string());
+                    Self::walk_block_for_vars(&fs.body, vars);
+                    if let Some(eb) = &fs.else_branch {
+                        Self::walk_block_for_vars(eb, vars);
+                    }
+                }
+                Stmt::If(is) => {
+                    Self::walk_block_for_vars(&is.body, vars);
+                    for eb in &is.elif_branches {
+                        Self::walk_block_for_vars(&eb.body, vars);
+                    }
+                    if let Some(eb) = &is.else_branch {
+                        Self::walk_block_for_vars(eb, vars);
+                    }
+                }
+                Stmt::While(ws) => {
+                    Self::walk_block_for_vars(&ws.body, vars);
+                }
+                Stmt::Match(ms) => {
+                    for arm in &ms.arms {
+                        Self::walk_block_for_vars(&arm.body, vars);
+                    }
+                }
+                Stmt::Guard(gs) => {
+                    Self::walk_block_for_vars(&gs.body, vars);
+                }
+                Stmt::Unsafe(us) => {
+                    Self::walk_block_for_vars(&us.body, vars);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Extract the type name string from an AstType.
+    fn ast_type_name(t: &AstType) -> String {
+        match t {
+            AstType::Primitive { name, .. } => name.clone(),
+            AstType::User { name, .. } => name.clone(),
+            AstType::Generic { name, .. } => name.clone(),
+            AstType::Optional { inner, .. } => Self::ast_type_name(inner),
+            AstType::Error { inner, .. } => Self::ast_type_name(inner),
+            AstType::Dict { .. } => "dict".to_string(),
+        }
+    }
+
+    /// Rough type inference from an expression AST for building local scope.
+    fn infer_type_from_expr(expr: &Expr) -> Option<String> {
+        match expr {
+            Expr::Literal { value, .. } => match value {
+                Literal::Integer(_) => Some("i32".to_string()),
+                Literal::Float(_) => Some("f64".to_string()),
+                Literal::String(_) => Some("str".to_string()),
+                Literal::Boolean(_) => Some("bool".to_string()),
+                Literal::None => None,
+            },
+            Expr::StructLiteral { struct_name, .. } => Some(struct_name.clone()),
+            Expr::Unary { operand, .. } => Self::infer_type_from_expr(operand),
+            Expr::FunctionCall { target, .. } => {
+                if let Expr::Identifier { name, .. } = target.as_ref() {
+                    // Builtins with known return types
+                    match name.as_str() {
+                        "input" => Some("str".to_string()),
+                        "len" => Some("i32".to_string()),
+                        "str" => Some("str".to_string()),
+                        "int" => Some("i32".to_string()),
+                        "float" => Some("f64".to_string()),
+                        "bool" => Some("bool".to_string()),
+                        "open" => Some("i64".to_string()),
+                        "now" => Some("i64".to_string()),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Expr::Ternary { then_expr, .. } => Self::infer_type_from_expr(then_expr),
+            Expr::List { .. } => Some("list".to_string()),
+            Expr::Dictionary { .. } => Some("dict".to_string()),
+            _ => None,
+        }
+    }
+
+    /// Given a Symbol, return the appropriate dot completions (fields,
+    /// methods, enum variants).
+    fn completions_for_sym(sym: &Symbol, symbols: &SymbolTable) -> Option<Vec<CompletionItem>> {
+        match &sym.kind {
+            SymKind::Struct(s) => {
+                let items: Vec<CompletionItem> = s.fields.iter().map(|f| {
+                    CompletionItem {
+                        label: f.name.clone(),
+                        kind: Some(CompletionItemKind::FIELD),
+                        detail: Some(format!("{}: {}", f.name, Self::fmt_ast_type(&f.type_))),
+                        sort_text: Some(format!("1{}", f.name)),
+                        ..Default::default()
+                    }
+                }).collect();
+                if items.is_empty() { None } else { Some(items) }
+            }
+            SymKind::Class(c) => {
+                let mut items = Vec::new();
+                for member in &c.members {
+                    match member {
+                        ClassMember::Field(f) => {
+                            items.push(CompletionItem {
+                                label: f.name.clone(),
+                                kind: Some(CompletionItemKind::FIELD),
+                                detail: Some(format!("{}: {}", f.name, Self::fmt_ast_type(&f.type_))),
+                                sort_text: Some(format!("1{}", f.name)),
+                                ..Default::default()
+                            });
+                        }
+                        ClassMember::Method(m) => {
+                            let params: Vec<String> = m.params.iter()
+                                .filter(|p| p.name != "this")
+                                .map(|p| format!("{}: {}", p.name, Self::fmt_ast_type(&p.type_)))
+                                .collect();
+                            let sig = format!("fn {}({})", m.name, params.join(", "));
+                            items.push(CompletionItem {
+                                label: m.name.clone(),
+                                kind: Some(CompletionItemKind::METHOD),
+                                detail: Some(sig),
+                                sort_text: Some(format!("2{}", m.name)),
+                                ..Default::default()
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+                if items.is_empty() { None } else { Some(items) }
+            }
+            SymKind::Enum(e) => {
+                let items: Vec<CompletionItem> = e.variants.iter().map(|v| {
+                    CompletionItem {
+                        label: v.name.clone(),
+                        kind: Some(CompletionItemKind::ENUM_MEMBER),
+                        detail: Some(format!("{}.{}", e.name, v.name)),
+                        sort_text: Some(format!("1{}", v.name)),
+                        ..Default::default()
+                    }
+                }).collect();
+                if items.is_empty() { None } else { Some(items) }
+            }
+            SymKind::Variable { type_: Some(t), .. } => {
+                Self::completions_for_type(t, symbols)
+            }
+            SymKind::Constant(t) => {
+                Self::completions_for_type(t, symbols)
+            }
+            _ => None,
+        }
+    }
+
+    /// Return dot completions for a given resolved Type.
+    fn completions_for_type(ty: &Type, symbols: &SymbolTable) -> Option<Vec<CompletionItem>> {
+        match ty {
+            Type::Named(name) | Type::Generic(name, _) => {
+                let sym = symbols.lookup(name)?;
+                Self::completions_for_sym(sym, symbols)
+            }
+            Type::Str => {
+                Some(vec![
+                    CompletionItem { label: "contains".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn contains(substr: str) -> bool".into()), sort_text: Some("1contains".into()), ..Default::default() },
+                    CompletionItem { label: "to_upper".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_upper() -> str".into()), sort_text: Some("2to_upper".into()), ..Default::default() },
+                    CompletionItem { label: "to_lower".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_lower() -> str".into()), sort_text: Some("3to_lower".into()), ..Default::default() },
+                    CompletionItem { label: "trim".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn trim() -> str".into()), sort_text: Some("4trim".into()), ..Default::default() },
+                    CompletionItem { label: "replace".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn replace(from: str, to: str) -> str".into()), sort_text: Some("5replace".into()), ..Default::default() },
+                    CompletionItem { label: "substr".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn substr(start: i64, len: i64) -> str".into()), sort_text: Some("6substr".into()), ..Default::default() },
+                    CompletionItem { label: "char_at".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn char_at(index: i64) -> char".into()), sort_text: Some("7char_at".into()), ..Default::default() },
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("8len".into()), ..Default::default() },
+                ])
+            }
+            Type::List(_) => {
+                Some(vec![
+                    CompletionItem { label: "push".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn push(value)".into()), sort_text: Some("1push".into()), ..Default::default() },
+                    CompletionItem { label: "pop".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn pop() -> i64".into()), sort_text: Some("2pop".into()), ..Default::default() },
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("3len".into()), ..Default::default() },
+                ])
+            }
+            Type::Dict(_, _) => {
+                Some(vec![
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("1len".into()), ..Default::default() },
+                    CompletionItem { label: "get".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn get(key)".into()), sort_text: Some("2get".into()), ..Default::default() },
+                    CompletionItem { label: "set".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn set(key, value)".into()), sort_text: Some("3set".into()), ..Default::default() },
+                    CompletionItem { label: "keys".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn keys() -> [str]".into()), sort_text: Some("4keys".into()), ..Default::default() },
+                    CompletionItem { label: "values".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn values() -> [T]".into()), sort_text: Some("5values".into()), ..Default::default() },
+                ])
+            }
+            _ => None,
+        }
+    }
+
+    fn fmt_ast_type(t: &AstType) -> String {
         match t {
             AstType::Primitive { name, .. } => name.clone(),
             AstType::User { name, .. } => name.clone(),
             AstType::Generic { name, args, .. } => {
-                let args: Vec<String> = args.iter().map(Self::fmt_type).collect();
+                let args: Vec<String> = args.iter().map(Self::fmt_ast_type).collect();
                 format!("{}<{}>", name, args.join(", "))
             }
-            AstType::Optional { inner, .. } => format!("{}?", Self::fmt_type(inner)),
-            AstType::Error { inner, .. } => format!("{}!", Self::fmt_type(inner)),
-            AstType::Dict { key, value, .. } => format!("Dict<{}, {}>", Self::fmt_type(key), Self::fmt_type(value)),
+            AstType::Optional { inner, .. } => format!("{}?", Self::fmt_ast_type(inner)),
+            AstType::Error { inner, .. } => format!("{}!", Self::fmt_ast_type(inner)),
+            AstType::Dict { key, value, .. } => format!("Dict<{}, {}>", Self::fmt_ast_type(key), Self::fmt_ast_type(value)),
         }
     }
 
@@ -523,10 +864,10 @@ impl LanguageServer {
                     if let Decl::Function(f) = decl {
                         if f.name == word {
                             let params_list: Vec<String> = f.params.iter()
-                                .map(|p| format!("{}: {}", p.name, Self::fmt_type(&p.type_)))
+                                .map(|p| format!("{}: {}", p.name, Self::fmt_ast_type(&p.type_)))
                                 .collect();
                             let return_info = f.return_type.as_ref()
-                                .map(|rt| format!(" -> {}", Self::fmt_type(rt)))
+                                .map(|rt| format!(" -> {}", Self::fmt_ast_type(rt)))
                                 .unwrap_or_default();
                             let label = format!("fn {}({}){}", f.name, params_list.join(", "), return_info);
                             let sig = SignatureInformation {
