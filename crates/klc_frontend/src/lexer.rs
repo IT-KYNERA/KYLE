@@ -552,9 +552,27 @@ mod tests {
     }
 
     #[test]
+    fn test_string_tab_escape() {
+        let kinds = tokenize(r#""col1\tcol2""#);
+        assert_eq!(kinds, vec![TokenKind::String("col1\tcol2".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_string_quote_escape() {
+        let kinds = tokenize(r#""she said \"hello\"""#);
+        assert_eq!(kinds, vec![TokenKind::String("she said \"hello\"".into()), TokenKind::Eof]);
+    }
+
+    #[test]
     fn test_char() {
         let kinds = tokenize("'x'");
         assert_eq!(kinds, vec![TokenKind::Char("x".into()), TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_char_escape() {
+        let kinds = tokenize(r"'\n'");
+        assert_eq!(kinds, vec![TokenKind::Char("\n".into()), TokenKind::Eof]);
     }
 
     #[test]
@@ -751,6 +769,18 @@ mod tests {
     fn test_question_dot() {
         let kinds = tokenize("?.");
         assert_eq!(kinds, vec![TokenKind::QuestionDot, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_range_operator() {
+        let kinds = tokenize("..");
+        assert_eq!(kinds, vec![TokenKind::DotDot, TokenKind::Eof]);
+    }
+
+    #[test]
+    fn test_spread_operator() {
+        let kinds = tokenize("...");
+        assert_eq!(kinds, vec![TokenKind::DotDotDot, TokenKind::Eof]);
     }
 
     #[test]

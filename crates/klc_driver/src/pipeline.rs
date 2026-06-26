@@ -13,7 +13,7 @@ use klc_backend::codegen::Codegen;
 use klc_backend::linker::Linker;
 use klc_tools::package::find_project_root;
 use inkwell::context::Context;
-use inkwell::targets::{FileType, InitializationConfig, Target, TargetTriple};
+use inkwell::targets::{FileType, InitializationConfig, Target, TargetMachine};
 use inkwell::OptimizationLevel;
 use std::io::Write;
 
@@ -184,8 +184,8 @@ impl Pipeline {
 fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), String> {
     Target::initialize_all(&InitializationConfig::default());
 
-    let triple_str = host_target_triple();
-    let triple = TargetTriple::create(triple_str);
+    let triple = TargetMachine::get_default_triple();
+    let triple_str = triple.as_str().to_str().unwrap_or("x86_64-unknown-linux-gnu");
     let target = Target::from_triple(&triple)
         .map_err(|e| format!("Failed to get target '{}': {}", triple_str, e))?;
     let target_machine = target.create_target_machine(
@@ -199,23 +199,6 @@ fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), Stri
 
     target_machine.write_to_file(module, FileType::Object, path)
         .map_err(|e| format!("Failed to emit object file: {}", e))
-}
-
-/// Return the host target triple string at compile time.
-fn host_target_triple() -> &'static str {
-    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        "arm64-apple-macosx"
-    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
-        "x86_64-apple-macosx"
-    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-        "aarch64-unknown-linux-gnu"
-    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        "x86_64-unknown-linux-gnu"
-    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-        "x86_64-pc-windows-msvc"
-    } else {
-        "x86_64-unknown-linux-gnu"
-    }
 }
 
 pub struct ParsedOutput {

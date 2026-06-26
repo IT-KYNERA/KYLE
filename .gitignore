@@ -8,6 +8,7 @@ Cargo.lock
 *.bc
 *.klc
 .klc-build/
+klc-build/
 
 # Compiled binaries in examples/
 /examples/*
@@ -33,3 +34,16 @@ vscode-kl/package-lock.json
 
 # Environment / secrets
 .env
+
+# Build output directories
+/klc-build/
+build/
+
+# Editor/IDE
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# OS
+Thumbs.db
+Desktop.ini

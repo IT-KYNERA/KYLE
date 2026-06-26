@@ -499,28 +499,141 @@ impl LanguageServer {
 
         let symbols = analyzer.type_checker.symbols();
 
+        // Build local scope for variable-to-type mapping
+        let local_types = Self::build_local_scope(&program, line, col);
+
+        // Handle chained dot completions: "user.address" → resolve base "user" → get "address" type
+        let parts: Vec<&str> = expr.split('.').collect();
+        if parts.len() > 1 {
+            let base = parts[0];
+            // Walk the chain: resolve each part's type
+            let mut current_type = Self::resolve_type_name(base, symbols, &local_types);
+            for i in 1..parts.len() {
+                let prop = parts[i];
+                // Look up `prop` as a field of `current_type`
+                if let Some(ref tn) = current_type {
+                    if let Some(sym) = symbols.lookup(tn) {
+                        let field_type = Self::field_type_for_sym(sym, prop);
+                        if let Some(ft) = field_type {
+                            current_type = Some(ft);
+                        } else {
+                            // If this is the last part, return completions for current type
+                            if i == parts.len() - 1 {
+                                return Self::completions_for_named_type(tn, symbols);
+                            }
+                            return None;
+                        }
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+            // Return completions for the resolved final type
+            if let Some(tn) = current_type {
+                return Self::completions_for_named_type(&tn, symbols);
+            }
+            return None;
+        }
+
         // First, try global symbol table
         if let Some(sym) = symbols.lookup(expr) {
             return Self::completions_for_sym(sym, symbols);
         }
 
         // Not found in globals — try local variables from the enclosing function
-        let local_types = Self::build_local_scope(&program, line, col);
         if let Some(type_name) = local_types.get(expr) {
-            // Look up the type name in the symbol table
-            if let Some(sym) = symbols.lookup(type_name) {
-                return Self::completions_for_sym(sym, symbols);
-            }
-            // Check primitive/known types by name
-            match type_name.as_str() {
-                "str" => return Self::completions_for_type(&Type::Str, symbols),
-                "list" => return Self::completions_for_type(&Type::List(Box::new(Type::TypeVar(0))), symbols),
-                "dict" => return Self::completions_for_type(&Type::Dict(Box::new(Type::Str), Box::new(Type::TypeVar(0))), symbols),
-                _ => {}
-            }
+            return Self::completions_for_named_type(type_name, symbols);
         }
 
         None
+    }
+
+    /// Resolve an expression name to its type name using symbol table and local scope.
+    fn resolve_type_name<'a>(name: &str, symbols: &'a SymbolTable, local_types: &HashMap<String, String>) -> Option<String> {
+        // Try global symbols first
+        if let Some(sym) = symbols.lookup(name) {
+            return match &sym.kind {
+                SymKind::Variable { type_: Some(t), .. } => Some(Self::type_to_name(t)),
+                SymKind::Constant(t) => Some(Self::type_to_name(t)),
+                SymKind::Function(f) => f.return_type.as_ref().map(|t| Self::fmt_ast_type(t)),
+                _ => None,
+            };
+        }
+        // Try local scope
+        if let Some(type_name) = local_types.get(name) {
+            return Some(type_name.clone());
+        }
+        None
+    }
+
+    /// Extract a simple name from a Type for resolution purposes.
+    fn type_to_name(t: &Type) -> String {
+        match t {
+            Type::Named(name) => name.clone(),
+            Type::Generic(name, _) => name.clone(),
+            Type::Str => "str".to_string(),
+            Type::I32 | Type::I64 => "i32".to_string(),
+            Type::Bool => "bool".to_string(),
+            Type::F32 | Type::F64 => "f64".to_string(),
+            Type::Char => "char".to_string(),
+            Type::List(_) => "list".to_string(),
+            Type::Dict(_, _) => "dict".to_string(),
+            Type::Option(inner) => Self::type_to_name(inner),
+            _ => String::new(),
+        }
+    }
+
+    /// Return the field type name for a symbol at a given property, or None.
+    fn field_type_for_sym(sym: &Symbol, property: &str) -> Option<String> {
+        match &sym.kind {
+            SymKind::Struct(s) => {
+                s.fields.iter().find(|f| f.name == property)
+                    .map(|f| Self::fmt_ast_type(&f.type_))
+            }
+            SymKind::Class(c) => {
+                for member in &c.members {
+                    if let ClassMember::Field(f) = member {
+                        if f.name == property {
+                            return Some(Self::fmt_ast_type(&f.type_));
+                        }
+                    }
+                }
+                None
+            }
+            SymKind::Enum(e) => {
+                e.variants.iter().find(|v| v.name == property)
+                    .map(|_| format!("{}", e.name)) // enum variant → returns the enum type
+            }
+            SymKind::Variable { type_: Some(t), .. } => Self::field_type_for_type(t, property),
+            SymKind::Constant(t) => Self::field_type_for_type(t, property),
+            _ => None,
+        }
+    }
+
+    /// Return completions for a type name (resolves str, list, dict and user types).
+    fn completions_for_named_type(type_name: &str, symbols: &SymbolTable) -> Option<Vec<CompletionItem>> {
+        if let Some(sym) = symbols.lookup(type_name) {
+            return Self::completions_for_sym(sym, symbols);
+        }
+        match type_name {
+            "str" => Self::completions_for_type(&Type::Str, symbols),
+            "list" => Self::completions_for_type(&Type::List(Box::new(Type::TypeVar(0))), symbols),
+            "dict" => Self::completions_for_type(&Type::Dict(Box::new(Type::Str), Box::new(Type::TypeVar(0))), symbols),
+            _ => None,
+        }
+    }
+
+    /// Look up a field's type from a Type.
+    fn field_type_for_type(t: &Type, _property: &str) -> Option<String> {
+        match t {
+            Type::Named(name) | Type::Generic(name, _) => {
+                // We don't have symbol table access here, so return None
+                Some(name.clone()) // best effort
+            }
+            _ => None,
+        }
     }
 
     /// Walk the program AST to build a map of local variable names to their
@@ -565,6 +678,16 @@ impl LanguageServer {
                         let val = &vd.value;
                         if let Some(tn) = Self::infer_type_from_expr(val) {
                             vars.insert(vd.name.clone(), tn);
+                        }
+                    }
+                }
+                // Auto-declared variables: `x = expr` (no mut/let)
+                Stmt::Expression(Expr::Assignment { target, value, .. }) => {
+                    if let Expr::Identifier { name, .. } = target.as_ref() {
+                        if !vars.contains_key(name) {
+                            if let Some(tn) = Self::infer_type_from_expr(value) {
+                                vars.insert(name.clone(), tn);
+                            }
                         }
                     }
                 }
@@ -626,10 +749,46 @@ impl LanguageServer {
                 Literal::None => None,
             },
             Expr::StructLiteral { struct_name, .. } => Some(struct_name.clone()),
+            Expr::Identifier { name, .. } => {
+                // Identifiers have unknown type without symbol table — return None
+                // but special-case common patterns
+                if name.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) {
+                    Some("i32".to_string()) // UPPERCASE constants are usually i32
+                } else {
+                    None
+                }
+            }
             Expr::Unary { operand, .. } => Self::infer_type_from_expr(operand),
+            Expr::Binary { left, operator, right, .. } => {
+                use klc_core::ast::BinaryOp;
+                // String concatenation: if either side is str, result is str
+                if matches!(operator, BinaryOp::Add) {
+                    let lt = Self::infer_type_from_expr(left);
+                    let rt = Self::infer_type_from_expr(right);
+                    if lt.as_deref() == Some("str") || rt.as_deref() == Some("str") {
+                        return Some("str".to_string());
+                    }
+                }
+                // Comparisons always return bool
+                if matches!(operator, BinaryOp::Eq | BinaryOp::Neq
+                    | BinaryOp::Lt | BinaryOp::Gt | BinaryOp::Le | BinaryOp::Ge) {
+                    return Some("bool".to_string());
+                }
+                // Arithmetic: use left operand type (both should match)
+                Self::infer_type_from_expr(left)
+            }
+            Expr::PropertyAccess { object: _object, property, .. } => {
+                // For chained completions like `obj.field`, infer from property name
+                // This is a simplification — real type resolution needs symbol table
+                if property == "len" { return Some("i32".to_string()); }
+                if property == "contains" || property == "is_some" || property == "is_none" {
+                    return Some("bool".to_string());
+                }
+                // For struct fields, we'd need the type — fallback to str
+                Some("str".to_string())
+            }
             Expr::FunctionCall { target, .. } => {
                 if let Expr::Identifier { name, .. } = target.as_ref() {
-                    // Builtins with known return types
                     match name.as_str() {
                         "input" => Some("str".to_string()),
                         "len" => Some("i32".to_string()),
@@ -639,7 +798,23 @@ impl LanguageServer {
                         "bool" => Some("bool".to_string()),
                         "open" => Some("i64".to_string()),
                         "now" => Some("i64".to_string()),
+                        "abs" | "sqrt" | "pow" | "gcd" => Some("i32".to_string()),
+                        "json_parse" => Some("dict".to_string()),
+                        "json_stringify" => Some("str".to_string()),
                         _ => None,
+                    }
+                } else if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
+                    // Method call: obj.method() — infer from method name
+                    if property == "to_upper" || property == "to_lower" || property == "trim" || property == "replace" || property == "substr" {
+                        Some("str".to_string())
+                    } else if property == "contains" || property == "is_some" || property == "is_none" {
+                        Some("bool".to_string())
+                    } else if property == "len" {
+                        Some("i32".to_string())
+                    } else if property == "pop" {
+                        Some("i64".to_string())
+                    } else {
+                        Self::infer_type_from_expr(object)
                     }
                 } else {
                     None
@@ -648,6 +823,19 @@ impl LanguageServer {
             Expr::Ternary { then_expr, .. } => Self::infer_type_from_expr(then_expr),
             Expr::List { .. } => Some("list".to_string()),
             Expr::Dictionary { .. } => Some("dict".to_string()),
+            Expr::Index { target, .. } => {
+                // For list[i], infer element type
+                let target_type = Self::infer_type_from_expr(target);
+                if target_type.as_deref() == Some("list") || target_type.as_deref() == Some("dict") {
+                    Some("i64".to_string()) // default to i64 for list/dict elements
+                } else {
+                    Some("i64".to_string())
+                }
+            }
+            Expr::OptionalChain { target, .. } => Self::infer_type_from_expr(target),
+            Expr::StringInterp { .. } => Some("str".to_string()),
+            Expr::Async { .. } => Some("i64".to_string()), // task handle
+            Expr::Spread { expression, .. } => Self::infer_type_from_expr(expression),
             _ => None,
         }
     }

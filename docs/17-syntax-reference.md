@@ -377,17 +377,19 @@ for item in items:               # ✅ genera código, itera sobre listas
     print(item)
 ```
 
-### For con rango 🔶
+### For con rango ✅
 
 ```kl
-for i in 0..10:                  # 🔶 parsea, sin codegen
+for i in 0..10:                  # ✅ genera código, counter loop optimizado
     print(i)
 ```
 
-### For-Else 🔶 (implementación pendiente)
+### For-Else ✅
 
 ```kl
-for item in items:               # ✅ listas, ❌ else branch pendiente
+for item in items:               # ✅ else branch con break-flag
+    print(item)
+else:
     print("No hay elementos")
 ```
 
@@ -793,8 +795,8 @@ fn primero<T>(items: [T]) -> T:     # ✅ parsea, type-checkea, genera código
 ### Clases genéricas 🔶
 
 ```kl
-class Repositorio<T>:               # 🔶 parsea y type-checkea, sin codegen
-    fn agregar(item: T)
+class Repositorio<T>:               # 🔶 parsea, type-checkea sin monomorfización
+    fn agregar(item: T)             # ❌ codegen: falta monomorphization de clases
 ```
 
 ### Structs genéricos ✅
@@ -822,11 +824,11 @@ nombre: Option<str> = None          # ✅
 nombre = Option.Some("Ana")         # ✅
 ```
 
-### Optional Chaining ?. 🔶
+### Optional Chaining ?. ✅
 
 ```kl
-nombre = usuario?.nombre            # 🔶 parsea y type-checkea, sin codegen
-ciudad = usuario?.direccion?.ciudad # 🔶
+nombre = usuario?.nombre            # ✅ genera código (Option<Struct> property access)
+ciudad = usuario?.direccion?.ciudad # ✅
 ```
 
 Equivale a:
@@ -849,10 +851,10 @@ match nombre:                       # ✅
 
 ## 23. Error Handling
 
-### Tipos de error ! 🔶
+### Tipos de error ! ✅
 
 ```kl
-fn encontrar_usuario(id: i32) -> Usuario!  # 🔶 parsea y type-checkea, sin codegen
+fn encontrar_usuario(id: i32) -> Usuario!  # ✅ parsea, type-checkea, genera código
 ```
 
 `!` indica que la función puede retornar un error.
@@ -970,11 +972,11 @@ Son structuralmente tipados — no necesitan declaración de clase.
 
 ---
 
-## 27. Dicts y Maps 📄
+## 27. Dicts y Maps ✅
 
 ```kl
-puntajes: Dict<str, i32>             # 📄 especificado, no implementado
-puntajes["jugador1"] = 100           # 📄
+puntajes: Dict<str, i32>             # ✅ dict literal, index get/set, .len()
+puntajes["jugador1"] = 100           # ✅
 ```
 
 Los object literals usan notación de punto.  
@@ -982,45 +984,45 @@ Los Dict usan notación de corchete `[]`.
 
 ---
 
-## 28. Spread Operator 🔶
+## 28. Spread Operator ✅
 
-### En listas 🔶
+### En listas ✅
 
 ```kl
-combinada = [...lista_a, ...lista_b]  # 🔶 parsea, sin codegen
-actualizada = [...original, nuevo]    # 🔶
+combinada = [...lista_a, ...lista_b]  # ✅ kl_list_extend en runtime
+actualizada = [...original, nuevo]    # ✅
 ```
 
 ### En object literals 🔶
 
 ```kl
 defaults = { theme: "dark", lang: "en" }  # ✅
-config = { ...defaults, lang: "es" }       # 🔶 sin codegen
+config = { ...defaults, lang: "es" }       # 🔶 object spread pendiente
 ```
 
 ---
 
 ## 29. Range y Slicing
 
-### Range 🔶
+### Range ✅
 
 ```kl
-for i in 0..10:                     # 🔶 parsea, sin codegen
-rango = 0..10                       # 🔶
+for i in 0..10:                     # ✅ genera código optimizado
+rango = 0..10                       # ✅ (usado en for-in-range)
 ```
 
-### Slicing de listas 🔶
+### Slicing de listas ✅
 
 ```kl
 items = [0, 1, 2, 3, 4, 5]         # ✅
-primeros = items[0..3]              # 🔶 parsea, sin codegen
-resto = items[3..]                  # 🔶
-todos = items[..]                   # 🔶
+primeros = items[0..3]              # ✅ kl_list_slice
+resto = items[3..]                  # ✅
+todos = items[..]                   # ✅
 ```
 
 ---
 
-## 30. Operator Overloading ✅
+## 30. Operator Overloading 🔶
 
 ```kl
 struct Vector:                       # ✅
@@ -1036,9 +1038,9 @@ struct Vector:                       # ✅
 
 ### Mapeo de operadores a métodos
 
-| Operador | Método |
-|----------|--------|
-| `+` | `add` |
+| Operador | Método | Estado |
+|----------|--------|--------|
+| `+` | `add` | 🔶 |
 | `-` | `sub` |
 | `*` | `mul` |
 | `/` | `div` |
@@ -1054,15 +1056,16 @@ struct Vector:                       # ✅
 
 ---
 
-## 31. Compile-Time Evaluation (const fn) 📄
+## 31. Compile-Time Evaluation (const fn) ✅
 
 ```kl
-const fn factorial(n: i32) -> i32:   # 📄 especificado, no implementado
+const fn factorial(n: i32) -> i32:   # ✅ type-checkea, genera código
     if n <= 1:
         return 1
     return n * factorial(n - 1)
 
-RESULTADO = factorial(10)            # 📄 evaluado en compilación
+result = factorial(10)               # ✅ llamado en runtime
+# const eval en compile-time: pendiente (optimizer pass existe)
 ```
 
 Restricciones de `const fn`:
@@ -1074,12 +1077,12 @@ Restricciones de `const fn`:
 
 ---
 
-## 32. Type Aliases 🔶
+## 32. Type Aliases ✅
 
 ```kl
-type Entero = i32                    # 🔶 parsea y type-checkea, sin codegen
-type Pares = (i32, i32)             # 🔶
-type Callback = (i32) -> bool       # 🔶
+type Entero = i32                    # ✅ lowering + codegen + type alias cache
+type Pares = (i32, i32)             # ✅ type alias con chained resolution
+# type Callback = (i32) -> bool     # ❌ function type aliases no implementados
 ```
 
 ---
@@ -1152,8 +1155,7 @@ now()                     # i64 — timestamp Unix en ms ✅
 ### Math
 
 ```kl
-range(end)                # rango 0..end 🔶
-range(start, end)         # rango start..end 🔶
+range(end)                # rango 0..end ✅ (crea lista)
 abs(x)                    # valor absoluto (std/math.kl) ✅
 pow(base, exp)            # potencia (std/math.kl) ✅
 sqrt(x)                   # raíz cuadrada (std/math.kl) ✅
@@ -1252,7 +1254,7 @@ usuario["nombre"]  ❌ — los object literals usan punto
 | If/Elif/Else | ✅ Completo |
 | Binding If | ✅ Completo |
 | While / Loop / While-Bind / While-Else | ✅ Completo |
-| **For / For-Else / For Range** | **✅ Listas completo** / **🔶 Range/Else** |
+| **For / For-Else / For Range** | **✅ Completo** |
 | Match + guards + enum variants | ✅ Completo |
 | Break (con y sin valor) | ✅ Completo |
 | **Defer** | **✅ Completo** |
@@ -1271,17 +1273,17 @@ usuario["nombre"]  ❌ — los object literals usan punto
 | Visibilidad por naming | ✅ Completo |
 | **Genéricos** | **✅ Completo** |
 | Option<T> + Option.Some/None | ✅ Completo |
-| **Optional Chaining ?.** | **🔶 Sin codegen** |
-| Error types ! | ✅ Parse + type-check, **🔶 sin codegen** |
+| **Optional Chaining ?.** | **✅ Completo** |
+| Error types ! | **✅ Completo** |
 | **Operador ?** | **✅ Completo** |
 | Async/Await | ✅ Completo |
 | Imports (import, from, alias) | ✅ Completo |
 | Object literals { } | ✅ Completo |
-| **Dict< K, V>** | **📄 Solo especificado** |
+| **Dict< K, V>** | **✅ Completo** |
 | **Spread operator (...)** | **✅ Completo** |
 | **Range + Slicing** | **✅ Completo** |
 | Operator overloading | ✅ Completo |
-| **const fn** | **📄 Solo especificado** |
+| **const fn** | **✅ Type-check + codegen** |
 | **Type aliases** | **✅ Completo** |
 | Attributes (#[ ]) | ✅ Completo |
 | Built-in functions | ✅ Completo |
@@ -1290,48 +1292,43 @@ usuario["nombre"]  ❌ — los object literals usan punto
 
 ---
 
-## Prioridades Actuales (Phase 6 — Language Completion)
+## Prioridades Actuales (Phase 7+8 — Cross-Platform + Tooling Polish)
 
-### 🟥 P0 — End-to-end language features (bloquean el MVP)
+### 🟥 Phase 7 — Cross-Platform Support
 
-1. **For loops** — ✅ **COMPLETED**
-2. **Genéricos** — ✅ **COMPLETED**
-3. **Error handling** — `!` y `?` ✅ **COMPLETED**
-4. **Optional chaining** — `?.` lowering + codegen (⚠️ PARCIAL)
-5. **String interpolation** — ✅ **COMPLETED**
+1. **Fix macOS linker warning** — target triple hardcodeado → auto-detección
+2. **Project build output** — klc build → binarios en target/debug/
+3. **Fix parser.kl crash** — list alignment bug en cleanup + range() builtin
+4. **Test en Linux x64, Windows x64, macOS Intel**
 
-### 🟧 P1 — Secondary features
+### 🟧 Phase 8 — LSP & Tooling
 
-6. Defer — ✅ **COMPLETED** (Sesión 25, LIFO lowering)
-7. Type aliases — ✅ **COMPLETED** (Sesión 25)
-8. Dict/Map literals — parse + type-check + codegen
-9. Spread operator — ✅ **COMPLETED** (Sesión 25)
-10. Range slicing — ✅ **COMPLETED** (Sesión 25)
-11. const fn — compile-time evaluation
-12. If como expresión (bloques) — codegen (ternary cubre 90% casos)
-13. Match como expresión — ✅ **COMPLETED** (Sesión 24)
-14. Guard — ✅ **COMPLETED** (Sesión 24, CondBr lowering)
-15. Standard library — collections, json, str, time
+5. **LSP dot-completions** — `objeto.` → fields/methods/enum variants
+6. **LSP scope-aware completions** — variables locales, scope actual
+7. **VS Code extension .vsix** — package + marketplace
+8. **PNG icon** — 128x128 para VS Code Marketplace
 
-### 🟪 P4 — Tooling polish
+### 🟦 Phase 8 — Build System
 
-15. LSP autocompletion, go-to-definition, hover
-16. Debug info (DWARF)
+9. **target/debug/ + target/release/** — output structure
+10. **.gitignore profesional** — target/, *.o, *.ll, .klc-build/
+11. **CLI tab completion** — bash/zsh
 
 ### 🟩 P5 — Robustness & testing
 
-17. Tests de integración (100+)
-18. LLVM verification errors
-19. CI pipeline
+12. Tests de integración (100+)
+13. LLVM verification errors
+14. CI pipeline (GitHub Actions)
 
 ---
 
 ## Versión
 
 ```text
-Kyle Syntax Reference v1.0
+Kyle Syntax Reference v2.0
 Idioma: Español
 Basado en: Kyle Language Specification v2.0
-Última actualización: 2026-06-22
-Prioridades: Phase 6 (Language Completion) → P0-P5
+Última actualización: 2026-06-26
+Prioridades: Phase 7 (Cross-Platform) + Phase 8 (Tooling Polish)
+Phase 6 (Language Completion): ✅ COMPLETE — all 14 P0+P1 features verified
 ```

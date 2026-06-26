@@ -1,9 +1,10 @@
 {
-  "name": "vscode-kl",
-  "displayName": "KL Language Support",
+  "name": "kl",
+  "displayName": "Kyle Language Support",
   "description": "Kyle programming language — syntax highlighting, LSP, snippets, and language support",
   "version": "0.2.0",
   "publisher": "kynera",
+  "icon": "icons/kl_128.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/IT-KYNERA/KYLE.git"
@@ -18,8 +19,8 @@
   "main": "./out/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "echo 'Using pre-built JS'",
-    "package": "npx @vscode/vsce package"
+    "compile": "cp src/extension.ts out/extension.js || true",
+    "package": "npx @vscode/vsce package --allow-missing-repository"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -75,8 +76,8 @@
       "properties": {
         "kl.klcPath": {
           "type": "string",
-          "default": "klc",
-          "description": "Path to the klc compiler binary"
+          "default": "kl",
+          "description": "Path to the kl (or klc) compiler binary"
         }
       }
     }

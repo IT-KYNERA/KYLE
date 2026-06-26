@@ -14,14 +14,14 @@ function activate(context) {
     );
 
     const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get('klcPath') || 'klc';
+    const klcPath = config.get('klcPath') || 'kl';
 
     try {
         startLanguageClient(context, klcPath);
     } catch (err) {
         console.error('Failed to start KL language server:', err);
         vscode.window.showWarningMessage(
-            'KL language server not available. Install klc or set "kl.klcPath".'
+            'KL language server not available. Install kl or set "kl.klcPath".'
         );
     }
 }
@@ -62,7 +62,7 @@ async function runFile(subcommand) {
         return;
     }
     const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get('klcPath') || 'klc';
+    const klcPath = config.get('klcPath') || 'kl';
     const terminal = vscode.window.createTerminal('KL');
     terminal.show();
     terminal.sendText(klcPath + ' ' + subcommand + ' "' + filePath + '"');

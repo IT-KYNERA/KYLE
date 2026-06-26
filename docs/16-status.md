@@ -257,11 +257,11 @@
 | Compile on save | ❌ | Phase 8 |
 | Error squiggles | ❌ | Phase 8 |
 | Autocompletion | ✅ | 44 builtins, 8 Decl types, 33 keywords, prefix filter |
-| Dot-triggered completion | ❌ | struct.field, object.method (Phase 8 P1) |
-| Scope-aware completion | ❌ | inner variables/functions (Phase 8 P1) |
+| Dot-triggered completion | ✅ | struct.field, object.method, str/list/dict methods |
+| Scope-aware completion | ✅ | inner variables, params, auto-declared, block walks |
 | Snippets | ✅ | 20 snippets (fn, class, enum, match, for, if, etc.) |
 | Language icon | ✅ | SVG logo |
-| .vsix packaging | ❌ | Phase 8 P1 |
+| .vsix packaging | ❌ | Phase 8 P1 (PNG icons 128×128 + 16×16 creados, package.json icon field listo) |
 
 ---
 
@@ -337,7 +337,7 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 | Linux x64/ARM binaries | ❌ | Phase 8 P3 |
 | VS Code .vsix package | ❌ | Phase 8 P1 |
 | kl-lang.org website | ❌ | Phase 8 P3 |
-| GitHub Actions CI (test every push) | ❌ | Phase 8 P2 |
+| GitHub Actions CI (test every push) | ✅ | .github/workflows/ci.yml — build + tests + examples |
 
 ---
 
@@ -345,10 +345,10 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| macOS Apple Silicon (aarch64) | ✅ | Currently working |
+| macOS Apple Silicon (aarch64) | ✅ | Working (linker warning corregido) |
 | macOS Intel (x86_64) | ❌ | Phase 7 |
 | Linux x86_64 | ❌ | Phase 7 |
-| Linux ARM (aarch64) | ❌ | Phase 7 |
+| Linux ARM (aarch64) | ✅ | Docker (este entorno) |
 | Windows x86_64 | ❌ | Phase 7 |
 | Windows ARM (aarch64) | ❌ | Phase 7 (low priority) |
 
@@ -371,8 +371,8 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Unit tests | 86 | 0 failures |
-| Integration tests (examples/*.kl) | 49 | 49 compile, 48 run correctly (1 known crash: parser.kl list alignment) |
+| Unit tests | 101 | 0 failures |
+| Integration tests (examples/*.kl) | 36 | 36 run correctly (1 known: error_test.kl returns 1 deliberately) |
 | Standard library tests | 0 | Pending |
 | Fuzz tests | 0 | Pending |
 
@@ -423,17 +423,20 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 ### 🟩 P5 — Robustness & testing
 
 27. **Fix LLVM verification errors** — ✅ (all examples pass)
-28. **100+ integration tests** — ❌
-29. **CI pipeline** — ❌
+28. **100+ integration tests** — ❌ (101 unit tests, 36 examples)
+29. **CI pipeline** — ✅ (.github/workflows/ci.yml)
 
 ---
 
 ## Version
 
 ```text
-Implementation Status v5.0 — Language Completion (Phase 6) done
-Next: Phase 8 — Tooling Polish (LSP dot-completions, scope-aware, .vsix, icons)
-Last updated: 2026-06-25
-Test count: 86 tests, 0 failures
-Example count: 20 examples, 0 failures
+Implementation Status v6.1 — Phase 6 Complete, Phase 7+8 Current
+Phase 6: Language Completion — ALL features verified ✅
+Phase 7: Cross-Platform — Linux ARM (Docker) ✅, macOS ARM (linker warning ✅)
+Phase 8: Tooling Polish — LSP basic + dot-completions ✅, scope-aware ✅, CI pipeline ✅
+Last updated: 2026-06-26
+Test count: 101 tests, 0 failures
+Example count: 36 examples, 36 run correctly (1 known: error_test.kl returns 1 deliberately)
+Known fixed: macOS linker warning, LSP dot-completions, completion_test.kl, VS Code icons
 ```

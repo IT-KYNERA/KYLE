@@ -19,7 +19,8 @@ Phase 3.5 Complete:     closures, methods, enums/match, async/await ✅
 Phase 6 P1:             Ternary ✅, Match-expression ✅, Guard ✅, Defer ✅
 Dict/Map:               literals, indexing, .len() ✅
 Self-Hosting (Phase 8): lexer.kl + parser.kl + semantic.kl (deferred post-MVP) ✅
-Tests:                  86 tests, 0 failures ✅
+LSP dot completions:    struct/class/enum/str/list/dict field/method completions ✅
+Tests:                  101 tests, 0 failures ✅
 ```
 
 ## Session Log
@@ -602,3 +603,15 @@ FASE 9 — Production Ecosystem (📅 Future)
 | Codegen LLVM type | `klc_backend/src/codegen.rs` | ✅ Dict→opaque ptr; extern decls |
 | dict_test.kl | `examples/dict_test.kl` | ✅ create, index get/set, len, str values |
 | Existing tests | - | ✅ 86 tests, 0 failures |
+
+### Sesión 27 — Phase 6: LSP dot-completions documented + macOS linker fix + VS Code icons + CI pipeline
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| LSP dot-completions implemented | `crates/klc_tools/src/lsp.rs` | ✅ `is_after_dot`, `word_before_dot`, `dot_completions`, `completions_for_sym`/`completions_for_type` para struct/class/enum/str/list/dict |
+| LSP scope-aware completions | `crates/klc_tools/src/lsp.rs` | ✅ `build_local_scope` + `walk_block_for_vars` capturan params, auto-declaradas, vars en for/if/while/match/guard/unsafe |
+| Fix: macOS linker warning | `crates/klc_driver/src/pipeline.rs` | ✅ `host_target_triple()` reemplazado por `TargetMachine::get_default_triple()`, eliminado hardcode `arm64-apple-macosx` |
+| Fix: completion_test.kl | `examples/completion_test.kl` | ✅ `//` reemplazado por comentarios válidos (crash por Slash token no soportado) |
+| VS Code extension icon | `vscode-kl/icons/kl_128.png`, `kl_16.png` | ✅ PNG 128×128 + 16×16 creados desde SVG; `package.json` añadido `icon` field |
+| CI pipeline | `.github/workflows/ci.yml` | ✅ Build + tests + examples + formatter en push/PR |
+| Docs updated | `docs/13-roadmap.md` | ✅ LSP dot-completions ✅, scope-aware ✅ |
+| Tests | - | ✅ 101 tests, 0 failures |

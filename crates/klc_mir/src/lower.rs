@@ -76,6 +76,10 @@ struct LowerCtx {
     deferred_exprs: Vec<Box<Expr>>,
     /// When set, break instructions store `true` here before branching.
     break_flag_local: Option<usize>,
+    /// When set, nested if/else branches should store their tail value to this alloca.
+    if_result_alloca: Option<usize>,
+    /// Set to true when a Stmt::If is the last statement lowered. Reset by each Stmt::If entry.
+    last_stmt_was_if: bool,
 }
 
 impl LowerCtx {
@@ -96,6 +100,8 @@ impl LowerCtx {
             is_fallible: false,
             deferred_exprs: Vec::new(),
             break_flag_local: None,
+            if_result_alloca: None,
+            last_stmt_was_if: false,
         }
     }
 
@@ -819,9 +825,19 @@ impl Lowerer {
             Stmt::If(s) => {
                 let is_tail = ctx.tail_if_as_return;
                 ctx.tail_if_as_return = false;
+                ctx.last_stmt_was_if = false;
                 let else_label = ctx.fresh_block();
                 let end_label = ctx.fresh_block();
                 let then_label = ctx.fresh_block();
+                // When tail, allocate shared result alloca so branches with nested
+                // if/else store to the same slot and the merge block returns it.
+                let result_alloca = if is_tail {
+                    let ra = ctx.alloc_local("_if_res", MirType::I64);
+                    ctx.if_result_alloca = Some(ra);
+                    Some(ra)
+                } else {
+                    None
+                };
                 let cond_ctx = self.lower_expr(ctx, &s.condition);
                 ctx = cond_ctx;
                 let cond_val = if let Some(last) = ctx.current_block.insts.last() {
@@ -863,7 +879,30 @@ impl Lowerer {
                     ctx = self.lower_stmt(ctx, stmt);
                 }
                 if is_tail {
-                    ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                    if let Some(ra) = result_alloca {
+                        if !ctx.last_stmt_was_if {
+                            let last = ctx.next_local - 1;
+                            let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                            ctx.local_types.insert(ra, last_type);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: ra,
+                                value: MirValue::Local(last),
+                            });
+                        }
+                        ctx.finish_block(MirTerminator::Br(end_label.clone()));
+                    } else {
+                        ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                    }
+                } else if let Some(ra) = ctx.if_result_alloca {
+                    // Parent if is a tail expression: store last expr to parent's result alloca
+                    let last = ctx.next_local - 1;
+                    let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                    ctx.local_types.insert(ra, last_type);
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: ra,
+                        value: MirValue::Local(last),
+                    });
+                    ctx.finish_block(MirTerminator::Br(end_label.clone()));
                 } else {
                     ctx.finish_block(MirTerminator::Br(end_label.clone()));
                 }
@@ -893,7 +932,29 @@ impl Lowerer {
                         ctx = self.lower_stmt(ctx, stmt);
                     }
                     if is_tail {
-                        ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                        if let Some(ra) = result_alloca {
+                            if !ctx.last_stmt_was_if {
+                                let last = ctx.next_local - 1;
+                                let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                                ctx.local_types.insert(ra, last_type);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: ra,
+                                    value: MirValue::Local(last),
+                                });
+                            }
+                            ctx.finish_block(MirTerminator::Br(end_label.clone()));
+                        } else {
+                            ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                        }
+                    } else if let Some(ra) = ctx.if_result_alloca {
+                        let last = ctx.next_local - 1;
+                        let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                        ctx.local_types.insert(ra, last_type);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: ra,
+                            value: MirValue::Local(last),
+                        });
+                        ctx.finish_block(MirTerminator::Br(end_label.clone()));
                     } else {
                         ctx.finish_block(MirTerminator::Br(end_label.clone()));
                     }
@@ -906,7 +967,29 @@ impl Lowerer {
                         ctx = self.lower_stmt(ctx, stmt);
                     }
                     if is_tail {
-                        ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                        if let Some(ra) = result_alloca {
+                            if !ctx.last_stmt_was_if {
+                                let last = ctx.next_local - 1;
+                                let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                                ctx.local_types.insert(ra, last_type);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: ra,
+                                    value: MirValue::Local(last),
+                                });
+                            }
+                            ctx.finish_block(MirTerminator::Br(end_label.clone()));
+                        } else {
+                            ctx.emit_return(MirValue::Local(ctx.next_local - 1));
+                        }
+                    } else if let Some(ra) = ctx.if_result_alloca {
+                        let last = ctx.next_local - 1;
+                        let last_type = ctx.local_types.get(&last).cloned().unwrap_or(MirType::I64);
+                        ctx.local_types.insert(ra, last_type);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: ra,
+                            value: MirValue::Local(last),
+                        });
+                        ctx.finish_block(MirTerminator::Br(end_label.clone()));
                     } else {
                         ctx.finish_block(MirTerminator::Br(end_label.clone()));
                     }
@@ -920,12 +1003,25 @@ impl Lowerer {
                 }
 
                 if is_tail {
-                    // All branches return directly; merge block returns void
+                    ctx.if_result_alloca = None;
+                    // Merge block: return result_alloca value (or void if no else)
                     ctx.current_block = MirBasicBlock::new(end_label);
-                    ctx.emit_return(MirValue::Constant(MirConstant::Void));
+                    if let Some(ra) = result_alloca {
+                        let result_type = ctx.local_types.get(&ra).cloned().unwrap_or(MirType::I64);
+                        let load = ctx.alloc_local("_if_res_val", result_type);
+                        ctx.current_block.insts.push(MirInst::Load {
+                            dest: load,
+                            src: ra,
+                        });
+                        ctx.emit_return(MirValue::Local(load));
+                    } else {
+                        // Only reachable if is_tail && no allocation — impossible
+                        ctx.emit_return(MirValue::Constant(MirConstant::Void));
+                    }
                 } else {
                     ctx.current_block = MirBasicBlock::new(end_label);
                 }
+                ctx.last_stmt_was_if = true;
                 ctx
             }
             Stmt::While(s) => {
@@ -2261,6 +2357,25 @@ impl Lowerer {
                     }
                 }
 
+                // Special case: range(n) — create a list [0, 1, ..., n-1]
+                if name == "range" && arguments.len() == 1 {
+                    ctx = self.lower_expr(ctx, &arguments[0]);
+                    let count_local = ctx.next_local - 1;
+                    let count_i64 = ctx.alloc_local("_cnt64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: count_i64,
+                        value: MirValue::Local(count_local),
+                        to_type: MirType::I64,
+                    });
+                    let result = ctx.alloc_local("_range", MirType::List(Box::new(MirType::I64)));
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(result),
+                        name: "kl_range".to_string(),
+                        args: vec![MirValue::Local(count_i64)],
+                    });
+                    return ctx;
+                }
+
                 // Special case: len() built-in — return string, list, or dict length
                 if name == "len" && arguments.len() == 1 {
                     ctx = self.lower_expr(ctx, &arguments[0]);
@@ -2511,8 +2626,9 @@ impl Lowerer {
                                 args: vec![MirValue::Local(*id)],
                             });
                             let call_name = if name == "println" { "kl_println" } else { "kl_print" };
+                            let pret = ctx.alloc_local("_pret", call_type.clone());
                             ctx.current_block.insts.push(MirInst::Call {
-                                dest: Some(dest),
+                                dest: Some(pret),
                                 name: call_name.to_string(),
                                 args: vec![
                                     MirValue::Local(*id),
@@ -2539,8 +2655,9 @@ impl Lowerer {
                                 MirValue::Local(*id)
                             };
                             let call_name = if name == "println" { "kl_println_int" } else { "kl_print_int" };
+                            let print_ret = ctx.alloc_local("_pret", call_type.clone());
                             ctx.current_block.insts.push(MirInst::Call {
-                                dest: Some(dest),
+                                dest: Some(print_ret),
                                 name: call_name.to_string(),
                                 args: vec![call_val],
                             });

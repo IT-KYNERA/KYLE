@@ -260,6 +260,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_list_free", ft, None);
         }
+        // ptr kl_range(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_range", ft, None);
+        }
         // void kl_list_push(ptr, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into()];

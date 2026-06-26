@@ -746,5 +746,25 @@ mod tests {
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
 
+    #[test]
+    fn test_const_fn_no_errors() {
+        let source = "const fn factorial(n: i32) -> i32:\n    if n <= 1:\n        1\n    else:\n        n * factorial(n - 1)\n";
+        let diags = check(source);
+        assert!(diags.is_empty(), "const fn should have no errors, got: {:?}", diags);
+    }
+
+    #[test]
+    fn test_ternary_type_unification() {
+        let source = "fn f(x: i32):\n    result = x > 0 ? x : 0\n";
+        let diags = check(source);
+        assert!(diags.is_empty(), "ternary with matching types should have no errors, got: {:?}", diags);
+    }
+
+    #[test]
+    fn test_dict_type_inference() {
+        let source = "fn f():\n    config = {name: \"Alice\"}\n";
+        let diags = check(source);
+        assert!(diags.is_empty(), "dict literal should have no errors, got: {:?}", diags);
+    }
 
 }

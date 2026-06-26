@@ -1656,6 +1656,44 @@ fn test():\n\
         assert!(parse(source).is_ok());
     }
 
+    #[test]
+    fn test_dict_multi_entry() {
+        let source = "\
+fn test():\n\
+    config = {name: \"Alice\", age: 30}\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_ternary_expression() {
+        let source = "\
+fn test():\n\
+    result = x > 0 ? \"pos\" : \"neg\"\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_match_expression() {
+        let source = "fn test():\n    result = match value:\n        1:\n            \"one\"\n        2:\n            \"two\"\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_optional_chain() {
+        let source = "\
+fn test():\n\
+    name = user?.name\n";
+        assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_spread_list() {
+        let source = "\
+fn test():\n\
+    items = [...a, 4, 5]\n";
+        assert!(parse(source).is_ok());
+    }
+
     // -----------------------------------------------------------------------
     // Error cases
     // -----------------------------------------------------------------------

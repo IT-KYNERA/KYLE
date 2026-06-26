@@ -10,11 +10,7 @@ struct Rectangle:
 
 fn main() -> i32:
     p = Point { x: 10, y: 20 }
-    // typing "p." should show: x, y
-
     s = "hello"
-    // typing "s." should show: contains, to_upper, to_lower, trim, replace, substr, char_at, len
 
     numbers = [1, 2, 3]
-    // typing "numbers." should show: push, pop, len
     0

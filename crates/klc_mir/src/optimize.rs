@@ -537,4 +537,62 @@ mod tests {
         opt.remove_unreachable_blocks(&mut func);
         assert_eq!(func.basic_blocks.len(), 1);
     }
+
+    #[test]
+    fn test_constant_fold_mul() {
+        let mut func = MirFunction::new("test");
+        let mut bb = MirBasicBlock::new("entry");
+        bb.insts.push(MirInst::BinaryOp {
+            dest: 0,
+            op: MirBinaryOp::Mul,
+            left: MirValue::Constant(MirConstant::I32(6)),
+            right: MirValue::Constant(MirConstant::I32(7)),
+        });
+        bb.terminator = MirTerminator::Return(MirValue::Constant(MirConstant::Void));
+        func.basic_blocks.push(bb);
+
+        let opt = Optimizer::new();
+        opt.constant_fold(&mut func);
+
+        if let MirInst::Store { value: MirValue::Constant(MirConstant::I32(n)), .. } = &func.basic_blocks[0].insts[0] {
+            assert_eq!(*n, 42);
+        } else {
+            panic!("expected folded constant 42");
+        }
+    }
+
+    #[test]
+    fn test_dce_preserves_conditional() {
+        let mut func = MirFunction::new("test");
+        let mut bb = MirBasicBlock::new("entry");
+        // Store used by CondBr condition — must survive DCE
+        bb.insts.push(MirInst::Alloca { dest: 0, type_: MirType::I32, name: "cond".into() });
+        bb.insts.push(MirInst::Store { dest: 0, value: MirValue::Constant(MirConstant::I32(1)) });
+        // Store never loaded — should be removed
+        bb.insts.push(MirInst::Alloca { dest: 1, type_: MirType::I32, name: "dead".into() });
+        bb.insts.push(MirInst::Store { dest: 1, value: MirValue::Constant(MirConstant::I32(99)) });
+        bb.terminator = MirTerminator::CondBr {
+            cond: MirValue::Local(0),
+            true_block: "then".into(),
+            false_block: "done".into(),
+        };
+        func.basic_blocks.push(bb);
+        func.basic_blocks.push(MirBasicBlock::new("then"));
+        func.basic_blocks.push(MirBasicBlock::new("done"));
+
+        let opt = Optimizer::new();
+        opt.dead_code_elim(&mut func);
+
+        // Entry block should keep cond store but drop dead store
+        let kept_stores: Vec<_> = func.basic_blocks[0].insts.iter()
+            .filter(|i| matches!(i, MirInst::Store { .. }))
+            .collect();
+        assert_eq!(kept_stores.len(), 1, "DCE should remove the unused store");
+        // The remaining store should be the cond variable (dest 0)
+        if let MirInst::Store { dest, .. } = &kept_stores[0] {
+            assert_eq!(*dest, 0, "the store used by CondBr must survive DCE");
+        } else {
+            panic!("expected a Store instruction");
+        }
+    }
 }

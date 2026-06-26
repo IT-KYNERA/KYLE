@@ -119,6 +119,20 @@ pub extern "C" fn kl_list_len(list: *const KlList) -> i64 {
     unsafe { (*list).len }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_range(count: i64) -> *mut KlList {
+    let list = kl_list_new();
+    if list.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe {
+        for i in 0..count {
+            kl_list_push(list, i);
+        }
+    }
+    list
+}
+
 /// Convert C's argc/argv to a Kyle list<str>.
 /// Skips argv[0] (program name).
 #[unsafe(no_mangle)]

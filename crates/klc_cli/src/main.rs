@@ -1,25 +1,20 @@
 // KL Compiler — CLI binary entry point
 //
 // Command-line interface for the KL compiler.
-// Usage:
-//   klc build <file.kl>    Compile KL source to native binary
-//   klc run   <file.kl>    Compile and execute
-//   klc check <file.kl>    Type-check without code generation
-//   klc parse <file.kl>    Parse KL source and dump AST
-//   klc mir   <file.kl>    Parse and dump MIR
-//   klc fmt   <file.kl>    Format KL source code
-//   klc new   <project>    Create new KL project
-//   klc test                Run tests
-//   klc lsp                 Start language server
-//   klc add     <dep>       Add dependency
-//   klc remove  <dep>       Remove dependency
-//   klc info                Show project info
-//   klc help                Show this help
+// Installed as both `kl` (primary) and `klc` (legacy).
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
+
+/// Return the binary name used to invoke this program (kl or klc).
+fn bin_name() -> String {
+    env::args().next()
+        .map(|p| Path::new(&p).file_stem().unwrap_or_default().to_string_lossy().to_string())
+        .filter(|n| n == "kl" || n == "klc")
+        .unwrap_or_else(|| "kl".to_string())
+}
 
 /// Return the output binary path with the correct platform extension.
 fn exe_path(path: &Path) -> PathBuf {
@@ -55,7 +50,7 @@ fn main() {
             print_usage();
         }
         "--version" | "-v" => {
-            println!("klc v{}", env!("CARGO_PKG_VERSION"));
+            println!("{} v{}", bin_name(), env!("CARGO_PKG_VERSION"));
         }
         _ => {
             eprintln!("Unknown command: {}", command);
@@ -112,7 +107,7 @@ fn cmd_fmt(args: &[String]) {
 fn cmd_new(args: &[String]) {
     if args.len() < 3 {
         eprintln!("Error: missing project name");
-        eprintln!("Usage: klc new <project>");
+        eprintln!("Usage: {} new <project>", bin_name());
         process::exit(1);
     }
     let project_name = &args[2];
@@ -121,28 +116,51 @@ fn cmd_new(args: &[String]) {
         eprintln!("Error: directory '{}' already exists", project_name);
         process::exit(1);
     }
+    // Create directory structure
     fs::create_dir_all(project_dir.join("src")).unwrap_or_else(|e| {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
     let _ = fs::create_dir(project_dir.join("tests"));
-    let main_kl = format!(
-        "fn main() -> i32:\n    println(\"Hello, {}!\")\n    return 0\n",
-        project_name
-    );
-    let manifest = format!(
-        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"1\"\nauthors = []\nlicense = \"MIT\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
-        project_name
-    );
+
+    // src/main.kl — professional entry point with args
+    let main_kl = [
+        "fn main(args: [str]) -> i32:",
+        &format!("    println(\"Hello from {} v0.1.0!\")", project_name),
+        "    println(\"args: {}\", len(args))",
+        "    return 0",
+    ].join("\n") + "\n";
     fs::write(project_dir.join("src").join("main.kl"), &main_kl).unwrap_or_else(|e| {
-        eprintln!("Error writing main.kl: {}", e);
+        eprintln!("Error writing src/main.kl: {}", e);
         process::exit(1);
     });
+
+    // tests/test_main.kl — test stub
+    let test_kl = format!(
+        "import {{ {} }} from \"src/main\"\n\nfn test_example() -> i32:\n    println(\"test: {}\")\n    return 0\n",
+        project_name, project_name
+    );
+    let _ = fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl);
+
+    // kl.toml — project manifest
+    let manifest = format!(
+        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"1\"\nauthors = []\nlicense = \"MIT\"\ndescription = \"A Kyle project\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
+        project_name
+    );
     fs::write(project_dir.join("kl.toml"), &manifest).unwrap_or_else(|e| {
         eprintln!("Error writing kl.toml: {}", e);
         process::exit(1);
     });
+
+    // .gitignore
+    let gitignore = "target/\n*.klc-build/\nkl.lock\n";
+    let _ = fs::write(project_dir.join(".gitignore"), gitignore);
+
     println!("Created project '{}'", project_name);
+    println!("  src/main.kl     — entry point");
+    println!("  tests/           — tests directory");
+    println!("  kl.toml          — project manifest");
+    println!("  .gitignore       — build artifacts excluded");
 }
 
 fn cmd_lsp(_args: &[String]) {
@@ -161,7 +179,7 @@ fn cmd_lsp(_args: &[String]) {
 }
 
 fn print_usage() {
-    let name = env::args().next().unwrap_or_else(|| "klc".to_string());
+    let name = bin_name();
     eprintln!("KL Compiler v{}", env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("Usage:");
@@ -214,20 +232,20 @@ fn cmd_build(args: &[String]) {
                 process::exit(1);
             }
         } else {
-            eprintln!("Usage: klc build <file.kl>");
+            eprintln!("Usage: {} build <file.kl>", bin_name());
             process::exit(1);
         }
         return;
     }
-    // Single-file mode
+    // Single-file mode: output to target/debug/<name>
     let source = load_source(args, 2);
     let file = &args[2];
     let file_stem = std::path::Path::new(file).file_stem()
         .unwrap_or_default().to_string_lossy().to_string();
-    let build_dir = std::path::Path::new(".klc-build");
+    let build_dir = std::path::Path::new("target").join("debug");
     let output = exe_path(&build_dir.join(&file_stem));
-    let _ = fs::create_dir_all(build_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, build_dir) {
+    let _ = fs::create_dir_all(&build_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir) {
         Ok(()) => {
             println!("Build complete: {}", output.display());
         }
@@ -239,7 +257,8 @@ fn cmd_build(args: &[String]) {
 }
 
 fn cmd_run(args: &[String]) {
-    if args.len() < 3 {
+    let release = args.iter().any(|a| a == "--release");
+    if args.len() < 3 || args[2].starts_with("--") {
         // Project mode
         if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
             if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
@@ -248,7 +267,7 @@ fn cmd_run(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                let build_dir = project_root.join("target").join("debug");
+                let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
                 let output = exe_path(&build_dir.join("main"));
                 let _ = fs::create_dir_all(&build_dir);
                 match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir) {
@@ -268,20 +287,20 @@ fn cmd_run(args: &[String]) {
                 process::exit(1);
             }
         } else {
-            eprintln!("Usage: klc run <file.kl>");
+            eprintln!("Usage: {} run <file.kl>", bin_name());
             process::exit(1);
         }
         return;
     }
-    // Single-file mode
+    // Single-file mode: output to target/debug/<name>
     let source = load_source(args, 2);
     let file = &args[2];
     let file_stem = std::path::Path::new(file).file_stem()
         .unwrap_or_default().to_string_lossy().to_string();
-    let build_dir = std::path::Path::new(".klc-build");
+    let build_dir = std::path::Path::new("target").join("debug");
     let output = exe_path(&build_dir.join(&file_stem));
-    let _ = fs::create_dir_all(build_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, build_dir) {
+    let _ = fs::create_dir_all(&build_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir) {
         Ok(()) => {
             let status = std::process::Command::new(&output)
                 .args(args.iter().skip(3))
@@ -401,7 +420,7 @@ fn cmd_test(_args: &[String]) {
 
 fn cmd_add(args: &[String]) {
     if args.len() < 3 {
-        eprintln!("Usage: klc add <dependency>[@version]");
+        eprintln!("Usage: {} add <dependency>[@version]", bin_name());
         process::exit(1);
     }
     let dep_str = &args[2];
@@ -428,7 +447,7 @@ fn cmd_add(args: &[String]) {
 
 fn cmd_remove(args: &[String]) {
     if args.len() < 3 {
-        eprintln!("Usage: klc remove <dependency>");
+        eprintln!("Usage: {} remove <dependency>", bin_name());
         process::exit(1);
     }
     let name = &args[2];

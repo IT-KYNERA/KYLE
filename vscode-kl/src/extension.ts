@@ -15,14 +15,14 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Start LSP client if klc binary is available
     const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get<string>('klcPath') || 'klc';
+    const klcPath = config.get<string>('klcPath') || 'kl';
 
     try {
         startLanguageClient(context, klcPath);
     } catch (err) {
         console.error('Failed to start KL language server:', err);
         vscode.window.showWarningMessage(
-            'KL language server not available. Install klc or set "kl.klcPath" in settings.'
+            'KL language server not available. Install kl or set "kl.klcPath" in settings.'
         );
     }
 }

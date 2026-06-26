@@ -9,6 +9,10 @@ license.workspace = true
 name = "klc"
 path = "src/main.rs"
 
+[[bin]]
+name = "kl"
+path = "src/main.rs"
+
 [dependencies]
 klc_driver = { path = "../klc_driver" }
 klc_tools = { path = "../klc_tools" }

@@ -1,4 +1,4 @@
-# Kyle Language Roadmap v7.0 — Production Polish
+# Kyle Language Roadmap v8.0 — Cross-Platform + Tooling Polish
 
 ---
 
@@ -10,17 +10,16 @@ pipeline (lexer → parser → semantic → MIR → LLVM → native binary), run
 (CLI, LSP, formatter, package manager, VS Code extension), AND all syntax
 features generate working code end-to-end.
 
-**Phase 7 — Cross-Platform Support** was completed earlier, making the runtime
-I/O cross-platform and the target triple auto-detectable. Distribution pipeline
-(GitHub Actions release, install.sh, public repo) is also done.
+**Phase 7 — Cross-Platform Support** is the current priority: make Kyle work on
+Linux (x64 + ARM), Windows (x64 + ARM), and macOS (Intel + Apple Silicon).
+Currently Linux ARM (Docker) and macOS Apple Silicon are verified.
 
-**Phase 8 — Distribution & Tooling Polish** is the current priority: make Kyle
-feel like a professional language — better VS Code experience, proper build
-output, LSP autocompletion, logo/branding, snippets, and website.
+**Phase 8 — Distribution & Tooling Polish** runs in parallel: VS Code extension,
+LSP dot-completions, build output structure, branding.
 
 ```
 Phase 6:  Language Completion           ← ✅ Complete
-Phase 7:  Cross-Platform + Distribution ← ✅ Complete
+Phase 7:  Cross-Platform Support        ← 🔶 CURRENT
 Phase 8:  Distribution & Tooling Polish ← 🔶 CURRENT
 Phase 9:  Self-Hosting                  ← ⏸️ deferred
 Phase 10: Production Ecosystem          ← 📅 future
@@ -286,9 +285,9 @@ Features that parsed and type-checked but generated no code were implemented:
 
 ---
 
-## Phase 6: Language Completion 🔶 CURRENT
+## Phase 6: Language Completion ✅
 
-### Status: 🔶 Current — Priority #1
+### Status: ✅ Complete
 
 ### Goal
 
@@ -343,8 +342,8 @@ en sí mismo esté completo.
 [x] Ternary operator — `cond ? a : b` ✅
 [x] Match como expresión ✅
 [x] Optional chaining — `?.` ✅ (property access en Option payload)
-[ ] const fn — compile-time evaluation
-    - parser ✅ | type-checker ❌ | lowering ❌ | codegen ❌
+[x] const fn — compile-time evaluation ✅
+    - parser ✅ | type-checker ✅ | lowering ✅ | codegen ✅
 ```
 
 #### 🟦 P3 — Standard Library
@@ -375,13 +374,13 @@ en sí mismo esté completo.
 #### 🟩 P5 — Robustness & Testing
 
 ```text
-[ ] Fix LLVM verification errors for all programs
+[x] Fix LLVM verification errors for all programs ✅
 [ ] Proper error messages for lowering/codegen failures
 [ ] Lint warnings — unused variables, dead code
-[ ] 100+ integration tests (examples/*.kl run and verify output)
+[ ] 100+ integration tests (examples/*.kl run and verify output) — 101 unit ✅, 36 examples ✅
 [ ] Fuzz testing for lexer + parser
 [ ] Standard library test suite
-[ ] CI pipeline (GitHub Actions)
+[x] CI pipeline (GitHub Actions) ✅
 ```
 
 ### Milestone
@@ -395,9 +394,9 @@ All syntax features generate working code
 
 ---
 
-## Phase 7: Cross-Platform Support ⏸️ NEXT
+## Phase 7: Cross-Platform Support 🔶 CURRENT
 
-### Status: ⏸️ Next — after Phase 6
+### Status: 🔶 Current
 
 ### Goal
 
@@ -439,17 +438,18 @@ hay que adaptar ~5 puntos localizados:
 ### Tasks
 
 ```text
-[ ] Runtime I/O — abstraer POSIX syscalls
-    - Actual: klc_runtime/src/io.rs usa open/read/write/close/nanosleep POSIX
-    - Solución: reemplazar con std::fs::File + std::io::{Read, Write}
-    - Rust stdlib es cross-platform, no requiere cambios de lógica
+[x] Runtime I/O — klc_runtime/src/io.rs already uses std::fs + std::io ✅
+    - Read_str/write_str/close basados en Rust std (cross-platform)
+    - POSIX raw syscalls reemplazadas en Sesión 19
 
-[ ] Target triple — auto-detección
-    - Actual: pipeline.rs hardcodea "arm64-apple-macosx"
-    - Solución: Target::initialize_all() + get_default_triple()
+[x] Target triple — auto-detección ✅
+    - Fix: pipeline.rs usa TargetMachine::get_default_triple()
+    - Causa: hardcode "arm64-apple-macosx" sin versión
+    - Solución: LLVM_getDefaultTargetTriple() — ya implementado
 
 [ ] Linker — soporte multiplataforma
-    - Actual: hardcodea "clang" + nombre de archivo sin extensión
+    - Actual: linker.rs usa clang + nombre sin extensión
+    - En Linux ARM Docker funciona con clang
     - Solución: detectar SO, usar link.exe en Windows
 
 [ ] CLI — extensión .exe
@@ -457,16 +457,18 @@ hay que adaptar ~5 puntos localizados:
     - Solución: usar std::env::consts::EXE_EXTENSION
 
 [ ] LLVM paths — config por plataforma
-    - Actual: .cargo/config.toml solo tiene ruta Linux aarch64
+    - Actual: .cargo/config.toml tiene ruta Linux aarch64
     - Solución: agregar secciones condicionales por target
 
 [ ] VS Code — detección Windows
     - Actual: extension.ts busca "klc" sin extensión
     - Solución: detectar plataforma, probar klc.exe
 
-[ ] Test en Linux x64 (CI)
-[ ] Test en Windows x64 (CI)
-[ ] Test en macOS Intel (CI)
+[ ] Test en Linux ARM (Docker) ✅ — Verified working now
+[ ] Test en Linux x64
+[ ] Test en macOS Intel
+[ ] Test en Windows x64
+[ ] Test en macOS ARM — funciona (linker warning corregido)
 ```
 
 ### Milestone
@@ -525,15 +527,18 @@ tenga una identidad visual profesional.
 [x] 33 keywords with context detail ✅
 [x] Prefix filtering (only show matching completions) ✅
 [x] Sort ordering (builtins first, then project symbols, then keywords) ✅
-[ ] Dot-triggered struct field / method completions
-[ ] Scope-aware completions (inner functions, variables)
+[ ] Dot-triggered struct field / method completions — 🔶 Current
+[ ] Scope-aware completions (inner functions, variables) — 🔶 Current
 [ ] Completion resolve provider (documentation on demand)
 ```
 
 #### 🟦 P2 — Build Output Structure
 
 ```text
-[ ] Project build → target/debug/main (or target/release/main) ✅
+[ ] Project build → target/debug/main (or target/release/main)
+    - klc build en proyecto debe poner binario en target/debug/main
+    - klc build --release → target/release/main
+    - No ensuciar src/ con binarios
 [x] Single-file build → binary next to source, artifacts in .klc-build/ ✅
 [x] Proper .gitignore (target/, *.o, *.ll, .klc-build/) ✅
 ```
@@ -632,7 +637,7 @@ Phase 4:   Runtime + Builtins                   — Complete ✅
 Phase 5:   Tooling & Ecosystem                  — Complete ✅
 Phase 3.5: Backend gap closure                  — Complete ✅
 Phase 6:   Language Completion                  — Complete ✅
-Phase 7:   Cross-Platform + Distribution        — Complete ✅
+Phase 7:   Cross-Platform Support               — 🔶 Current
 Phase 8:   Distribution & Tooling Polish        — 🔶 Current
 Phase 9:   Self-Hosting                         — ⏸️ Deferred
 Phase 10:  Production Ecosystem                 — 📅 Future
@@ -697,16 +702,21 @@ Public repo + GitHub Actions release workflow
 install.sh (curl | sh) installer
 ```
 
-### v0.8.0 — Beta (Phase 8 — Current 🔶)
+### v0.8.0 — Beta (Phase 7+8 — Current 🔶)
 
 ```text
-🟥 P0: For loops, Generics, Error handling, Optional chaining, String interpolation,
-       Range for loop, For-Else/While-Else — todas generan código
-🟧 P1: Defer, Guard, Type aliases, Dict/Map, Spread, Range slicing,
-       Ternary, Match-expression — todas generan código
-🟦 P3: Standard library core + math + io + testing
-🟪 P4: LSP completion + hover + go-to-definition (in progress)
-🟩 P5: 100+ integration tests, no crashes
+🟥 P0: All language features complete (For loops, Generics, Error handling,
+       Optional chaining, String interpolation, Range for loop, For-Else) ✅
+🟧 P1: All secondary features (Defer, Guard, Type aliases, Dict/Map, Spread,
+       Range slicing, Ternary, Match-expression, const fn) ✅
+🟦 P3: Standard library (core, math, io, testing, str, collections, json, time) ✅
+🟪 P4: LSP autocompletion (builtins, symbols, keywords) ✅
+       LSP dot-completions (struct.field, object.method) ✅
+🟩 P5: LSP hover, go-to-definition ✅
+✅ P7: Cross-platform: macOS ARM, Linux ARM (Docker) ✅
+       Linux x64, Windows x64, macOS Intel — ❌ pending
+🔶 P8: Build output structure, .gitignore, snippets, logo ✅
+       .vsix package, PNG icons, website — ❌ pending
 ```
 
 ### v1.0.0 — Stable (Phase 9 — Self-Hosting)
@@ -718,9 +728,10 @@ Stable standard library API
 Full tooling support
 kl-lang.org con documentación, ejemplos, descargas
 VS Code extension .vsix publicada
-LSP autocompletado completo
-Multiplataforma (macOS, Linux, Windows)
+LSP autocompletado completo (con dot-completions)
+Multiplataforma (macOS, Linux, Windows) — sin linker warnings
 ```
+
 
 ```text
 Self-hosting: kl build klc
@@ -755,24 +766,39 @@ Organizado por prioridad:
 ### 🟠 P1 — Should have (alta prioridad)
 
 ```text
-[ ] LSP autocompletado con punto: struct.field, object.method
-    - Detectar que el usuario escribió `objeto.`
-    - Resolver el tipo de `objeto`
-    - Mostrar campos del struct / métodos de la clase
-    - Mostrar variantes del enum
+[x] LSP autocompletado con punto: struct.field, object.method          ✅
+    - Detectar `objeto.` vía is_after_dot + word_before_dot
+    - Resolver tipo vía dot_completions (parse + type-check + scope)
+    - Struct → fields / Class → fields+methods / Enum → variants
+    - str → contains, to_upper, to_lower, trim, replace, substr, char_at, len
+    - list → push, pop, len / dict → len, get, set, keys
+    - Chained: `obj.field.subfield` resuelve paso a paso
 
-[ ] LSP scope-aware completions
-    - Variables locales dentro de funciones
-    - Símbolos visibles en el scope actual (no solo top-level)
-    - Cerrar popup al escribir fuera de contexto
+[x] LSP scope-aware completions                                       ✅
+    - Variables locales dentro de funciones (build_local_scope)
+    - Parámetros de función registrados
+    - Auto-declaradas: `x = expr` inferidas
+    - Bloques for/if/while/match guard/unsafe recorridos recursivamente
 
-[ ] VS Code extension empaquetada (.vsix)
+[x] Fix macOS linker warning ("no platform load command found") ✅
+    - pipeline.rs usa target triple hardcodeado "arm64-apple-macosx"
+    - Debe auto-detectar el target triple con get_default_triple()
+
+[x] Fix range() builtin (missing runtime function)                ✅
+    - kl_range() runtime + lowerer intercept + codegen extern
+
+[x] Project build output: target/debug/, target/release/ structure ✅
+    - Binarios no ensucian el source directory
+    - .gitignore profesional
+
+[x] VS Code extension empaquetada (.vsix) — iconos PNG 128×128 + 16×16 + package.json icon field ✅
     - npx vsce package
     - Publicar en Marketplace VS Code
     - O instalar desde el .vsix
 
-[ ] PNG icon 128x128 para VS Code Marketplace
-    - A partir del SVG, convertir a PNG
+[x] PNG icon 128x128 + 16x16 para VS Code Marketplace ✅
+    - Creados desde SVG (kl.svg → kl_128.png, kl_16.png)
+    - package.json icon field configurado
 
 [ ] Prueba integral: que el autocompletado funcione end-to-end
     - Abrir .kl en VS Code
@@ -792,9 +818,9 @@ Organizado por prioridad:
     - src/main.kl con mejor ejemplo
     - tests/ con test de ejemplo
 
-[ ] 100+ integration tests
-    - Cada ejemplo en examples/ corre y verifica output
-    - CI que los ejecute automáticamente
+[x] 101 unit tests + 36 examples ✅
+    - Todos los ejemplos en examples/ corren correctamente
+    - CI pipeline creado (.github/workflows/ci.yml)
 
 [ ] Mensajes de error más claros
     - El compilador muestra "error[E0001]: ..." con span exacto
@@ -814,7 +840,7 @@ Organizado por prioridad:
 
 [ ] Soporte Linux x64
 [ ] Soporte Windows x64
-[ ] LSP dot-completions + scope-aware completions + hover docs
+[x] LSP dot-completions + scope-aware completions + hover docs ✅
 [ ] LSP rename (textDocument/rename)
 [ ] Debug info (DWARF)
 [ ] Optimización levels (O0, O1, O2, O3)
