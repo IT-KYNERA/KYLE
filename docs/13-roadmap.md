@@ -731,7 +731,97 @@ Full tooling support
 
 ---
 
-## Success Metrics
+## v1.0 Release Checklist
+
+Todo lo que falta para considerar Kyle un lenguaje **usable y publicable**.
+Organizado por prioridad:
+
+### 🔴 P0 — Must have (bloquea el release)
+
+```text
+[x] Build output limpio: target/debug/, target/release/, .klc-build/   ✅
+[x] .gitignore profesional                                              ✅
+[x] Syntax highlighting VS Code completo (keywords, types, builtins,
+    strings, numbers, char literals, operators, escapes, constants)     ✅
+[x] LSP autocompletado básico (44 builtins, todos los Decl,
+    33 keywords, filtro por prefijo)                                    ✅
+[x] LSP client funcional en extension.js                                ✅
+[x] Snippets VS Code (20 snippets comunes)                              ✅
+[x] Logo SVG del lenguaje                                               ✅
+[x] Instalador install.sh (curl | sh)                                   ✅
+[x] GitHub Actions release workflow                                     ✅
+```
+
+### 🟠 P1 — Should have (alta prioridad)
+
+```text
+[ ] LSP autocompletado con punto: struct.field, object.method
+    - Detectar que el usuario escribió `objeto.`
+    - Resolver el tipo de `objeto`
+    - Mostrar campos del struct / métodos de la clase
+    - Mostrar variantes del enum
+
+[ ] LSP scope-aware completions
+    - Variables locales dentro de funciones
+    - Símbolos visibles en el scope actual (no solo top-level)
+    - Cerrar popup al escribir fuera de contexto
+
+[ ] VS Code extension empaquetada (.vsix)
+    - npx vsce package
+    - Publicar en Marketplace VS Code
+    - O instalar desde el .vsix
+
+[ ] PNG icon 128x128 para VS Code Marketplace
+    - A partir del SVG, convertir a PNG
+
+[ ] Prueba integral: que el autocompletado funcione end-to-end
+    - Abrir .kl en VS Code
+    - Escribir "pri" → debe sugerir "print", "println", "print_int"
+    - Escribir "list." → debe mostrar métodos disponibles
+```
+
+### 🟡 P2 — Nice to have
+
+```text
+[ ] CLI tab completion (bash/zsh)
+    - klc build <TAB> → autocompletar archivos .kl
+    - klc <TAB> → autocompletar subcomandos
+
+[ ] Mejorar templates de `klc new`
+    - kl.toml con metadata más completa
+    - src/main.kl con mejor ejemplo
+    - tests/ con test de ejemplo
+
+[ ] 100+ integration tests
+    - Cada ejemplo en examples/ corre y verifica output
+    - CI que los ejecute automáticamente
+
+[ ] Mensajes de error más claros
+    - El compilador muestra "error[E0001]: ..." con span exacto
+    - Sugerencias de cómo arreglarlo
+```
+
+### 🟢 P3 — Future
+
+```text
+[ ] Website kl-lang.org
+    - Landing page con hero + install command + hello world
+    - Documentation section
+    - Downloads page (binarios + .vsix)
+
+[ ] Homebrew tap (macOS)
+    - brew install kyle-lang/tap/klc
+
+[ ] Soporte Linux x64
+[ ] Soporte Windows x64
+[ ] LSP dot-completions + scope-aware completions + hover docs
+[ ] LSP rename (textDocument/rename)
+[ ] Debug info (DWARF)
+[ ] Optimización levels (O0, O1, O2, O3)
+[ ] Self-hosting (compilador escrito en Kyle)
+```
+
+---
 
 ```text
 Parity with Python for readability
@@ -748,6 +838,6 @@ Works on all major platforms
 ## Version
 
 ```text
-Kyle Language Roadmap v6.0 — MVP & Distribution Focus
+Kyle Language Roadmap v7.0 — Production Polish
 Last updated: 2026-06-25
 ```

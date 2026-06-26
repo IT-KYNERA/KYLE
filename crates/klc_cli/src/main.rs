@@ -222,10 +222,12 @@ fn cmd_build(args: &[String]) {
     // Single-file mode
     let source = load_source(args, 2);
     let file = &args[2];
-    let output = exe_path(&std::path::Path::new(file).with_extension(""));
-    let artifact_dir = std::path::Path::new(".klc-build");
-    let _ = fs::create_dir_all(artifact_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, artifact_dir) {
+    let file_stem = std::path::Path::new(file).file_stem()
+        .unwrap_or_default().to_string_lossy().to_string();
+    let build_dir = std::path::Path::new(".klc-build");
+    let output = exe_path(&build_dir.join(&file_stem));
+    let _ = fs::create_dir_all(build_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, build_dir) {
         Ok(()) => {
             println!("Build complete: {}", output.display());
         }
@@ -274,10 +276,12 @@ fn cmd_run(args: &[String]) {
     // Single-file mode
     let source = load_source(args, 2);
     let file = &args[2];
-    let output = exe_path(&std::path::Path::new(file).with_extension(""));
-    let artifact_dir = std::path::Path::new(".klc-build");
-    let _ = fs::create_dir_all(artifact_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, artifact_dir) {
+    let file_stem = std::path::Path::new(file).file_stem()
+        .unwrap_or_default().to_string_lossy().to_string();
+    let build_dir = std::path::Path::new(".klc-build");
+    let output = exe_path(&build_dir.join(&file_stem));
+    let _ = fs::create_dir_all(build_dir);
+    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, build_dir) {
         Ok(()) => {
             let status = std::process::Command::new(&output)
                 .args(args.iter().skip(3))

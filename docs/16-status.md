@@ -1,4 +1,4 @@
-# Kyle Language Implementation Status v5.0
+# Kyle Language Implementation Status v6.0
 
 > **Source of Truth** — verified implementation status for MVP, cross-platform,
 > and distribution.
@@ -256,8 +256,12 @@
 | Icon theme | ✅ | |
 | Compile on save | ❌ | Phase 8 |
 | Error squiggles | ❌ | Phase 8 |
-| Autocompletion | ❌ | Requires LSP completion handler (Phase 8) |
-| .vsix packaging | ❌ | Phase 8 |
+| Autocompletion | ✅ | 44 builtins, 8 Decl types, 33 keywords, prefix filter |
+| Dot-triggered completion | ❌ | struct.field, object.method (Phase 8 P1) |
+| Scope-aware completion | ❌ | inner variables/functions (Phase 8 P1) |
+| Snippets | ✅ | 20 snippets (fn, class, enum, match, for, if, etc.) |
+| Language icon | ✅ | SVG logo |
+| .vsix packaging | ❌ | Phase 8 P1 |
 
 ---
 
@@ -323,14 +327,17 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 
 | Feature | Status | Phase |
 |---------|--------|-------|
-| Pre-compiled binaries | ❌ | Phase 8 |
-| install.sh (curl \| sh) | ❌ | Phase 8 |
-| Homebrew tap | ❌ | Phase 8 |
-| Windows package (winget/scoop) | ❌ | Phase 8 |
-| VS Code .vsix package | ❌ | Phase 8 |
-| kl-lang.org website | ❌ | Phase 8 |
-| GitHub Actions CI/CD | ❌ | Phase 8 |
-| GitHub Actions releases | ❌ | Phase 8 |
+| Pre-compiled binaries (macOS ARM) | ✅ | Phase 7 |
+| install.sh (curl \| sh) | ✅ | Phase 7 |
+| GitHub Actions releases | ✅ | Phase 7 |
+| Public repo (raw.githubusercontent.com) | ✅ | Phase 7 |
+| Logo / branding (SVG) | ✅ | Phase 8 |
+| Homebrew tap | ❌ | Phase 8 P3 |
+| Windows package (winget/scoop) | ❌ | Phase 8 P3 |
+| Linux x64/ARM binaries | ❌ | Phase 8 P3 |
+| VS Code .vsix package | ❌ | Phase 8 P1 |
+| kl-lang.org website | ❌ | Phase 8 P3 |
+| GitHub Actions CI (test every push) | ❌ | Phase 8 P2 |
 
 ---
 
@@ -425,7 +432,7 @@ Each feature below is tracked through the full pipeline (parses → type-checks 
 
 ```text
 Implementation Status v5.0 — Language Completion (Phase 6) done
-Next: Phase 7 — Cross-Platform, Phase 8 — Distribution
+Next: Phase 8 — Tooling Polish (LSP dot-completions, scope-aware, .vsix, icons)
 Last updated: 2026-06-25
 Test count: 86 tests, 0 failures
 Example count: 20 examples, 0 failures
