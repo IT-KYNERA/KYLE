@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="IT-KYNERA/KYNERA-LENGUAJE"
+REPO="IT-KYNERA/KYLE"
 
 # --- Colores ---
 RED='\033[0;31m'
