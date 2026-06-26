@@ -2,67 +2,42 @@
 
 **Readable like Python. Typed like Rust. Fast like C.**
 
-Kyle is a compiled, statically-typed language combining Python's indentation-based readability, Rust's type safety, Go's simplicity, and LLVM's native performance.
-
-```
-fn main():
-    println("Hello, World!")
-```
+Kyle is a compiled, statically-typed language with Python-like indentation syntax, Rust-grade type safety, and native performance via LLVM. No GC, no borrow checker — just fast, safe code.
 
 ---
 
-## Quick Start
+## Install (macOS ARM)
 
-### Requirements
+**No dependencies required.** Just download and run.
 
-- **macOS ARM (Apple Silicon)** — the only currently supported platform
-- No need to install Rust, LLVM, or any dependencies
+### Option 1 — GitHub CLI
 
-### Install
-
-The repo is private, so you need **one** of these:
-
-**Option 1 — GitHub CLI (recommended):**
 ```bash
-gh release download v0.1.1 -R IT-KYNERA/KYLE
-tar xzf klc-v0.1.1-macos-arm64.tar.gz
+gh release download v0.2.0 -R IT-KYNERA/KYLE
+tar xzf klc-v0.2.0-macos-arm64.tar.gz
 cd klc && sudo ./install.sh --local .
 ```
 
-**Option 2 — Manual download from GitHub:**
-1. Go to https://github.com/IT-KYNERA/KYLE/releases
-2. Download `klc-v0.1.1-macos-arm64.tar.gz`
-3. Extract and install:
+### Option 2 — Manual
+
+Download `klc-v0.2.0-macos-arm64.tar.gz` from [releases](https://github.com/IT-KYNERA/KYLE/releases), then:
+
 ```bash
-tar xzf klc-v0.1.1-macos-arm64.tar.gz
+tar xzf klc-v0.2.0-macos-arm64.tar.gz
 cd klc && sudo ./install.sh --local .
 ```
 
-**Option 3 — With a GitHub token:**
+### Option 3 — With a token
+
 ```bash
 export GITHUB_TOKEN=ghp_...
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
-**Option 4 — Build from source (requires Rust):**
-```bash
-git clone https://github.com/IT-KYNERA/KYLE.git
-cd kl
-cargo build --bin klc --release
-cargo build -p klc_runtime --release
-# Then copy target/release/klc and target/release/libklc_runtime.a somewhere
-```
-
 ### Verify
-```bash
-klc --version
-```
 
-### Create and run a project
 ```bash
-klc new my_project
-cd my_project
-klc run
+klc --version   # → klc v0.2.0
 ```
 
 ---
@@ -74,33 +49,54 @@ fn main():
     println("Hello, World!")
 ```
 
-Save as `hello.kl`, then:
 ```bash
-klc build hello.kl   # → produces ./hello
-./hello               # → Hello, World!
-# Or directly:
 klc run hello.kl
 ```
 
 ---
 
-## More Examples
+## Language Tour
 
-### Fibonacci
+### Variables
 
 ```kl
-fn fibonacci(n: i32) -> i32:
-    if n <= 1:
-        return n
-    return fibonacci(n - 1) + fibonacci(n - 2)
-
-fn main() -> i32:
-    result = fibonacci(10)
-    println("fibonacci(10) = " + str(result))
-    return 0
+name = "Kyle"         # immutable by default
+mut count = 0         # mutable with `mut`
+PI = 3.1416           # constants are UPPERCASE
 ```
 
-### Structs and Methods
+### Functions
+
+```kl
+fn greet(name: str):
+    println("Hello, " + name + "!")
+
+fn add(a: i32, b: i32) -> i32:
+    return a + b
+```
+
+### Control Flow
+
+```kl
+if x > 0:
+    println("positive")
+elif x < 0:
+    println("negative")
+else:
+    println("zero")
+
+while i < 10:
+    println(str(i))
+    i = i + 1
+
+for i in 0..5:
+    println(str(i))
+
+for item in list:
+    println(item)
+```
+
+### Structs / Classes
 
 ```kl
 class Counter:
@@ -113,18 +109,12 @@ class Counter:
         this.count = this.count + 1
         return this.count
 
-    fn add(n: i32) -> i32:
-        this.count = this.count + n
-        return this.count
-
 fn main():
     c = Counter(10)
-    println(c.increment())   # 11
-    println(c.increment())   # 12
-    println(c.add(5))        # 17
+    println(c.increment())  # 11
 ```
 
-### Match and Enums
+### Enums & Match
 
 ```kl
 enum Option:
@@ -140,11 +130,31 @@ fn main():
             println("No value")
 ```
 
+### Generics
+
+```kl
+fn first<T>(list: [T]) -> T:
+    return list[0]
+
+fn main():
+    x = first([10, 20, 30])    # → 10
+    y = first(["a", "b", "c"]) # → "a"
+```
+
+### Dict / Map
+
+```kl
+fn main():
+    user = { "name": "Anna", "age": 30 }
+    println(user["name"])      # Anna
+    println(str(user.len()))   # 2
+```
+
 ### Async
 
 ```kl
 fn main():
-    task = async compute(42)
+    task = async compute(21)
     result = await task
     println("Result: " + str(result))
 
@@ -152,110 +162,116 @@ fn compute(x: i32) -> i32:
     return x * 2
 ```
 
+### Closures
+
+```kl
+fn main():
+    double = (x) => x * 2
+    println(str(double(21)))  # 42
+```
+
+### Error Handling
+
+```kl
+fn div(a: i32, b: i32) -> i32!:
+    if b == 0:
+        return Error("division by zero")
+    return a / b
+
+fn main():
+    result = div(10, 2)?
+    println(str(result))
+```
+
+### Defer
+
+```kl
+fn main():
+    f = open("file.txt")
+    defer close(f)
+    # f is automatically closed when main() returns
+```
+
+### Pattern Matching (expression)
+
+```kl
+fn describe(n: i32) -> str:
+    return match n:
+        0: "zero"
+        1: "one"
+        _: "many"
+```
+
+### Ternary
+
+```kl
+age_desc = age >= 18 ? "adult" : "minor"
+```
+
 ---
 
-## CLI Commands
+## CLI
 
 | Command | Description |
 |---------|-------------|
-| `klc build <file>` | Compile to native binary |
-| `klc run <file>` | Compile and execute |
+| `klc build <file>` | Compile to binary |
+| `klc run <file>` | Compile and run |
 | `klc check <file>` | Type-check only |
-| `klc parse <file>` | Show AST |
-| `klc mir <file>` | Show MIR |
 | `klc fmt <file>` | Format code |
-| `klc new <name>` | Create new project |
+| `klc new <name>` | Create a new project |
 | `klc --version` | Show version |
-| `klc --help` | Show help |
 
 ---
 
-## Features
+## Feature Status
 
-- Indentation-based syntax (4 spaces)
-- Strong static typing with inference
-- Generics (structs + functions, monomorphized)
-- Pattern matching with enums
-- Closures (first-class functions)
-- Async/await (thread-based)
-- RAII memory management (no GC, no borrow checker)
-- Classes with constructors and methods
-- Dict/Map literals
-- Spread operator, range slicing
-- Ternary (`cond ? a : b`), match-expression
-- Defer, guard, type aliases
-- Package manager (`klc new`, `klc add`)
-- Language server (LSP)
-- Code formatter
-- VS Code extension
+| Feature | Status |
+|---------|--------|
+| Functions, variables, control flow | ✅ |
+| Structs / classes with methods | ✅ |
+| Enums + pattern matching | ✅ |
+| Generics (structs + functions) | ✅ |
+| Closures | ✅ |
+| Async / await | ✅ |
+| Dict / Map literals | ✅ |
+| Error handling (`!` / `?`) | ✅ |
+| Defer, guard | ✅ |
+| Match as expression | ✅ |
+| Ternary operator | ✅ |
+| Spread operator, range slicing | ✅ |
+| Type aliases | ✅ |
+| Package manager | ✅ |
+| Code formatter | ✅ |
+| Language server (LSP) | ✅ |
+| VS Code extension | ✅ |
+| String interpolation | ✅ |
+| RAII memory management | ✅ |
 
 ---
 
-## Project Structure
+## Examples
 
-```
-kl/
-├── crates/          # 9 Rust crates (compiler)
-│   ├── klc_core/    #   AST, types, spans, diagnostics
-│   ├── klc_frontend/#   Lexer + parser
-│   ├── klc_semantic/#   Type checker + symbol table
-│   ├── klc_mir/     #   MIR lowering + optimizer + ownership
-│   ├── klc_backend/ #   LLVM codegen + linker
-│   ├── klc_driver/  #   Pipeline orchestration
-│   ├── klc_cli/     #   CLI binary
-│   ├── klc_runtime/ #   Runtime (RAII, I/O, strings, async)
-│   └── klc_tools/   #   LSP, formatter, package manager
-├── std/             # Standard library (.kl sources)
-├── examples/        # Example programs
-├── docs/            # 20 specification documents
-└── vscode-kl/       # VS Code extension
+See [`examples/`](examples/) for 50+ working programs:
+
+```bash
+klc run examples/fibonacci.kl
+klc run examples/enum_test.kl
+klc run examples/async_test.kl
+klc run examples/generic_struct.kl
+klc run examples/dict_test.kl
 ```
 
 ---
 
 ## Documentation
 
-Full documentation is in `docs/`:
+Full language docs in [`docs/`](docs/):
 
-| Doc | Description |
-|-----|-------------|
-| [Language Spec](docs/01-language-specification.md) | Complete syntax reference |
-| [Formal Grammar](docs/02-formal-grammar.md) | EBNF grammar |
-| [Type System](docs/04-type-system.md) | Types and type rules |
-| [Standard Library](docs/07-standard-library.md) | std API reference |
-| [Memory Model](docs/09-memory-model.md) | RAII + ownership |
-| [Roadmap](docs/13-roadmap.md) | Current and future phases |
-| [Getting Started](docs/18-getting-started.md) | Beginner's guide |
-| [Syntax Reference](docs/17-syntax-reference.md) | Quick syntax lookup |
-
----
-
-## Building from Source
-
-**Prerequisites:** Rust toolchain + LLVM 18
-
-```bash
-# macOS
-brew install llvm@18
-export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
-
-# Build
-cargo build --workspace
-
-# Test
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
-```
-
----
-
-## Status
-
-- **Phase 6 — Language Completion** (current)
-- 86 unit tests passing
-- 52 example programs working
-- macOS ARM only
-
-See [docs/13-roadmap.md](docs/13-roadmap.md) for the full roadmap.
+- [Language Specification](docs/01-language-specification.md)
+- [Syntax Reference](docs/17-syntax-reference.md)
+- [Getting Started](docs/18-getting-started.md)
+- [Standard Library](docs/07-standard-library.md)
+- [Roadmap](docs/13-roadmap.md)
 
 ---
 
