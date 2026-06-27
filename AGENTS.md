@@ -68,7 +68,7 @@ complete feature matrix (what works, what doesn't) and the phase breakdown.
 
 ---
 
-## Known Issues (CI)
+## Known Issues
 
 | Issue | Status |
 |-------|--------|
@@ -76,6 +76,18 @@ complete feature matrix (what works, what doesn't) and the phase breakdown.
 | `error_test.kl` exits non-zero (by design, `Option` return) | ✅ Fixed — CI checks all, runs subset |
 | Release: existing tag blocks re-create | ✅ Fixed — `gh release delete` before create |
 | Node.js 20 deprecation (actions/checkout@v4) | ⚠️ Warning only, non-fatal |
+| Install: `set -o pipefail` fatal in dash (Ubuntu `sh`) | ✅ Fixed — conditional pipefail only in bash |
+| Linker: runtime lib path mismatch (`lib/klc/` vs `lib/kl/`) | ✅ Fixed — `find_runtime_lib()` looks in `lib/kl/` |
+
+## Release v0.2.0
+
+https://github.com/IT-KYNERA/KYLE/releases/tag/v0.2.0
+
+| Asset | Platform |
+|-------|----------|
+| `kl-v0.2.0-macos-arm64.tar.gz` | macOS Apple Silicon |
+| `kl-v0.2.0-linux-arm64.tar.gz` | Linux ARM (aarch64) |
+| `kl-0.2.0.vsix` | VS Code extension (universal) |
 
 ## Development Commands
 
