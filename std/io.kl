@@ -1,7 +1,7 @@
 fn read_file(path: str) -> str:
     fd = open(path, 0)
     if fd >= 0:
-        content = read_str(fd)
+        content = read_str(fd, 4096)
         close(fd)
         content
     else:

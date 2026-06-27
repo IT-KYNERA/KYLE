@@ -1469,7 +1469,7 @@ fn main():
 
     println("=== Parser ===")
     println("Source: " + path)
-    println()
+    println("")
 
     tokens = tokenize(source)
     println("Tokens: " + str(len(tokens)))
@@ -1499,12 +1499,12 @@ fn main():
         print("  " + kn + "(" + t.value + ")\n")
         i = i + 1
 
-    println()
+    println("")
 
     p = new_parser(tokens)
     ast = parse_program(p)
 
     println("=== AST ===")
     print_ast(ast, 0)
-    println()
+    println("")
     println("=== Done ===")
