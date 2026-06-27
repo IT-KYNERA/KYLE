@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -eu
+if command -v bash >/dev/null 2>&1 && [ -n "$BASH_VERSION" ]; then
+    set -o pipefail 2>/dev/null || true
+fi
 
 REPO="IT-KYNERA/KYLE"
 
@@ -81,6 +84,9 @@ UNINSTALL_SCRIPT="$BIN_DIR/kl-uninstall"
 cat > "$UNINSTALL_SCRIPT" << 'UNINSTALL_EOF'
 #!/usr/bin/env bash
 set -eu
+if command -v bash >/dev/null 2>&1 && [ -n "$BASH_VERSION" ]; then
+    set -o pipefail 2>/dev/null || true
+fi
 INSTALL_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
 echo "Removing kl from $INSTALL_DIR..."
 rm -f "$INSTALL_DIR/bin/kl" "$INSTALL_DIR/bin/klc" "$INSTALL_DIR/bin/kl-uninstall"
