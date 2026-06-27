@@ -8,8 +8,8 @@
 
 ```
 Phase 0-6:   Language Design + Compiler + Language Completion    ✅ Complete
-Phase 7:     Cross-Platform Support                              🔶 Current
-Phase 8:     Distribution & Tooling Polish                        🔶 Current
+Phase 7:     Cross-Platform Support                              ✅ Complete
+Phase 8:     Distribution & Tooling Polish                        ✅ Complete
 Phase 9:     Backend & Systems (FFI, HTTP, DB, Net)               ⏸️ Next
 Phase 10:    Std Library & Ergonomics (Iterators, Collections)   📅 Planned
 Phase 11:    Production Hardening (Errors, Debug, Security)      📅 Planned
@@ -168,7 +168,7 @@ All language syntax generates working code end-to-end.
 
 ---
 
-## Phase 8: Distribution & Tooling Polish 🔶
+## Phase 8: Distribution & Tooling Polish ✅
 
 ### P0 — VS Code Extension
 - [x] Syntax highlighting (TextMate grammar)
@@ -538,7 +538,7 @@ and the std library is rich enough.
 | Metric | Value |
 |--------|-------|
 | Unit tests | 101 (0 failures) |
-| Integration tests (examples) | 50+ (all run correctly; error_test returns 1 deliberately) |
+| Integration tests (examples) | 51+ (all run correctly; error_test returns 1 deliberately) |
 | Standard library tests | 0 (Phase 11) |
 | Fuzz tests | 0 (Phase 11) |
 
@@ -557,7 +557,7 @@ A developer must be able to:
 7. [x] Run tests (`kl test`)
 8. [ ] Deploy to production (Phase 7 + 11)
 
-**Current state:** Phases 0-6 complete, Phase 7-8 nearly done. Phase 9 (Backend
+**Current state:** Phases 0-8 complete. Phase 9 (Backend
 & Systems) is the critical next milestone — it unlocks real-world usage.
 
 ---
@@ -592,8 +592,8 @@ A developer must be able to:
 Roadmap & Status v1.0
 Last updated: 2026-06-26
 Tests: 101 unit tests, 0 failures
-Examples: 50+ examples, all run correctly
+Examples: 51+ examples, all run correctly
 Phase 6: COMPLETE — all language features generate working code
-Phase 7-8: CURRENT — cross-platform + distribution polish
+Phase 7-8: COMPLETE — cross-platform + distribution polish
 Phase 9: NEXT — backend & systems (FFI, HTTP, DB) is the critical milestone
 ```
