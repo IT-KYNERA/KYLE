@@ -68,27 +68,14 @@ No dependencies required. The installer downloads a pre-compiled native binary.
 
 ### VS Code Extension
 
-Install the Kyle VS Code extension for syntax highlighting, autocompletion,
-LSP integration, and semantic coloring:
-
-**Option 1 — From the terminal:**
-
 ```bash
-code --install-extension vscode-kl/vscode-kl-0.2.1.vsix
+curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/download/v0.2.1/kl-0.2.1.vsix
+code --install-extension /tmp/kl.vsix
 ```
 
-**Option 2 — Via the command palette:**
-
-1. Open VS Code
-2. Press `Cmd+Shift+P` (macOS) / `Ctrl+Shift+P` (Linux)
-3. Type **Extensions: Install from VSIX...** and select the file
-   `vscode-kl/vscode-kl-0.2.1.vsix` from the Kyle repository
-
-**Option 3 — From the GitHub release:**
-
-Download `kl-0.2.1.vsix` from the
-[latest release](https://github.com/IT-KYNERA/KYLE/releases/latest) and install via
-`code --install-extension kl-0.2.1.vsix`.
+Or download `kl-0.2.1.vsix` from the
+[latest release](https://github.com/IT-KYNERA/KYLE/releases/latest)
+and install via `code --install-extension kl-0.2.1.vsix`.
 
 ### Building from Source
 
