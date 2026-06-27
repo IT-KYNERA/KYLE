@@ -193,7 +193,7 @@ fn emit_object(module: &inkwell::module::Module, path: &Path) -> Result<(), Stri
         "generic",
         "",
         OptimizationLevel::Default,
-        inkwell::targets::RelocMode::Default,
+        inkwell::targets::RelocMode::PIC,
         inkwell::targets::CodeModel::Default,
     ).ok_or_else(|| "Failed to create target machine".to_string())?;
 

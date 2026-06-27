@@ -54,7 +54,7 @@ jobs:
           cp target/release/klc dist/kl/
           cp target/release/libklc_runtime.a dist/kl/lib/
           cp install.sh uninstall.sh dist/kl/
-          cp vscode-kl/vscode-kl-*.vsix dist/kl/vscode/
+          cp vscode-kl/kl-*.vsix dist/kl/vscode/
           chmod +x dist/kl/install.sh dist/kl/uninstall.sh
           cd dist
           tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl/
@@ -65,6 +65,6 @@ jobs:
         run: |
           gh release create ${{ github.ref_name }} \
             dist/kl-*.tar.gz \
-            vscode-kl/vscode-kl-*.vsix \
+            vscode-kl/kl-*.vsix \
             --title "Kyle ${{ github.ref_name }}" \
             --notes "See commit history for changes."
