@@ -63,6 +63,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Delete existing release and tag if re-running (e.g., after force-push)
+          gh release delete ${{ github.ref_name }} --yes 2>/dev/null || true
           gh release create ${{ github.ref_name }} \
             dist/kl-*.tar.gz \
             vscode-kl/kl-*.vsix \
