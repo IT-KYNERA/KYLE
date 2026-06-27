@@ -52,32 +52,50 @@ function findKlBinary() {
     const envPath = process.env.PATH || '';
     const dirs = envPath.split(path.delimiter);
     for (const dir of dirs) {
-        const candidate = path.join(dir, 'kl');
-        if (fs.existsSync(candidate))
-            return candidate;
+        for (const name of ['kl', 'klc']) {
+            const candidate = path.join(dir, name);
+            if (fs.existsSync(candidate))
+                return candidate;
+        }
     }
-    // 3. Common install locations
+    // 3. Common install locations (search kl + klc)
     const home = process.env.HOME || '';
     const locations = [
         path.join(home, '.kl', 'bin', 'kl'),
+        path.join(home, '.kl', 'bin', 'klc'),
+        path.join(home, '.cargo', 'bin', 'kl'),
+        path.join(home, '.cargo', 'bin', 'klc'),
         '/usr/local/bin/kl',
+        '/usr/local/bin/klc',
         '/opt/homebrew/bin/kl',
+        '/opt/homebrew/bin/klc',
         '/usr/bin/kl',
     ];
     for (const loc of locations) {
         if (fs.existsSync(loc))
             return loc;
     }
-    // 4. Fallback: just try "kl" in PATH via shell
-    return 'kl';
+    // 4. Try `which kl` as last resort
+    try {
+        const which = require('child_process').execSync('which kl', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+        if (which && fs.existsSync(which))
+            return which;
+    }
+    catch (_) { }
+    // 5. Not found — return null (caller handles gracefully)
+    return null;
 }
 function activate(context) {
     console.log('KL Language Support activating...');
     // Register commands
     context.subscriptions.push(vscode.commands.registerCommand('kl.run', () => runFile('run')), vscode.commands.registerCommand('kl.build', () => runFile('build')), vscode.commands.registerCommand('kl.check', () => runFile('check')));
     // Start LSP client
-    const klPath = findKlBinary();
-    if (klPath && fs.existsSync(klPath)) {
+    let klPath = findKlBinary();
+    if (!klPath) {
+        // Fallback: try bare "kl" command name (resolved by system PATH)
+        klPath = 'kl';
+    }
+    if (fs.existsSync(klPath) || klPath === 'kl') {
         try {
             startLanguageClient(context, klPath);
             console.log('KL language server started:', klPath);
@@ -119,10 +137,9 @@ async function runFile(subcommand) {
         vscode.window.showErrorMessage('Not a KL file');
         return;
     }
-    const klPath = findKlBinary();
+    let klPath = findKlBinary();
     if (!klPath) {
-        vscode.window.showErrorMessage('kl binary not found. Install kl or set "kl.klcPath" in settings.');
-        return;
+        klPath = 'kl'; // let shell resolve via PATH
     }
     const terminal = vscode.window.createTerminal('KL');
     terminal.show();

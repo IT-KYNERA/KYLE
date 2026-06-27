@@ -11,7 +11,10 @@
     { "include": "#types" },
     { "include": "#builtins" },
     { "include": "#constants" },
-    { "include": "#operators" }
+    { "include": "#operators" },
+    { "include": "#functions" },
+    { "include": "#properties" },
+    { "include": "#variables" }
   ],
   "repository": {
     "comments": {
@@ -66,6 +69,21 @@
     "operators": {
       "name": "keyword.operator.kl",
       "match": "(==|!=|<=|>=|&&|\\|\\||\\+\\+|--|->|=>|\\?|\\.\\.\\.|\\.\\.|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=|<<|>>|\\+|-|\\*|/|%|&|\\||\\^|~|=|<|>|!)"
+    },
+    "functions": {
+      "patterns": [
+        { "name": "entity.name.function.kl", "match": "(?<=\\bfn\\s+)([a-zA-Z_][a-zA-Z0-9_]*)" }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        { "name": "variable.other.property.kl", "match": "(?<=\\.)([a-zA-Z_][a-zA-Z0-9_]*)" }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        { "name": "variable.other.kl", "match": "(?<=\\b(?:mut|let|var)\\s+)([a-z_][a-zA-Z0-9_]*)" }
+      ]
     }
   }
 }

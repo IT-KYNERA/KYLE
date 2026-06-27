@@ -424,40 +424,165 @@ impl LanguageServer {
         let mut lexer = klc_frontend::lexer::Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = klc_frontend::parser::Parser::new(tokens);
-        if let Ok(prog) = parser.parse() {
-            for decl in &prog.declarations {
-                match decl {
-                    Decl::Function(f) => {
-                        let l1 = f.span.start.line;
-                        let l2 = f.span.end.line;
-                        if (l1 <= line + 1 && line + 1 <= l2) || l1 == line + 1 {
-                            let mut info = format!("**fn {}**", f.name);
-                            if let Some(rt) = &f.return_type {
-                                info.push_str(&format!(" -> {}", Self::fmt_ast_type(rt)));
-                            }
-                            return info;
-                        }
-                    }
-                    _ => {}
+        let program = match parser.parse() {
+            Ok(p) => p,
+            Err(_) => return "KL source file".to_string(),
+        };
+
+        // Run semantic analysis to get the symbol table with resolved types
+        let mut source_map = klc_core::source_map::SourceMap::new();
+        let _file_id = source_map.add("input.kl".to_string(), source.to_string());
+        let mut analyzer = klc_semantic::analyzer::SemanticAnalyzer::new()
+            .with_source(source_map, "input.kl".to_string());
+        analyzer.analyze(&program);
+        let symbols = analyzer.type_checker.symbols();
+
+        let word = self.word_at(source, line, col);
+        if word.is_empty() {
+            return "KL source file".to_string();
+        }
+
+        // 1. Check if it's a built-in function (prefer rich description over dummy symbol)
+        if let Some(info) = Self::builtin_hover_info(&word) {
+            return info;
+        }
+
+        // 2. Check local scope (variables within the enclosing function)
+        let local_types = Self::build_local_scope(&program, line, col);
+        if let Some(type_name) = local_types.get(&word) {
+            return format!("`{}`: **{}**", word, type_name);
+        }
+
+        // 3. Check global symbol table
+        if let Some(sym) = symbols.lookup(&word) {
+            return Self::format_symbol_hover(sym, &word);
+        }
+
+        // 4. Check if it's a known type
+        if symbols.lookup_type(&word).is_some() {
+            return format!("`{}` — type", word);
+        }
+
+        format!("`{}` — KL identifier", word)
+    }
+
+    fn format_symbol_hover(sym: &Symbol, name: &str) -> String {
+        match &sym.kind {
+            SymKind::Function(f) => {
+                let params: Vec<String> = f.params.iter()
+                    .map(|p| format!("{}: {}", p.name, Self::fmt_ast_type(&p.type_)))
+                    .collect();
+                let mut info = format!("**fn {}({})", f.name, params.join(", "));
+                if let Some(rt) = &f.return_type {
+                    info.push_str(&format!(" -> {}", Self::fmt_ast_type(rt)));
                 }
+                info.push(')');
+                info
             }
-            let word = self.word_at(source, line, col);
-            match word.as_str() {
-                "print" => return "`print(value)` — Print value to stdout".to_string(),
-                "println" => return "`println(value)` — Print value with newline".to_string(),
-                "str" => return "`str(value)` — Convert to string".to_string(),
-                "len" => return "`len(value)` — Get length".to_string(),
-                "int" => return "`int(value)` — Convert to integer".to_string(),
-                "float" => return "`float(value)` — Convert to float".to_string(),
-                "bool" => return "`bool(value)` — Convert to boolean".to_string(),
-                _ => {
-                    if !word.is_empty() {
-                        return format!("`{}` — KL identifier", word);
-                    }
+            SymKind::Variable { type_: Some(t), is_mutable, .. } => {
+                let mut info = format!("`{}`: **{}**", name, Self::type_to_name(t));
+                if *is_mutable {
+                    info.push_str(" (mutable)");
                 }
+                info
+            }
+            SymKind::Variable { type_: None, is_mutable, .. } => {
+                let mut info = format!("`{}`: inferred", name);
+                if *is_mutable {
+                    info.push_str(" (mutable)");
+                }
+                info
+            }
+            SymKind::Constant(t) => {
+                format!("`{}`: **{}** (constant)", name, Self::type_to_name(t))
+            }
+            SymKind::Struct(s) => {
+                let fields: Vec<String> = s.fields.iter()
+                    .map(|f| format!("{}: {}", f.name, Self::fmt_ast_type(&f.type_)))
+                    .collect();
+                format!("**struct {}** — fields: {}", s.name, fields.join(", "))
+            }
+            SymKind::Class(c) => {
+                let mut info = format!("**class {}**", c.name);
+                if !c.members.is_empty() {
+                    let members: Vec<String> = c.members.iter().map(|m| match m {
+                        ClassMember::Field(f) => format!("{}: {}", f.name, Self::fmt_ast_type(&f.type_)),
+                        ClassMember::Method(m) => m.name.clone(),
+                        ClassMember::Constructor(_) => "constructor".to_string(),
+                        ClassMember::Property(_) => "property".to_string(),
+                    }).collect();
+                    info.push_str(&format!(" — members: {}", members.join(", ")));
+                }
+                info
+            }
+            SymKind::Enum(e) => {
+                let variants: Vec<String> = e.variants.iter().map(|v| v.name.clone()).collect();
+                format!("**enum {}** — variants: {}", e.name, variants.join(", "))
+            }
+            SymKind::Contract(c) => {
+                format!("**contract {}**", c.name)
+            }
+            SymKind::TypeAlias(t) => {
+                format!("**type {}** = {}", t.name, Self::fmt_ast_type(&t.type_))
+            }
+            SymKind::Module(_) => {
+                format!("**module {}**", name)
+            }
+            SymKind::TypeParam => {
+                format!("`{}` — type parameter", name)
             }
         }
-        "KL source file".to_string()
+    }
+
+    fn builtin_hover_info(word: &str) -> Option<String> {
+        let info = match word {
+            "print" => "`print(value)` — Print value to stdout",
+            "println" => "`println(value)` — Print value with newline",
+            "print_int" => "`print_int(n)` — Print integer to stdout",
+            "println_int" => "`println_int(n)` — Print integer with newline",
+            "print_err" => "`print_err(value)` — Print value to stderr",
+            "str" => "`str(value)` — Convert to string",
+            "len" => "`len(value)` — Get length of string, list, or dict",
+            "int" => "`int(value)` — Convert to integer",
+            "float" => "`float(value)` — Convert to float",
+            "bool" => "`bool(value)` — Convert to boolean",
+            "input" => "`input()` — Read a line from stdin",
+            "open" => "`open(path) -> i64` — Open a file, returns file descriptor",
+            "read_str" => "`read_str(fd) -> str` — Read file content as string",
+            "write_str" => "`write_str(fd, str)` — Write string to file",
+            "close" => "`close(fd)` — Close a file descriptor",
+            "sleep" => "`sleep(ms)` — Sleep for given milliseconds",
+            "now" => "`now() -> i64` — Current Unix timestamp in milliseconds",
+            "contains" => "`contains(str, substr) -> bool` — Check if string contains substring",
+            "to_upper" => "`to_upper(str) -> str` — Convert string to uppercase",
+            "to_lower" => "`to_lower(str) -> str` — Convert string to lowercase",
+            "trim" => "`trim(str) -> str` — Remove leading/trailing whitespace",
+            "replace" => "`replace(str, from, to) -> str` — Replace all occurrences",
+            "substr" => "`substr(str, start, len) -> str` — Extract substring",
+            "char_at" => "`char_at(str, index) -> char` — Get character at index",
+            "ord" => "`ord(c) -> i32` — Get ASCII code of character",
+            "is_digit" => "`is_digit(c) -> bool` — Check if char is a digit",
+            "is_alpha" => "`is_alpha(c) -> bool` — Check if char is alphabetic",
+            "is_alnum" => "`is_alnum(c) -> bool` — Check if char is alphanumeric",
+            "is_whitespace" => "`is_whitespace(c) -> bool` — Check if char is whitespace",
+            "is_upper" => "`is_upper(c) -> bool` — Check if char is uppercase",
+            "is_lower" => "`is_lower(c) -> bool` — Check if char is lowercase",
+            "assert" => "`assert(condition)` — Assert condition is true",
+            "assert_eq" => "`assert_eq(a, b)` — Assert values are equal",
+            "assert_str" => "`assert_str(a, b)` — Assert strings are equal",
+            "assert_ne" => "`assert_ne(a, b)` — Assert values are not equal",
+            "range" => "`range(start, end) -> [i32]` — Create a range list",
+            "json_parse" => "`json_parse(str)` — Parse JSON string",
+            "json_stringify" => "`json_stringify(value) -> str` — Convert to JSON string",
+            "list_push" => "`list_push(list, value)` — Push value to list (mutates)",
+            "list_pop" => "`list_pop(list) -> i64` — Pop last value from list",
+            "list_len" => "`list_len(list) -> i32` — Get list length",
+            "ceil" => "`ceil(f64) -> f64` — Round up to nearest integer",
+            "floor" => "`floor(f64) -> f64` — Round down to nearest integer",
+            "round" => "`round(f64) -> f64` — Round to nearest integer",
+            _ => return None,
+        };
+        Some(info.to_string())
     }
 
     fn word_at(&self, source: &str, line: usize, col: usize) -> String {
@@ -582,14 +707,22 @@ impl LanguageServer {
             return None;
         }
 
-        // First, try global symbol table
+        // First, try global symbol table — but don't short-circuit on None
+        // (variable may exist but have unresolved type)
         if let Some(sym) = symbols.lookup(expr) {
-            return Self::completions_for_sym(sym, symbols);
+            if let Some(items) = Self::completions_for_sym(sym, symbols) {
+                return Some(items);
+            }
         }
 
-        // Not found in globals — try local variables from the enclosing function
+        // Try local variables from the enclosing function (inferred types)
         if let Some(type_name) = local_types.get(expr) {
             return Self::completions_for_named_type(type_name, symbols);
+        }
+
+        // Try treating the expression as a type name directly
+        if let Some(items) = Self::completions_for_named_type(expr, symbols) {
+            return Some(items);
         }
 
         None
