@@ -21,13 +21,14 @@ and tooling are all Rust. This will NOT change.
 
 ---
 
-## Current State (2026-06-26)
+## Current State (2026-06-27)
 
 ```
 ✅ Phases 0-6 COMPLETE   — Full compiler pipeline, all language features, std lib
-🔶 Phase 7 CURRENT       — Cross-Platform (macOS ARM ✅, Linux ARM ✅, rest deferred)
-🔶 Phase 8 CURRENT       — Tooling polish (.vsix ✅, LSP dot-completions ✅, CI ✅)
-⏸️ Phase 9 NEXT          — Backend & Systems (FFI, HTTP, DB, ENV, Process)
+✅ Phase 7 DONE          — macOS ARM ✅, Linux ARM ✅ (x64/Intel/Windows deferred)
+✅ Phase 8 DONE          — Docs consolidation, kl binary alias, LSP polish,
+                          VS Code .vsix, CI/CD, install scripts
+⏸️ Phase 9 NEXT          — Backend & Systems (ENV, Process, FFI, HTTP, DB)
 📅 Phase 10              — Std Library & Ergonomics (Iterators, Func ops, Collections)
 📅 Phase 11              — Production Hardening (Errors, DWARF, TLS, WASM)
 ⏸️ Phase 12 DEFERRED     — Self-Hosting (compiler written in Kyle)
