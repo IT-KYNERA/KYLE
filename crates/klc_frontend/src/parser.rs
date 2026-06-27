@@ -266,7 +266,7 @@ impl Parser {
             }
         }
 
-        // Check for inheritance: `class Dog : Animal:`
+        // Check for inheritance: `class Dog : Animal` or `class Dog : Animal:`
         let parent = if self.at(TokenKind::Colon) {
             let saved = self.pos;
             self.advance();
@@ -281,8 +281,12 @@ impl Parser {
                         contracts.push(self.eat_identifier());
                     }
                 }
+                // `class Dog : Animal:` — optional second colon, then body
                 if self.at(TokenKind::Colon) {
                     self.advance();
+                }
+                // Body starts (either right after `:` or on next line)
+                if self.at(TokenKind::Newline) || self.at(TokenKind::Indent) {
                     let members = self.parse_class_members()?;
                     return self.make_class_decl(start, name, type_params.clone(), Some(parent_name), contracts, members, is_abstract);
                 }

@@ -443,7 +443,14 @@ impl TypeChecker {
                             // Builtin — check with hardcoded expected counts
                             if let Some(name) = Self::target_name(target) {
                                 if let Some(exp) = Self::builtin_expected_args(name) {
-                                    if arg_count != exp {
+                                    if name == "input" {
+                                        if arg_count > 1 {
+                                            self.reporter.report(
+                                                Diagnostic::error(ErrorCode::E0001,
+                                                    format!("'{}' expects 0 or 1 argument(s), got {}", name, arg_count))
+                                            );
+                                        }
+                                    } else if arg_count != exp {
                                         self.reporter.report(
                                             Diagnostic::error(ErrorCode::E0001,
                                                 format!("'{}' expects {} argument(s), got {}", name, exp, arg_count))
@@ -488,6 +495,16 @@ impl TypeChecker {
                 }
             }
             Expr::PropertyAccess { object, property, .. } => {
+                // Visibility check: `__` members are private (only `this` may access)
+                if property.starts_with("__") {
+                    let is_this = matches!(object.as_ref(), Expr::Identifier { name, .. } if name == "this");
+                    if !is_this {
+                        self.reporter.report(
+                            Diagnostic::error(ErrorCode::E0014,
+                                format!("Cannot access private member '__{}' from outside the class", property.trim_start_matches('_')))
+                        );
+                    }
+                }
                 let obj_type = self.infer_expr(object);
                 // Detect enum variant construction: Option.None, Option.Some
                 if let Type::Named(name) = &obj_type {

@@ -618,11 +618,17 @@ impl LanguageServer {
         for (i, l) in source.lines().enumerate() {
             if i == line {
                 let chars: Vec<char> = l.chars().collect();
-                if col >= chars.len() || !chars[col].is_alphanumeric() && chars[col] != '_' {
+                if chars.is_empty() {
                     return String::new();
                 }
-                let mut start = col;
-                let mut end = col;
+                // LSP `col` is the gap between characters; the character the
+                // user just typed sits at chars[col-1].  Anchor on that.
+                let anchor = if col == 0 { 0 } else { col - 1 };
+                if !chars[anchor].is_alphanumeric() && chars[anchor] != '_' {
+                    return String::new();
+                }
+                let mut start = anchor;
+                let mut end = anchor + 1;
                 while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
                     start -= 1;
                 }
