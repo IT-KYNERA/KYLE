@@ -11,7 +11,7 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 [![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-101%20passing-6C3FC5?style=flat-square)](#testing)
 [![Platform](https://img.shields.io/badge/platform-macOS%20ARM%20%7C%20Linux%20ARM-6C3FC5?style=flat-square)](#install)
-[![LLVM](https://img.shields.io/badge/LLVM-18-6C3FC5?style=flat-square)](#building-from-source)
+[![Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=flat-square)](https://rust-lang.org)
 
 </div>
 
@@ -95,22 +95,7 @@ Download `kl-0.2.1.vsix` from the
 > You only need this if you want to contribute to the compiler itself.
 > For everyday use, use the one-line installer above.
 
-**Prerequisites:** LLVM 18.1 is required to build from source.
-
-**macOS (Apple Silicon):**
-
 ```bash
-brew install llvm@18
-export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
-git clone https://github.com/IT-KYNERA/KYLE
-cd kl
-cargo build --workspace
-```
-
-**Linux (Ubuntu ARM):**
-
-```bash
-sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
 git clone https://github.com/IT-KYNERA/KYLE
 cd kl
 cargo build --workspace
