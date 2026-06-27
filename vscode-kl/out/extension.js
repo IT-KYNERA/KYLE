@@ -36,26 +36,65 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const node_1 = require("vscode-languageclient/node");
 let client = null;
+function findKlBinary() {
+    // 1. Check explicit setting
+    const config = vscode.workspace.getConfiguration('kl');
+    const configured = config.get('klcPath');
+    if (configured && configured !== 'kl') {
+        if (fs.existsSync(configured))
+            return configured;
+    }
+    // 2. Check PATH (works when launched from terminal)
+    const envPath = process.env.PATH || '';
+    const dirs = envPath.split(path.delimiter);
+    for (const dir of dirs) {
+        const candidate = path.join(dir, 'kl');
+        if (fs.existsSync(candidate))
+            return candidate;
+    }
+    // 3. Common install locations
+    const home = process.env.HOME || '';
+    const locations = [
+        path.join(home, '.kl', 'bin', 'kl'),
+        '/usr/local/bin/kl',
+        '/opt/homebrew/bin/kl',
+        '/usr/bin/kl',
+    ];
+    for (const loc of locations) {
+        if (fs.existsSync(loc))
+            return loc;
+    }
+    // 4. Fallback: just try "kl" in PATH via shell
+    return 'kl';
+}
 function activate(context) {
     console.log('KL Language Support activating...');
     // Register commands
     context.subscriptions.push(vscode.commands.registerCommand('kl.run', () => runFile('run')), vscode.commands.registerCommand('kl.build', () => runFile('build')), vscode.commands.registerCommand('kl.check', () => runFile('check')));
-    // Start LSP client if kl binary is available
-    const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get('klcPath') || 'kl';
-    try {
-        startLanguageClient(context, klcPath);
+    // Start LSP client
+    const klPath = findKlBinary();
+    if (klPath && fs.existsSync(klPath)) {
+        try {
+            startLanguageClient(context, klPath);
+            console.log('KL language server started:', klPath);
+        }
+        catch (err) {
+            console.error('Failed to start KL language server:', err);
+            vscode.window.showWarningMessage('KL language server could not start. Check that kl is installed and try again.');
+        }
     }
-    catch (err) {
-        console.error('Failed to start KL language server:', err);
+    else {
+        console.warn('kl binary not found in PATH or common install locations');
         vscode.window.showWarningMessage('KL language server not available. Install kl or set "kl.klcPath" in settings.');
     }
 }
-function startLanguageClient(context, klcPath) {
+function startLanguageClient(context, klPath) {
     const serverOptions = {
-        command: klcPath,
+        command: klPath,
         args: ['lsp'],
     };
     const clientOptions = {
@@ -80,11 +119,14 @@ async function runFile(subcommand) {
         vscode.window.showErrorMessage('Not a KL file');
         return;
     }
-    const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get('klcPath') || 'kl';
+    const klPath = findKlBinary();
+    if (!klPath) {
+        vscode.window.showErrorMessage('kl binary not found. Install kl or set "kl.klcPath" in settings.');
+        return;
+    }
     const terminal = vscode.window.createTerminal('KL');
     terminal.show();
-    terminal.sendText(`${klcPath} ${subcommand} "${filePath}"`);
+    terminal.sendText(`${klPath} ${subcommand} "${filePath}"`);
 }
 function deactivate() {
     if (client) {
