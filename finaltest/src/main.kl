@@ -1,4 +1,0 @@
-fn main(args: [str]) -> i32:
-    println("Hello from finaltest v0.1.0!")
-    println("args: " + str(len(args)))
-    return 0
