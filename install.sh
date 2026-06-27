@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -eu
 
 REPO="IT-KYNERA/KYLE"
 
@@ -80,7 +80,7 @@ chmod 644 "$LIB_DIR/libklc_runtime.a"
 UNINSTALL_SCRIPT="$BIN_DIR/kl-uninstall"
 cat > "$UNINSTALL_SCRIPT" << 'UNINSTALL_EOF'
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail 2>/dev/null || set -eu
 INSTALL_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
 echo "Removing kl from $INSTALL_DIR..."
 rm -f "$INSTALL_DIR/bin/kl" "$INSTALL_DIR/bin/klc" "$INSTALL_DIR/bin/kl-uninstall"

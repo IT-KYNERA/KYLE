@@ -76,7 +76,7 @@ impl Linker {
     /// Locate the klc_runtime static library.
     ///
     /// Search order:
-    /// 1. Relative to the klc binary (installed: /usr/local/lib/klc/libklc_runtime.a)
+    /// 1. Relative to the kl binary (installed: /usr/local/lib/kl/libklc_runtime.a)
     /// 2. Cargo workspace (debug/release)
     /// 3. Current working directory
     pub fn find_runtime_lib() -> Option<PathBuf> {
@@ -85,8 +85,8 @@ impl Linker {
         // 1. Relative to the running binary
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                // /usr/local/bin/klc → /usr/local/lib/klc/libklc_runtime.a
-                paths.push(exe_dir.join("../lib/klc/libklc_runtime.a"));
+                // /usr/local/bin/kl → /usr/local/lib/kl/libklc_runtime.a
+                paths.push(exe_dir.join("../lib/kl/libklc_runtime.a"));
                 // Alongside binary
                 paths.push(exe_dir.join("libklc_runtime.a"));
             }
