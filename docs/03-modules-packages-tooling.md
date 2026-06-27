@@ -10,7 +10,7 @@
 
 ```bash
 # From source (development)
-git clone https://github.com/kynera/kl
+git clone https://github.com/IT-KYNERA/KYLE
 cd kl
 cargo build --workspace
 # Binary: target/debug/kl

@@ -44,13 +44,13 @@ fn get_users(req: http.Request, res: http.Response):
 ### macOS (Apple Silicon)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kynera/kl/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
 ### Linux (ARM / aarch64)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kynera/kl/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
 ### Verify
@@ -417,7 +417,7 @@ Comprehensive documentation lives in [`docs/`](docs/):
 brew install llvm@18
 export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 
-git clone https://github.com/kynera/kl
+git clone https://github.com/IT-KYNERA/KYLE
 cd kl
 cargo build --workspace
 cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
@@ -428,7 +428,7 @@ cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime
 ```bash
 sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
 
-git clone https://github.com/kynera/kl
+git clone https://github.com/IT-KYNERA/KYLE
 cd kl
 cargo build --workspace
 cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
