@@ -1,7 +1,7 @@
-import * as path from 'path';
 import * as vscode from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 
-let client: any = null;
+let client: LanguageClient | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('KL Language Support activating...');
@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('kl.check', () => runFile('check'))
     );
 
-    // Start LSP client if klc binary is available
+    // Start LSP client if kl binary is available
     const config = vscode.workspace.getConfiguration('kl');
     const klcPath = config.get<string>('klcPath') || 'kl';
 
@@ -28,27 +28,28 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function startLanguageClient(context: vscode.ExtensionContext, klcPath: string) {
-    const serverOptions: vscode.ServerOptions = {
+    const serverOptions: ServerOptions = {
         command: klcPath,
         args: ['lsp'],
     };
 
-    const clientOptions: vscode.LanguageClientOptions = {
+    const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: 'file', language: 'kl' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/*.kl'),
         },
     };
 
-    const lspClient = new (vscode.languageclient || (vscode as any).LanguageClient)(
+    const lspClient = new LanguageClient(
         'klLanguageServer',
         'KL Language Server',
         serverOptions,
         clientOptions
     );
 
-    client = lspClient.start();
-    context.subscriptions.push(client);
+    client = lspClient;
+    lspClient.start();
+    context.subscriptions.push({ dispose: () => lspClient.stop() });
 }
 
 async function runFile(subcommand: string) {
@@ -65,8 +66,7 @@ async function runFile(subcommand: string) {
     }
 
     const config = vscode.workspace.getConfiguration('kl');
-    const klcPath = config.get<string>('klcPath') || 'klc';
-
+    const klcPath = config.get<string>('klcPath') || 'kl';
     const terminal = vscode.window.createTerminal('KL');
     terminal.show();
     terminal.sendText(`${klcPath} ${subcommand} "${filePath}"`);
@@ -74,6 +74,7 @@ async function runFile(subcommand: string) {
 
 export function deactivate() {
     if (client) {
-        client.then((c: any) => c.stop());
+        return client.stop();
     }
+    return undefined;
 }

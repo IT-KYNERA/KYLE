@@ -1,8 +1,8 @@
-# Kyle Vision Document v1.0
+# Kyle Vision
 
-## Introduction
-
-Kyle is a compiled programming language designed for the modern software era. It combines the readability of Python with the type safety of Rust and the performance of native compilation via LLVM.
+Kyle is a compiled, statically-typed programming language that combines the
+readability of Python, the type safety of Rust, the simplicity of Go, and the
+performance of native code via LLVM.
 
 ---
 
@@ -10,166 +10,69 @@ Kyle is a compiled programming language designed for the modern software era. It
 
 Existing languages force trade-offs:
 
-- Python: readable but slow, runtime errors
-- Rust: safe and fast but complex, steep learning curve
-- Go: simple but limited type system, no generics
-- TypeScript: typed but transpiled, runtime types
-- C#/Java: verbose, heavy runtime, legacy baggage
+- **Python:** readable but slow, runtime type errors
+- **Rust:** safe and fast but complex, steep learning curve
+- **Go:** simple but limited type system, no user-defined generics
+- **TypeScript:** typed but transpiled, erases types at runtime
+- **C#/.NET:** verbose, heavy runtime, legacy baggage
 
-Kyle aims to eliminate these trade-offs.
+Kyle eliminates these trade-offs.
 
 ---
 
 ## Core Philosophy
 
-```text
+```
 Readable like Python
 Typed like Rust
-Fast like C
 Simple like Go
+Fast like C
 ```
 
 ---
 
 ## Design Principles
 
-### 1. Readability First
-
-```text
-No self
-No let
-No var
-
-No semicolons
-No braces
-No exceptions
-```
-
-### 2. Explicit Over Implicit
-
-```text
-Errors are values
-Types are checked at compile time
-Null is explicit
-Async is explicit
-Imports are explicit
-```
-
-### 3. Predictable Performance
-
-```text
-Compiled to native code
-LLVM backend
-No hidden allocations
-Deterministic RAII
-Zero-cost abstractions
-```
-
-### 4. Modern Tooling
-
-```text
-Built-in package manager
-Built-in formatter
-Built-in test runner
-Built-in language server
-Built-in build system
-```
-
----
-
-## Target Audience
-
-```text
-Backend developers
-Systems programmers
-Enterprise teams
-Startups building products
-Developers tired of complexity
-```
-
----
-
-## Target Platforms
-
-```text
-macOS
-Linux
-Windows
-```
-
-Future:
-
-```text
-WebAssembly
-iOS
-Android
-Embedded systems
-```
+1. **Readability first** — no `self`, no `let`/`var`, no semicolons, no braces, no exceptions
+2. **Explicit over implicit** — errors are values, types checked at compile time, null is explicit, async is explicit
+3. **Predictable performance** — compiled to native code, LLVM backend, deterministic RAII (no GC), zero-cost abstractions
+4. **Modern tooling built-in** — package manager, formatter, test runner, language server, build system
+5. **Memory safety without GC** — RAII + Compiler-Inferred Ownership (the compiler inserts `free` for you)
 
 ---
 
 ## Language Highlights
 
 - Indentation-based syntax (4 spaces)
-- Strong static type system with inference
+- Strong static type system with Hindley-Milner inference
 - Optional types (`Option<T>`) and error types (`T!`)
-- Generics with monomorphization
-- Classes, structs, enums, contracts
-- Async/await with work-stealing scheduler
-- Package manager with registry
-- Compiles to native machine code via LLVM
-- No exceptions — errors are values
-- RAII memory model with compiler-inferred ownership (no GC)
+- Generics with monomorphization (structs + functions)
+- Classes (with inheritance), structs (pass-by-reference), enums (tagged unions), contracts
+- Async/await (thread-based runtime)
+- Pattern matching with guards
+- Defer, guard, unsafe blocks
+- Ternary, match-expression, spread, range slicing
+- Dict/Map literals with indexing
+- Compiles to native machine code via LLVM 18
+- RAII memory model — no garbage collector, no manual `free`
 - Constants by UPPERCASE convention (`PI = 3.14`)
-- Object literals (`{ name: "Juan" }`) with dot access
 
 ---
 
 ## What Kyle Eliminates
 
-```text
-self
-let / var
-public / private / protected keywords
+```
+self / let / var keyword
+public / private / protected
 virtual / override
 try / catch / finally
 semicolons
 braces for blocks
 pass keyword
-continue keyword
-spawn keyword
 exceptions
 hidden control flow
-NULL pointers
+NULL pointers (use Option<T>)
 wildcard imports
-circular dependencies
-```
-
----
-
-## Kyle in One Example
-
-```kl
-import io
-import json
-
-contract Serializable:
-    fn serialize() -> str
-
-class User : Serializable:
-    name: str
-    age: i32
-
-    User(name: str, age: i32):
-        name = name
-        age = age
-
-    fn serialize() -> str:
-        return json.stringify(this)
-
-fn main():
-    user = User("Anna", 30)
-    io.println(user.serialize())
 ```
 
 ---
@@ -177,70 +80,70 @@ fn main():
 ## Comparison Table
 
 | Feature | Kyle | Python | Rust | Go | TypeScript |
-|---------|----|--------|------|-----|------------|
-| Compiled | Yes | No | Yes | Yes | No |
-| Type Safety | Strong | Weak | Strong | Weak | Weak |
-| Type Inference | Yes | N/A | Yes | No | Yes |
+|---------|------|--------|------|-----|------------|
+| Compiled to native | Yes | No | Yes | Yes | No |
+| Strong typed | Yes | No | Yes | Weak | Weak |
+| Type inference | Yes | N/A | Yes | No | Yes |
 | Generics | Yes | No | Yes | No | Yes |
-| No Exceptions | Yes | No | Yes | No | Yes |
-| GC | No (RAII) | Yes | No | Yes | Yes |
-| Async Built-in | Yes | No | No | Yes | No |
-| Package Manager | Built-in | Third-party | Built-in | Built-in | Third-party |
-| Object Literals | Yes | No | No | No | Yes |
-| Indentation Syntax | Yes | Yes | No | No | No |
-| LLVM Backend | Yes | No | Yes | No | No |
+| No exceptions | Yes | No | Yes | No | No |
+| No GC (RAII) | Yes | No | Yes | No | No |
+| Async built-in | Yes | No | No | Yes | No |
+| Package manager | Built-in | 3rd-party | Built-in | Built-in | 3rd-party |
+| Indentation syntax | Yes | Yes | No | No | No |
+| LLVM backend | Yes | No | Yes | No | No |
+| Entry point args | `[str]` | `sys.argv` | `Vec<String>` | `os.Args` | `process.argv` |
 
 ---
 
-## Market Position
+## Kyle in One Example
 
-Kyle occupies the space between:
+```kl
+import io
 
-```text
-Python (readability)
-    ↓
-Kyle
-    ↓
-Rust (safety, performance)
+contract Greeter:
+    fn greet() -> str
+
+class Person(name: str):
+    fn greet() -> str:
+        return "Hello, " + name + "!"
+
+fn main(args: [str]) -> i32:
+    person = Person("Anna")
+    io.println(person.greet())
+    return 0
 ```
 
-It is designed for teams that want:
+---
 
-```text
-Productivity of Python
-Safety of Rust
-Simplicity of Go
-Performance of C
-```
+## Target Audience
+
+- Backend developers building APIs and microservices
+- Systems programmers who want safety without complexity
+- Teams that want Python readability with C-level performance
+- Developers tired of Rust's learning curve or Go's limitations
+
+---
+
+## Target Platforms
+
+- macOS (Apple Silicon + Intel)
+- Linux (x64 + ARM)
+- Windows (x64)
+
+Future: WebAssembly, embedded systems
 
 ---
 
 ## Project Status
 
-Current phase: **Phase 8 — Distribution & Tooling Polish**
-
-Phase 6 (Language Completion) y Phase 7 (Cross-Platform + Distribution)
-están completas. Todas las features de sintaxis generan código funcionando,
-el pipeline de distribución (GitHub Actions, install.sh, repo público)
-está operativo, y el runtime es cross-platform.
-
-Fase actual:
-- **Phase 8 — Distribution & Tooling Polish**: VS Code extension pulida,
-  LSP autocompletado, build output limpio, logo/branding, snippets, website.
-
-Próximas fases:
-- **Phase 9 — Self-Hosting**: compilador escrito en Kyle
-- **Phase 10 — Production Ecosystem**: registry, WASM, etc.
-
-See `docs/13-roadmap.md` for the phase breakdown and `docs/16-status.md`
-for the verified feature matrix (what really generates code vs. what is
-still a placeholder).
+See `docs/05-roadmap-status.md` for the complete phase breakdown and verified
+implementation status.
 
 ---
 
 ## Version
 
-```text
-Kyle Vision Document v1.2
-Last updated: 2026-06-22
+```
+Kyle Vision v2.0
+Last updated: 2026-06-26
 ```

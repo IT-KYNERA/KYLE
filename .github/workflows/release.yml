@@ -28,7 +28,12 @@ jobs:
           echo "LLVM_SYS_181_PREFIX=$LLVM_SYS_181_PREFIX"
           "$LLVM_SYS_181_PREFIX/bin/llvm-config" --version
 
-      - name: Build klc (release)
+      - name: Build kl (release)
+        run: |
+          cargo build --bin kl --release \
+            --config 'env.LLVM_SYS_181_PREFIX=""'
+
+      - name: Build klc (legacy compat)
         run: |
           cargo build --bin klc --release \
             --config 'env.LLVM_SYS_181_PREFIX=""'
@@ -44,21 +49,22 @@ jobs:
 
       - name: Package tarball
         run: |
-          mkdir -p dist/klc/lib dist/klc/vscode
-          cp target/release/klc dist/klc/
-          cp target/release/libklc_runtime.a dist/klc/lib/
-          cp install.sh uninstall.sh dist/klc/
-          cp vscode-kl/vscode-kl-*.vsix dist/klc/vscode/
-          chmod +x dist/klc/install.sh dist/klc/uninstall.sh
+          mkdir -p dist/kl/lib dist/kl/vscode
+          cp target/release/kl dist/kl/
+          cp target/release/klc dist/kl/
+          cp target/release/libklc_runtime.a dist/kl/lib/
+          cp install.sh uninstall.sh dist/kl/
+          cp vscode-kl/vscode-kl-*.vsix dist/kl/vscode/
+          chmod +x dist/kl/install.sh dist/kl/uninstall.sh
           cd dist
-          tar czf klc-${{ github.ref_name }}-macos-arm64.tar.gz klc/
+          tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl/
 
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
-            dist/klc-*.tar.gz \
+            dist/kl-*.tar.gz \
             vscode-kl/vscode-kl-*.vsix \
-            --title "klc ${{ github.ref_name }}" \
+            --title "Kyle ${{ github.ref_name }}" \
             --notes "See commit history for changes."

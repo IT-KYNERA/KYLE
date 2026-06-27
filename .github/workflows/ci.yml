@@ -37,9 +37,9 @@ jobs:
         run: |
           for f in examples/*.kl; do
             echo "=== $(basename $f) ==="
-            cargo run --bin klc -- run "$f"
+            cargo run --bin kl -- run "$f"
           done
 
       - name: Verify formatter
         run: |
-          cargo run --bin klc -- fmt examples/hello.kl
+          cargo run --bin kl -- fmt examples/hello.kl

@@ -1,49 +1,43 @@
-# Rust / Cargo
+# === Rust / Cargo ===
 target/
-Cargo.lock
 
-# KL build artifacts
+# Cargo.lock should be committed for binaries (Kyle is a binary, not a library)
+# Do NOT ignore Cargo.lock
+
+# === KL build artifacts ===
 *.o
 *.ll
 *.bc
 *.klc
 .klc-build/
 klc-build/
+build/
 
-# Compiled binaries in examples/
+# === Examples — only .kl source files are tracked ===
 /examples/*
 !/examples/*.kl
 
-# IDE
+# === VS Code extension ===
+vscode-kl/node_modules/
+vscode-kl/package-lock.json
+vscode-kl/*.vsix
+*.js.map
+
+# === IDE / Editor ===
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# macOS
-.DS_Store
-
-# Temporary
-tmp/
-*.log
-
-# VS Code extension artifacts
-vscode-kl/node_modules/
-vscode-kl/package-lock.json
-*.vsix
-
-# Environment / secrets
-.env
-
-# Build output directories
-/klc-build/
-build/
-
-# Editor/IDE
 *.sublime-project
 *.sublime-workspace
 *.code-workspace
 
-# OS
+# === OS ===
+.DS_Store
 Thumbs.db
 Desktop.ini
+
+# === Temporary / Logs ===
+tmp/
+*.log
+*.env

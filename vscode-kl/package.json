@@ -19,8 +19,8 @@
   "main": "./out/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "cp src/extension.ts out/extension.js || true",
-    "package": "npx @vscode/vsce package --allow-missing-repository"
+    "compile": "tsc -p ./",
+    "package": "npx @vscode/vsce package"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -35,8 +35,13 @@
     "languages": [
       {
         "id": "kl",
-        "aliases": ["Kyle", "kl"],
-        "extensions": [".kl"],
+        "aliases": [
+          "Kyle",
+          "kl"
+        ],
+        "extensions": [
+          ".kl"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./icons/kl.png",
@@ -81,5 +86,11 @@
         }
       }
     }
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "typescript": "^6.0.3"
   }
 }

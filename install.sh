@@ -38,7 +38,7 @@ if [ -z "$LOCAL_DIR" ]; then
             error "Could not determine latest version.\n  Try: curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh -s v0.2.0"
         fi
     fi
-    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/klc-$VERSION-$PLATFORM.tar.gz"
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/kl-$VERSION-$PLATFORM.tar.gz"
 fi
 
 # --- Install dir ---
@@ -50,7 +50,7 @@ else
 fi
 
 BIN_DIR="$INSTALL_DIR/bin"
-LIB_DIR="$INSTALL_DIR/lib/klc"
+LIB_DIR="$INSTALL_DIR/lib/kl"
 
 # --- Download ---
 TMPDIR=$(mktemp -d)
@@ -58,44 +58,50 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 if [ -n "$LOCAL_DIR" ]; then
     info "Installing from $LOCAL_DIR..."
-    cp -r "$LOCAL_DIR/" "$TMPDIR/klc/"
+    cp -r "$LOCAL_DIR/" "$TMPDIR/kl/"
 else
-    info "Downloading klc $VERSION ($PLATFORM)..."
-    curl -fsSL "$DOWNLOAD_URL" -o "$TMPDIR/klc.tar.gz"
-    tar xzf "$TMPDIR/klc.tar.gz" -C "$TMPDIR"
+    info "Downloading kl $VERSION ($PLATFORM)..."
+    curl -fsSL "$DOWNLOAD_URL" -o "$TMPDIR/kl.tar.gz"
+    tar xzf "$TMPDIR/kl.tar.gz" -C "$TMPDIR"
 fi
 
 # --- Install binary ---
 mkdir -p "$BIN_DIR" "$LIB_DIR"
-cp "$TMPDIR/klc/klc" "$BIN_DIR/klc"
-chmod +x "$BIN_DIR/klc"
+cp "$TMPDIR/kl/kl" "$BIN_DIR/kl"
+chmod +x "$BIN_DIR/kl"
+# Legacy alias
+ln -sf "kl" "$BIN_DIR/klc"
 
 # --- Install runtime library ---
-cp "$TMPDIR/klc/lib/libklc_runtime.a" "$LIB_DIR/libklc_runtime.a"
+cp "$TMPDIR/kl/lib/libklc_runtime.a" "$LIB_DIR/libklc_runtime.a"
 chmod 644 "$LIB_DIR/libklc_runtime.a"
 
 # --- Uninstaller ---
-UNINSTALL_SCRIPT="$BIN_DIR/klc-uninstall"
+UNINSTALL_SCRIPT="$BIN_DIR/kl-uninstall"
 cat > "$UNINSTALL_SCRIPT" << 'UNINSTALL_EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 INSTALL_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
-echo "Removing klc from $INSTALL_DIR..."
-rm -f "$INSTALL_DIR/bin/klc" "$INSTALL_DIR/bin/klc-uninstall"
-rm -rf "$INSTALL_DIR/lib/klc"
+echo "Removing kl from $INSTALL_DIR..."
+rm -f "$INSTALL_DIR/bin/kl" "$INSTALL_DIR/bin/klc" "$INSTALL_DIR/bin/kl-uninstall"
+rm -rf "$INSTALL_DIR/lib/kl"
 if [ "$INSTALL_DIR" != "/usr/local" ]; then
     rmdir "$INSTALL_DIR/bin" 2>/dev/null || true
     rmdir "$INSTALL_DIR/lib" 2>/dev/null || true
     rmdir "$INSTALL_DIR" 2>/dev/null || true
 fi
-echo "klc uninstalled."
+echo "kl uninstalled."
 UNINSTALL_EOF
 chmod +x "$UNINSTALL_SCRIPT"
 
 # --- Verify ---
-if "$BIN_DIR/klc" --version >/dev/null 2>&1; then
-    ok "klc $VERSION installed successfully"
-    "$BIN_DIR/klc" --version
+if "$BIN_DIR/kl" --version >/dev/null 2>&1; then
+    ok "kl $VERSION installed successfully"
+    "$BIN_DIR/kl" --version
+    # Verify legacy alias too
+    if "$BIN_DIR/klc" --version >/dev/null 2>&1; then
+        ok "klc legacy alias also installed"
+    fi
 else
     error "Installation verification failed"
 fi
@@ -110,4 +116,4 @@ if [ "$INSTALL_DIR" = "$HOME/.kl" ]; then
     echo "  export PATH=\"\$HOME/.kl/bin:\$PATH\""
 fi
 
-ok "Run 'klc --help' to get started."
+ok "Run 'kl --help' to get started."

@@ -127,7 +127,7 @@ fn cmd_new(args: &[String]) {
     let main_kl = [
         "fn main(args: [str]) -> i32:",
         &format!("    println(\"Hello from {} v0.1.0!\")", project_name),
-        "    println(\"args: {}\", len(args))",
+        "    println(\"args: \" + str(len(args)))",
         "    return 0",
     ].join("\n") + "\n";
     fs::write(project_dir.join("src").join("main.kl"), &main_kl).unwrap_or_else(|e| {
