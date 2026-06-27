@@ -71,6 +71,31 @@ impl LanguageServer {
                 prepare_provider: Some(true),
                 work_done_progress_options: Default::default(),
             })),
+            semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+                SemanticTokensOptions {
+                    legend: SemanticTokensLegend {
+                        token_types: vec![
+                            SemanticTokenType::VARIABLE,
+                            SemanticTokenType::TYPE,
+                            SemanticTokenType::CLASS,
+                            SemanticTokenType::STRUCT,
+                            SemanticTokenType::ENUM,
+                            SemanticTokenType::FUNCTION,
+                            SemanticTokenType::METHOD,
+                            SemanticTokenType::PARAMETER,
+                            SemanticTokenType::PROPERTY,
+                        ],
+                        token_modifiers: vec![
+                            SemanticTokenModifier::MODIFICATION,
+                            SemanticTokenModifier::DECLARATION,
+                            SemanticTokenModifier::READONLY,
+                        ],
+                    },
+                    range: None,
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                    work_done_progress_options: Default::default(),
+                },
+            )),
             ..Default::default()
         }
     }
@@ -88,6 +113,7 @@ impl LanguageServer {
             "textDocument/formatting" => self.handle_formatting(req),
             "textDocument/rename" => self.handle_rename(req),
             "textDocument/prepareRename" => self.handle_prepare_rename(req),
+            "textDocument/semanticTokens/full" => self.handle_semantic_tokens_full(req),
             _ => {
                 let resp = Response::new_err(
                     req.id,
@@ -1434,6 +1460,151 @@ impl LanguageServer {
         None
     }
 
+    fn handle_semantic_tokens_full(&mut self, req: Request) {
+        let params: SemanticTokensParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = self.sources.get(&uri).cloned().unwrap_or_default();
+
+        let mut lexer = klc_frontend::lexer::Lexer::new(&source);
+        let tokens = lexer.tokenize();
+        let mut parser = klc_frontend::parser::Parser::new(tokens);
+        let program = match parser.parse() {
+            Ok(p) => p,
+            Err(_) => {
+                let result = SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data: vec![] });
+                let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+
+        let mut source_map = klc_core::source_map::SourceMap::new();
+        let _file_id = source_map.add("input.kl".to_string(), source.to_string());
+        let mut analyzer = klc_semantic::analyzer::SemanticAnalyzer::new()
+            .with_source(source_map, "input.kl".to_string());
+        analyzer.analyze(&program);
+        let symbols = analyzer.type_checker.symbols();
+
+        // Token type indices matching the legend in server_capabilities
+        const T_VARIABLE: u32 = 0;
+        const T_TYPE: u32 = 1;
+        const T_CLASS: u32 = 2;
+        const T_STRUCT: u32 = 3;
+        const T_ENUM: u32 = 4;
+        const T_FUNCTION: u32 = 5;
+        const T_METHOD: u32 = 6;
+        const T_PARAMETER: u32 = 7;
+        const T_PROPERTY: u32 = 8;
+
+        // Modifier indices (bitmask values matching legend order)
+        const M_MODIFICATION: u32 = 1;
+        const M_DECLARATION: u32 = 2;
+        const M_READONLY: u32 = 4;
+
+        let mut semantic_tokens: Vec<(usize, usize, usize, u32, u32)> = Vec::new();
+
+        // Walk all declarations
+        for decl in &program.declarations {
+            match decl {
+                Decl::Function(f) => {
+                    // Function name
+                    semantic_tokens.push((f.span.start.line, f.span.start.column, f.name.len(), T_FUNCTION, M_DECLARATION));
+                    // Parameters
+                    for p in &f.params {
+                        semantic_tokens.push((p.span.start.line, p.span.start.column, p.name.len(), T_PARAMETER, M_DECLARATION));
+                    }
+                    // Walk body
+                    if let Some(body) = &f.body {
+                        Self::walk_semantic_block(body, &mut semantic_tokens, symbols);
+                    }
+                }
+                Decl::Variable(v) => {
+                    let modifier = if v.is_mutable { M_MODIFICATION } else { M_READONLY };
+                    semantic_tokens.push((v.span.start.line, v.span.start.column, v.name.len(), T_VARIABLE, M_DECLARATION | modifier));
+                    if let Some(ref t) = v.type_ {
+                        Self::walk_semantic_type(t, &mut semantic_tokens, symbols);
+                    }
+                    Self::walk_semantic_expr(&v.value, &mut semantic_tokens, symbols);
+                }
+                Decl::Constant(c) => {
+                    semantic_tokens.push((c.span.start.line, c.span.start.column, c.name.len(), T_VARIABLE, M_DECLARATION | M_READONLY));
+                    Self::walk_semantic_expr(&c.value, &mut semantic_tokens, symbols);
+                }
+                Decl::Class(c) => {
+                    semantic_tokens.push((c.span.start.line, c.span.start.column, c.name.len(), T_CLASS, M_DECLARATION));
+                    for member in &c.members {
+                        match member {
+                            ClassMember::Field(f) => {
+                                semantic_tokens.push((f.span.start.line, f.span.start.column, f.name.len(), T_PROPERTY, M_DECLARATION));
+                                Self::walk_semantic_type(&f.type_, &mut semantic_tokens, symbols);
+                            }
+                            ClassMember::Method(m) => {
+                                semantic_tokens.push((m.span.start.line, m.span.start.column, m.name.len(), T_METHOD, M_DECLARATION));
+                                for p in &m.params {
+                                    semantic_tokens.push((p.span.start.line, p.span.start.column, p.name.len(), T_PARAMETER, M_DECLARATION));
+                                }
+                                if let Some(body) = &m.body {
+                                    Self::walk_semantic_block(body, &mut semantic_tokens, symbols);
+                                }
+                            }
+                            ClassMember::Constructor(ctor) => {
+                                for p in &ctor.params {
+                                    semantic_tokens.push((p.span.start.line, p.span.start.column, p.name.len(), T_PARAMETER, M_DECLARATION));
+                                }
+                                Self::walk_semantic_block(&ctor.body, &mut semantic_tokens, symbols);
+                            }
+                            ClassMember::Property(p) => {
+                                semantic_tokens.push((p.span.start.line, p.span.start.column, p.name.len(), T_PROPERTY, M_DECLARATION));
+                            }
+                        }
+                    }
+                }
+                Decl::Struct(s) => {
+                    semantic_tokens.push((s.span.start.line, s.span.start.column, s.name.len(), T_STRUCT, M_DECLARATION));
+                    for f in &s.fields {
+                        semantic_tokens.push((f.span.start.line, f.span.start.column, f.name.len(), T_PROPERTY, M_DECLARATION));
+                        Self::walk_semantic_type(&f.type_, &mut semantic_tokens, symbols);
+                    }
+                }
+                Decl::Enum(e) => {
+                    semantic_tokens.push((e.span.start.line, e.span.start.column, e.name.len(), T_ENUM, M_DECLARATION));
+                }
+                Decl::Contract(c) => {
+                    semantic_tokens.push((c.span.start.line, c.span.start.column, c.name.len(), T_CLASS, M_DECLARATION));
+                }
+                Decl::FromImport(fi) => {
+                    semantic_tokens.push((fi.span.start.line, fi.span.start.column, fi.imported_name.len(), T_TYPE, 0));
+                }
+                _ => {}
+            }
+        }
+
+        // Sort by (line, column) for encoding
+        semantic_tokens.sort_by_key(|t| (t.0, t.1));
+
+        // Encode as delta-encoded SemanticToken array
+        let mut data: Vec<SemanticToken> = Vec::new();
+        let mut prev_line: usize = 0;
+        let mut prev_col: usize = 0;
+        for (line, col, len, ty, mods) in &semantic_tokens {
+            let d_line = if data.is_empty() { *line as u32 } else { (*line - prev_line) as u32 };
+            let d_start = if data.is_empty() || *line != prev_line { *col as u32 } else { (*col - prev_col) as u32 };
+            data.push(SemanticToken {
+                delta_line: d_line,
+                delta_start: d_start,
+                length: *len as u32,
+                token_type: *ty,
+                token_modifiers_bitset: *mods,
+            });
+            prev_line = *line;
+            prev_col = *col;
+        }
+
+        let result = SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data });
+        let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
+        let _ = self.connection.sender.send(Message::Response(resp));
+    }
+
     fn handle_prepare_rename(&mut self, req: Request) {
         let params: TextDocumentPositionParams = serde_json::from_value(req.params).unwrap();
         let uri = params.text_document.uri.to_string();
@@ -1532,6 +1703,253 @@ impl LanguageServer {
             }
         }
         symbols
+    }
+
+    fn walk_semantic_block(block: &Block, tokens: &mut Vec<(usize, usize, usize, u32, u32)>, symbols: &SymbolTable) {
+        const T_VARIABLE: u32 = 0;
+        const M_DECLARATION: u32 = 2;
+        const M_MODIFICATION: u32 = 1;
+        const M_READONLY: u32 = 4;
+
+        for stmt in &block.statements {
+            match stmt {
+                Stmt::Variable(vd) | Stmt::TypedVariable(vd) => {
+                    let modifier = if vd.is_mutable { M_MODIFICATION } else { M_READONLY };
+                    tokens.push((vd.span.start.line, vd.span.start.column, vd.name.len(), T_VARIABLE, M_DECLARATION | modifier));
+                    if let Some(ref t) = vd.type_ {
+                        Self::walk_semantic_type(t, tokens, symbols);
+                    }
+                    Self::walk_semantic_expr(&vd.value, tokens, symbols);
+                }
+                Stmt::Constant(c) => {
+                    tokens.push((c.span.start.line, c.span.start.column, c.name.len(), T_VARIABLE, M_DECLARATION | M_READONLY));
+                    Self::walk_semantic_expr(&c.value, tokens, symbols);
+                }
+                Stmt::Expression(expr) => {
+                    Self::walk_semantic_expr(expr, tokens, symbols);
+                }
+                Stmt::Return(ret) => {
+                    if let Some(e) = ret {
+                        Self::walk_semantic_expr(e, tokens, symbols);
+                    }
+                }
+                Stmt::Break(ret) => {
+                    if let Some(e) = ret {
+                        Self::walk_semantic_expr(e, tokens, symbols);
+                    }
+                }
+                Stmt::If(is) => {
+                    Self::walk_semantic_expr(&is.condition, tokens, symbols);
+                    Self::walk_semantic_block(&is.body, tokens, symbols);
+                    for el in &is.elif_branches {
+                        Self::walk_semantic_expr(&el.condition, tokens, symbols);
+                        Self::walk_semantic_block(&el.body, tokens, symbols);
+                    }
+                    if let Some(ref eb) = is.else_branch {
+                        Self::walk_semantic_block(eb, tokens, symbols);
+                    }
+                }
+                Stmt::BindingIf(bi) => {
+                    tokens.push((bi.span.start.line, bi.span.start.column, bi.name.len(), T_VARIABLE, M_DECLARATION));
+                    Self::walk_semantic_expr(&bi.value, tokens, symbols);
+                    Self::walk_semantic_block(&bi.body, tokens, symbols);
+                    if let Some(ref eb) = bi.else_branch {
+                        Self::walk_semantic_block(eb, tokens, symbols);
+                    }
+                }
+                Stmt::While(ws) => {
+                    Self::walk_semantic_expr(&ws.condition, tokens, symbols);
+                    Self::walk_semantic_block(&ws.body, tokens, symbols);
+                    if let Some(ref eb) = ws.else_branch {
+                        Self::walk_semantic_block(eb, tokens, symbols);
+                    }
+                }
+                Stmt::WhileBind(wb) => {
+                    tokens.push((wb.span.start.line, wb.span.start.column, wb.name.len(), T_VARIABLE, M_DECLARATION));
+                    Self::walk_semantic_expr(&wb.iterable, tokens, symbols);
+                    Self::walk_semantic_block(&wb.body, tokens, symbols);
+                }
+                Stmt::For(fs) => {
+                    tokens.push((fs.span.start.line, fs.span.start.column, fs.variable.len(), T_VARIABLE, M_DECLARATION));
+                    Self::walk_semantic_expr(&fs.iterable, tokens, symbols);
+                    Self::walk_semantic_block(&fs.body, tokens, symbols);
+                    if let Some(ref eb) = fs.else_branch {
+                        Self::walk_semantic_block(eb, tokens, symbols);
+                    }
+                }
+                Stmt::Match(ms) => {
+                    Self::walk_semantic_expr(&ms.expression, tokens, symbols);
+                    for arm in &ms.arms {
+                        Self::walk_semantic_block(&arm.body, tokens, symbols);
+                    }
+                }
+                Stmt::Guard(gs) => {
+                    Self::walk_semantic_expr(&gs.condition, tokens, symbols);
+                    Self::walk_semantic_block(&gs.body, tokens, symbols);
+                }
+                Stmt::Unsafe(us) => {
+                    Self::walk_semantic_block(&us.body, tokens, symbols);
+                }
+                Stmt::Defer(ds) => {
+                    Self::walk_semantic_expr(&ds.call, tokens, symbols);
+                }
+                Stmt::Continue => {}
+            }
+        }
+    }
+
+    fn walk_semantic_expr(expr: &Expr, tokens: &mut Vec<(usize, usize, usize, u32, u32)>, symbols: &SymbolTable) {
+        const T_VARIABLE: u32 = 0;
+        const T_TYPE: u32 = 1;
+        const T_FUNCTION: u32 = 5;
+        const T_METHOD: u32 = 6;
+
+        match expr {
+            Expr::Identifier { name, span } => {
+                if let Some(sym) = symbols.lookup(name) {
+                    let (ty, mods) = match &sym.kind {
+                        SymKind::Variable { is_mutable, .. } => {
+                            (T_VARIABLE, if *is_mutable { 1 } else { 4 })
+                        }
+                        SymKind::Function(_) => (T_FUNCTION, 0),
+                        SymKind::Class(_) => (T_TYPE, 0),
+                        SymKind::Struct(_) => (T_TYPE, 0),
+                        SymKind::Enum(_) => (T_TYPE, 0),
+                        SymKind::Constant(_) => (T_VARIABLE, 4),
+                        _ => return,
+                    };
+                    tokens.push((span.start.line, span.start.column, name.len(), ty, mods));
+                } else {
+                    match name.as_str() {
+                        "i32" | "i64" | "i8" | "i16" | "u8" | "u16" | "u32" | "u64"
+                        | "f32" | "f64" | "bool" | "str" | "char" | "void" | "any" => {
+                            tokens.push((span.start.line, span.start.column, name.len(), T_TYPE, 0));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Expr::FunctionCall { target, arguments, .. } => {
+                Self::walk_semantic_expr(target, tokens, symbols);
+                for arg in arguments {
+                    Self::walk_semantic_expr(arg, tokens, symbols);
+                }
+            }
+            Expr::PropertyAccess { object, property, span } => {
+                Self::walk_semantic_expr(object, tokens, symbols);
+                tokens.push((span.end.line, span.end.column.saturating_sub(property.len()), property.len(), T_METHOD, 0));
+            }
+            Expr::Binary { left, right, .. } => {
+                Self::walk_semantic_expr(left, tokens, symbols);
+                Self::walk_semantic_expr(right, tokens, symbols);
+            }
+            Expr::Unary { operand, .. } => {
+                Self::walk_semantic_expr(operand, tokens, symbols);
+            }
+            Expr::Assignment { target, value, .. } => {
+                Self::walk_semantic_expr(target, tokens, symbols);
+                Self::walk_semantic_expr(value, tokens, symbols);
+            }
+            Expr::Ternary { cond, then_expr, else_expr, .. } => {
+                Self::walk_semantic_expr(cond, tokens, symbols);
+                Self::walk_semantic_expr(then_expr, tokens, symbols);
+                Self::walk_semantic_expr(else_expr, tokens, symbols);
+            }
+            Expr::Index { target, index, .. } => {
+                Self::walk_semantic_expr(target, tokens, symbols);
+                Self::walk_semantic_expr(index, tokens, symbols);
+            }
+            Expr::RangeSlice { target, start, end, .. } => {
+                Self::walk_semantic_expr(target, tokens, symbols);
+                if let Some(s) = start {
+                    Self::walk_semantic_expr(s, tokens, symbols);
+                }
+                if let Some(e) = end {
+                    Self::walk_semantic_expr(e, tokens, symbols);
+                }
+            }
+            Expr::List { elements, .. } => {
+                for e in elements {
+                    Self::walk_semantic_expr(e, tokens, symbols);
+                }
+            }
+            Expr::Tuple { elements, .. } => {
+                for e in elements {
+                    Self::walk_semantic_expr(e, tokens, symbols);
+                }
+            }
+            Expr::Dictionary { entries, .. } => {
+                for (_k, v) in entries {
+                    Self::walk_semantic_expr(v, tokens, symbols);
+                }
+            }
+            Expr::StructLiteral { fields, .. } => {
+                for (_name, expr) in fields {
+                    Self::walk_semantic_expr(expr, tokens, symbols);
+                }
+            }
+            Expr::OptionalChain { target, .. } => {
+                Self::walk_semantic_expr(target, tokens, symbols);
+            }
+            Expr::Spread { expression, .. } => {
+                Self::walk_semantic_expr(expression, tokens, symbols);
+            }
+            Expr::Closure { body, .. } => {
+                Self::walk_semantic_expr(body, tokens, symbols);
+            }
+            Expr::Await { expression, .. } => {
+                Self::walk_semantic_expr(expression, tokens, symbols);
+            }
+            Expr::Async { expression, .. } => {
+                Self::walk_semantic_expr(expression, tokens, symbols);
+            }
+            Expr::ErrorProp { expression, .. } => {
+                Self::walk_semantic_expr(expression, tokens, symbols);
+            }
+            Expr::Loop { body, .. } => {
+                Self::walk_semantic_block(body, tokens, symbols);
+            }
+            Expr::StringInterp { parts, .. } => {
+                for p in parts {
+                    Self::walk_semantic_expr(p, tokens, symbols);
+                }
+            }
+            Expr::MatchExpr { expression, arms, .. } => {
+                Self::walk_semantic_expr(expression, tokens, symbols);
+                for arm in arms {
+                    Self::walk_semantic_block(&arm.body, tokens, symbols);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn walk_semantic_type(ast_type: &AstType, tokens: &mut Vec<(usize, usize, usize, u32, u32)>, symbols: &SymbolTable) {
+        const T_TYPE: u32 = 1;
+        match ast_type {
+            AstType::Primitive { name, span } => {
+                tokens.push((span.start.line, span.start.column, name.len(), T_TYPE, 0));
+            }
+            AstType::User { name, span } => {
+                tokens.push((span.start.line, span.start.column, name.len(), T_TYPE, 0));
+            }
+            AstType::Generic { name, args, span } => {
+                tokens.push((span.start.line, span.start.column, name.len(), T_TYPE, 0));
+                for p in args {
+                    Self::walk_semantic_type(p, tokens, symbols);
+                }
+            }
+            AstType::Optional { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::Error { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::Dict { key, value, .. } => {
+                Self::walk_semantic_type(key, tokens, symbols);
+                Self::walk_semantic_type(value, tokens, symbols);
+            }
+        }
     }
 }
 
