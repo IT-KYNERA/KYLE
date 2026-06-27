@@ -53,7 +53,7 @@ impl LanguageServer {
         ServerCapabilities {
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
             completion_provider: Some(CompletionOptions {
-                trigger_characters: Some(vec![".".to_string()]),
+                trigger_characters: Some(vec![".".to_string(), ":".to_string()]),
                 ..Default::default()
             }),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -67,7 +67,10 @@ impl LanguageServer {
             }),
             code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
             document_formatting_provider: Some(OneOf::Left(true)),
-            rename_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Right(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress_options: Default::default(),
+            })),
             ..Default::default()
         }
     }
@@ -979,7 +982,14 @@ impl LanguageServer {
                         "abs" | "sqrt" | "pow" | "gcd" => Some("i32".to_string()),
                         "json_parse" => Some("dict".to_string()),
                         "json_stringify" => Some("str".to_string()),
-                        _ => None,
+                        _ => {
+                            // Constructor call: Person(...) → type "Person"
+                            if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                                Some(name.clone())
+                            } else {
+                                None
+                            }
+                        }
                     }
                 } else if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
                     // Method call: obj.method() — infer from method name

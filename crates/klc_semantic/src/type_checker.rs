@@ -38,6 +38,47 @@ impl TypeChecker {
         &self.symbols
     }
 
+    /// Extract a display name from a function call target expression.
+    fn target_name(target: &Expr) -> Option<&str> {
+        match target {
+            Expr::Identifier { name, .. } => Some(name.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Hardcoded expected argument counts for built-in functions.
+    fn builtin_expected_args(name: &str) -> Option<usize> {
+        match name {
+            "print" | "println" | "print_err" => Some(1),
+            "print_int" | "println_int" => Some(1),
+            "str" | "int" | "float" | "bool" => Some(1),
+            "len" => Some(1),
+            "input" => Some(0),
+            "open" => Some(1),
+            "read_str" => Some(1),
+            "write_str" => Some(2),
+            "close" => Some(1),
+            "sleep" => Some(1),
+            "now" => Some(0),
+            "contains" => Some(2),
+            "to_upper" | "to_lower" | "trim" => Some(1),
+            "replace" => Some(3),
+            "substr" => Some(3),
+            "char_at" => Some(2),
+            "ord" => Some(1),
+            "is_digit" | "is_alpha" | "is_alnum" => Some(1),
+            "is_whitespace" | "is_upper" | "is_lower" => Some(1),
+            "assert" => Some(1),
+            "assert_eq" | "assert_str" | "assert_ne" => Some(2),
+            "range" => Some(2),
+            "json_parse" | "json_stringify" => Some(1),
+            "list_push" => Some(2),
+            "list_pop" | "list_len" => Some(1),
+            "ceil" | "floor" | "round" => Some(1),
+            _ => None,
+        }
+    }
+
     pub fn has_errors(&self) -> bool {
         self.reporter.has_errors()
     }
@@ -385,8 +426,34 @@ impl TypeChecker {
             Expr::FunctionCall { target, arguments, .. } => {
                 let fn_type = self.infer_expr(target);
                 for arg in arguments { self.infer_expr(arg); }
+                let arg_count = arguments.len();
                 match fn_type {
-                    Type::Function(ft) => *ft.return_,
+                    Type::Function(ft) => {
+                        // For user-defined functions, check arg count against params
+                        // Builtins have empty params, so use hardcoded expected count
+                        if !ft.params.is_empty() {
+                            if arg_count != ft.params.len() {
+                                let name = Self::target_name(target).unwrap_or("function");
+                                self.reporter.report(
+                                    Diagnostic::error(ErrorCode::E0001,
+                                        format!("'{}' expects {} argument(s), got {}", name, ft.params.len(), arg_count))
+                                );
+                            }
+                        } else {
+                            // Builtin — check with hardcoded expected counts
+                            if let Some(name) = Self::target_name(target) {
+                                if let Some(exp) = Self::builtin_expected_args(name) {
+                                    if arg_count != exp {
+                                        self.reporter.report(
+                                            Diagnostic::error(ErrorCode::E0001,
+                                                format!("'{}' expects {} argument(s), got {}", name, exp, arg_count))
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        *ft.return_
+                    }
                     _ => {
                         if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
                             if let Expr::Identifier { name, .. } = object.as_ref() {

@@ -72,9 +72,6 @@ fi
 mkdir -p "$BIN_DIR" "$LIB_DIR"
 cp "$TMPDIR/kl/kl" "$BIN_DIR/kl"
 chmod +x "$BIN_DIR/kl"
-# Legacy symlink: `klc` → `kl`
-ln -sf "kl" "$BIN_DIR/klc"
-
 # --- Install runtime library ---
 cp "$TMPDIR/kl/lib/libklc_runtime.a" "$LIB_DIR/libklc_runtime.a"
 chmod 644 "$LIB_DIR/libklc_runtime.a"
@@ -89,7 +86,7 @@ if command -v bash >/dev/null 2>&1 && [ -n "${BASH_VERSION:-}" ]; then
 fi
 INSTALL_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
 echo "Removing kl from $INSTALL_DIR..."
-rm -f "$INSTALL_DIR/bin/kl" "$INSTALL_DIR/bin/klc" "$INSTALL_DIR/bin/kl-uninstall"
+rm -f "$INSTALL_DIR/bin/kl" "$INSTALL_DIR/bin/kl-uninstall"
 rm -rf "$INSTALL_DIR/lib/kl"
 if [ "$INSTALL_DIR" != "/usr/local" ]; then
     rmdir "$INSTALL_DIR/bin" 2>/dev/null || true
@@ -104,10 +101,6 @@ chmod +x "$UNINSTALL_SCRIPT"
 if "$BIN_DIR/kl" --version >/dev/null 2>&1; then
     ok "kl $VERSION installed successfully"
     "$BIN_DIR/kl" --version
-    # Verify legacy alias too
-    if "$BIN_DIR/klc" --version >/dev/null 2>&1; then
-        ok "klc legacy alias also installed"
-    fi
 else
     error "Installation verification failed"
 fi

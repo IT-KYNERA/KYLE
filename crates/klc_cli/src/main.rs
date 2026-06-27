@@ -8,12 +8,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-/// Return the binary name used to invoke this program (kl or klc).
+/// Return the binary name used to invoke this program.
 fn bin_name() -> String {
-    env::args().next()
-        .map(|p| Path::new(&p).file_stem().unwrap_or_default().to_string_lossy().to_string())
-        .filter(|n| n == "kl" || n == "klc")
-        .unwrap_or_else(|| "kl".to_string())
+    "kl".to_string()
 }
 
 /// Return the output binary path with the correct platform extension.
@@ -47,7 +44,7 @@ fn main() {
         "info" => cmd_info(&args),
         "lsp" => cmd_lsp(&args),
         "completions" => cmd_completions(&args),
-        "help" => {
+        "help" | "-h" => {
             print_usage();
         }
         "--version" | "-v" => {
@@ -122,7 +119,7 @@ fn cmd_new(args: &[String]) {
         process::exit(1);
     }
     // Create directory structure
-    for dir in &["src", "tests", "examples", "docs"] {
+    for dir in &["src", "tests"] {
         fs::create_dir_all(project_dir.join(dir)).unwrap_or_else(|e| {
             eprintln!("Error creating project: {}", e);
             process::exit(1);
@@ -143,7 +140,7 @@ fn cmd_new(args: &[String]) {
 
     // src/lib.kl — library module
     let lib_kl = format!(
-        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\npub fn greet(name: str) -> str:\n    \"Hello, \" + name + \"!\"\n",
+        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\nfn greet(name: str) -> str:\n    \"Hello, \" + name + \"!\"\n",
         project_name
     );
     fs::write(project_dir.join("src").join("lib.kl"), &lib_kl).unwrap_or_else(|e| {
@@ -158,16 +155,6 @@ fn cmd_new(args: &[String]) {
     );
     fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl).unwrap_or_else(|e| {
         eprintln!("Error writing tests/test_main.kl: {}", e);
-        process::exit(1);
-    });
-
-    // examples/hello.kl — example
-    let example_kl = format!(
-        "# {} — example\nfn main():\n    println!(\"Hello from {}!\")\n",
-        project_name, project_name
-    );
-    fs::write(project_dir.join("examples").join("hello.kl"), &example_kl).unwrap_or_else(|e| {
-        eprintln!("Error writing examples/hello.kl: {}", e);
         process::exit(1);
     });
 
@@ -190,7 +177,7 @@ fn cmd_new(args: &[String]) {
 
     // README.md — project docs
     let readme = format!(
-        "# {}\n\n{}\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Run tests\n{bname} test\n\n# Release build\n{bname} build --release\n```\n\n## Project Structure\n\n```\n├── src/\n│   ├── main.kl       # Entry point\n│   └── lib.kl        # Library module\n├── tests/\n│   └── test_main.kl  # Tests\n├── examples/\n│   └── hello.kl      # Example\n├── kl.toml           # Project manifest\n└── README.md\n```\n",
+        "# {}\n\n{}\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Run tests\n{bname} test\n\n# Release build\n{bname} build --release\n```\n\n## Project Structure\n\n```\n├── src/\n│   ├── main.kl       # Entry point\n│   └── lib.kl        # Library module\n├── tests/\n│   └── test_main.kl  # Tests\n├── kl.toml           # Project manifest\n└── README.md\n```\n",
         project_name, project_name, bname = bin_name()
     );
     fs::write(project_dir.join("README.md"), &readme).unwrap_or_else(|e| {
@@ -200,7 +187,7 @@ fn cmd_new(args: &[String]) {
 
     // .vscode/settings.json — workspace settings
     let vscode_settings = format!(
-        r#"{{"kl.klcPath":"{}","files.associations":{{"*.kl":"kl"}}}}""#,
+        r#"{{"kl.klcPath":"{}","files.associations":{{"*.kl":"kl"}}}}"#,
         bin_name()
     );
     let vscode_dir = project_dir.join(".vscode");
@@ -217,7 +204,6 @@ fn cmd_new(args: &[String]) {
     println!("   ├── src/main.kl        — entry point");
     println!("   ├── src/lib.kl         — library module");
     println!("   ├── tests/             — tests");
-    println!("   ├── examples/          — examples");
     println!("   ├── kl.toml            — manifest");
     println!("   ├── README.md          — project docs");
     println!("   └── .vscode/           — VS Code settings");
@@ -472,6 +458,40 @@ fn cmd_run(args: &[String]) {
 }
 
 fn cmd_check(args: &[String]) {
+    if args.len() < 3 || args[2].starts_with("--") {
+        // Project mode
+        if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
+            if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
+                let source = fs::read_to_string(&source_path).unwrap_or_else(|e| {
+                    eprintln!("Error reading {}: {}", source_path.display(), e);
+                    process::exit(1);
+                });
+                let file = source_path.to_string_lossy().to_string();
+                match klc_driver::pipeline::Pipeline::check_source(&source, &file) {
+                    Ok(output) => {
+                        if output.analyzer.has_errors() {
+                            output.analyzer.emit_diagnostics();
+                            process::exit(1);
+                        } else {
+                            println!("No errors found.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Check error: {}", e);
+                        process::exit(1);
+                    }
+                }
+            } else {
+                eprintln!("No src/main.kl found in project");
+                process::exit(1);
+            }
+        } else {
+            eprintln!("Usage: {} check <file.kl>", bin_name());
+            process::exit(1);
+        }
+        return;
+    }
+    // Single-file mode
     let source = load_source(args, 2);
     let file = &args[2];
     match klc_driver::pipeline::Pipeline::check_source(&source, file) {

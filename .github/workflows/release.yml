@@ -30,7 +30,7 @@ jobs:
 
       - name: Build kl (release)
         run: |
-          cargo build --bin kl --bin klc --release \
+          cargo build --bin kl --release \
             --config 'env.LLVM_SYS_181_PREFIX=""'
 
       - name: Build runtime static library
@@ -46,7 +46,6 @@ jobs:
         run: |
           mkdir -p dist/kl/lib dist/kl/vscode
           cp target/release/kl dist/kl/
-          ln -sf kl dist/kl/klc
           cp target/release/libklc_runtime.a dist/kl/lib/
           cp install.sh uninstall.sh dist/kl/
           cp vscode-kl/kl-*.vsix dist/kl/vscode/

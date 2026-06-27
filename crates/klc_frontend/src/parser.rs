@@ -930,6 +930,26 @@ impl Parser {
                 span: self.span_from(start),
             }));
         }
+        // Immutable variable with type annotation: `ident : Type = expr`
+        if self.at_identifier() && self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::Colon)) {
+            let start = self.pos;
+            let name = self.eat_identifier();
+            self.advance(); // ':'
+            let type_ = Some(self.parse_type()?);
+            let value = if self.at(TokenKind::Equals) {
+                self.advance();
+                self.parse_expr()?
+            } else {
+                Expr::Literal { value: Literal::None, span: self.span_from(start) }
+            };
+            return Ok(Stmt::Variable(VariableDecl {
+                name,
+                type_,
+                value: Box::new(value),
+                is_mutable: false,
+                span: self.span_from(start),
+            }));
+        }
         // Variable declaration or binding-if: `ident = expr`
         // Disambiguate by checking if the next token after the expr is ':'
         // (binding-if) or something else (expression statement with assignment).

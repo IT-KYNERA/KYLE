@@ -52,23 +52,17 @@ function findKlBinary() {
     const envPath = process.env.PATH || '';
     const dirs = envPath.split(path.delimiter);
     for (const dir of dirs) {
-        for (const name of ['kl', 'klc']) {
-            const candidate = path.join(dir, name);
-            if (fs.existsSync(candidate))
-                return candidate;
-        }
+        const candidate = path.join(dir, 'kl');
+        if (fs.existsSync(candidate))
+            return candidate;
     }
-    // 3. Common install locations (search kl + klc)
+    // 3. Common install locations
     const home = process.env.HOME || '';
     const locations = [
         path.join(home, '.kl', 'bin', 'kl'),
-        path.join(home, '.kl', 'bin', 'klc'),
         path.join(home, '.cargo', 'bin', 'kl'),
-        path.join(home, '.cargo', 'bin', 'klc'),
         '/usr/local/bin/kl',
-        '/usr/local/bin/klc',
         '/opt/homebrew/bin/kl',
-        '/opt/homebrew/bin/klc',
         '/usr/bin/kl',
     ];
     for (const loc of locations) {
