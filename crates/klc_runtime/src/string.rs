@@ -34,6 +34,59 @@ pub extern "C" fn kl_i64_to_str(val: i64) -> *const u8 {
     buf as *const u8
 }
 
+/// Parse a null-terminated C string as a signed integer (i64).
+///
+/// Mirrors Rust's `str::parse::<i64>()` semantics: optional leading
+/// `+`/`-`, decimal digits, stops at the first non-digit byte. Leading
+/// whitespace is skipped. Returns 0 if the string is empty or contains no
+/// digits. Overflow saturates to i64::MAX/MIN (no UB).
+///
+/// This is the inverse of `kl_i64_to_str`.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_str_to_i64(ptr: *const u8) -> i64 {
+    if ptr.is_null() {
+        return 0;
+    }
+    let len = kl_strlen(ptr) as usize;
+    if len == 0 {
+        return 0;
+    }
+    let bytes: &[u8] = unsafe { core::slice::from_raw_parts(ptr, len) };
+    // Skip leading ASCII whitespace.
+    let mut start = 0;
+    while start < bytes.len() && bytes[start] <= b' ' {
+        start += 1;
+    }
+    if start >= bytes.len() {
+        return 0;
+    }
+    let rest = &bytes[start..];
+    // Determine sign.
+    let (negative, digits) = match rest[0] {
+        b'-' => (true, &rest[1..]),
+        b'+' => (false, &rest[1..]),
+        _ => (false, rest),
+    };
+    if digits.is_empty() {
+        return 0;
+    }
+    // Accumulate with saturating overflow.
+    let mut result: i64 = 0;
+    for &b in digits {
+        if !(b'0'..=b'9').contains(&b) {
+            break;
+        }
+        let d = (b - b'0') as i64;
+        result = match result.checked_mul(10).and_then(|v| {
+            if negative { v.checked_sub(d) } else { v.checked_add(d) }
+        }) {
+            Some(v) => v,
+            None => return if negative { i64::MIN } else { i64::MAX },
+        };
+    }
+    result
+}
+
 /// Get the length of a null-terminated C string (strlen).
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_strlen(ptr: *const u8) -> i32 {

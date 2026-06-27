@@ -226,7 +226,7 @@ impl LanguageServer {
                     lsp_diags.push(Diagnostic {
                         range,
                         severity,
-                        source: Some("klc".to_string()),
+                        source: Some("kl".to_string()),
                         message: format!("[{}] {}", diag.code, diag.message),
                         ..Default::default()
                     });
@@ -239,7 +239,7 @@ impl LanguageServer {
                         end: Position { line: 0, character: 0 },
                     },
                     severity: Some(DiagnosticSeverity::ERROR),
-                    source: Some("klc".to_string()),
+                    source: Some("kl".to_string()),
                     message: format!("Parse error: {}", e),
                     ..Default::default()
                 });
