@@ -95,10 +95,7 @@ Download `kl-0.2.1.vsix` from the
 > You only need this if you want to contribute to the compiler itself.
 > For everyday use, use the one-line installer above.
 
-**Prerequisites:**
-
-- **Rust toolchain** (stable, 1.70+) — install via [`rustup.rs`](https://rustup.rs)
-- **LLVM 18.1** — see platform-specific instructions below
+**Prerequisites:** LLVM 18.1 is required to build from source.
 
 **macOS (Apple Silicon):**
 
