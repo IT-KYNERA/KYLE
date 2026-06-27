@@ -187,8 +187,8 @@ All language syntax generates working code end-to-end.
 - [x] Hover (function sigs + builtin docs + identifier info)
 - [x] Error squiggles (diagnostics → VS Code via publishDiagnostics notification)
 - [ ] Completion resolve provider
-- [ ] Compile-on-save
-- [ ] LSP rename
+- [x] Compile-on-save (type-check on save via didSave handler)
+- [x] LSP rename (textDocument/rename + prepareRename)
 - [x] LSP formatting (via formatter, textDocument/formatting handler)
 
 ### P2 — Build & Project

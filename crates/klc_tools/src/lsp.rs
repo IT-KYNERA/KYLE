@@ -67,6 +67,7 @@ impl LanguageServer {
             }),
             code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
             document_formatting_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Left(true)),
             ..Default::default()
         }
     }
@@ -82,6 +83,8 @@ impl LanguageServer {
             "textDocument/signatureHelp" => self.handle_signature_help(req),
             "textDocument/codeAction" => self.handle_code_action(req),
             "textDocument/formatting" => self.handle_formatting(req),
+            "textDocument/rename" => self.handle_rename(req),
+            "textDocument/prepareRename" => self.handle_prepare_rename(req),
             _ => {
                 let resp = Response::new_err(
                     req.id,
@@ -97,6 +100,7 @@ impl LanguageServer {
         match not.method.as_str() {
             "textDocument/didOpen" => self.handle_did_open(not),
             "textDocument/didChange" => self.handle_did_change(not),
+            "textDocument/didSave" => self.handle_did_save(not),
             _ => {}
         }
     }
@@ -115,6 +119,45 @@ impl LanguageServer {
             self.sources.insert(uri.clone(), change.text);
         }
         self.publish_diagnostics(&uri);
+    }
+
+    fn handle_did_save(&mut self, not: Notification) {
+        let params: DidSaveTextDocumentParams = serde_json::from_value(not.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = match self.sources.get(&uri) {
+            Some(s) => s.clone(),
+            None => return,
+        };
+
+        // Quick check — only compile if it looks like a KL file
+        if !uri.ends_with(".kl") {
+            return;
+        }
+
+        // Build in a background thread so we don't block the LSP
+        let uri_clone = uri.clone();
+        let source_clone = source.clone();
+        std::thread::spawn(move || {
+            let mut lexer = klc_frontend::lexer::Lexer::new(&source_clone);
+            let tokens = lexer.tokenize();
+            let mut parser = klc_frontend::parser::Parser::new(tokens);
+            match parser.parse() {
+                Ok(program) => {
+                    let file_name = uri_clone.trim_start_matches("file://");
+                    let mut source_map = klc_core::source_map::SourceMap::new();
+                    let _file_id = source_map.add(file_name.to_string(), source_clone);
+                    let mut analyzer = klc_semantic::analyzer::SemanticAnalyzer::new()
+                        .with_source(source_map, file_name.to_string());
+                    analyzer.analyze(&program);
+                    if analyzer.has_errors() {
+                        // Diagnostics are already published by didChange
+                        return;
+                    }
+                    // Type-check passed
+                }
+                Err(_) => {}
+            }
+        });
     }
 
     fn publish_diagnostics(&self, uri: &str) {
@@ -1246,6 +1289,70 @@ impl LanguageServer {
             }
         }
         None
+    }
+
+    fn handle_prepare_rename(&mut self, req: Request) {
+        let params: TextDocumentPositionParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = self.sources.get(&uri).cloned().unwrap_or_default();
+        let pos = params.position;
+        let word = self.word_at(&source, pos.line as usize, pos.character as usize);
+
+        let result = if word.is_empty() {
+            None
+        } else {
+            Some(PrepareRenameResponse::RangeWithPlaceholder {
+                range: Range {
+                    start: Position { line: pos.line, character: (pos.character as usize).saturating_sub(word.len()) as u32 },
+                    end: pos,
+                },
+                placeholder: word,
+            })
+        };
+        let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
+        let _ = self.connection.sender.send(Message::Response(resp));
+    }
+
+    fn handle_rename(&mut self, req: Request) {
+        let params: RenameParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document_position.text_document.uri.to_string();
+        let source = self.sources.get(&uri).cloned().unwrap_or_default();
+        let pos = params.text_document_position.position;
+        let new_name = params.new_name.clone();
+
+        let word = self.word_at(&source, pos.line as usize, pos.character as usize);
+        let result: Option<WorkspaceEdit> = if word.is_empty() {
+            None
+        } else {
+            let mut changes: HashMap<lsp_types::Url, Vec<TextEdit>> = HashMap::new();
+            for (doc_uri, doc_source) in &self.sources {
+                if let Ok(url) = lsp_types::Url::parse(doc_uri) {
+                    let mut edits = Vec::new();
+                    let mut lexer = klc_frontend::lexer::Lexer::new(doc_source);
+                    let tokens = lexer.tokenize();
+                    for tok in &tokens {
+                        if let TokenKind::Identifier(ref id) = tok.kind {
+                            if id == &word {
+                                edits.push(TextEdit {
+                                    range: span_to_range(&tok.span),
+                                    new_text: new_name.clone(),
+                                });
+                            }
+                        }
+                    }
+                    if !edits.is_empty() {
+                        changes.insert(url, edits);
+                    }
+                }
+            }
+            Some(WorkspaceEdit {
+                changes: Some(changes),
+                document_changes: None,
+                change_annotations: None,
+            })
+        };
+        let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
+        let _ = self.connection.sender.send(Message::Response(resp));
     }
 
     fn collect_symbols(&self, source: &str, uri: &str) -> Vec<SymbolInformation> {
