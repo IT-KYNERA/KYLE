@@ -30,12 +30,7 @@ jobs:
 
       - name: Build kl (release)
         run: |
-          cargo build --bin kl --release \
-            --config 'env.LLVM_SYS_181_PREFIX=""'
-
-      - name: Build klc (legacy compat)
-        run: |
-          cargo build --bin klc --release \
+          cargo build --bin kl --bin klc --release \
             --config 'env.LLVM_SYS_181_PREFIX=""'
 
       - name: Build runtime static library
@@ -51,10 +46,10 @@ jobs:
         run: |
           mkdir -p dist/kl/lib dist/kl/vscode
           cp target/release/kl dist/kl/
-          cp target/release/klc dist/kl/
+          ln -sf kl dist/kl/klc
           cp target/release/libklc_runtime.a dist/kl/lib/
           cp install.sh uninstall.sh dist/kl/
-          cp vscode-kl/kl-*.vsix dist/kl/vscode/
+          cp vscode-kl/vscode-kl-*.vsix dist/kl/vscode/
           chmod +x dist/kl/install.sh dist/kl/uninstall.sh
           cd dist
           tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl/
@@ -67,6 +62,6 @@ jobs:
           gh release delete ${{ github.ref_name }} --yes 2>/dev/null || true
           gh release create ${{ github.ref_name }} \
             dist/kl-*.tar.gz \
-            vscode-kl/kl-*.vsix \
-            --title "Kyle ${{ github.ref_name }}" \
+            vscode-kl/vscode-kl-*.vsix \
+            --title "kl ${{ github.ref_name }}" \
             --notes "See commit history for changes."

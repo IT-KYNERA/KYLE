@@ -68,11 +68,11 @@ else
     tar xzf "$TMPDIR/kl.tar.gz" -C "$TMPDIR"
 fi
 
-# --- Install binary ---
+# --- Install binary (as `kl`) ---
 mkdir -p "$BIN_DIR" "$LIB_DIR"
 cp "$TMPDIR/kl/kl" "$BIN_DIR/kl"
 chmod +x "$BIN_DIR/kl"
-# Legacy alias
+# Legacy symlink: `klc` → `kl`
 ln -sf "kl" "$BIN_DIR/klc"
 
 # --- Install runtime library ---

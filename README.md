@@ -107,9 +107,9 @@ fn main(args: [str]) -> i32:
     return 0
 ```
 
-```bash
-kl run hello.kl
-# Hello, World!
+```console
+$ kl run hello.kl
+Hello, World!
 ```
 
 ---
@@ -309,7 +309,7 @@ and LSP integration.
 
 ```bash
 # From the .vsix in this repo
-code --install-extension vscode-kl/kl-0.2.0.vsix
+code --install-extension vscode-kl/vscode-kl-0.2.0.vsix
 ```
 
 ### Features

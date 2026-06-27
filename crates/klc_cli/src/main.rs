@@ -110,18 +110,23 @@ fn cmd_new(args: &[String]) {
         eprintln!("Usage: {} new <project>", bin_name());
         process::exit(1);
     }
-    let project_name = &args[2];
-    let project_dir = Path::new(project_name);
+    let project_name_arg = &args[2];
+    let project_dir = Path::new(project_name_arg);
+    let project_name = project_dir.file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     if project_dir.exists() {
         eprintln!("Error: directory '{}' already exists", project_name);
         process::exit(1);
     }
     // Create directory structure
-    fs::create_dir_all(project_dir.join("src")).unwrap_or_else(|e| {
-        eprintln!("Error creating project: {}", e);
-        process::exit(1);
-    });
-    let _ = fs::create_dir(project_dir.join("tests"));
+    for dir in &["src", "tests", "examples", "docs"] {
+        fs::create_dir_all(project_dir.join(dir)).unwrap_or_else(|e| {
+            eprintln!("Error creating project: {}", e);
+            process::exit(1);
+        });
+    }
 
     // src/main.kl — professional entry point with args
     let main_kl = [
@@ -135,16 +140,39 @@ fn cmd_new(args: &[String]) {
         process::exit(1);
     });
 
+    // src/lib.kl — library module
+    let lib_kl = format!(
+        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\npub fn greet(name: str) -> str:\n    \"Hello, \" + name + \"!\"\n",
+        project_name
+    );
+    fs::write(project_dir.join("src").join("lib.kl"), &lib_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing src/lib.kl: {}", e);
+        process::exit(1);
+    });
+
     // tests/test_main.kl — test stub
     let test_kl = format!(
-        "import {{ {} }} from \"src/main\"\n\nfn test_example() -> i32:\n    println(\"test: {}\")\n    return 0\n",
+        "# Tests for {}\nimport {{ greet }} from \"src/lib\"\n\nfn test_greet() -> i32:\n    assert_str(greet(\"World\"), \"Hello, World!\")\n    println(\"test_greet PASS\")\n    0\n",
+        project_name
+    );
+    fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing tests/test_main.kl: {}", e);
+        process::exit(1);
+    });
+
+    // examples/hello.kl — example
+    let example_kl = format!(
+        "# {} — example\nfn main():\n    println!(\"Hello from {}!\")\n",
         project_name, project_name
     );
-    let _ = fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl);
+    fs::write(project_dir.join("examples").join("hello.kl"), &example_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing examples/hello.kl: {}", e);
+        process::exit(1);
+    });
 
     // kl.toml — project manifest
     let manifest = format!(
-        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"1\"\nauthors = []\nlicense = \"MIT\"\ndescription = \"A Kyle project\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
+        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"1\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle programming language project\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
         project_name
     );
     fs::write(project_dir.join("kl.toml"), &manifest).unwrap_or_else(|e| {
@@ -153,14 +181,47 @@ fn cmd_new(args: &[String]) {
     });
 
     // .gitignore
-    let gitignore = "target/\n*.klc-build/\nkl.lock\n";
-    let _ = fs::write(project_dir.join(".gitignore"), gitignore);
+    let gitignore = "target/\n*.klc-build/\nkl.lock\n.vscode/\n";
+    fs::write(project_dir.join(".gitignore"), gitignore).unwrap_or_else(|e| {
+        eprintln!("Error writing .gitignore: {}", e);
+        process::exit(1);
+    });
 
-    println!("Created project '{}'", project_name);
-    println!("  src/main.kl     — entry point");
-    println!("  tests/           — tests directory");
-    println!("  kl.toml          — project manifest");
-    println!("  .gitignore       — build artifacts excluded");
+    // README.md — project docs
+    let readme = format!(
+        "# {}\n\n{}\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Run tests\n{bname} test\n\n# Release build\n{bname} build --release\n```\n\n## Project Structure\n\n```\n├── src/\n│   ├── main.kl       # Entry point\n│   └── lib.kl        # Library module\n├── tests/\n│   └── test_main.kl  # Tests\n├── examples/\n│   └── hello.kl      # Example\n├── kl.toml           # Project manifest\n└── README.md\n```\n",
+        project_name, project_name, bname = bin_name()
+    );
+    fs::write(project_dir.join("README.md"), &readme).unwrap_or_else(|e| {
+        eprintln!("Error writing README.md: {}", e);
+        process::exit(1);
+    });
+
+    // .vscode/settings.json — workspace settings
+    let vscode_settings = format!(
+        r#"{{"kl.klcPath":"{}","files.associations":{{"*.kl":"kl"}}}}""#,
+        bin_name()
+    );
+    let vscode_dir = project_dir.join(".vscode");
+    fs::create_dir_all(&vscode_dir).unwrap_or_else(|e| {
+        eprintln!("Error creating .vscode: {}", e);
+        process::exit(1);
+    });
+    fs::write(vscode_dir.join("settings.json"), vscode_settings).unwrap_or_else(|e| {
+        eprintln!("Error writing .vscode/settings.json: {}", e);
+        process::exit(1);
+    });
+
+    println!("✅ Created project '{}'", project_name);
+    println!("   ├── src/main.kl        — entry point");
+    println!("   ├── src/lib.kl         — library module");
+    println!("   ├── tests/             — tests");
+    println!("   ├── examples/          — examples");
+    println!("   ├── kl.toml            — manifest");
+    println!("   ├── README.md          — project docs");
+    println!("   └── .vscode/           — VS Code settings");
+    println!();
+    println!("   cd {} && {} run", project_name, bin_name());
 }
 
 fn cmd_lsp(_args: &[String]) {
@@ -180,22 +241,30 @@ fn cmd_lsp(_args: &[String]) {
 
 fn print_usage() {
     let name = bin_name();
-    eprintln!("KL Compiler v{}", env!("CARGO_PKG_VERSION"));
+    eprintln!("{} v{} — Kyle Programming Language Compiler", name, env!("CARGO_PKG_VERSION"));
     eprintln!();
-    eprintln!("Usage:");
-    eprintln!("  {name} build <file.kl>    Compile to native binary");
-    eprintln!("  {name} run   <file.kl>    Compile and execute");
-    eprintln!("  {name} check <file.kl>    Type-check without codegen");
-    eprintln!("  {name} parse <file.kl>    Parse and dump AST");
-    eprintln!("  {name} mir   <file.kl>    Parse and dump MIR");
-    eprintln!("  {name} fmt   <file.kl>    Format KL source code");
-    eprintln!("  {name} new   <project>    Create new KL project");
-    eprintln!("  {name} add   <dep>        Add dependency");
+    eprintln!("Project commands (run from a project directory with kl.toml):");
+    eprintln!("  {name} build [--release]   Compile project to native binary");
+    eprintln!("  {name} run   [--release]   Compile and execute project");
+    eprintln!("  {name} test                Run project tests");
+    eprintln!("  {name} info                Show project info");
+    eprintln!("  {name} add   <dep>         Add dependency");
     eprintln!("  {name} remove <dep>        Remove dependency");
-    eprintln!("  {name} info               Show project info");
-    eprintln!("  {name} lsp               Start LSP server (stdio)");
-    eprintln!("  {name} test               Run tests");
-    eprintln!("  {name} help               Show this help");
+    eprintln!();
+    eprintln!("File commands:");
+    eprintln!("  {name} build <file.kl>     Compile single file");
+    eprintln!("  {name} run   <file.kl>     Compile and run single file");
+    eprintln!("  {name} check <file.kl>     Type-check without codegen");
+    eprintln!("  {name} parse <file.kl>     Parse and dump AST");
+    eprintln!("  {name} mir   <file.kl>     Parse and dump MIR");
+    eprintln!("  {name} fmt   <file.kl>     Format source code");
+    eprintln!();
+    eprintln!("Project creation:");
+    eprintln!("  {name} new   <project>     Create new KL project");
+    eprintln!();
+    eprintln!("Tools:");
+    eprintln!("  {name} lsp                 Start LSP server (stdio)");
+    eprintln!("  {name} help                Show this help");
 }
 
 fn cmd_build(args: &[String]) {
