@@ -208,7 +208,16 @@ impl Parser {
             return Err("expected 'fn'".to_string());
         }
         self.advance();
-        let name = self.eat_identifier();
+        let raw_name = self.eat_identifier();
+        // Visibility convention: `__` prefix → private, `_` prefix → protected, none → public.
+        // The stored name is always stripped of the convention prefixes.
+        let (name, visibility) = if raw_name.starts_with("__") {
+            (raw_name.trim_start_matches('_').to_string(), Visibility::Private)
+        } else if raw_name.starts_with('_') {
+            (raw_name.trim_start_matches('_').to_string(), Visibility::Protected)
+        } else {
+            (raw_name.clone(), Visibility::Public)
+        };
         // Parse optional type params: `<T, U>`
         let type_params = if self.at(TokenKind::Less) {
             self.parse_type_params()?
@@ -239,7 +248,7 @@ impl Parser {
             Some(self.parse_block()?)
         };
         Ok(FunctionDecl {
-            name, type_params, params, return_type, is_async, is_const, is_abstract, body,
+            name, type_params, params, return_type, is_async, is_const, is_abstract, visibility, body,
             span: self.span_from(start),
         })
     }
@@ -308,9 +317,20 @@ impl Parser {
         type_params: Vec<TypeParam>,
         parent: Option<String>,
         contracts: Vec<String>,
-        members: Vec<ClassMember>,
+        mut members: Vec<ClassMember>,
         is_abstract: bool,
     ) -> Result<Decl, String> {
+        // If the class has no explicit constructor, synthesize a default empty
+        // one so that `ClassName()` instantiations work without user-written
+        // boilerplate.
+        let has_ctor = members.iter().any(|m| matches!(m, ClassMember::Constructor(_)));
+        if !has_ctor && !is_abstract {
+            members.push(ClassMember::Constructor(Constructor {
+                params: Vec::new(),
+                body: Block { statements: Vec::new(), span: self.span_from(start_pos) },
+                span: self.span_from(start_pos),
+            }));
+        }
         if is_abstract {
             Ok(Decl::AbstractClass(AbstractClassDecl {
                 name, type_params, parent, contracts, members, span: self.span_from(start_pos),

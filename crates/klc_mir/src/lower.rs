@@ -199,6 +199,9 @@ pub struct Lowerer {
     /// Built during lower_program by scanning ClassMember::Method entries.
     /// Used to lower `obj.method(args)` into `Call ClassName::method(obj, args...)`.
     method_table: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    /// Maps each class to its optional parent class name, used to walk the
+    /// inheritance chain when resolving method calls (polymorphism/override).
+    class_parent_map: RefCell<std::collections::HashMap<String, Option<String>>>,
     /// Enum variant index map: enum_name -> (variant_name -> index)
     enum_variants: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, usize>>>,
     /// Counter for generating unique closure function names.
@@ -225,6 +228,7 @@ impl Lowerer {
             class_constructor_map: RefCell::new(std::collections::HashMap::new()),
             const_values: RefCell::new(std::collections::HashMap::new()),
             method_table: RefCell::new(std::collections::HashMap::new()),
+            class_parent_map: RefCell::new(std::collections::HashMap::new()),
             enum_variants: RefCell::new(std::collections::HashMap::new()),
             closure_counter: RefCell::new(0),
             closure_functions: RefCell::new(Vec::new()),
@@ -293,15 +297,7 @@ impl Lowerer {
                     struct_defs.insert(s.name.clone(), fields);
                 }
                 if let Decl::Class(c) = decl {
-                    let fields: Vec<(String, MirType)> = c.members.iter()
-                        .filter_map(|m| {
-                            if let ClassMember::Field(f) = m {
-                                Some((f.name.clone(), ast_type_to_mir(&f.type_, Some(&struct_defs))))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
+                    let fields = Self::collect_class_fields(c, &program, &struct_defs);
                     struct_defs.insert(c.name.clone(), fields);
                 }
                 if let Decl::Enum(e) = decl {
@@ -348,10 +344,12 @@ impl Lowerer {
             let mut fn_returns = self.fn_returns.borrow_mut();
             let mut cc_map = self.class_constructor_map.borrow_mut();
             let mut method_table = self.method_table.borrow_mut();
+            let mut class_parent_map = self.class_parent_map.borrow_mut();
             let mut generic_fn_templates = self.generic_function_templates.borrow_mut();
             fn_returns.clear();
             cc_map.clear();
             method_table.clear();
+            class_parent_map.clear();
             generic_fn_templates.clear();
             for decl in &program.declarations {
                 if let Decl::Function(f) = decl {
@@ -367,6 +365,7 @@ impl Lowerer {
                     fn_returns.insert(f.name.clone(), ret_type);
                 }
                 if let Decl::Class(c) = decl {
+                    class_parent_map.insert(c.name.clone(), c.parent.clone());
                     if c.members.iter().any(|m| matches!(m, ClassMember::Constructor(_))) {
                         cc_map.insert(c.name.clone(), format!("{}::new", c.name));
                         for member in &c.members {
@@ -376,6 +375,12 @@ impl Lowerer {
                                 fn_returns.insert(format!("{}::new", c.name), MirType::Struct(c.name.clone(), fields));
                             }
                         }
+                    } else {
+                        // No explicit constructor — auto-register a default one
+                        cc_map.insert(c.name.clone(), format!("{}::new", c.name));
+                        let defs = self.struct_defs.borrow();
+                        let fields = defs.get(&c.name).cloned().unwrap_or_default();
+                        fn_returns.insert(format!("{}::new", c.name), MirType::Struct(c.name.clone(), fields));
                     }
                     // Build method dispatch table for this class.
                     // Each method `fn foo()` inside `class C` becomes a free function
@@ -537,6 +542,67 @@ impl Lowerer {
         }
 
         module
+    }
+
+    /// Recursively collect a class's fields, prepending fields from any parent
+    /// class (and its parent, …) so that subclass instances laid out as a
+    /// struct include the full inherited field set.
+    fn collect_class_fields(
+        c: &ClassDecl,
+        program: &Program,
+        struct_defs: &std::collections::HashMap<String, Vec<(String, MirType)>>,
+    ) -> Vec<(String, MirType)> {
+        let mut fields = Vec::new();
+        if let Some(ref parent_name) = c.parent {
+            if let Some(parent_fields) = struct_defs.get(parent_name) {
+                fields.extend(parent_fields.clone());
+            } else {
+                // Fall back to manually resolving the parent declaration so we
+                // still order things correctly even when the parent was not yet
+                // inserted into struct_defs (mainly relevant during testing).
+                for decl in &program.declarations {
+                    if let Decl::Class(pc) = decl {
+                        if &pc.name == parent_name {
+                            fields.extend(Self::collect_class_fields(pc, program, struct_defs));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        for m in &c.members {
+            if let ClassMember::Field(f) = m {
+                fields.push((f.name.clone(), ast_type_to_mir(&f.type_, Some(struct_defs))));
+            }
+        }
+        fields
+    }
+
+    /// Walk a class's inheritance chain to resolve a method call.  Returns the
+    /// mangled `Class::method` name of the most-derived class that declares the
+    /// method (or None if no ancestor declares it).  This is what gives us
+    /// polymorphism: subclasses override inherited methods by simply shadowing
+    /// the entry in `method_table`.
+    fn lookup_method_in_chain(
+        &self,
+        class_name: &str,
+        method_name: &str,
+        method_table: &std::collections::HashMap<String, std::collections::HashMap<String, String>>,
+        parent_map: &std::collections::HashMap<String, Option<String>>,
+    ) -> Option<String> {
+        let mut current = class_name.to_string();
+        loop {
+            if let Some(methods) = method_table.get(&current) {
+                if let Some(mangled) = methods.get(method_name) {
+                    return Some(mangled.clone());
+                }
+            }
+            match parent_map.get(&current) {
+                Some(Some(parent)) => current = parent.clone(),
+                _ => break,
+            }
+        }
+        None
     }
 
     fn lower_function(&self, f: &FunctionDecl) -> Option<MirFunction> {
@@ -2203,8 +2269,8 @@ impl Lowerer {
                     // declares a method named `property`, emit a real method call.
                     if let Some(MirType::Struct(class_name, _)) = &obj_type {
                         let method_table = self.method_table.borrow();
-                        if let Some(methods) = method_table.get(class_name) {
-                            if let Some(mangled) = methods.get(property) {
+                        let parent_map = self.class_parent_map.borrow();
+                        if let Some(mangled) = self.lookup_method_in_chain(class_name, property, &method_table, &parent_map) {
                                 // First argument is the receiver (this).
                                 let mut call_args = vec![MirValue::Local(obj_local)];
                                 for arg in arguments {
@@ -2221,7 +2287,7 @@ impl Lowerer {
                                     call_args.push(MirValue::Local(ctx.next_local - 1));
                                 }
                                 let call_type = self.fn_returns.borrow()
-                                    .get(mangled).cloned().unwrap_or(MirType::Void);
+                                    .get(&mangled).cloned().unwrap_or(MirType::Void);
                                 let dest = ctx.alloc_local("_mcall", call_type.clone());
                                 if call_type == MirType::Str {
                                     ctx.string_locals.push(dest);
@@ -2233,7 +2299,6 @@ impl Lowerer {
                                 });
                                 return ctx;
                             }
-                        }
                     }
 
                     // Otherwise, fall back to list method shortcuts (pop/add) when the

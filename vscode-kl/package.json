@@ -83,6 +83,11 @@
           "type": "string",
           "default": "kl",
           "description": "Path to the kl (or klc) compiler binary"
+        },
+        "kl.semanticHighlighting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable semantic highlighting for variables, types, functions, etc."
         }
       }
     }

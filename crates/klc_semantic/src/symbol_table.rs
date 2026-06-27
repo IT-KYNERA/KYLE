@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use klc_core::ast::{FunctionDecl, ClassDecl, StructDecl, EnumDecl, ContractDecl, TypeAlias};
+use klc_core::ast::{FunctionDecl, ClassDecl, StructDecl, EnumDecl, ContractDecl, TypeAlias, Visibility};
 use klc_core::types::Type;
 
 #[derive(Clone, Debug)]
@@ -83,6 +83,7 @@ impl SymbolTable {
                         is_async: false,
                         is_const: false,
                         is_abstract: false,
+                        visibility: Visibility::Public,
                         body: None,
                         span: klc_core::span::Span::dummy(),
                     }),
@@ -115,6 +116,15 @@ impl SymbolTable {
             }
         }
         None
+    }
+
+    /// Return every class-name registered in the global (bottom) scope.
+    /// Used by the visibility check to scan for private members.
+    pub fn all_top_level_names(&self) -> Vec<String> {
+        self.scopes
+            .first()
+            .map(|scope| scope.keys().cloned().collect())
+            .unwrap_or_default()
     }
 
     pub fn lookup_type(&self, name: &str) -> Option<Type> {

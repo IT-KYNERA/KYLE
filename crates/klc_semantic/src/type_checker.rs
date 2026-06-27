@@ -495,14 +495,29 @@ impl TypeChecker {
                 }
             }
             Expr::PropertyAccess { object, property, .. } => {
-                // Visibility check: `__` members are private (only `this` may access)
-                if property.starts_with("__") {
-                    let is_this = matches!(object.as_ref(), Expr::Identifier { name, .. } if name == "this");
-                    if !is_this {
-                        self.reporter.report(
-                            Diagnostic::error(ErrorCode::E0014,
-                                format!("Cannot access private member '__{}' from outside the class", property.trim_start_matches('_')))
-                        );
+                let is_this = matches!(object.as_ref(), Expr::Identifier { name, .. } if name == "this");
+                // Visibility check: scan all known classes for a private
+                // method with this name; if found and the access is not
+                // through `this`, report an error.
+                if !is_this {
+                    let names: Vec<String> = self.symbols.all_top_level_names();
+                    for n in &names {
+                        if let Some(sym) = self.symbols.lookup(n) {
+                            if let SymKind::Class(class) = &sym.kind {
+                                for m in &class.members {
+                                    if let ClassMember::Method(f) = m {
+                                        if f.name == *property
+                                            && matches!(f.visibility, Visibility::Private)
+                                        {
+                                            self.reporter.report(
+                                                Diagnostic::error(ErrorCode::E0014,
+                                                    format!("Cannot access private member '{}' from outside the class", property))
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 let obj_type = self.infer_expr(object);
