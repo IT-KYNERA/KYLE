@@ -112,14 +112,30 @@ else
     error "Installation verification failed"
 fi
 
-# --- PATH advice ---
+# --- Auto-add to PATH ---
 if [ "$INSTALL_DIR" = "$HOME/.kl" ]; then
-    echo ""
-    echo "Add to your ~/.zshrc (or ~/.bashrc):"
-    echo "  export PATH=\"\$HOME/.kl/bin:\$PATH\""
-    echo ""
-    echo "Or run now:"
-    echo "  export PATH=\"\$HOME/.kl/bin:\$PATH\""
+    PATH_LINE='export PATH="$HOME/.kl/bin:$PATH"'
+    if echo "$PATH" | grep -q "$HOME/.kl/bin"; then
+        :  # already in PATH
+    else
+        export PATH="$HOME/.kl/bin:$PATH"
+        # Add to shell profile if not already present
+        for RC in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile"; do
+            if [ -f "$RC" ] && ! grep -qF "$HOME/.kl/bin" "$RC" 2>/dev/null; then
+                echo "" >> "$RC"
+                echo "# Kyle programming language" >> "$RC"
+                echo "$PATH_LINE" >> "$RC"
+                ok "Added ~/.kl/bin to PATH in $RC"
+                break
+            fi
+        done
+        # Create .zshrc if it doesn't exist (macOS default shell)
+        if [ ! -f "$HOME/.zshrc" ] && [ ! -f "$HOME/.bashrc" ] && [ ! -f "$HOME/.bash_profile" ]; then
+            echo "# Kyle programming language" > "$HOME/.zshrc"
+            echo "$PATH_LINE" >> "$HOME/.zshrc"
+            ok "Created ~/.zshrc with ~/.kl/bin in PATH"
+        fi
+    fi
 fi
 
 ok "Run 'kl --help' to get started."
