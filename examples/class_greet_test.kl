@@ -1,0 +1,16 @@
+# Test: class with constructor and method returning str.
+fn main(args: [str]) -> i32:
+    person = Person("Alice", 30)
+    println(person.greet())
+    return 0
+
+class Person:
+    name: str
+    age: i32
+
+    Person(name: str, age: i32):
+        this.name = name
+        this.age = age
+
+    fn greet() -> str:
+        return "Hello, my name is " + this.name + " and I am " + str(this.age) + " years old."

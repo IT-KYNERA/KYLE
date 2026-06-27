@@ -1,0 +1,5 @@
+# Test: input with prompt — input(prompt) returns the line typed by the user.
+fn main(args: [str]) -> i32:
+    name = input("What is your name? ")
+    println("Hello, " + name + "!")
+    return 0

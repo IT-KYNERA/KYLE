@@ -1,0 +1,20 @@
+# Test: class inheritance + method access through this.
+fn main(args: [str]) -> i32:
+    p1 = Hablar()
+    p1.name = "Juan"
+    p1.age = 30
+    p1.hablar()
+    return 0
+
+class Person:
+    name: str
+    age: i32
+
+    fn __print_info():
+        println("Name: " + this.name)
+        println("Age: " + str(this.age))
+
+class Hablar: Person
+    speak: str
+    fn hablar():
+        println("Hola, estoy hablando! Mi nombre es " + this.name + " y tengo " + str(this.age) + " anos.")
