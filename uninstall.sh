@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eu
+if command -v bash >/dev/null 2>&1 && [ -n "${BASH_VERSION:-}" ]; then
+    set -o pipefail 2>/dev/null || true
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

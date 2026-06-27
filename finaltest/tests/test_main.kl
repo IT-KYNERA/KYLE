@@ -1,0 +1,5 @@
+import { finaltest } from "src/main"
+
+fn test_example() -> i32:
+    println("test: finaltest")
+    return 0

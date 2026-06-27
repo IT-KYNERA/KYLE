@@ -1,0 +1,3 @@
+target/
+*.klc-build/
+kl.lock

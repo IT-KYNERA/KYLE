@@ -1,0 +1,12 @@
+name = "finaltest"
+version = "0.1.0"
+edition = "1"
+authors = []
+license = "MIT"
+description = "A Kyle project"
+
+[compiler]
+optimization = "O2"
+target = "native"
+
+[dependencies]
