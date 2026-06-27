@@ -185,18 +185,18 @@ All language syntax generates working code end-to-end.
 - [x] Scope-aware completion (params, auto-declared, block walks)
 - [x] Go-to-definition (8 declaration types)
 - [x] Hover (function sigs + builtin docs + identifier info)
+- [x] Error squiggles (diagnostics → VS Code via publishDiagnostics notification)
 - [ ] Completion resolve provider
 - [ ] Compile-on-save
-- [ ] Error squiggles (diagnostics → VS Code)
 - [ ] LSP rename
-- [ ] LSP formatting (via formatter)
+- [x] LSP formatting (via formatter, textDocument/formatting handler)
 
 ### P2 — Build & Project
 - [x] `kl new` creates professional template (src/main.kl with args, tests/, .gitignore, kl.toml)
 - [x] Build output to `target/debug/` and `target/release/`
 - [x] `--release` flag on `kl build` and `kl run`
 - [x] `.gitignore` (target/, *.klc-build/, kl.lock)
-- [ ] CLI tab completion (bash/zsh completions)
+- [x] CLI tab completion (`kl completions bash|zsh|fish`)
 
 ### P3 — Branding
 - [x] SVG logo

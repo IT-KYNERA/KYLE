@@ -66,6 +66,7 @@ impl LanguageServer {
                 ..Default::default()
             }),
             code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+            document_formatting_provider: Some(OneOf::Left(true)),
             ..Default::default()
         }
     }
@@ -80,6 +81,7 @@ impl LanguageServer {
             "workspace/symbol" => self.handle_workspace_symbol(req),
             "textDocument/signatureHelp" => self.handle_signature_help(req),
             "textDocument/codeAction" => self.handle_code_action(req),
+            "textDocument/formatting" => self.handle_formatting(req),
             _ => {
                 let resp = Response::new_err(
                     req.id,
@@ -1198,6 +1200,41 @@ impl LanguageServer {
 
         let resp = Response::new_ok(req.id, serde_json::to_value(actions).unwrap());
         let _ = self.connection.sender.send(Message::Response(resp));
+    }
+
+    fn handle_formatting(&mut self, req: Request) {
+        let params: DocumentFormattingParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = match self.sources.get(&uri) {
+            Some(s) => s.clone(),
+            None => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<TextEdit>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+
+        let formatter = crate::formatter::Formatter::new();
+        match formatter.format(&source) {
+            Ok(formatted) => {
+                let lines = source.lines().count();
+                let last_line_len = source.lines().last().map(|l| l.len()).unwrap_or(0);
+                let full_range = Range {
+                    start: Position { line: 0, character: 0 },
+                    end: Position { line: (lines.max(1) as u32).saturating_sub(1), character: last_line_len.max(1) as u32 },
+                };
+                let edits = vec![TextEdit {
+                    range: full_range,
+                    new_text: formatted,
+                }];
+                let resp = Response::new_ok(req.id, serde_json::to_value(edits).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+            }
+            Err(_) => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<TextEdit>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+            }
+        }
     }
 
     /// Extract the symbol name from a diagnostic message like "'foo' is not defined"

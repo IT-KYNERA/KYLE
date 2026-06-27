@@ -46,6 +46,7 @@ fn main() {
         "remove" => cmd_remove(&args),
         "info" => cmd_info(&args),
         "lsp" => cmd_lsp(&args),
+        "completions" => cmd_completions(&args),
         "help" => {
             print_usage();
         }
@@ -239,6 +240,89 @@ fn cmd_lsp(_args: &[String]) {
     }
 }
 
+fn cmd_completions(args: &[String]) {
+    let name = bin_name();
+    let shell = if args.len() > 2 { &args[2] } else { "bash" };
+    match shell {
+        "bash" => print!("{}", bash_completions(&name)),
+        "zsh" => print!("{}", zsh_completions(&name)),
+        "fish" => print!("{}", fish_completions(&name)),
+        _ => {
+            eprintln!("Unknown shell '{}'. Supported: bash, zsh, fish", shell);
+            process::exit(1);
+        }
+    }
+}
+
+fn bash_completions(name: &str) -> String {
+    format!(
+        "_{name}() {{
+    local cur prev words cword
+    _init_completion || return
+    local cmds=\"build run check parse mir fmt new add remove info lsp completions help\"
+    if [[ $cword -eq 1 ]]; then
+        COMPREPLY=($(compgen -W \"$cmds\" -- \"$cur\"))
+    elif [[ $cword -ge 2 ]]; then
+        case \"${{prev}}\" in
+            build|run|check|parse|mir|fmt)
+                COMPREPLY=($(compgen -f -X '!*.kl' -- \"$cur\"))
+                ;;
+            new)
+                ;;
+            *)
+                COMPREPLY=($(compgen -W \"$cmds\" -- \"$cur\"))
+                ;;
+        esac
+    fi
+}} &&
+complete -F _{name} {name}
+"
+    )
+}
+
+fn zsh_completions(name: &str) -> String {
+    format!(
+        "#compdef {name}
+local -a cmds
+cmds=(
+    'build:Compile project or file'
+    'run:Compile and execute'
+    'check:Type-check without codegen'
+    'parse:Parse and dump AST'
+    'mir:Parse and dump MIR'
+    'fmt:Format source code'
+    'new:Create new project'
+    'add:Add dependency'
+    'remove:Remove dependency'
+    'info:Show project info'
+    'lsp:Start LSP server'
+    'completions:Generate shell completions'
+    'help:Show help'
+)
+_describe -t commands '{name}' cmds && ret=0
+"
+    )
+}
+
+fn fish_completions(name: &str) -> String {
+    format!(
+        "complete -c {name} -f -a build -d \"Compile project or file\"
+complete -c {name} -f -a run -d \"Compile and execute\"
+complete -c {name} -f -a check -d \"Type-check without codegen\"
+complete -c {name} -f -a parse -d \"Parse and dump AST\"
+complete -c {name} -f -a mir -d \"Parse and dump MIR\"
+complete -c {name} -f -a fmt -d \"Format source code\"
+complete -c {name} -f -a new -d \"Create new project\"
+complete -c {name} -f -a add -d \"Add dependency\"
+complete -c {name} -f -a remove -d \"Remove dependency\"
+complete -c {name} -f -a info -d \"Show project info\"
+complete -c {name} -f -a lsp -d \"Start LSP server\"
+complete -c {name} -f -a completions -d \"Generate shell completions\"
+complete -c {name} -f -a help -d \"Show help\"
+"
+    )
+}
+
 fn print_usage() {
     let name = bin_name();
     eprintln!("{} v{} — Kyle Programming Language Compiler", name, env!("CARGO_PKG_VERSION"));
@@ -264,6 +348,7 @@ fn print_usage() {
     eprintln!();
     eprintln!("Tools:");
     eprintln!("  {name} lsp                 Start LSP server (stdio)");
+    eprintln!("  {name} completions <shell>  Generate shell completions (bash, zsh, fish)");
     eprintln!("  {name} help                Show this help");
 }
 
