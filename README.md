@@ -10,7 +10,7 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-101%20passing-6C3FC5?style=flat-square)](#testing)
-[![Platform](https://img.shields.io/badge/platform-macOS%20ARM%20%7C%20Linux%20ARM-6C3FC5?style=flat-square)](#platform-support)
+[![Platform](https://img.shields.io/badge/platform-macOS%20ARM%20%7C%20Linux%20ARM-6C3FC5?style=flat-square)](#install)
 [![LLVM](https://img.shields.io/badge/LLVM-18-6C3FC5?style=flat-square)](#building-from-source)
 
 </div>
@@ -41,17 +41,22 @@ fn get_users(req: http.Request, res: http.Response):
 
 ## Install
 
-### macOS (Apple Silicon)
+One command for all supported platforms — the script auto-detects your OS and
+architecture:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
-### Linux (ARM / aarch64)
+**Supported platforms:**
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
-```
+| Platform | Status |
+|----------|--------|
+| macOS ARM (Apple Silicon) | ✅ |
+| Linux ARM (aarch64) | ✅ |
+| macOS Intel | 📅 Future |
+| Linux x64 | 📅 Future |
+| Windows x64 | 📅 Future |
 
 ### Verify
 
@@ -60,6 +65,61 @@ kl --version
 ```
 
 No dependencies required. The installer downloads a pre-compiled native binary.
+
+### VS Code Extension
+
+Install the Kyle VS Code extension for syntax highlighting, autocompletion,
+LSP integration, and semantic coloring:
+
+**Option 1 — From the terminal:**
+
+```bash
+code --install-extension vscode-kl/vscode-kl-0.2.1.vsix
+```
+
+**Option 2 — Via the command palette:**
+
+1. Open VS Code
+2. Press `Cmd+Shift+P` (macOS) / `Ctrl+Shift+P` (Linux)
+3. Type **Extensions: Install from VSIX...** and select the file
+   `vscode-kl/vscode-kl-0.2.1.vsix` from the Kyle repository
+
+**Option 3 — From the GitHub release:**
+
+Download `kl-0.2.1.vsix` from the
+[latest release](https://github.com/IT-KYNERA/KYLE/releases/latest) and install via
+`code --install-extension kl-0.2.1.vsix`.
+
+### Building from Source
+
+> You only need this if you want to contribute to the compiler itself.
+> For everyday use, use the one-line installer above.
+
+**Prerequisites:**
+
+- **Rust toolchain** (stable, 1.70+) — install via [`rustup.rs`](https://rustup.rs)
+- **LLVM 18.1** — see platform-specific instructions below
+
+**macOS (Apple Silicon):**
+
+```bash
+brew install llvm@18
+export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
+git clone https://github.com/IT-KYNERA/KYLE
+cd kl
+cargo build --workspace
+```
+
+**Linux (Ubuntu ARM):**
+
+```bash
+sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
+git clone https://github.com/IT-KYNERA/KYLE
+cd kl
+cargo build --workspace
+```
+
+The compiled binary is at `target/debug/kl`.
 
 ---
 
@@ -300,21 +360,10 @@ c = a[0..2]          # [1, 2]
 
 ---
 
-## VS Code Extension
-
-Kyle ships with a VS Code extension providing syntax highlighting, autocompletion,
-and LSP integration.
-
-### Install
-
-```bash
-# From the .vsix in this repo
-code --install-extension vscode-kl/vscode-kl-0.2.0.vsix
-```
-
-### Features
+## VS Code Extension Features
 
 - **Syntax highlighting** — keywords, types, builtins, strings, numbers, operators
+- **Semantic coloring** — variables, types, functions, params colored by meaning
 - **Autocompletion** — 44 builtins, all declarations, keywords, with prefix filter
 - **Dot-completions** — typing `obj.` shows fields/methods (struct, class, enum, str, list, dict)
 - **Scope-aware** — local variables, function params, block-scoped declarations
@@ -398,55 +447,6 @@ Comprehensive documentation lives in [`docs/`](docs/):
 | [Modules, Packages & Tooling](docs/03-modules-packages-tooling.md) | CLI reference, getting started, VS Code |
 | [Compiler Architecture](docs/04-compiler-architecture.md) | 9-crate pipeline, repo layout, runtime |
 | [Roadmap & Status](docs/05-roadmap-status.md) | Phases 0-13, implementation matrix, release checklist |
-
----
-
-## Building from Source
-
-> You only need this if you want to contribute to the compiler itself.
-> For everyday use, use the installer above.
-
-### Prerequisites
-
-- **Rust toolchain** (stable, 1.70+)
-- **LLVM 18.1**
-
-### macOS (Apple Silicon)
-
-```bash
-brew install llvm@18
-export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
-
-git clone https://github.com/IT-KYNERA/KYLE
-cd kl
-cargo build --workspace
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
-```
-
-### Linux (Ubuntu ARM)
-
-```bash
-sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
-
-git clone https://github.com/IT-KYNERA/KYLE
-cd kl
-cargo build --workspace
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
-```
-
-The compiled binary is at `target/debug/kl`.
-
----
-
-## Platform Support
-
-| Platform | Status |
-|----------|--------|
-| macOS ARM (Apple Silicon) | ✅ Supported |
-| Linux ARM (aarch64) | ✅ Supported |
-| macOS Intel | 📅 Planned (future phase) |
-| Linux x64 | 📅 Planned (future phase) |
-| Windows x64 | 📅 Planned (future phase) |
 
 ---
 
