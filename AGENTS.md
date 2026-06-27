@@ -29,6 +29,13 @@ and tooling are all Rust. This will NOT change.
 ✅ Phase 8 DONE          — Docs consolidation, kl binary alias, LSP polish,
                           VS Code .vsix, CI/CD, install scripts
 ⏸️ Phase 9 NEXT          — Backend & Systems (ENV, Process, FFI, HTTP, DB)
+
+```
+✅ Phases 0-6 COMPLETE   — Full compiler pipeline, all language features, std lib
+✅ Phase 7 DONE          — macOS ARM ✅, Linux ARM ✅ (x64/Intel/Windows deferred)
+✅ Phase 8 DONE          — Docs consolidation, kl binary alias, LSP polish,
+                          VS Code .vsix, CI/CD, install scripts
+⏸️ Phase 9 NEXT          — Backend & Systems (ENV, Process, FFI, HTTP, DB)
 📅 Phase 10              — Std Library & Ergonomics (Iterators, Func ops, Collections)
 📅 Phase 11              — Production Hardening (Errors, DWARF, TLS, WASM)
 ⏸️ Phase 12 DEFERRED     — Self-Hosting (compiler written in Kyle)
@@ -61,18 +68,27 @@ complete feature matrix (what works, what doesn't) and the phase breakdown.
 
 ---
 
+## Known Issues (CI)
+
+| Issue | Status |
+|-------|--------|
+| PIE relocation on x86_64 (R_X86_64_32) | ✅ Fixed — `RelocMode::PIC` in `pipeline.rs` |
+| `error_test.kl` exits non-zero (by design, `Option` return) | ✅ Fixed — CI checks all, runs subset |
+| Release: existing tag blocks re-create | ✅ Fixed — `gh release delete` before create |
+| Node.js 20 deprecation (actions/checkout@v4) | ⚠️ Warning only, non-fatal |
+
 ## Development Commands
 
 ```bash
 cargo build --workspace                    # Build all crates
 cargo run --bin kl -- run <file.kl>        # Compile and run a Kyle file
-cargo run --bin kl -- build <file.kl>       # Compile to native binary
-cargo run --bin kl -- check <file.kl>      # Type-check only
-cargo run --bin kl -- new <project>         # Create new project
+cargo run --bin kl -- build <file.kl>      # Compile to native binary
+cargo run --bin kl -- check <file.kl>      # Type-check only (fast)
+cargo run --bin kl -- new <project>        # Create new project
 cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools  # Run tests
 ```
 
-**Verify before any change:** build + 101 tests must pass.
+**Verify before any change:** build + 101 tests must pass. CI runs on push.
 
 ---
 
