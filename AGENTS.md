@@ -79,15 +79,14 @@ complete feature matrix (what works, what doesn't) and the phase breakdown.
 | Install: `set -o pipefail` fatal in dash (Ubuntu `sh`) | ✅ Fixed — conditional pipefail only in bash |
 | Linker: runtime lib path mismatch (`lib/klc/` vs `lib/kl/`) | ✅ Fixed — `find_runtime_lib()` looks in `lib/kl/` |
 
-## Release v0.2.0
+## Release v0.2.1
 
-https://github.com/IT-KYNERA/KYLE/releases/tag/v0.2.0
+https://github.com/IT-KYNERA/KYLE/releases/tag/v0.2.1
 
 | Asset | Platform |
 |-------|----------|
-| `kl-v0.2.0-macos-arm64.tar.gz` | macOS Apple Silicon |
-| `kl-v0.2.0-linux-arm64.tar.gz` | Linux ARM (aarch64) |
-| `kl-0.2.0.vsix` | VS Code extension (universal) |
+| `kl-v0.2.1-macos-arm64.tar.gz` | macOS Apple Silicon |
+| `kl-0.2.1.vsix` | VS Code extension (universal) |
 
 ## Development Commands
 
@@ -153,7 +152,7 @@ kl/
 │
 ├── std/                   ← Standard library (8 .kl modules)
 ├── docs/                  ← 6 specification documents
-├── examples/              ← 50+ example .kl programs
+├── examples/              ← 51+ example .kl programs
 └── vscode-kl/             ← VS Code extension (.vsix)
 ```
 
@@ -202,3 +201,5 @@ export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 | FFI | Foreign Function Interface — calling C library functions from Kyle (Phase 9) |
 | CLI | Command Line Interface — the `kl` binary |
 | DOT-completion | LSP feature: typing `obj.` shows fields/methods (`struct.field`, `obj.method`) |
+| LSP rename | F2 on symbol → renames all references via `textDocument/rename` |
+| LSP formatting | Shift+Option+F → formats code via `textDocument/formatting` |

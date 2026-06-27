@@ -37,6 +37,9 @@ vscode-kl/*.vsix
 Thumbs.db
 Desktop.ini
 
+# === Distribution / Release artifacts ===
+dist/
+
 # === Temporary / Logs ===
 tmp/
 *.log
