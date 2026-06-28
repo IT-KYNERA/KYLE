@@ -1,25 +1,47 @@
 <div align="center">
 
-<img src="vscode-kl/icons/kl_128.png" width="160" alt="Kyle logo">
+<img src="vscode-kl/icons/kl_128.png" width="128" alt="Kyle">
 
 # Kyle
 
-**A backend programming language that doesn't make you choose.**
+**A compiled, statically-typed language for backend systems.**
 
 Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=flat-square)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-101%20passing-6C3FC5?style=flat-square)](#testing)
-[![Platform](https://img.shields.io/badge/platform-macOS%20ARM%20%7C%20Linux%20ARM-6C3FC5?style=flat-square)](#install)
-[![Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=flat-square)](https://rust-lang.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=for-the-badge)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-101%20passing-6C3FC5?style=for-the-badge)](#development)
+[![Platform](https://img.shields.io/badge/platform-macOS%20ARM%20%7C%20Linux%20ARM-6C3FC5?style=for-the-badge)](#platform-support)
+[![Release](https://img.shields.io/badge/release-v0.2.2-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
+[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=for-the-badge)](https://www.rust-lang.org)
 
 </div>
 
 ---
 
-Kyle is a compiled, statically-typed programming language for building backend
-services, CLI tools, and systems software. It compiles to native machine code via
-LLVM — no interpreter, no runtime overhead, no garbage collector.
+## Why Kyle?
+
+Kyle is a single language that gives you the **readability of Python**, the **type
+safety of Rust**, the **simplicity of Go**, and the **performance of C** — without
+the tradeoffs.
+
+| | Kyle | Python | Rust | Go | C |
+|---|---|---|---|---|---|
+| Compiles to native machine code | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Static typing | ✅ | ❌ | ✅ | ✅ | ❌ |
+| Generics | ✅ | partial | ✅ | ✅ | ❌ |
+| Pattern matching | ✅ | ❌ | ✅ | partial | ❌ |
+| RAII (no GC, no manual free) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| No borrow checker / lifetimes | ✅ | ✅ | ❌ | ✅ | ❌ |
+| No garbage collector | ✅ | ❌ | ✅ | ❌ | ✅ |
+| No null / no exceptions | ✅ | ❌ | ✅ | ❌ | ❌ |
+| First-class closures | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Error values (not exceptions) | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Compiles in seconds | ✅ | — | ❌ | ✅ | ✅ |
+| Single binary, zero runtime | ✅ | ❌ | ✅ | ✅ | ❌ |
+
+---
+
+## At a Glance
 
 ```kl
 import http
@@ -37,50 +59,76 @@ fn get_users(req: http.Request, res: http.Response):
     res.json(users)
 ```
 
+- **Indentation-based** — no braces, no semicolons
+- **Optional types** — type inference by default, annotate when you want
+- **Mutability explicit** — `mut x = 10` for mutable, `x = 10` for immutable
+- **`this`** for instance reference, **no `self`**
+- **Errors are values** — return `T!` and propagate with `?`
+
+---
+
+## Quick Start
+
+```bash
+# 1. Install Kyle (macOS / Linux)
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
+
+# 2. Install the VS Code extension (optional, but recommended)
+curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
+code --install-extension /tmp/kl.vsix
+
+# 3. Create and run a project
+kl new hello
+cd hello
+kl run
+```
+
+You should see something like:
+
+```
+Hello from hello v0.1.0!
+```
+
+That's it. No toolchain to set up, no PATH gymnastics, no system dependencies.
+
 ---
 
 ## Install
 
-One command for all supported platforms — the script auto-detects your OS and
-architecture:
+Kyle is distributed as a single static binary. The install script auto-detects
+your OS and architecture.
+
+### macOS / Linux
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
-**Supported platforms:**
-
-| Platform | Status |
-|----------|--------|
-| macOS ARM (Apple Silicon) | ✅ |
-| Linux ARM (aarch64) | ✅ |
-| macOS Intel | 📅 Future |
-| Linux x64 | 📅 Future |
-| Windows x64 | 📅 Future |
+The installer downloads the latest pre-compiled release, places `kl` in
+`~/.kl/bin` (or `/usr/local/bin` if writable), and adds it to your `PATH`.
 
 ### Verify
 
 ```bash
 kl --version
+# kl v0.2.2
 ```
-
-No dependencies required. The installer downloads a pre-compiled native binary.
 
 ### VS Code Extension
 
+For syntax highlighting, autocomplete, hover, go-to-definition, semantic
+coloring, and built-in snippets:
+
 ```bash
-curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/download/v0.2.1/kl-0.2.1.vsix
+curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
 code --install-extension /tmp/kl.vsix
 ```
 
-Or download `kl-0.2.1.vsix` from the
-[latest release](https://github.com/IT-KYNERA/KYLE/releases/latest)
-and install via `code --install-extension kl-0.2.1.vsix`.
+Then in VS Code, run **Developer: Reload Window** (Cmd+Shift+P) to activate it.
 
-### Building from Source
+### Build from Source
 
-> You only need this if you want to contribute to the compiler itself.
-> For everyday use, use the one-line installer above.
+If you want to hack on the compiler itself:
 
 ```bash
 git clone https://github.com/IT-KYNERA/KYLE
@@ -88,73 +136,23 @@ cd kl
 cargo build --workspace
 ```
 
-The compiled binary is at `target/debug/kl`.
+See [`docs/04-compiler-architecture.md`](docs/04-compiler-architecture.md) for
+the internals.
 
 ---
 
-## Quick Start
+## Platform Support
 
-```bash
-# Create a new project
-kl new myapp
-cd myapp
+| Platform | Status |
+|---|---|
+| macOS ARM (Apple Silicon) | ✅ Supported |
+| Linux ARM (aarch64) | ✅ Supported |
+| Linux x64 | 📅 Planned |
+| macOS Intel | 📅 Planned |
+| Windows x64 | 📅 Planned |
 
-# Run it
-kl run
-# → Hello from myapp v0.1.0!
-# → args: 0
-
-# Build a release binary
-kl build --release
-# → target/release/myapp
-
-# Type-check without compiling
-kl check src/main.kl
-```
-
-### Project Structure
-
-`kl new` creates a professional project layout:
-
-```
-myapp/
-├── src/
-│   └── main.kl           ← entry point (fn main)
-├── tests/
-│   └── test_main.kl      ← test stub
-├── kl.toml                ← project manifest
-└── .gitignore             ← target/, build artifacts
-```
-
----
-
-## Hello, World
-
-```kl
-fn main(args: [str]) -> i32:
-    println("Hello, World!")
-    return 0
-```
-
-```console
-$ kl run hello.kl
-Hello, World!
-```
-
----
-
-## Why Kyle?
-
-| Problem | Kyle's Solution |
-|---------|-----------------|
-| Python is too slow | Compiled to native code via LLVM |
-| Rust is too complex | No borrow checker, no lifetimes, no `self` |
-| Go is too limited | Full generics, enums, pattern matching |
-| TypeScript isn't native | True native compilation, zero runtime |
-| C has no safety | Strong typing, RAII, no nulls, no exceptions |
-
-Kyle gives you the **readability of Python**, the **type safety of Rust**, the
-**simplicity of Go**, and the **performance of C** — all in one language.
+The install script is ready for new platforms — each new release adds a new
+`<platform>.tar.gz` asset, and the script picks the right one.
 
 ---
 
@@ -163,12 +161,13 @@ Kyle gives you the **readability of Python**, the **type safety of Rust**, the
 ### Variables & Types
 
 ```kl
-name = "Kyle"          # immutable by default
-mut count = 0          # mutable with `mut`
-PI = 3.14159           # constants (UPPERCASE)
+name = "Kyle"           # immutable by default
+mut count = 0           # mutable with `mut`
+PI = 3.14159            # constant (UPPERCASE convention)
 
-x: i32 = 42            # explicit type annotation
-items: [str] = ["a"]   # list of strings
+x: i32 = 42             # explicit type
+items: [str] = ["a"]    # list of strings
+point: (i32, i32) = (3, 4)
 ```
 
 ### Functions & Closures
@@ -177,7 +176,7 @@ items: [str] = ["a"]   # list of strings
 fn add(a: i32, b: i32) -> i32:
     return a + b
 
-# Generic function
+# Generic
 fn first<T>(items: [T]) -> Option<T>:
     if len(items) > 0:
         return Some(items[0])
@@ -187,7 +186,7 @@ fn first<T>(items: [T]) -> Option<T>:
 double = (x: i32) => x * 2
 ```
 
-### Structs & Classes
+### Structs, Enums, Classes
 
 ```kl
 struct Point:
@@ -196,6 +195,10 @@ struct Point:
 
 p = Point { x: 10, y: 20 }
 println(p.x)            # 10
+
+enum Result:
+    Ok(i32)
+    Err(str)
 
 class Counter(start: i32):
     count: i32
@@ -211,19 +214,24 @@ c = Counter(10)
 println(c.increment())  # 11
 ```
 
-### Enums & Pattern Matching
+### Pattern Matching
 
 ```kl
-enum Result:
-    Ok(i32)
-    Err(str)
-
 match parse("123"):
     Ok(v)  => println("got: " + str(v))
     Err(e) => println("error: " + e)
+
+# Match as expression
+label = match x:
+    0 => "zero"
+    1 => "one"
+    _ => "many"
 ```
 
 ### Error Handling
+
+Errors are values, not exceptions. Functions that can fail return `T!`, and `?`
+propagates them.
 
 ```kl
 fn div(a: i32, b: i32) -> i32!:
@@ -231,43 +239,19 @@ fn div(a: i32, b: i32) -> i32!:
         return error("division by zero")
     return a / b
 
-# Propagate errors with ?
 result = div(10, 2)?    # 5 (or propagates the error)
 ```
 
-### Optional Chaining
+### Optionals
 
 ```kl
 name = user?.name       # None if user is None
 age = user?.age ?: 0    # default 0 if None
 ```
 
-### Async / Await
-
-```kl
-task = async fetch_data()    # spawn concurrent task
-result = await task          # wait for result
-```
-
-### Dict / Map
-
-```kl
-users = {"alice": 30, "bob": 25}
-users["charlie"] = 35
-println(users["alice"])       # 30
-println(users.len())           # 3
-```
-
 ### Control Flow
 
 ```kl
-if x > 0:
-    println("positive")
-elif x < 0:
-    println("negative")
-else:
-    println("zero")
-
 for i in 0..5:
     println(i)
 
@@ -275,15 +259,6 @@ for item in items:
     process(item)
 else:
     println("list was empty")
-
-# Match as expression
-label = match x:
-    0 => "zero"
-    1 => "one"
-    _ => "many"
-
-# Ternary
-status = age >= 18 ? "adult" : "minor"
 
 # Guard (early return)
 fn process(data: [i32]):
@@ -298,6 +273,13 @@ fn process_file(path: str):
     # file auto-closed on return
 ```
 
+### Async / Await
+
+```kl
+task = async fetch_data()    # spawn concurrent task
+result = await task          # wait for result
+```
+
 ### Spread & Slicing
 
 ```kl
@@ -308,143 +290,148 @@ c = a[0..2]          # [1, 2]
 
 ---
 
+## Features
+
+| | |
+|---|---|
+| Compiled to native via LLVM 18 | RAII memory management |
+| Indentation-based blocks | No GC, no manual `free()` |
+| Static typing with inference | No null, no exceptions |
+| Generics (functions & structs) | First-class closures |
+| Pattern matching + match expressions | Async / await (thread-based) |
+| Structs, classes, enums | Dict / Map literals |
+| Inheritance + polymorphism | `defer` / `guard` for control flow |
+| Error values with `?` propagation | Ternary, spread, range slicing |
+| Mutability explicit (`mut`) | Standard library included |
+| Class visibility (`_`, `__`) | Type aliases |
+| Language Server (LSP) | Code formatter (`kl fmt`) |
+| VS Code extension with semantic coloring | Package manager (`kl new`, `kl add`) |
+
+---
+
 ## CLI Reference
 
 | Command | Description |
-|---------|-------------|
-| `kl new <project>` | Create a new project (src/, tests/, kl.toml, .gitignore) |
-| `kl build [<file>]` | Compile to native binary (project mode if no file) |
+|---|---|
+| `kl new <name>` | Create a new project |
 | `kl run [<file>]` | Compile and execute |
-| `kl build --release` | Compile with optimizations (target/release/) |
-| `kl check <file>` | Type-check without codegen |
-| `kl parse <file>` | Parse and print AST |
-| `kl mir <file>` | Print MIR (intermediate representation) |
-| `kl fmt <file>` | Format source code in-place |
+| `kl build [<file>]` | Compile to native binary |
+| `kl build --release` | Optimised binary in `target/release/` |
+| `kl check <file>` | Type-check only (no codegen, fast) |
+| `kl parse <file>` | Print the AST |
+| `kl mir <file>` | Print the MIR (mid-level IR) |
+| `kl fmt <file>` | Format source in-place |
 | `kl test` | Run project tests |
-| `kl add <dep@ver>` | Add a dependency to kl.toml |
-| `kl remove <dep>` | Remove a dependency |
+| `kl add <dep@ver>` | Add a dependency to `kl.toml` |
 | `kl info` | Show project info |
-| `kl lsp` | Start language server (for editor integration) |
-| `kl --version` | Show version |
+| `kl lsp` | Start the language server |
+| `kl --version` | Show the compiler version |
 
 ---
 
-## VS Code Extension Features
+## Project Layout
 
-- **Syntax highlighting** — keywords, types, builtins, strings, numbers, operators
-- **Semantic coloring** — variables, types, functions, params colored by meaning
-- **Autocompletion** — 44 builtins, all declarations, keywords, with prefix filter
-- **Dot-completions** — typing `obj.` shows fields/methods (struct, class, enum, str, list, dict)
-- **Scope-aware** — local variables, function params, block-scoped declarations
-- **Go-to-definition** — jump to declaration of any symbol
-- **Hover** — function signatures, builtin docs, identifier info
-- **Snippets** — 20 common patterns (fn, class, enum, match, for, if, etc.)
-- **Commands** — `KL: Run`, `KL: Build`, `KL: Check` from the command palette
+`kl new <name>` creates a clean, conventional layout:
 
----
-
-## Feature Matrix
-
-| Feature | Status |
-|---------|--------|
-| Variables, functions, control flow | ✅ |
-| Structs / classes with inheritance | ✅ |
-| Enums + pattern matching | ✅ |
-| Generics (structs + functions) | ✅ |
-| Closures (first-class functions) | ✅ |
-| Async / await (thread-based) | ✅ |
-| Dict / Map literals | ✅ |
-| Error types (`!` / `?`) | ✅ |
-| Optional chaining (`?.`) | ✅ |
-| Defer, guard | ✅ |
-| Match as expression | ✅ |
-| Ternary operator | ✅ |
-| Spread operator | ✅ |
-| Range slicing | ✅ |
-| Type aliases | ✅ |
-| String operations | ✅ |
-| RAII memory (no GC) | ✅ |
-| Package manager | ✅ |
-| Code formatter | ✅ |
-| Language server (LSP) | ✅ |
-| VS Code extension | ✅ |
-| **FFI (extern "C")** | 🔜 Phase 9 |
-| **HTTP server / client** | 🔜 Phase 9 |
-| **Database drivers** | 🔜 Phase 9 |
-| **Iterators / map / filter** | 🔜 Phase 10 |
-
----
-
-## Testing
-
-```bash
-# Run all unit tests (101 tests)
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
-
-# Run all example programs (50+ programs)
-for f in examples/*.kl; do kl run "$f"; done
+```
+myapp/
+├── src/
+│   └── main.kl           ← entry point (fn main)
+├── tests/
+│   └── test_main.kl
+├── kl.toml               ← project manifest
+└── .gitignore
 ```
 
 ---
 
 ## Examples
 
-See the [`examples/`](examples/) directory for 50+ working programs:
+The `examples/` directory contains 50+ working programs:
 
 ```bash
-kl run examples/hello.kl          # Hello, World!
-kl run examples/fibonacci.kl     # fibonacci(10) = 55
-kl run examples/enum_test.kl     # enums + match
-kl run examples/async_test.kl   # async/await
-kl run examples/generic_struct.kl  # generics
-kl run examples/dict_test.kl     # dict/map
-kl run examples/closure_test.kl  # closures
-kl run examples/json_test.kl     # JSON parse/stringify
+kl run examples/hello.kl              # Hello, World!
+kl run examples/fibonacci.kl         # fibonacci(10) = 55
+kl run examples/enum_test.kl         # enums + match
+kl run examples/async_test.kl        # async / await
+kl run examples/generic_struct.kl    # generics
+kl run examples/dict_test.kl         # dict / map
+kl run examples/closure_test.kl      # closures
+kl run examples/json_test.kl         # JSON parse / stringify
+kl run examples/input_prompt_test.kl # input("prompt")
+kl run examples/inheritance_test.kl  # class inheritance
+kl run examples/polymorphism_test.kl # method override
 ```
 
 ---
 
 ## Documentation
 
-Comprehensive documentation lives in [`docs/`](docs/):
+The full language specification lives in [`docs/`](docs/):
 
-| Document | Content |
-|----------|---------|
-| [Vision](docs/00-vision.md) | Philosophy, design principles, language comparison |
-| [Language Reference](docs/01-language-reference.md) | Complete syntax + EBNF grammar + status per construct |
-| [Types, Errors & Memory](docs/02-types-errors-memory.md) | Type system, error handling, RAII, ABI, FFI |
-| [Modules, Packages & Tooling](docs/03-modules-packages-tooling.md) | CLI reference, getting started, VS Code |
-| [Compiler Architecture](docs/04-compiler-architecture.md) | 9-crate pipeline, repo layout, runtime |
-| [Roadmap & Status](docs/05-roadmap-status.md) | Phases 0-13, implementation matrix, release checklist |
+| | |
+|---|---|
+| [00 — Vision](docs/00-vision.md) | Philosophy, design principles, comparison |
+| [01 — Language Reference](docs/01-language-reference.md) | Complete syntax + EBNF grammar + status per construct |
+| [02 — Types, Errors & Memory](docs/02-types-errors-memory.md) | Type system, error handling, RAII, ABI |
+| [03 — Modules, Packages & Tooling](docs/03-modules-packages-tooling.md) | CLI reference, getting started, VS Code |
+| [04 — Compiler Architecture](docs/04-compiler-architecture.md) | 9-crate pipeline, repo layout, runtime |
+| [05 — Roadmap & Status](docs/05-roadmap-status.md) | Phases 0–13, implementation matrix, release checklist |
+
+---
+
+## Development
+
+The compiler is written in pure Rust and uses LLVM 18 via `inkwell`.
+
+```bash
+git clone https://github.com/IT-KYNERA/KYLE
+cd kl
+cargo build --workspace
+cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
+```
+
+**Tests:** 101 unit tests, 0 failures.
+
+```bash
+# Run all unit tests
+cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
+
+# Check every example in examples/
+for f in examples/*.kl; do kl check "$f"; done
+```
 
 ---
 
 ## Roadmap
 
-Kyle is developed in phases. See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md)
-for the full breakdown.
-
 | Phase | Focus | Status |
-|-------|-------|--------|
-| 0-6 | Language design + compiler + all syntax features | ✅ Complete |
-| 7 | Cross-platform (macOS ARM + Linux ARM) | 🔶 Current |
-| 8 | Tooling polish (VS Code, LSP, distribution) | 🔶 Current |
-| 9 | Backend & systems (FFI, HTTP, DB, ENV) | ⏸️ Next |
-| 10 | Std library & ergonomics (iterators, collections) | 📅 Planned |
-| 11 | Production hardening (debug, errors, testing) | 📅 Planned |
-| 12 | Self-hosting (compiler in Kyle) | ⏸️ Deferred |
-| 13 | Ecosystem (registry, framework, WASM) | 📅 Future |
+|---|---|---|
+| 0–6 | Language design + compiler + all syntax features | ✅ |
+| 7 | Cross-platform: macOS ARM + Linux ARM | ✅ |
+| 8 | Tooling: VS Code, LSP, distribution, CI/CD | ✅ |
+| 9 | Backend & systems: FFI, HTTP, DB, ENV | 🔜 Next |
+| 10 | Std library: iterators, collections, ergonomics | 📅 |
+| 11 | Production hardening: errors, DWARF, TLS, WASM | 📅 |
+| 12 | Self-hosting (compiler written in Kyle) | ⏸ Deferred |
+| 13 | Ecosystem: registry, framework, website | 📅 |
+
+See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for the full
+breakdown and feature matrix.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome.
 
-1. Read `AGENTS.md` for project context and design decisions
-2. Check `docs/05-roadmap-status.md` for current priorities
-3. Ensure `cargo build --workspace` and all 101 tests pass before submitting
-4. Follow the existing code style (Rust standard, `cargo fmt`)
+1. Read [`AGENTS.md`](AGENTS.md) for project context, design decisions, and
+   frozen rules
+2. Check [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for current
+   priorities
+3. Make sure `cargo build --workspace` succeeds and all 101 tests pass
+4. Follow Rust standard style (`cargo fmt`)
+5. Open a pull request against `main`
 
 ---
 
