@@ -1,6 +1,6 @@
 # Compiler Architecture
 
-> How the Kyle compiler is organized: the 9 Rust crates, the 7-stage
+> How the Kyle compiler is organized: the 9 Rust crates, the 9-stage
 > pipeline, and the runtime it links against.
 
 ---
@@ -8,15 +8,15 @@
 ## 1. The Pipeline
 
 ```
-   ┌──────────┐    ┌───────┐    ┌────────┐    ┌──────────┐    ┌─────────┐
-   │  Source  │ →  │ Lexer │ →  │ Parser │ →  │ Semantic │ →  │   MIR   │
-   │  .kl     │    │       │    │        │    │  + Types │    │ Lowering│
-   └──────────┘    └───────┘    └────────┘    └──────────┘    └────┬────┘
-                                                                     │
-   ┌──────────┐    ┌─────────┐    ┌─────────┐    ┌──────────┐         │
-   │  Binary  │ ←  │  Linker │ ←  │  LLVM   │ ←  │Optimize+ │ ←───────┘
-   │ kl       │    │         │    │ Codegen │    │Ownership │
-   └──────────┘    └─────────┘    └─────────┘    └──────────┘
+   ┌──────────┐    ┌───────┐    ┌────────┐    ┌────────┐    ┌──────────┐    ┌────────┐
+   │  Source  │ →  │ Lexer │ →  │ Parser │ →  │  HIR   │ →  │ Semantic │ →  │  MIR   │
+   │  .kl     │    │       │    │        │    │ Build  │    │  + Types │    │Lowering│
+   └──────────┘    └───────┘    └────────┘    └────────┘    └──────────┘    └────┬───┘
+                                                                                  │
+   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
+   │  Binary  │ ←  │  Linker  │ ←  │ Codegen  │ ←  │   SSA    │ ←  │  Move    │ ←─┘
+   │   .kl    │    │          │    │(LLVM 18) │    │  Lower   │    │ Analysis │
+   └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
 ```
 
 Each stage is implemented as a separate Rust crate and is independently
@@ -32,8 +32,9 @@ kl/
 ├── crates/
 │   ├── klc_core/        ← AST, span, types, diagnostics
 │   ├── klc_frontend/    ← Lexer, parser
+│   ├── klc_hir/         ← HIR definition, builder, HIR-level validation
 │   ├── klc_semantic/    ← Symbol table, type checker, scope resolver
-│   ├── klc_mir/         ← MIR definition, lowering, optimizer, ownership
+│   ├── klc_mir/         ← MIR definition, lowering, optimizer, move analysis, SSA
 │   ├── klc_backend/     ← LLVM 18 codegen (inkwell), linker driver
 │   ├── klc_driver/      ← Pipeline orchestrator (klc::run)
 │   ├── klc_cli/         ← Command-line interface (the `kl` binary)
@@ -45,10 +46,11 @@ kl/
 |---|---|---|---|
 | `klc_core` | Foundation types | (none) | AST nodes, type system, source maps, diagnostic reporters |
 | `klc_frontend` | Lexing + parsing | Source string | `Program` (AST) |
-| `klc_semantic` | Name resolution + type checking | `Program` | `Program` (typed) + `SymbolTable` |
-| `klc_mir` | Mid-level IR + passes | `Program` | `MirModule` (functions, types, control flow) |
+| `klc_hir` | HIR building + validation | `Program` (AST) | `HirModule` (HIR) |
+| `klc_semantic` | Name resolution + type checking | `HirModule` | `HirModule` (typed) + `SymbolTable` |
+| `klc_mir` | Mid-level IR + passes | `HirModule` | `MirModule` (functions, types, control flow) |
 | `klc_backend` | LLVM codegen + linking | `MirModule` | Native executable |
-| `klc_driver` | Glue between stages | (none) | `klc::run(source, options) -> Result` |
+| `klc_driver` | Pipeline orchestrator | (none) | `klc::run(source, options) -> Result` |
 | `klc_cli` | Command-line tool | argv | Compiled binary, stdout/stderr |
 | `klc_runtime` | C-ABI runtime library | (linked at compile time) | Provides memory, I/O, string ops to compiled Kyle code |
 | `klc_tools` | Out-of-band tools (LSP, fmt) | Source string | LSP responses, formatted source |
@@ -63,11 +65,13 @@ Converts source text into a stream of tokens.
 
 **Recognized token kinds:**
 
-- 38 keywords (`fn`, `class`, `if`, `match`, `mut`, `and`, `or`, ...)
+- 40+ keywords (`fn`, `class`, `if`, `match`, `and`, `or`, `abstract`, `final`, ...)
 - Literals: integer (decimal, hex `0x`, binary `0b`, with `_` separators), float, string (with `{...}` interpolation), char, `true`, `false`, `None`
 - Identifiers (alphanumeric + `_`, starting with letter or `_`)
-- Operators: arithmetic, comparison, logical, bitwise, assignment, range, spread, ternary, optional chain, error prop
+- Operators: arithmetic, comparison, logical, bitwise, range, spread, ternary, optional chain, error prop
+- Assignment operators: `=` (immutable bind), `:=` (`Walrus`, mutable bind), `::=` (`ConstDecl`, constant declaration)
 - Indentation: `INDENT` and `DEDENT` (the lexer implements Python-style indent/dedent based on leading whitespace)
+- Modifier keywords: `Abstract`, `Final` (class/variant modifiers)
 - Punctuation: `(`, `)`, `[`, `]`, `{`, `}`, `,`, `:` (with no space), `;` (optional)
 
 The lexer does **not** validate syntax — it just tokenizes. Syntax errors
@@ -91,24 +95,59 @@ from the lexer to identify block bodies. There is no `end` keyword and no
 **Error recovery:** The parser reports the first syntax error and stops. It
 does not attempt to recover and report multiple errors.
 
+**New syntax handled:**
+
+- `:=` (walrus) and `::=` (const-decl) are parsed as `DeclKind::Variable` with
+  mutability/constancy flags on the declaration node
+- `abstract class` / `final class` are parsed as modifiers on the class declaration
+  (the lexer emits `Abstract` / `Final` tokens before `class`/`variant`)
+- `T?` is parsed as `TypeKind::Optional(inner)` — sugar for `Option<T>` that is
+  normalized during HIR building
+
 ---
 
-## 5. Stage 3: Semantic Analysis (`klc_semantic`)
+## 5. Stage 3: HIR Build (`klc_hir`)
 
-Resolves names to symbols and checks types.
+Converts the parser's AST into the High-level Intermediate Representation
+(HIR). The HIR is a desugared, simplified tree that is easier for the
+semantic analyzer and subsequent passes to consume.
+
+**Output:** `HirModule { items: Vec<HirItem> }`
+
+**Desugarings performed:**
+
+- `T?` is normalized to `Option<T>` (the internal representation)
+- `:=` (walrus) and `::=` (const-decl) are lowered to immutable variable
+  declarations with mutability/constancy flags on the `HirBinding`
+- `abstract class` / `final class` modifiers are stored as flags on the
+  `HirClass` node
+- String interpolation (`"hello {name}"`) is decomposed into a sequence
+  of literal and interpolation fragments
+- Tuple unpacking in assignments is normalized
+
+**Validation:** The HIR builder also checks for basic well-formedness
+constraints not checked by the parser (e.g. duplicate declarations in the
+same scope, invalid modifier combinations).
+
+---
+
+## 6. Stage 4: Semantic Analysis (`klc_semantic`)
+
+Resolves names to symbols and checks types. Operates on the HIR rather
+than the raw AST.
 
 Three sub-phases:
 
 ### 5.1 Scope Resolution
 
-Walks the AST building a `SymbolTable` — a stack of scopes, one per block
+Walks the HIR building a `SymbolTable` — a stack of scopes, one per block
 and one per class. Every name reference is resolved to a `Symbol` that
 records its kind (variable, function, class, etc.) and its type.
 
 ### 5.2 Type Checking
 
 Verifies that every expression has a well-defined type, that assignments
-match, and that function calls pass the right number of types of arguments.
+match, and that function calls pass the right number and types of arguments.
 
 ### 5.3 Contract Validation
 
@@ -116,14 +155,14 @@ For each class that declares `class X: Contract`, verifies that `X`
 provides all the methods declared in `Contract`. (Generic contracts are
 not yet supported.)
 
-**Output:** A typed `Program`, a `SymbolTable`, and a list of
+**Output:** A typed `HirModule`, a `SymbolTable`, and a list of
 `Diagnostic` (errors and warnings).
 
 ---
 
-## 6. Stage 4: MIR Lowering (`klc_mir::lower`)
+## 7. Stage 5: MIR Lowering (`klc_mir::lower`)
 
-Converts the typed AST into Kyle's Mid-level Intermediate Representation
+Converts the typed HIR into Kyle's Mid-level Intermediate Representation
 (MIR). MIR is a simpler, more uniform form that is easier to analyze and
 optimize.
 
@@ -145,7 +184,7 @@ specifically for Kyle's semantics. The backend translates MIR → LLVM IR.
 
 ---
 
-## 7. Stage 5: MIR Optimization (`klc_mir::optimize`)
+## 8. Stage 6: MIR Optimization (`klc_mir::optimize`)
 
 Constant-folding and dead-code elimination passes on the MIR.
 
@@ -162,22 +201,52 @@ Constant-folding and dead-code elimination passes on the MIR.
 
 ---
 
-## 8. Stage 6: Ownership Pass (`klc_mir::ownership`)
+## 9. Stage 7: Move Analysis (`klc_mir::move_check`)
 
-Inserts `kl_retain` / `kl_release` calls to manage refcounting automatically.
+Performs move-semantics analysis on the MIR to ensure that no value is
+used after it has been moved. Eliminates the need for refcounting.
 
-**Tracked operations (currently):**
+**What is tracked:**
 
-- `kl_concat` results (string concatenation allocates)
-- `kl_list_new` / `kl_dict_new` results
-- Direct `kl_alloc` results
+- Every variable binding has a move state (live / moved / consumed)
+- Function call arguments are consumed (moved) unless the parameter type
+  is `Copy`
+- Assignment to a previously bound name (`x = new_val`) moves out the
+  old value
+- Return values from functions are moved to the caller
 
-**Known limitation:** Forwarded values (e.g. `let y = f(x); use(y)`) are
-conservatively considered leaks. This will be addressed in Phase 11.
+**Enforcement:**
+
+- A compile error is emitted if a moved value is referenced again
+- The analysis handles all control-flow paths (branches, loops, early
+  returns) using a data-flow framework on the MIR control-flow graph
+
+**Future (Phase 11+):**
+
+- Partial moves (moving one field of a class while keeping others alive)
+- Destructors (`drop`) for types with cleanup logic
 
 ---
 
-## 9. Stage 7: LLVM Codegen (`klc_backend`)
+## 10. Stage 8: SSA Lowering (`klc_mir::ssa`)
+
+Lowers the moved-checked MIR into Static Single Assignment (SSA) form,
+which is the primary input for LLVM codegen.
+
+**Transformations:**
+
+- Each mutable variable is decomposed into a chain of SSA values, one per
+  assignment
+- Phi (φ) nodes are inserted at join points in the control-flow graph
+- Moves are translated to value forwarding (no runtime copy unless the
+  type requires `Clone`)
+
+**Output:** `SsaModule { functions: Vec<SsaFunction> }` — a representation
+ready for LLVM IR generation.
+
+---
+
+## 11. Stage 9: LLVM Codegen (`klc_backend`)
 
 Translates MIR to LLVM IR using `inkwell` (Rust bindings for LLVM 18), then
 invokes the LLVM toolchain to compile to an object file, and links the
@@ -194,14 +263,17 @@ runtime library `libklc_runtime.a` is linked statically.
 
 ---
 
-## 10. The Runtime (`klc_runtime`)
+## 12. The Runtime (`klc_runtime`)
 
 A static C-ABI library linked into every compiled Kyle program. It
 provides the primitive operations that the compiler lowers calls to.
+The runtime is being migrated from refcounting to move semantics;
+refcounting functions remain for backward compatibility during the
+transition (Phase 6).
 
 | File | Responsibility |
 |---|---|
-| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — refcounting heap |
+| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — heap management (refcounting legacy) |
 | `string.rs` | `kl_concat`, `kl_strlen`, `kl_str_to_*`, `kl_i64_to_str`, `kl_str_to_i64` |
 | `list.rs` | `kl_list_new`, `kl_list_push`, `kl_list_pop`, `kl_list_get`, `kl_list_set`, `kl_list_len`, `kl_list_slice`, `kl_list_extend` |
 | `dict.rs` | `kl_dict_new`, `kl_dict_set`, `kl_dict_get`, `kl_dict_len` |
@@ -219,13 +291,14 @@ The runtime is written in **pure Rust** with `#[unsafe(no_mangle)]` and
 
 ---
 
-## 11. The Standard Library (`std/`)
+## 13. The Standard Library (`std/`)
 
-Eight `.kl` modules, all written in Kyle itself:
+Eight `.kl` modules, all written in Kyle itself. The public syntax for
+optional types is `T?` (internally represented as `Option<T>`).
 
 | Module | Purpose |
 |---|---|
-| `core` | `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none` |
+| `core` | `T?`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none` |
 | `math` | `absolute`, `pow`, `sqrt`, `gcd`, `min`, `max`, `clamp` |
 | `io` | `read_file`, `write_file` (file convenience wrappers) |
 | `str` | `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str` |
@@ -236,7 +309,7 @@ Eight `.kl` modules, all written in Kyle itself:
 
 ---
 
-## 12. Compilation Modes
+## 14. Compilation Modes
 
 | Mode | Trigger | Optimization | Output |
 |---|---|---|---|
@@ -248,14 +321,14 @@ optimization level passed to LLVM.
 
 ---
 
-## 13. Development Commands
+## 15. Development Commands
 
 ```bash
 # Build all crates
 cargo build --workspace
 
-# Run all 101 unit tests
-cargo test -p klc_core -p klc_frontend -p klc_semantic \
+# Run all unit tests
+cargo test -p klc_core -p klc_frontend -p klc_hir -p klc_semantic \
           -p klc_mir -p klc_runtime -p klc_tools
 
 # Build the kl binary in release mode
@@ -273,4 +346,4 @@ cargo build --release --bin kl
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.3.0 · Last updated: 2026-06-28*

@@ -170,6 +170,12 @@ impl Lexer {
                     if self.current() == '.' {
                         self.advance();
                         Some(TokenKind::DotDotDot)
+                    } else if self.current() == '=' {
+                        self.advance();
+                        Some(TokenKind::DotDotEquals)
+                    } else if self.current() == '<' {
+                        self.advance();
+                        Some(TokenKind::DotDotLess)
                     } else {
                         Some(TokenKind::DotDot)
                     }
@@ -178,7 +184,30 @@ impl Lexer {
                 }
             }
             ',' => { self.advance(); Some(TokenKind::Comma) }
-            ':' => { self.advance(); Some(TokenKind::Colon) }
+            ':' => {
+                self.advance();
+                if self.current() == '=' {
+                    self.advance();
+                    Some(TokenKind::Walrus)
+                } else if self.current() == ':' {
+                    self.advance();  // consume second ':'
+                    if self.current() == '=' {
+                        self.advance();
+                        Some(TokenKind::ConstDecl)
+                    } else {
+                        // Push the second colon as a pending token
+                        let col2 = self.make_token(TokenKind::Colon, &Position {
+                            line: self.line,
+                            column: self.column.saturating_sub(1),
+                            offset: self.pos - 1,
+                        });
+                        self.pending_tokens.push(col2);
+                        Some(TokenKind::Colon)
+                    }
+                } else {
+                    Some(TokenKind::Colon)
+                }
+            }
             '?' => {
                 self.advance();
                 if self.current() == '.' { self.advance(); Some(TokenKind::QuestionDot) }
@@ -190,6 +219,7 @@ impl Lexer {
             ']' => { self.advance(); Some(TokenKind::RBracket) }
             '{' => { self.advance(); Some(TokenKind::LBrace) }
             '}' => { self.advance(); Some(TokenKind::RBrace) }
+            '@' => { self.advance(); Some(TokenKind::At) }
             _ => None,
         } {
             return Some(self.make_token(kind, &start_pos));
@@ -234,8 +264,10 @@ impl Lexer {
         match word {
             "fn" => TokenKind::Fn,
             "class" => TokenKind::Class,
-            "abs" => TokenKind::Abs,
-            "struct" => TokenKind::Struct,
+            "abstract" => TokenKind::Abstract,
+            "abs" => TokenKind::Abstract,     // temporary alias for compat
+            "final" => TokenKind::Final,
+            "struct" => TokenKind::Struct,    // temporary alias for final class
             "enum" => TokenKind::Enum,
             "contract" => TokenKind::Contract,
             "if" => TokenKind::If,
@@ -266,7 +298,6 @@ impl Lexer {
             "as" => TokenKind::As,
             "get" => TokenKind::Get,
             "set" => TokenKind::Set,
-            "mut" => TokenKind::Mut,
             "implements" => TokenKind::Implements,
             "and" => TokenKind::And,
             "or" => TokenKind::Or,
@@ -455,6 +486,11 @@ impl Lexer {
                     self.advance();
                 }
                 '#' => {
+                    // Check for doc comment `##`
+                    let is_doc = self.pos + 1 < self.chars.len() && self.chars[self.pos + 1] == '#';
+                    if is_doc {
+                        self.advance(); // skip first #
+                    }
                     // Line comment: skip to newline.
                     while self.pos < self.chars.len() && self.chars[self.pos] != '\n' {
                         self.advance();
@@ -586,9 +622,9 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let kinds = tokenize("fn class abs struct enum contract if elif else while for in match return break defer guard unsafe async await const loop type None ok error extern");
+        let kinds = tokenize("fn class abstract final struct enum contract if elif else while for in match return break defer guard unsafe async await const loop type None ok error extern");
         assert_eq!(kinds, vec![
-            TokenKind::Fn, TokenKind::Class, TokenKind::Abs, TokenKind::Struct,
+            TokenKind::Fn, TokenKind::Class, TokenKind::Abstract, TokenKind::Final, TokenKind::Struct,
             TokenKind::Enum, TokenKind::Contract, TokenKind::If, TokenKind::Elif,
             TokenKind::Else, TokenKind::While, TokenKind::For, TokenKind::In,
             TokenKind::Match, TokenKind::Return, TokenKind::Break, TokenKind::Defer,
@@ -861,8 +897,16 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_unexpected_character() {
+    fn test_at_token() {
         let kinds = tokenize("@");
+        assert_eq!(kinds.len(), 2);
+        assert_eq!(kinds[0], TokenKind::At);
+        assert_eq!(kinds[1], TokenKind::Eof);
+    }
+
+    #[test]
+    fn test_unexpected_character() {
+        let kinds = tokenize("`");
         assert_eq!(kinds.len(), 2);
         assert!(matches!(&kinds[0], TokenKind::LexError(_)));
         assert_eq!(kinds[1], TokenKind::Eof);

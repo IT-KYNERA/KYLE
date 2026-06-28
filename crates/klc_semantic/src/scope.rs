@@ -316,7 +316,6 @@ impl ScopeResolver {
             Expr::MatchExpr { expression, arms, .. } => {
                 self.resolve_expr(expression);
                 for arm in arms {
-                    self.resolve_expr(&Expr::Identifier { name: "_".to_string(), span: arm.span });
                     // Walk pattern variables and guard
                     if let Some(g) = &arm.guard {
                         self.resolve_expr(g);

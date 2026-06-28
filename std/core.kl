@@ -2,23 +2,23 @@ enum Option<T>:
     None
     Some(T)
 
-fn unwrap_or<T>(opt: Option<T>, default: T) -> T:
+fn unwrap_or<T>(opt: T?, default: T) -> T:
     match opt:
-        Option.Some(v):
+        v:
             v
-        Option.None:
+        none:
             default
 
-fn is_some<T>(opt: Option<T>) -> bool:
+fn is_some<T>(opt: T?) -> bool:
     match opt:
-        Option.Some(_):
+        v:
             true
-        Option.None:
+        none:
             false
 
-fn is_none<T>(opt: Option<T>) -> bool:
+fn is_none<T>(opt: T?) -> bool:
     match opt:
-        Option.Some(_):
+        v:
             false
-        Option.None:
+        none:
             true

@@ -44,6 +44,7 @@ pub enum Pattern {
     Wildcard { span: Span },
     EnumVariant { enum_name: String, variant: String, args: Vec<Pattern>, span: Span },
     IsType { type_: AstType, span: Span },
+    Tuple { elements: Vec<Pattern>, span: Span },
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +266,24 @@ pub struct ElifBranch {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BindingIf {
     pub name: String,
+    pub value: Box<Expr>,
+    pub body: Block,
+    pub else_branch: Option<Block>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct IfLet {
+    pub pattern: Pattern,
+    pub value: Box<Expr>,
+    pub body: Block,
+    pub else_branch: Option<Block>,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WhileLet {
+    pub pattern: Pattern,
     pub value: Box<Expr>,
     pub body: Block,
     pub else_branch: Option<Block>,

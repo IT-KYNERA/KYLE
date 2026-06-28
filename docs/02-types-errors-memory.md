@@ -54,7 +54,13 @@ deliberately simpler and faster to compile.
 
 ```kl
 x: i32 = 42
-mut name: str = "Kyle"
+# immutable — no mut keyword needed
+name: str = "Kyle"
+
+# mutable — use := walrus operator
+name := "Kyle"
+name = "Kyle2"         # allowed: mutable
+
 items: [i32] = [1, 2, 3]
 ```
 
@@ -68,12 +74,15 @@ compile error is reported.
 | `[T]` | List of T | `[1, 2, 3]` |
 | `{K: V}` | Dict with K keys, V values | `{"a": 1, "b": 2}` |
 | `(T, U, ...)` | Tuple | `(1, "hi", 3.14)` |
-| `struct Name { ... }` | User-defined struct | `Point { x: 1, y: 2 }` |
-| `class Name: ...` | User-defined class | `Counter(10)` |
-| `enum Name { ... }` | User-defined enum | `Option.Some(42)` |
+| `final class Name:` | User-defined value class | `Point(1, 2)` |
+| `abstract class Name:` | User-defined abstract class | `Animal` |
+| `enum Name { ... }` | User-defined enum | `Result.Ok(42)` |
 | `Name<T>` | Generic instantiation | `Box<i32>` |
-| `T?` (planned) | Optional T | `i32?` (not yet implemented) |
+| `T?` | Optional T | `i32?` |
 | `T!` | Error-returning T | `i32!` |
+
+Note: `final class` replaces `struct` (which remains as a deprecated alias
+for migration purposes and will be removed before v1.0).
 
 ### 1.5 Generics
 
@@ -109,25 +118,31 @@ same width. Float types follow the same rule: `f32` < `f64`.
 
 Mixing integers and floats (e.g. `i32 + f64`) is a compile error.
 
-### 1.7 Casting (Planned)
+### 1.7 Casting
 
-- [ ] `x as i64` explicit cast — ❌ not implemented
-- [ ] The `as` keyword is currently used only for import aliases
+```kl
+x = 42
+y = x as i64          # explicit cast from i32 to i64
+z = 3.14 as i32       # float to int (truncates)
+c = 65 as char        # int to char
+```
 
-For now, use the implicit widening rules above.
+The `as` keyword performs explicit type conversion. The compiler must be
+able to statically verify the conversion is valid (no runtime type checks).
 
 ---
 
 ## 2. Error Handling
 
 Kyle has **no exceptions**. Errors are values. There are two complementary
-mechanisms: `T!` return types for fallible functions, and `Option<T>` for
-optional values.
+mechanisms: `T!` return types for fallible functions, and `T?` for optional
+values.
 
 ### 2.1 The `T!` Return Type
 
 A function with `-> T!` returns either `T` (success) or an error. Internally
-this is `Option<T>` where `Some(v)` is success and `None` is the error.
+this is represented as `Option<T>` in the runtime, where `Some(v)` is success
+and `None` is the error.
 
 ```kl
 fn parse(s: str) -> i32!:
@@ -144,8 +159,9 @@ is preserved for runtime error messages and debug output.
 
 ### 2.2 The `?` Operator
 
-`expr?` extracts the value from an `Option<T>`. If the option is `None`, the
-current function returns immediately with that `None`.
+`expr?` extracts the value from a `T?` or propagates the error from a `T!`.
+If the value is `None`/error, the current function returns immediately with
+that value.
 
 ```kl
 fn read_int(path: str) -> i32!:
@@ -158,40 +174,42 @@ fn read_int(path: str) -> i32!:
 `?` can only be used in a function with a `T!` return type. Using it in a
 function that returns `T` (not `T!`) is a compile error.
 
-### 2.3 The `Option<T>` Type
+### 2.3 The `T?` Optional Type
 
-`Option<T>` is the standard enum for nullable values:
-
-```kl
-enum Option<T>:
-    Some(T)
-    None
-```
-
-It is matched with `match`:
+`T?` is the syntactic sugar for optional values. It is the only public
+syntax — the internal representation is `Option<T>` but developers never
+write it directly.
 
 ```kl
-match user:
-    Some(u) => process(u)
-    None    => handle_missing()
+name: str? = find_user("alice")    # may or may not exist
 ```
 
-Or accessed with `?.`:
+Matching an optional:
+
+```kl
+match name:
+    Some(n): process(n)
+    None:    handle_missing()
+```
+
+Chained access with `?.`:
 
 ```kl
 name = user?.name        # returns None if user is None
 ```
+
+The match arms use `:` (not `=>`).
 
 ### 2.4 Errors vs. Options — When to Use Which
 
 | Use | When |
 |---|---|
 | `T!` return type | The function can fail for a reason (file not found, parse error) |
-| `Option<T>` | The value is fundamentally optional (lookup miss, missing field) |
+| `T?` | The value is fundamentally optional (lookup miss, missing field) |
 | `T` (no return type) | The function always succeeds |
 
-In practice, `T!` and `Option<T>` are the same type internally (`Option<T>`).
-The `!` is a marker that says "this function may fail and you must handle it".
+In practice, `T!` and `T?` are the same type internally. The `!` is a marker
+that says "this function may fail and you must handle it".
 
 ### 2.5 What is NOT an Error
 
@@ -204,66 +222,76 @@ Kyle's error model does not include:
 
 ---
 
-## 3. Memory Model: RAII + Compiler-Inferred Ownership
+## 3. Memory Model: Move Semantics (Planned)
 
-Kyle uses **RAII** (Resource Acquisition Is Initialization) combined with
-**compiler-inferred ownership** to manage memory deterministically, with no
-garbage collector and no manual `free()`.
+Kyle is moving from a **reference-counted** model to **move semantics by
+default** (Phase 6). This section documents the *target* memory model. The
+current implementation still uses refcounting for heap values; the transition
+is underway.
 
-### 3.1 The Three Mechanisms
+### 3.1 Core Principle: Move by Default, Copy on Intent
 
-| Mechanism | When it runs | What it does |
+| Category | Behavior | Examples |
 |---|---|---|
-| `kl_alloc(size)` | At `new` / `[]` / `{}` literal | Allocates heap memory, refcount=1 |
-| `kl_retain(ptr)` | When a pointer is copied | Increments refcount |
-| `kl_release(ptr)` | When a pointer goes out of scope | Decrements refcount; frees at 0 |
+| **Copy types** | Implicitly copied on assignment | `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `char`, `void` |
+| **Move types** | Ownership transfers on assignment; source is invalidated | `final class`, `abstract class`, `[T]`, `{K: V}`, `str`, `T?`, `T!` |
+| **Clone** | Explicit deep copy via `.clone()` | `b = a.clone()` |
 
-The **compiler** tracks the lifetime of every value and inserts `kl_retain`
-and `kl_release` calls automatically. The **runtime** does the actual
-refcount arithmetic and free.
-
-### 3.2 What the Developer Sees
-
-Nothing. The developer writes:
+Primitives are `Copy` — they live on the stack and assignment duplicates
+the bits. Classes and collections are `Move` — they own heap resources and
+assignment transfers ownership.
 
 ```kl
-greeting = "Hello, " + name
+# Copy — stack value, bits are duplicated
+x: i32 = 42
+y = x              # both x and y are valid, independent copies
+
+# Move — ownership transfers
+a = [1, 2, 3]
+b = a              # a is now invalid (move)
+# print(a)        # compile error: a was moved
+
+# Explicit clone
+c = b.clone()      # deep copy, both b and c are valid
 ```
 
-The compiler inserts (conceptually):
+### 3.2 What the Compiler Does
 
-```c
-char* tmp1 = kl_concat("Hello, ", name);
-char* greeting = tmp1;        // refcount already 1, no retain needed
-// ... at end of scope ...
-kl_release(greeting);         // refcount 1 -> 0, frees memory
-```
+The compiler's **move checker** (Phase 6) tracks:
 
-There is no `free`, no `drop`, no `defer free(ptr)`. The compiler handles it.
+1. **Live variables** — which names hold valid values at each program point
+2. **Move paths** — when a value is assigned to another name, the source is
+   marked as moved (invalidated)
+3. **Re-initialization** — moved-from variables can be re-assigned:
+   ```kl
+   a = [1, 2, 3]
+   b = a           # a is moved
+   a = [4, 5, 6]   # re-initialization is fine
+   ```
+4. **Borrows** — `&expr` creates a temporary reference without moving
+   (planned, see §3.8)
 
-### 3.3 What's Tracked
+### 3.3 What Happens at Scope Exit
 
-The ownership pass currently tracks:
+When a variable goes out of scope:
 
-- ✅ `kl_concat` results (the only operation that allocates a new string)
-- ✅ `kl_list_new` / `kl_dict_new` results
-- ✅ `kl_alloc` results (raw memory)
+- **Copy types:** nothing — the value is on the stack, no destructor needed
+- **Move types:** the compiler inserts a `kl_release` call to free associated
+  heap memory, but **only if** the value was not moved out (ownership was not
+  transferred). Once moved, the destructor is suppressed — the new owner
+  is responsible.
 
-What is **not** yet fully tracked:
+This is analogous to Rust's `drop` but managed by the compiler rather than
+via a trait. The compiler knows statically whether a variable is the
+current owner.
 
-- ⚠️ Forwarded values (e.g. `y = f(x); use(y)` where `x` flows through) may
-  leak — the pass is conservative
-- ⚠️ Cyclic references (would deadlock refcount) — not yet prevented
+### 3.4 Final Class ABI: Pass-by-Reference
 
-These are known gaps to be addressed in Phase 11 (production hardening).
-
-### 3.4 Struct ABI: Pass-by-Reference
-
-Structs and classes are passed by reference (pointer) in function calls. There
-is no copy overhead for struct parameters:
+Final classes are passed by reference (pointer) in function calls. There
+is no copy overhead for class parameters:
 
 ```kl
-struct Point:
+final class Point:
     x: i32
     y: i32
 
@@ -277,30 +305,81 @@ fn distance(a: Point, b: Point) -> f64:
 In the generated LLVM IR, `Point` parameters are `ptr` (8 bytes), not the
 full struct layout. This matches C ABI conventions.
 
+If you need a stack copy (for mutation without affecting the caller), use
+`.clone()`.
+
 ### 3.5 List and Dict Storage
 
-Lists and dicts are **heap-allocated** via `kl_list_new` / `kl_dict_new`. They
-are reference-counted like any other heap value:
+Lists and dicts are **heap-allocated** via `kl_list_new` / `kl_dict_new`.
+With move semantics, assignment transfers ownership:
 
 ```kl
-a = [1, 2, 3]      # kl_list_new, refcount=1
-b = a              # kl_retain, a's refcount=2
+a = [1, 2, 3]      # kl_list_new, a owns the allocation
+b = a              # move: a is invalidated, b owns the allocation
 # ... at end of scope ...
-# kl_release(b) -> refcount=1
-# kl_release(a) -> refcount=0, frees the list
+# kl_release(b) -> refcount=0, frees the list
+# kl_release(a) is NOT emitted — a was moved out
 ```
 
 ### 3.6 String Literals
 
-String literals (`"hello"`) are **not** refcounted. They are stored as
-static constant data in the binary's `.rodata` section. You cannot free
-them, and you don't need to.
+String literals (`"hello"`) are **not** owned by any variable. They are
+stored as static constant data in the binary's `.rodata` section. You cannot
+free them, and you don't need to.
 
-### 3.7 No Borrow Checker, No Lifetimes
+When a string literal is assigned to a variable, the compiler treats it as
+a `&str` (borrow) — no allocation, no move. Concatenation results (e.g.
+`"a" + "b"`) produce owned strings via `kl_concat`.
 
-Kyle intentionally avoids Rust's borrow checker and lifetime annotations.
-The compiler infers ownership statically, not through explicit annotations.
-This is the trade-off: simpler syntax, slightly less safety guarantees.
+### 3.7 Refcounting: Legacy Mechanism
+
+The current compiler (pre-Phase 6) uses **reference counting** as the
+default memory management strategy. Every heap allocation starts with
+refcount = 1; `kl_retain` and `kl_release` are inserted automatically.
+
+This is being replaced by move semantics because:
+
+- **Performance:** refcounting adds atomic operations on every copy, even
+  in single-threaded code
+- **Predictability:** refcounting cannot handle cyclic references without
+  an explicit weak-reference mechanism
+- **Ergonomics:** move semantics makes ownership explicit at the syntax level
+
+After Phase 6, reference counting will remain only in the stdlib types
+`Rc<T>` and `Arc<T>` for shared ownership scenarios where single-owner
+semantics do not apply.
+
+### 3.8 Borrow Checker (Planned — Phase 13)
+
+Kyle is adopting a **borrow checker** similar to Rust's, but with a
+simpler annotation model:
+
+- `&T` — immutable borrow (shared reference, read-only)
+- `&mut T` — mutable borrow (exclusive reference, read-write)
+
+The borrow checker enforces the standard rules:
+
+1. **Aliasing XOR mutability** — you may have unlimited `&T` or exactly one
+   `&mut T`, but not both
+2. **No dangling references** — borrows cannot outlive the value they
+   reference
+3. **No moving while borrowed** — a value cannot be moved out (assigned to
+   another owner) while any borrow is live
+
+This is planned for Phase 13. Until then, the compiler takes a conservative
+approach: heap types are reference-counted, and borrows are not enforced
+at compile time.
+
+### 3.9 Summary of Memory Operations
+
+| Operation | Copy types | Move types |
+|---|---|---|
+| Assignment (`=`) | Bitwise copy | Ownership transfer, source invalidated |
+| Function parameter | Bitwise copy | Reference passed (ABI) |
+| Return value | Bitwise copy | Ownership transferred to caller |
+| `.clone()` | N/A (free) | Deep copy, both valid |
+| Scope exit | Nothing | `kl_release` if owned |
+| Borrow (`&`) | Reference | Reference (no move) |
 
 ---
 
@@ -332,8 +411,8 @@ able to call C libraries directly from Kyle (Phase 9).
 | `i32 kl_now()` | `now()` |
 | `void* kl_alloc(i64 size)` | heap allocation |
 | `void kl_free(void* ptr)` | heap free |
-| `void kl_retain(void* ptr)` | refcount++ |
-| `void kl_release(void* ptr)` | refcount-- / free |
+| `void kl_retain(void* ptr)` | refcount++ (legacy) |
+| `void kl_release(void* ptr)` | refcount-- / free (legacy) |
 | `i32 kl_str_to_upper(const u8* s, i32 len)` | `to_upper(s)` |
 | `i32 kl_str_to_lower(const u8* s, i32 len)` | `to_lower(s)` |
 | `i32 kl_str_trim(const u8* s, i32 len)` | `trim(s)` |
@@ -413,4 +492,4 @@ exposed to the Kyle language. This is planned for Phase 9.
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.3.0 · Last updated: 2026-06-28*

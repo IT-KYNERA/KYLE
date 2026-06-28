@@ -72,13 +72,20 @@ impl Parser {
         {
             return self.parse_function().map(Decl::Function);
         }
-        // Class: `class X:` or `abs class X:`
-        if self.at(TokenKind::Abs) {
-            self.advance(); // consume 'abs'
+        // Class: `final class X:`, `class X:`, `abstract class X:`
+        if self.at(TokenKind::Final) {
+            self.advance();
+            if self.at(TokenKind::Class) {
+                return self.parse_class(false); // final class = normal class
+            }
+            return Err("expected 'class' after 'final'".to_string());
+        }
+        if self.at(TokenKind::Abstract) {
+            self.advance();
             if self.at(TokenKind::Class) {
                 return self.parse_class(true);
             }
-            return Err("expected 'class' after 'abs'".to_string());
+            return Err("expected 'class' after 'abstract'".to_string());
         }
         if self.at(TokenKind::Class) {
             return self.parse_class(false);
@@ -92,47 +99,30 @@ impl Parser {
         if self.at(TokenKind::Contract) {
             return self.parse_contract().map(Decl::Contract);
         }
-        // Mutable variable declaration: `mut name = expr`
-        if self.at(TokenKind::Mut) {
-            let start = self.pos;
-            self.advance();
-            let name = self.eat_identifier();
-            if name.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) {
-                return Err("constants (UPPERCASE) cannot be mutable. Use lowercase for mutable variables.".to_string());
-            }
-            self.expect(TokenKind::Equals)?;
-            let value = self.parse_expr()?;
-            return Ok(Decl::Variable(VariableDecl {
-                name,
-                type_: None,
-                value: Box::new(value),
-                is_mutable: true,
-                span: self.span_from(start),
-            }));
-        }
-        // Variable/constant declaration: `name = expr`
+        // Variable/constant declaration: `name =|:=|::= expr`
         if self.at_identifier() {
             let start = self.pos;
             let name = self.eat_identifier();
             if self.at(TokenKind::Equals) {
                 self.advance();
                 let value = self.parse_expr()?;
-                if name.chars().all(|c| c.is_uppercase() || c == '_' || c.is_ascii_digit()) {
-                    return Ok(Decl::Constant(ConstantDecl {
-                        name,
-                        value: Box::new(value),
-                        span: self.span_from(start),
-                    }));
-                }
                 return Ok(Decl::Variable(VariableDecl {
-                    name,
-                    type_: None,
-                    value: Box::new(value),
-                    is_mutable: false,
-                    span: self.span_from(start),
+                    name, type_: None, value: Box::new(value), is_mutable: false, span: self.span_from(start),
+                }));
+            } else if self.at(TokenKind::Walrus) {
+                self.advance();
+                let value = self.parse_expr()?;
+                return Ok(Decl::Variable(VariableDecl {
+                    name, type_: None, value: Box::new(value), is_mutable: true, span: self.span_from(start),
+                }));
+            } else if self.at(TokenKind::ConstDecl) {
+                self.advance();
+                let value = self.parse_expr()?;
+                return Ok(Decl::Constant(ConstantDecl {
+                    name, value: Box::new(value), span: self.span_from(start),
                 }));
             }
-            return Err(format!("expected '=' after identifier '{}'", name));
+            return Err(format!("expected '=', ':=', or '::=' after identifier '{}'", name));
         }
         let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
         Err(format!("unexpected token at declaration start: {}", found))
@@ -397,7 +387,7 @@ impl Parser {
                 break;
             }
             // Method: `fn name(params):`
-            if self.at(TokenKind::Fn) || self.at(TokenKind::Async) || self.at(TokenKind::Const) || self.at(TokenKind::Abs) {
+            if self.at(TokenKind::Fn) || self.at(TokenKind::Async) || self.at(TokenKind::Const) || self.at(TokenKind::Abstract) {
                 let method = self.parse_function()?;
                 members.push(ClassMember::Method(method));
                 continue;
@@ -734,6 +724,11 @@ impl Parser {
                 self.advance();
                 Expr::Literal { value: Literal::None, span: self.span_from(start) }
             }
+            TokenKind::Char(s) => {
+                let val = s.chars().next().unwrap_or('\0') as u8 as i64;
+                self.advance();
+                Expr::Literal { value: Literal::Integer(val), span: self.span_from(start) }
+            }
             TokenKind::Identifier(name) => {
                 let val = name.clone();
                 self.advance();
@@ -957,54 +952,55 @@ impl Parser {
             let body = self.parse_block()?;
             return Ok(Stmt::Unsafe(UnsafeBlock { body, span: self.span_from(start) }));
         }
-        // Mutable variable declaration: `mut ident[: Type][ = expr]`
-        if self.at(TokenKind::Mut) {
-            let start = self.pos;
-            self.advance();
-            let name = self.eat_identifier();
-            let type_ = if self.at(TokenKind::Colon) {
-                self.advance();
-                Some(self.parse_type()?)
-            } else {
-                None
-            };
-            let value = if self.at(TokenKind::Equals) {
-                self.advance();
-                self.parse_expr()?
-            } else {
-                Expr::Literal { value: Literal::None, span: self.span_from(start) }
-            };
-            return Ok(Stmt::Variable(VariableDecl {
-                name,
-                type_,
-                value: Box::new(value),
-                is_mutable: true,
-                span: self.span_from(start),
-            }));
-        }
-        // Immutable variable with type annotation: `ident : Type = expr`
+        // Variable declaration: `ident [":" type] ("=" | ":=" | "::=") expr`
+        // Handle typed declarations first: `ident : type =|:=|::= expr`
         if self.at_identifier() && self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::Colon)) {
             let start = self.pos;
             let name = self.eat_identifier();
             self.advance(); // ':'
             let type_ = Some(self.parse_type()?);
-            let value = if self.at(TokenKind::Equals) {
+            if self.at(TokenKind::Equals) {
                 self.advance();
-                self.parse_expr()?
-            } else {
-                Expr::Literal { value: Literal::None, span: self.span_from(start) }
-            };
+                let value = self.parse_expr()?;
+                return Ok(Stmt::Variable(VariableDecl {
+                    name, type_, value: Box::new(value), is_mutable: false, span: self.span_from(start),
+                }));
+            } else if self.at(TokenKind::Walrus) {
+                self.advance();
+                let value = self.parse_expr()?;
+                return Ok(Stmt::Variable(VariableDecl {
+                    name, type_, value: Box::new(value), is_mutable: true, span: self.span_from(start),
+                }));
+            } else if self.at(TokenKind::ConstDecl) {
+                self.advance();
+                let value = self.parse_expr()?;
+                return Ok(Stmt::Variable(VariableDecl {
+                    name, type_, value: Box::new(value), is_mutable: false, span: self.span_from(start),
+                }));
+            }
+            return Err("expected '=', ':=', or '::=' after typed declaration".to_string());
+        }
+        // Mutable declaration: `ident := expr` (unambiguous)
+        if self.at_identifier() && self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::Walrus)) {
+            let start = self.pos;
+            let name = self.eat_identifier();
+            self.advance(); // consume :=
+            let value = self.parse_expr()?;
             return Ok(Stmt::Variable(VariableDecl {
-                name,
-                type_,
-                value: Box::new(value),
-                is_mutable: false,
-                span: self.span_from(start),
+                name, type_: None, value: Box::new(value), is_mutable: true, span: self.span_from(start),
             }));
         }
-        // Variable declaration or binding-if: `ident = expr`
-        // Disambiguate by checking if the next token after the expr is ':'
-        // (binding-if) or something else (expression statement with assignment).
+        // Constant declaration: `ident ::= expr` (unambiguous)
+        if self.at_identifier() && self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::ConstDecl)) {
+            let start = self.pos;
+            let name = self.eat_identifier();
+            self.advance(); // consume ::=
+            let value = self.parse_expr()?;
+            return Ok(Stmt::Variable(VariableDecl {
+                name, type_: None, value: Box::new(value), is_mutable: false, span: self.span_from(start),
+            }));
+        }
+        // Binding-if or assignment: `ident = expr [: block]`
         if self.at_identifier() && self.peek_equals() {
             let start = self.pos;
             let name = self.eat_identifier();
@@ -1314,6 +1310,21 @@ impl Parser {
     fn peek_equals(&self) -> bool {
         if !self.at_identifier() { return false; }
         self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::Equals))
+    }
+
+    /// Returns true if the next token is `:=` (Walrus) — mutable declaration.
+    fn peek_walrus(&self) -> bool {
+        self.tokens.get(self.pos).map_or(false, |t| t.is(&TokenKind::Walrus))
+    }
+
+    /// Returns the kind of declaration operator at pos+1: Equals, Walrus, or ConstDecl.
+    fn peek_decl_op(&self) -> Option<TokenKind> {
+        self.tokens.get(self.pos + 1).and_then(|t| {
+            if t.is(&TokenKind::Equals) { Some(TokenKind::Equals) }
+            else if t.is(&TokenKind::Walrus) { Some(TokenKind::Walrus) }
+            else if t.is(&TokenKind::ConstDecl) { Some(TokenKind::ConstDecl) }
+            else { None }
+        })
     }
 
     /// Returns the current token, or an error.

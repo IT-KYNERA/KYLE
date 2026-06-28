@@ -35,12 +35,11 @@ how each piece behaves. Every construct includes:
 Every Kyle program has exactly one entry point, `main`, in `src/main.kl` for
 project mode or the top of the file for single-file mode.
 
-- [ ] `fn main(args: [str]) -> i32:` declaration recognized as entry point
-- [ ] `args: [str]` is the list of command-line arguments
-- [ ] Return value is the process exit code (`0` = success, non-zero = failure)
-- [ ] `fn main() -> i32:` (no args) is also accepted
-- [ ] `fn main(args: list<str>)` (generic-syntax list) is also accepted
-- [ ] `klc-backend` generates a C-style `main` wrapper that calls the Kyle `main`
+- [x] `fn main(args: [str]) -> i32:` declaration recognized as entry point
+- [x] `args: [str]` is the list of command-line arguments
+- [x] Return value is the process exit code (`0` = success, non-zero = failure)
+- [x] `fn main() -> i32:` (no args) is also accepted
+- [x] `klc-backend` generates a C-style `main` wrapper that calls the Kyle `main`
 
 ```kl
 fn main(args: [str]) -> i32:
@@ -49,18 +48,20 @@ fn main(args: [str]) -> i32:
 ```
 
 **Semantics:** The compiler wraps the Kyle `main` in a C `int main(int argc,
-const char** argv)` function, marshals `argv` into a `list<str>`, calls the
+const char** argv)` function, marshals `argv` into a `[str]`, calls the
 Kyle function, and returns its `i32` result to the OS.
 
 ---
 
 ## 1.2 Comments
 
-- [ ] `#` starts a line comment to end of line
-- [ ] No block comments (planned: `-# ... #-`)
+- [x] `#` starts a line comment to end of line
+- [x] `##` starts a documentation comment (doc comment), collected for `kl doc`
+- [x] No block comments (planned: `-# ... #-`)
 
 ```kl
 # This is a comment
+## Documentation for the next declaration
 x = 42   # trailing comment
 ```
 
@@ -69,20 +70,22 @@ x = 42   # trailing comment
 # 2. Variables & Mutability
 
 Kyle has three forms of binding: **immutable variable**, **mutable variable**,
-and **constant**. There is no `let`, `var`, or `val` keyword — the convention
-is:
+and **constant**. There is no `let`, `var`, `mut`, or `const` keyword. Instead,
+the **assignment operator** itself signals the mutability:
 
 | Form | Syntax | Mutability | Rebindable |
 |---|---|---|---|
 | Immutable | `name = value` | ❌ | ❌ |
-| Mutable | `mut name = value` | ✅ | ✅ |
-| Constant | `NAME = value` | ❌ | ❌ |
+| Mutable | `name := value` | ✅ | ✅ |
+| Constant | `name ::= value` | ❌ | ❌ |
+
+The operator itself is the declaration — no keyword needed.
 
 ## 2.1 Immutable Variables
 
-- [ ] `name = expr` declares an immutable variable
-- [ ] Re-assignment is a compile error
-- [ ] Type is inferred from the right-hand side
+- [x] `name = expr` declares an immutable variable
+- [x] Re-assignment is a compile error
+- [x] Type is inferred from the right-hand side
 
 ```kl
 name = "Kyle"           # str, immutable
@@ -92,46 +95,59 @@ items = [1, 2, 3]       # [i32], immutable
 
 ## 2.2 Mutable Variables
 
-- [ ] `mut name = expr` declares a mutable variable
-- [ ] Re-assignment is allowed
-- [ ] Type is fixed at declaration
+`:=` (walrus operator) declares a mutable variable and assigns its initial
+value. The variable can be re-assigned later (same type only).
+
+- [x] `name := expr` declares a mutable variable
+- [x] Re-assignment with `name = expr` is allowed
+- [x] Type is fixed at declaration
+- [x] `name := name + 1` (read current, write new) is common
 
 ```kl
-mut count = 0
+count := 0
 count = count + 1       # OK
 count = "hello"         # ❌ compile error: type changed
 ```
 
+**Why `:=` instead of `mut`:** The walrus operator makes mutability visually
+distinct at a glance. It is consistent with other languages (Go, Pascal) and
+eliminates a keyword from the language.
+
 ## 2.3 Constants
 
-- [ ] `UPPER_NAME = expr` declares a compile-time constant
-- [ ] The name must be all uppercase (letters, digits, underscores)
-- [ ] Value must be a literal (no function calls, no variables)
+`::=` declares a compile-time constant. The value must be evaluable at compile
+time (a literal, a `const fn` call, or an expression composed of these).
+
+- [x] `NAME ::= expr` declares a compile-time constant
+- [x] Value must be compile-time evaluable
+- [x] No naming convention enforced by the compiler (UPPERCASE recommended by convention)
 
 ```kl
-PI = 3.14159
-MAX_RETRIES = 3
-GREETING = "Hello"
+PI ::= 3.14159
+MAX_RETRIES ::= 3
+GREETING ::= "Hello"
+secret_base_url ::= "https://api.example.com"   # valid, but convention is UPPERCASE
 ```
 
 ## 2.4 Explicit Type Annotations
 
-- [ ] `name: T = expr` annotates the type explicitly
-- [ ] Works for both `mut` and immutable forms
-- [ ] The annotation must match the inferred type, or a wider compatible one
+- [x] `name: T = expr` / `name: T := expr` / `name: T ::= expr` annotates the type explicitly
+- [x] Works for immutable, mutable, and constant forms
+- [x] The annotation must match the inferred type, or a wider compatible one
 
 ```kl
 x: i32 = 42
-mut name: str = "Kyle"
+name: str := "Kyle"
+PI: f64 ::= 3.14159
 items: [i32] = [1, 2, 3]
 ```
 
 ## 2.5 Type Inference
 
-- [ ] Local variables are inferred from the initializer
-- [ ] Function parameters are inferred only if not annotated
-- [ ] Function return type is inferred if not annotated
-- [ ] Generics are inferred from call-site argument types
+- [x] Local variables are inferred from the initializer
+- [x] Function parameters are inferred only if not annotated
+- [x] Function return type is inferred if not annotated
+- [x] Generics are inferred from call-site argument types
 
 ```kl
 x = 42                 # i32
@@ -139,9 +155,25 @@ items = [1, 2, 3]      # [i32]
 pi = 3.14              # f64
 ```
 
+## 2.6 Destructuring Declaration
+
+A destructuring declaration unpacks a compound value into multiple variables
+in one line. No `let` keyword — the syntax is direct.
+
+- [ ] Tuple destructuring: `(x, y) = expr` — ❌ not implemented
+- [ ] `(x, y) = (1, "hi")` unpacks into `x = 1`, `y = "hi"`
+- [ ] Works with any value that has `.0`, `.1`, ... accessors
+
+```kl
+(x, y) = (1, "hello")   # x = 1, y = "hello"
+(first, second) = items  # destructure a tuple return
+```
+
 ---
 
-# 3. Primitive Types
+# 3. Types
+
+## 3.1 Primitive Types
 
 | Type | Size | Literal | Notes |
 |---|---|---|---|
@@ -156,17 +188,57 @@ pi = 3.14              # f64
 | `f32` | 4 bytes float | `3.14` | Single-precision |
 | `f64` | 8 bytes float | `3.14159265358979` | Double-precision |
 | `bool` | 1 byte | `true` / `false` | Boolean |
-| `str` | pointer + length | `"hello"` | Null-terminated UTF-8 bytes |
-| `char` | 1 byte | `'a'` | Single byte (ASCII subset) |
-| `void` | n/a | (no value) | Return type only |
+| `str` | 8 bytes (ptr+len) | `"hello"` | Null-terminated UTF-8 |
+| `char` | 1 byte | `'a'` | Single ASCII byte |
+| `void` | 0 bytes | (no value) | Return type only |
+| `ptr` | 8 bytes | `null` | Opaque pointer (raw memory address) |
 
-## 3.1 Integer Literals
+**Semantics:** Strings are null-terminated UTF-8 byte arrays, stored as
+`*const u8` in the LLVM IR. Length is computed by `kl_strlen` at runtime.
 
-- [ ] Decimal: `42`, `1_000_000`
-- [ ] Hexadecimal: `0xFF`, `0xDEAD_BEEF`
-- [ ] Binary: `0b1010`, `0b1100_0011`
-- [ ] Underscores as digit separators
-- [ ] Suffix annotation: `42i8`, `42u32`, `42i64`
+## 3.2 Composite Types
+
+| Syntax | Type | Example |
+|---|---|---|
+| `[T]` | List of T | `[1, 2, 3]` |
+| `{K: V}` | Dict with K keys, V values | `{"a": 1, "b": 2}` |
+| `(T, U, ...)` | Tuple | `(1, "hi", 3.14)` |
+| `T?` | Optional T | `i32?` means `i32 \| None` |
+| `T!` | Error-returning T | `i32!` = `Result<T, Error>` |
+| `final class Name { ... }` | Inline struct type | (structural typing) |
+
+## 3.3 Optional Type `T?`
+
+`T?` is sugar for `Option<T>`. It means "either a value of type `T` or
+`None`". This is the **only** way to express optional values — `Option<T>`
+is not exposed as a public syntax.
+
+- [ ] `T?` postfix syntax in type annotations — ❌ not implemented
+- [ ] `None` is the absent value (from stdlib, always available)
+- [ ] `some_value` is constructed implicitly by assigning a `T` to a `T?` variable
+
+```kl
+name: str? = None          # optional string, currently absent
+age: i32? = 42             # age is an optional i32 containing 42
+```
+
+## 3.4 The `ptr` Type
+
+- [ ] `ptr` is an opaque pointer (raw memory address) — ❌ not implemented
+- [ ] No arithmetic on `ptr` without `unsafe:`
+- [ ] Used for FFI with C libraries
+
+```kl
+p: ptr = null              # null pointer
+```
+
+## 3.5 Integer Literals
+
+- [x] Decimal: `42`, `1_000_000`
+- [x] Hexadecimal: `0xFF`, `0xDEAD_BEEF`
+- [x] Binary: `0b1010`, `0b1100_0011`
+- [~] Underscores as digit separators
+- [~] Suffix annotation: `42i8`, `42u32`, `42i64`
 
 ```kl
 x = 42           # i32
@@ -176,11 +248,11 @@ big = 1_000_000  # i32
 b: u8 = 255      # u8
 ```
 
-## 3.2 Float Literals
+## 3.6 Float Literals
 
-- [ ] Decimal: `3.14`, `0.5`, `1.0`
-- [ ] Scientific: `1e10`, `2.5e-3`
-- [ ] Suffix annotation: `3.14f32`, `2.5f64`
+- [x] Decimal: `3.14`, `0.5`, `1.0`
+- [~] Scientific: `1e10`, `2.5e-3`
+- [x] Suffix annotation: `3.14f32`, `2.5f64`
 
 ```kl
 pi = 3.14159          # f64
@@ -188,11 +260,11 @@ small: f32 = 0.5      # f32
 huge = 1.0e100        # f64
 ```
 
-## 3.3 String Literals
+## 3.7 String Literals
 
-- [ ] Double-quoted: `"hello"`, `"multi\nline"`
-- [ ] Escape sequences: `\n`, `\t`, `\r`, `\\`, `\"`, `\0`
-- [ ] String interpolation: `"Hello, {name}!"` (any expression in `{}`)
+- [x] Double-quoted: `"hello"`, `"multi\nline"`
+- [x] Escape sequences: `\n`, `\t`, `\r`, `\\`, `\"`, `\0`
+- [x] String interpolation: `"Hello, {name}!"` (any expression in `{}`)
 
 ```kl
 name = "World"
@@ -201,36 +273,85 @@ escape = "Line1\nLine2"
 quote = "She said \"hi\""
 ```
 
-**Semantics:** Strings are null-terminated UTF-8 byte arrays, stored as
-`*const u8` in the LLVM IR. The length is computed by `kl_strlen` at
-runtime; no length field is stored alongside the pointer.
+**Semantics:** Strings are null-terminated UTF-8 bytes. No length field
+stored alongside the pointer at the value level.
 
-## 3.4 Character Literals
+## 3.8 Character Literals
 
-- [ ] Single-quoted: `'a'`, `'Z'`, `'0'`
-- [ ] Escape sequences: `'\n'`, `'\t'`, `'\\'`, `'\''`
-- [ ] ASCII only (one byte)
+- [x] Single-quoted: `'a'`, `'Z'`, `'0'`
+- [x] Escape sequences: `'\n'`, `'\t'`, `'\\'`, `'\''`
+- [x] ASCII only (one byte)
 
 ```kl
 c = 'a'
 newline = '\n'
 ```
 
-## 3.5 Boolean Literals
+## 3.9 Boolean Literals
 
-- [ ] `true` and `false` are keywords
+- [x] `true` and `false` are keywords
 
 ```kl
 ok = true
 done = false
 ```
 
-## 3.6 None Literal
+## 3.10 None Literal
 
-- [ ] `None` is the value of the absent case in `Option<T>`
+- [x] `None` is the special absent value. It is available without any import.
+- [x] `None` is the only value of the `None` type (`!` — uninhabited)
+- [x] `None` is coerced to any `T?` type
 
 ```kl
-result: Option<i32> = None
+name: str? = None
+age: i32? = None
+```
+
+## 3.11 Null Literal
+
+- [ ] `null` is the pointer value for `ptr` type — ❌ not implemented
+- [ ] `null` is a literal, not a keyword (it is a name from `core`)
+- [ ] Only assignable to `ptr` types
+
+```kl
+p: ptr = null
+```
+
+## 3.12 Explicit Cast `as`
+
+- [ ] `expr as Type` performs an explicit type cast — ❌ not implemented
+- [ ] Integer-to-integer: `x as i64` widens or narrows
+- [ ] Float-to-integer: `3.14 as i32` truncates
+- [ ] Integer-to-float: `42 as f64`
+- [ ] Pointer-to-integer: `p as i64` (in `unsafe:`)
+- [ ] Integer-to-pointer: `addr as ptr` (in `unsafe:`)
+
+```kl
+x: i64 = 42 as i64
+y: i32 = 3.14 as i32   # 3 (truncation)
+```
+
+## 3.13 Type Check `is`
+
+- [ ] `value is Type` returns `true` if the value has the given type — ❌ not implemented
+- [ ] Used in match patterns: `x is str => ...`
+- [ ] Useful for `T?` types: `x is None => ...`
+
+```kl
+if x is str:
+    println("x is a string")
+```
+
+## 3.14 Integer Overflow
+
+| Mode | Behavior |
+|---|---|
+| Debug (`kl run`) | Panics on overflow |
+| Release (`kl build --release`) | Wrapping arithmetic (silent) |
+
+```kl
+x: i8 = 127
+x = x + 1              # panics in debug, wraps to -128 in release
 ```
 
 ---
@@ -251,11 +372,11 @@ result: Option<i32> = None
 | `-%` | `a - (a * b / 100)` | `x -% 10` | 🔶 Parsed, no semantic meaning |
 | `*%` | `a * b / 100` | `x *% 10` | 🔶 Parsed, no semantic meaning |
 
-- [ ] `+` works for `i32`/`i64`/`f32`/`f64` and `str + str` (concatenation)
-- [ ] `-`, `*`, `/`, `%` work for `i32`/`i64`/`f32`/`f64`
-- [ ] Integer division by zero panics
-- [ ] Float division by zero produces inf/nan
-- [ ] String concatenation with `+` allocates a new buffer
+- [x] `+` works for `i32`/`i64`/`f32`/`f64` and `str + str` (concatenation)
+- [x] `-`, `*`, `/`, `%` work for `i32`/`i64`/`f32`/`f64`
+- [x] Integer division by zero panics
+- [x] Float division by zero produces inf/nan
+- [x] String concatenation with `+` allocates a new buffer
 
 ## 4.2 Comparison Operators
 
@@ -268,9 +389,9 @@ result: Option<i32> = None
 | `<=` | less or equal | `a <= b` | ✅ |
 | `>=` | greater or equal | `a >= b` | ✅ |
 
-- [ ] `==` and `!=` work for integers, floats, booleans, strings
-- [ ] `<`, `>`, `<=`, `>=` work for integers, floats, strings (lexicographic)
-- [ ] Returns a `bool`
+- [x] `==` and `!=` work for integers, floats, booleans, strings
+- [x] `<`, `>`, `<=`, `>=` work for integers, floats, strings (lexicographic)
+- [x] Returns a `bool`
 
 ```kl
 x = 5 == 5         # true
@@ -285,8 +406,8 @@ y = "a" < "b"      # true (lexicographic)
 | `or` | logical or | `a or b` | ✅ |
 | `not` | logical not | `not a` | ✅ |
 
-- [ ] `and`, `or` are short-circuit (right side not evaluated if result determined)
-- [ ] `not` has higher precedence than `and`/`or`
+- [x] `and`, `or` are short-circuit (right side not evaluated if result determined)
+- [x] `not` has higher precedence than `and`/`or`
 
 ```kl
 ok = x > 0 and x < 10
@@ -304,9 +425,9 @@ ready = not done
 | `>>` | right shift | `a >> 3` | ✅ (i32/i64) |
 | `~` | bitwise not | `~a` | ✅ (i32/i64) |
 
-- [ ] All bitwise operators work for `i32`, `i64`
-- [ ] All bitwise operators work for `u8`, `u16`, `u32`, `u64`
-- [ ] Bitwise operators on `f32`/`f64` are a compile error
+- [x] All bitwise operators work for `i32`, `i64`
+- [x] All bitwise operators work for `u8`, `u16`, `u32`, `u64`
+- [x] Bitwise operators on `f32`/`f64` are a compile error
 
 ```kl
 mask = 0xFF & 0x0F       # 0x0F
@@ -316,9 +437,12 @@ flipped = ~0             # all bits set
 
 ## 4.5 Assignment Operators
 
+`=` is always reassignment (to an existing mutable variable). `:=` is the
+declaration form for mutable variables (see §2.2). Compound forms:
+
 | Op | Meaning | Example | Status |
 |---|---|---|---|
-| `=` | assign | `x = 5` | ✅ |
+| `=` | reassign | `x = 5` | ✅ |
 | `+=` | add-assign | `x += 1` | ✅ |
 | `-=` | sub-assign | `x -= 1` | ✅ |
 | `*=` | mul-assign | `x *= 2` | ✅ |
@@ -330,28 +454,31 @@ flipped = ~0             # all bits set
 | `<<=` | shl-assign | `x <<= 2` | ✅ |
 | `>>=` | shr-assign | `x >>= 2` | ✅ |
 
-- [ ] All compound assignments work for the corresponding scalar types
-- [ ] Compound assignment on immutable is a compile error
-- [ ] `x op= y` is equivalent to `x = x op y`
+- [x] All compound assignments work for the corresponding scalar types
+- [x] Compound assignment on immutable is a compile error
+- [x] `x op= y` is equivalent to `x = x op y`
 
 ## 4.6 Range Operator
 
-- [ ] `start..end` creates a range (used inside `for`)
-- [ ] `0..5` iterates 0, 1, 2, 3, 4
-- [ ] `start..` is an open-ended range (end omitted) — 🔶 partial
-- [ ] `..end` is a start-open range — 🔶 partial
-- [ ] `..` alone is a full range — 🔶 partial
+| Form | Meaning | Example | Status |
+|---|---|---|---|
+| `start..end` | exclusive end | `0..5` → 0,1,2,3,4 | ✅ |
+| `start..=end` | inclusive end | `0..=5` → 0,1,2,3,4,5 | ❌ |
+| `start..<end` | exclusive end (alias) | `0..<5` → 0,1,2,3,4 | ❌ |
+| `start..` | open-ended | `3..` → 3,4,... | ❌ |
+| `..end` | start-open | `..3` → 0,1,2 | ❌ |
+| `..` | full range | `..` → everything | ❌ |
 
 ```kl
 for i in 0..5:
-    println(i)         # prints 0, 1, 2, 3, 4
+    println(i)         # 0, 1, 2, 3, 4
 ```
 
 ## 4.7 Spread Operator
 
-- [ ] `...expr` inside a list literal spreads its elements
-- [ ] `...expr` outside a list literal is a no-op (parsed but inert)
-- [ ] Works for both lists and dicts in literal context
+- [x] `...expr` inside a list literal spreads its elements
+- [x] `...expr` outside a list literal is a no-op (parsed but inert)
+- [x] Works for both lists and dicts in literal context
 
 ```kl
 a = [1, 2, 3]
@@ -360,9 +487,9 @@ b = [...a, 4, 5]       # [1, 2, 3, 4, 5]
 
 ## 4.8 Ternary Operator
 
-- [ ] `cond ? a : b` returns `a` if `cond` is true, else `b`
-- [ ] Right-associative for chained ternaries
-- [ ] Both branches must have the same type
+- [x] `cond ? a : b` returns `a` if `cond` is true, else `b`
+- [x] Right-associative for chained ternaries
+- [x] Both branches must have the same type
 
 ```kl
 status = age >= 18 ? "adult" : "minor"
@@ -370,9 +497,9 @@ status = age >= 18 ? "adult" : "minor"
 
 ## 4.9 Optional Chaining
 
-- [ ] `obj?.field` returns `None` if `obj` is `None`, else the field
-- [ ] `obj?.method()` returns `None` if `obj` is `None`, else the result
-- [ ] `?.` chains left-to-right
+- [x] `obj?.field` returns `None` if `obj` is `None`, else the field
+- [x] `obj?.method()` returns `None` if `obj` is `None`, else the result
+- [x] `?.` chains left-to-right
 
 ```kl
 name = user?.name
@@ -383,9 +510,9 @@ greeting = user?.greet()?.upper()
 
 ## 4.10 Error Propagation
 
-- [ ] `expr?` extracts the value from an `Option<T>` or returns the function
-- [ ] Only valid in functions with `T!` return type
-- [ ] Propagates the `None` case as the function's return
+- [x] `expr?` extracts the value from a `T?` or `T!`, returning the function
+- [x] Only valid in functions with `T!` return type
+- [x] Propagates the `None`/error case as the function's return
 
 ```kl
 fn parse_num(s: str) -> i32!:
@@ -397,11 +524,11 @@ fn parse_num(s: str) -> i32!:
 
 ## 4.11 Member Access
 
-- [ ] `obj.field` accesses a field
-- [ ] `obj.method()` calls a method
-- [ ] `obj.field = value` assigns a field
-- [ ] `obj[index]` indexes a list or dict
-- [ ] `obj[start..end]` slices a list
+- [x] `obj.field` accesses a field
+- [x] `obj.method()` calls a method
+- [x] `obj.field = value` assigns a field
+- [x] `obj[index]` indexes a list or dict
+- [x] `obj[start..end]` slices a list
 
 ```kl
 p = Point { x: 1, y: 2 }
@@ -411,29 +538,46 @@ first = items[0]
 slice = items[1..3]      # [2, 3]
 ```
 
-## 4.12 Precedence Table
+## 4.12 Function Pointer Type
+
+- [ ] `(T, U) -> V` is the type of a function that takes `T, U` and returns `V`
+- [ ] Used for callbacks, closures, and higher-order functions
+
+```kl
+type Callback = (i32) -> str
+fn apply(x: i32, f: (i32) -> i32) -> i32:
+    return f(x)
+```
+
+## 4.13 Operator Overloading
+
+- [ ] A class/struct can define `op_+(other)` etc. to overload operators — ❌ not implemented
+- [ ] Overloadable: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `[]`, `()`
+
+## 4.14 Precedence Table
 
 From highest to lowest:
 
 | Precedence | Operators | Associativity |
 |---|---|---|
 | 1 (highest) | `()` `[]` `.` `?.` | left |
-| 2 | unary `-` `~` `not` | right |
+| 2 | unary `-` `~` `not` `await` | right |
 | 3 | `**` | right |
 | 4 | `*` `/` `%` `*%` | left |
 | 5 | `+` `-` `+%` `-%` | left |
-| 6 | `..` `...` | left |
+| 6 | `..` `..=` `..<` `...` | left |
 | 7 | `<<` `>>` | left |
 | 8 | `&` | left |
 | 9 | `^` | left |
 | 10 | `\|` | left |
-| 11 | `==` `!=` `<` `>` `<=` `>=` `is` | left |
-| 12 | `and` | left |
-| 13 | `or` | left |
-| 14 | `?:` (planned) | right |
-| 15 | `?` | right |
-| 16 | `=`, `+=`, `-=`, ... | right |
-| 17 (lowest) | `,` | left |
+| 11 | `is` `as` | left |
+| 12 | `==` `!=` `<` `>` `<=` `>=` | left |
+| 13 | `and` | left |
+| 14 | `or` | left |
+| 15 | `?:` | right |
+| 16 | `?` | right |
+| 17 | `=`, `:=`, `+=`, `-=`, ... | right |
+| 18 (lowest) | `,` | left |
 
 ---
 
@@ -441,10 +585,10 @@ From highest to lowest:
 
 ## 5.1 Function Declaration
 
-- [ ] `fn name(params) -> RetType:` declares a function
-- [ ] `fn name(params):` (no return type) returns `void`
-- [ ] `fn name<T>(params) -> T:` declares a generic function
-- [ ] Function body is an indented block
+- [x] `fn name(params) -> RetType:` declares a function
+- [x] `fn name(params):` (no return type) returns `void`
+- [x] `fn name<T>(params) -> T:` declares a generic function
+- [x] Function body is an indented block
 
 ```kl
 fn add(a: i32, b: i32) -> i32:
@@ -456,8 +600,9 @@ fn greet(name: str):
 
 ## 5.2 Parameters
 
-- [ ] `name: type` declares a typed parameter
-- [ ] `name` (untyped) infers from the body
+- [x] `name: type` declares a typed parameter
+- [x] `name` (untyped) infers from the body
+- [x] Parameters are **immutable** by default (like all bindings)
 - [ ] Default values: `name: type = default` — ❌ not implemented
 - [ ] Variadic: `...names: T` — ❌ not implemented
 
@@ -466,41 +611,48 @@ fn add(a: i32, b: i32) -> i32:
     return a + b
 ```
 
+**Making a local mutable copy of a parameter:**
+```kl
+fn process(id: i32):
+    id := id                  # local mutable copy
+    id = id + 1
+```
+
 ## 5.3 Return Values
 
-- [ ] `return expr` exits the function with a value
-- [ ] The last expression of a block is implicitly returned (if no `return`)
-- [ ] Reaching the end of a non-void function without `return` is a compile error
+- [x] `return expr` exits the function with a value
+- [x] The last expression of a block is implicitly returned (if no `return`)
+- [x] Reaching the end of a non-void function without `return` is a compile error
 
 ```kl
 fn add(a: i32, b: i32) -> i32:
     return a + b
 
-# equivalent
+# equivalent (implicit return)
 fn add(a: i32, b: i32) -> i32:
     a + b
 ```
 
 ## 5.4 Generic Functions
 
-- [ ] `<T>` declares a type parameter
-- [ ] `<T, U>` declares multiple type parameters
-- [ ] Generics are monomorphized (one specialized function per type combination)
+- [x] `<T>` declares a type parameter
+- [x] `<T, U>` declares multiple type parameters
+- [x] Generics are monomorphized (one specialized function per type combination)
 
 ```kl
 fn identity<T>(x: T) -> T:
     return x
 
-fn pair<T, U>(a: T, b: U) -> (T, U):
-    return (a, b)
+fn pair<T, U>(a: T, b: U) -> (T?, U?):
+    return (a, b)              # returns a tuple (see §8.3)
 ```
 
 ## 5.5 Error-Returning Functions
 
-- [ ] `-> T!` declares a function that can return an error
-- [ ] Internally represented as `Option<T>` (None = error)
-- [ ] `return error(msg)` returns an error
-- [ ] `?` propagates `None` as the function's return
+- [x] `-> T!` declares a function that can return an error
+- [x] Internally represented as `Option<T>` (None = error)
+- [x] `return error(msg)` returns an error
+- [x] `?` propagates `None` as the function's return
 
 ```kl
 fn read_int() -> i32!:
@@ -511,9 +663,9 @@ fn read_int() -> i32!:
 
 ## 5.6 Async Functions (Expression-Form)
 
-- [ ] `async expr` spawns `expr` on a new thread
-- [ ] Returns a task handle (i64)
-- [ ] `await task` joins the thread and returns its result
+- [~] `async expr` spawns `expr` on a new thread
+- [~] Returns a task handle (i64)
+- [x] `await task` joins the thread and returns its result
 - [ ] `async fn name():` form — ❌ not implemented (use `async <expr>` instead)
 
 ```kl
@@ -523,10 +675,10 @@ result = await task
 
 ## 5.7 Const Functions
 
-- [ ] `const fn name():` declares a function callable at compile time
-- [ ] Only allowed in constant expressions
-- [ ] Body must use only const-allowed operations (literals, other const fns)
-- [ ] Real compile-time evaluation — 🔶 partial (type-checks only, not evaluated)
+- [~] `const fn name():` declares a function callable at compile time
+- [~] Only allowed in constant expressions
+- [~] Body must use only const-allowed operations (literals, other const fns)
+- [~] Real compile-time evaluation — 🔶 partial (type-checks only, not evaluated)
 
 ```kl
 const fn double(x: i32) -> i32:
@@ -535,17 +687,17 @@ const fn double(x: i32) -> i32:
 
 ## 5.8 Abstract Functions
 
-- [ ] `abs fn name():` declares an abstract function — ❌ not implemented
-- [ ] Only `abs class` exists; `abs fn` is not yet a syntax
+- [ ] `abstract fn name():` declares an abstract function — ❌ not implemented
+- [ ] Only `abstract class` exists; `abstract fn` is not yet a syntax
 
 ## 5.9 Function Visibility
 
-- [ ] `fn name():` — public (default, callable from anywhere)
-- [ ] `fn _name():` — protected (callable from same class and subclasses)
-- [ ] `fn __name():` — private (callable only from inside the declaring class)
-- [ ] The leading underscores are stripped from the stored name; you call
+- [x] `fn name():` — public (default, callable from anywhere)
+- [x] `fn _name():` — protected (callable from same class and subclasses)
+- [x] `fn __name():` — private (callable only from inside the declaring class)
+- [x] The leading underscores are stripped from the stored name; you call
   `this._name()` and `this.__name()` without the prefixes
-- [ ] Calling a private method from outside the class is a compile error
+- [x] Calling a private method from outside the class is a compile error
 
 ```kl
 class Counter:
@@ -565,11 +717,11 @@ c = Counter()
 
 ## 6.1 If / Elif / Else
 
-- [ ] `if cond:` opens a conditional
-- [ ] `elif cond:` continues the chain
-- [ ] `else:` is the final branch
-- [ ] `if` is a **statement only**, not an expression
-- [ ] For inline conditionals, use the ternary operator: `cond ? a : b`
+- [x] `if cond:` opens a conditional
+- [x] `elif cond:` continues the chain
+- [x] `else:` is the final branch
+- [x] `if` is a **statement only**, not an expression
+- [x] For inline conditionals, use the ternary operator: `cond ? a : b`
 
 ```kl
 if x > 0:
@@ -583,23 +735,45 @@ else:
 **Note:** Kyle has only **one way** to do conditionals. Use `if` for blocks,
 ternary (`?:`) for inline values. There is no "if as expression" syntax.
 
-## 6.2 While
+## 6.2 If Let
 
-- [ ] `while cond:` loops while the condition is true
-- [ ] `while-else:` runs the `else` block if the loop completes without `break`
+- [ ] `if let pattern = expr:` destructures and conditionally executes — ❌ not implemented
+- [ ] If the pattern matches, the bound variables are available inside the block
+- [ ] Commonly used with `T?` types: `if let Some(v) = opt:`
 
 ```kl
-mut i = 0
+if let Some(n) = parse_int(s):
+    println("parsed {n}")
+else:
+    println("failed to parse")
+```
+
+## 6.3 While
+
+- [x] `while cond:` loops while the condition is true
+- [~] `while-else:` runs the `else` block if the loop completes without `break`
+
+```kl
+i := 0
 while i < 10:
     println(i)
     i = i + 1
 ```
 
-## 6.3 For
+## 6.4 While Let
 
-- [ ] `for var in iterable:` iterates over a list
-- [ ] `for var in start..end:` iterates a numeric range
-- [ ] `for-else:` runs the `else` block if the loop completes without `break`
+- [ ] `while let pattern = expr:` loops while the pattern matches — ❌ not implemented
+
+```kl
+while let Some(val) = iter.next():
+    process(val)
+```
+
+## 6.5 For
+
+- [x] `for var in iterable:` iterates over a list
+- [x] `for var in start..end:` iterates a numeric range
+- [~] `for-else:` runs the `else` block if the loop completes without `break`
 
 ```kl
 for item in items:
@@ -609,24 +783,38 @@ for i in 0..10:
     println(i)
 ```
 
-## 6.4 Loop
+## 6.6 Loop
 
-- [ ] `loop:` is an infinite loop
-- [ ] Exit with `break`
-- [ ] Skip iteration with `continue`
+- [x] `loop:` is an infinite loop
+- [x] Exit with `break`
+- [x] Skip iteration with `continue`
 
 ```kl
-mut i = 0
+i := 0
 loop:
     i = i + 1
     if i > 10:
         break
 ```
 
-## 6.5 Break
+## 6.7 Labeled Loops
 
-- [ ] `break` exits the innermost loop
-- [ ] `break value` exits with a value (used in for/while-else)
+- [ ] `'label:` marks a loop with a label — ❌ not implemented
+- [ ] `break 'label` exits the labeled loop from nested loops
+- [ ] `continue 'label` continues the labeled loop from nested loops
+
+```kl
+'outer:
+for i in 0..10:
+    for j in 0..10:
+        if i * j > 50:
+            break 'outer     # exits both loops
+```
+
+## 6.8 Break
+
+- [x] `break` exits the innermost loop (or labeled loop)
+- [x] `break value` exits with a value (used in for/while-else)
 
 ```kl
 for x in items:
@@ -634,11 +822,11 @@ for x in items:
         break
 ```
 
-## 6.6 Continue
+## 6.9 Continue
 
-- [ ] `continue` skips the rest of the current loop iteration and jumps to
-  the next one
-- [ ] Useful for filtering out items without nested `if` blocks
+- [x] `continue` skips the rest of the current loop iteration and jumps to
+  the next one (or the labeled loop's next iteration)
+- [x] Useful for filtering out items without nested `if` blocks
 
 ```kl
 # Without continue (nested ifs):
@@ -658,33 +846,50 @@ for user in users:
 
 ## 6.7 Match
 
-- [ ] `match value:` opens a pattern match
-- [ ] Arms are `pattern => body`
-- [ ] Patterns: literal, identifier binding, wildcard `_`, enum variant
-- [ ] `1 | 2 =>` or-patterns — ❌ not implemented
-- [ ] `if cond` guard — 🔶 partial (parsed, not used for filtering)
+- [x] `match value:` opens a pattern match
+- [x] Arms are `pattern : body` (colon separator)
+- [x] Patterns: literal, identifier binding, wildcard `_`, enum variant
+- [ ] `1 | 2 :` or-patterns — ❌ not implemented
+- [~] `if cond` guard — 🔶 partial (parsed, not used for filtering)
 - [ ] `is type` is-type pattern — ❌ not implemented in lowering
-- [ ] Match as expression returns a value
+- [x] Match as expression returns a value
 
 ```kl
 match status:
-    200 => "ok"
-    404 => "not found"
-    500 => "error"
-    _   => "unknown"
+    200 : "ok"
+    404 : "not found"
+    500 : "error"
+    _   : "unknown"
 
 # Match as expression
 label = match x:
-    0 => "zero"
-    1 => "one"
-    _ => "many"
+    0 : "zero"
+    1 : "one"
+    _ : "many"
+
+# Or-patterns (planned)
+match value:
+    0 | 1 | 2 : "small"
+    3 | 4 | 5 : "medium"
+    _         : "large"
+
+# Guard (planned)
+match x:
+    n if n > 0 : "positive"
+    n if n < 0 : "negative"
+    0          : "zero"
+
+# Destructuring (planned)
+match p:
+    Point { x, y } : println("{x}, {y}")
+    _              : println("unknown")
 ```
 
-## 6.8 Defer
+## 6.11 Defer
 
-- [ ] `defer expr` schedules the expression to run when the current scope exits
-- [ ] Multiple defers run in LIFO order (last-in, first-out)
-- [ ] Used for guaranteed cleanup (closing files, releasing locks, etc.)
+- [x] `defer expr` schedules the expression to run when the current scope exits
+- [x] Multiple defers run in LIFO order (last-in, first-out)
+- [x] Used for guaranteed cleanup (closing files, releasing locks, etc.)
 
 **Why:** Without `defer`, cleanup code at the end of a function might not run
 if an early return happens. `defer` guarantees cleanup runs no matter how the
@@ -722,11 +927,11 @@ fn example():
 # first defer
 ```
 
-## 6.9 Guard
+## 6.12 Guard
 
-- [ ] `guard cond else: body` — if `cond` is true, continue; if false, run `body`
-- [ ] The `body` must return (or `break`/`continue` in a loop)
-- [ ] Used for "fail fast" validation at the top of a function
+- [x] `guard cond else: body` — if `cond` is true, continue; if false, run `body`
+- [x] The `body` must return (or `break`/`continue` in a loop)
+- [x] Used for "fail fast" validation at the top of a function
 
 **Why:** Instead of writing `if not condition: return ...` everywhere, you
 write a single `guard` at the top. The rest of the function can assume the
@@ -755,19 +960,19 @@ fn process_order(order: Order) -> i32!:
     return charge(order)
 ```
 
-## 6.10 Unsafe
+## 6.13 Unsafe
 
-- [ ] `unsafe:` marks a block as containing unsafe operations
-- [ ] Used for FFI calls, raw pointers, and other low-level work
-- [ ] The type-checker is more permissive inside the block
-- [ ] FFI lowering inside `unsafe:` — ❌ not implemented (planned Phase 9)
+- [x] `unsafe:` marks a block as containing unsafe operations
+- [x] Used for FFI calls, raw pointers, and other low-level work
+- [x] The type-checker is more permissive inside the block
+- [ ] FFI lowering inside `unsafe:` — ❌ not implemented (planned Phase 10)
 - [ ] `alloc`/`free` outside `unsafe:` — ❌ not implemented
 
 **Why:** `unsafe` makes dangerous code **explicit and searchable**. When a
 security auditor searches for `unsafe` in your codebase, they find every place
 that needs careful review.
 
-**Planned syntax (Phase 9):**
+**Planned syntax (Phase 10):**
 
 ```kl
 extern "C":
@@ -790,18 +995,22 @@ operational effect.
 
 # 7. Data Structures
 
-## 7.1 Structs
+## 7.1 Final Classes (Lightweight Structs)
 
-- [ ] `struct Name:` declares a struct
-- [ ] `struct Name<T>:` declares a generic struct
+`final class` defines a lightweight, heap-allocated struct that **cannot** be
+inherited. This replaces what was `struct` in earlier versions — it is the
+simplest form of a user-defined data type.
+
+- [ ] `final class Name:` declares a final class (replaces `struct`) — ❌ not implemented
+- [ ] `final class Name<T>:` declares a generic final class
 - [ ] Fields are `name: type` declarations
-- [ ] `Name { x: 1, y: 2 }` creates an instance
+- [ ] `Name { x: 1, y: 2 }` creates an instance via literal syntax
 - [ ] `.field` accesses a field
 - [ ] `.field = value` assigns a field
-- [ ] Structs are passed by reference (no copy)
+- [ ] Passed by reference (no copy overhead)
 
 ```kl
-struct Point:
+final class Point:
     x: i32
     y: i32
 
@@ -810,14 +1019,19 @@ println(p.x)            # 10
 p.y = 30
 ```
 
-## 7.2 Generic Structs
+**Why `final class` and not `struct`:** Kyle unifies all user-defined types
+under `class`. The `final` modifier signals "no inheritance" — cleaner than
+two distinct keywords (`struct` vs `class`). The `struct` keyword is kept as
+an **alias** during migration but will be removed.
 
-- [ ] `struct Name<T>:` declares a generic struct
+## 7.2 Generic Final Classes
+
+- [ ] `final class Name<T>:` declares a generic final class — ❌ not implemented
 - [ ] `Name<i32> { x: 0 }` instantiates with a concrete type
 - [ ] Each instantiation is monomorphized
 
 ```kl
-struct Box<T>:
+final class Box<T>:
     value: T
 
 b = Box<i32> { value: 42 }
@@ -826,35 +1040,41 @@ b = Box<str> { value: "hi" }
 
 ## 7.3 Enums
 
-- [ ] `enum Name:` declares an enum
-- [ ] Variants are `Name` (no payload) or `Name(T1, T2, ...)` (with payload)
-- [ ] `Name.Variant` constructs a value
-- [ ] Pattern-matched in `match`
+- [x] `enum Name:` declares an enum
+- [x] Variants are `Name` (no payload) or `Name(T1, T2, ...)` (with payload)
+- [x] `Name.Variant` constructs a value
+- [x] Pattern-matched in `match`
+- [ ] Methods on enums: `fn name():` inside `enum` — ❌ not implemented
 
 ```kl
-enum Option<T>:
-    Some(T)
-    None
+enum Color:
+    Red
+    Green
+    Blue
 
-v: Option<i32> = Option.Some(42)
+enum Result:
+    Ok(i32)
+    Err(str)
+
+v = Result.Ok(42)
 
 match v:
-    Option.Some(n) => println("got " + str(n))
-    Option.None    => println("nothing")
+    Result.Ok(n) : println("got " + str(n))
+    Result.Err(e) : println("error: " + e)
 ```
 
 ## 7.4 Classes
 
-- [ ] `class Name:` declares a class
-- [ ] `class Name(args):` declares a class with constructor parameters
-- [ ] `class Name: Parent` declares inheritance from `Parent`
-- [ ] `class Name: Contract` declares implementation of `Contract`
-- [ ] `class Name: Parent implements Contract` does both
-- [ ] Fields are declared inside the class
-- [ ] Methods are `fn name():` inside the class
-- [ ] `Name(args)` invokes the constructor
-- [ ] `instance.field` and `instance.method()` work
-- [ ] `this` refers to the current instance
+- [x] `class Name:` declares a class (supports inheritance)
+- [x] `class Name(args):` declares a class with constructor parameters
+- [x] `class Name: Parent` declares inheritance from `Parent`
+- [x] `class Name: Contract` declares implementation of `Contract`
+- [x] `class Name: Parent implements Contract` does both
+- [x] Fields are declared inside the class
+- [x] Methods are `fn name():` inside the class
+- [x] `Name(args)` invokes the constructor
+- [x] `instance.field` and `instance.method()` work
+- [x] `this` refers to the current instance
 
 ```kl
 class Counter:
@@ -871,13 +1091,14 @@ c = Counter(10)
 c.increment()
 ```
 
-## 7.5 Inheritance & Polymorphism
+## 7.5 Inheritance, Polymorphism & Super
 
-- [ ] `class Child: Parent` inherits from `Parent`
-- [ ] Child inherits all parent fields
-- [ ] Child inherits all parent methods
-- [ ] Child can override a parent method by re-declaring it
-- [ ] Method dispatch follows the inheritance chain at call time
+- [x] `class Child: Parent` inherits from `Parent`
+- [x] Child inherits all parent fields
+- [x] Child inherits all parent methods
+- [x] Child can override a parent method by re-declaring it
+- [x] Method dispatch follows the inheritance chain at call time
+- [ ] `super.method()` calls the parent's overridden method — ❌ not implemented
 
 ```kl
 class Animal:
@@ -888,6 +1109,9 @@ class Dog: Animal
     fn speak():
         println("Woof!")
 
+    fn parent_speak():
+        super.speak()           # calls Animal.speak()
+
 a = Animal()
 a.speak()        # "generic sound"
 d = Dog()
@@ -896,13 +1120,13 @@ d.speak()        # "Woof!"
 
 ## 7.6 Visibility on Class Members
 
-- [ ] `name: type` (no prefix) — public field/method
-- [ ] `_name: type` — protected field/method (same class + subclasses)
-- [ ] `__name: type` — private field/method (only inside the class)
-- [ ] The leading underscores are stripped from the stored name
-- [ ] You call `this._name` and `this.__name` without the prefixes
-- [ ] Private access from outside the class is a compile error
-- [ ] Protected access from outside the class hierarchy is a compile error
+- [~] `name: type` (no prefix) — public field/method
+- [~] `_name: type` — protected field/method (same class + subclasses)
+- [~] `__name: type` — private field/method (only inside the class)
+- [~] The leading underscores are stripped from the stored name
+- [~] You call `this._name` and `this.__name` without the prefixes
+- [~] Private access from outside the class is a compile error
+- [~] Protected access from outside the class hierarchy is a compile error
 
 ```kl
 class Bank:
@@ -921,14 +1145,14 @@ class Bank:
 
 ## 7.7 Abstract Classes
 
-- [ ] `abs class Name:` declares an abstract class
-- [ ] Cannot be instantiated directly
-- [ ] Subclasses must inherit and provide all methods
-- [ ] Abstract method enforcement — 🔶 partial (class can be abstract, but no
+- [ ] `abstract class Name:` declares an abstract class (cannot be instantiated) — ❌ not implemented
+- [x] `abs class Name:` is a temporary alias for `abstract class`
+- [x] Subclasses must inherit and provide all methods
+- [~] Abstract method enforcement — 🔶 partial (class can be abstract, but no
   abstract method marker is enforced on subclasses)
 
 ```kl
-abs class Shape:
+abstract class Shape:
     fn area() -> f64
 
 class Circle: Shape
@@ -941,11 +1165,29 @@ class Circle: Shape
         return 3.14159 * this.radius * this.radius
 ```
 
-## 7.8 Contracts
+## 7.8 Static Methods
 
-- [ ] `contract Name:` declares a contract (interface)
-- [ ] Contracts list method signatures (no bodies)
-- [ ] `class X: Contract` declares that `X` implements the contract
+- [ ] `static fn name():` inside a class declares a static method — ❌ not implemented
+- [ ] Called on the class itself: `ClassName.method()`, not on instances
+- [ ] Cannot access `this` (no instance)
+- [ ] Can access other static methods and constants
+
+```kl
+class MathUtils:
+    static fn square(x: i32) -> i32:
+        return x * x
+
+    static fn cube(x: i32) -> i32:
+        return square(x) * x      # calls static method
+
+result = MathUtils.square(5)      # 25
+```
+
+## 7.9 Contracts
+
+- [x] `contract Name:` declares a contract (interface)
+- [x] Contracts list method signatures (no bodies)
+- [x] `class X: Contract` declares that `X` implements the contract
 - [ ] Generic contracts `contract Name<T>:` — ❌ not implemented
 - [ ] `impl` keyword — ❌ not used; `class X: Contract` does the impl
 
@@ -963,10 +1205,10 @@ class Person: Greeter
         return "Hello, " + name + ", I'm " + this.name
 ```
 
-## 7.9 Type Aliases
+## 7.10 Type Aliases
 
-- [ ] `type Alias = T` declares a type alias
-- [ ] `type Alias<T> = T<T>` declares a generic type alias
+- [~] `type Alias = T` declares a type alias
+- [~] `type Alias<T> = T<T>` declares a generic type alias
 
 ```kl
 type IntList = [i32]
@@ -974,7 +1216,7 @@ type StringMap = dict<str, str>
 type Callback<T> = (T) -> void
 ```
 
-## 7.10 Properties
+## 7.11 Properties
 
 Properties are fields with custom **getter** and/or **setter** logic. The
 caller uses normal field-access syntax (`obj.prop`), but the compiler inserts
@@ -1023,14 +1265,14 @@ println(a.is_overdrawn)         # calls get is_overdrawn → false
 
 ## 8.1 Lists
 
-- [ ] `[1, 2, 3]` creates a list literal
-- [ ] `[1, 2, ...rest]` spreads another list
-- [ ] `items[i]` indexes
-- [ ] `items[i..j]` slices
-- [ ] `items[i] = val` assigns
-- [ ] `items.add(val)` appends (method)
-- [ ] `items.pop()` removes and returns the last
-- [ ] `items.len()` returns the length
+- [x] `[1, 2, 3]` creates a list literal
+- [x] `[1, 2, ...rest]` spreads another list
+- [x] `items[i]` indexes
+- [~] `items[i..j]` slices
+- [x] `items[i] = val` assigns
+- [x] `items.add(val)` appends (method)
+- [x] `items.pop()` removes and returns the last
+- [x] `items.len()` returns the length
 
 ```kl
 items = [1, 2, 3]
@@ -1042,11 +1284,11 @@ slice = items[0..2]        # [1, 2]
 
 ## 8.2 Dicts
 
-- [ ] `{"key": value}` creates a dict literal
-- [ ] Keys must be strings
-- [ ] `dict["key"]` looks up
-- [ ] `dict["key"] = val` sets
-- [ ] `dict.len()` returns the number of entries
+- [x] `{"key": value}` creates a dict literal
+- [x] Keys must be strings
+- [x] `dict["key"]` looks up
+- [x] `dict["key"] = val` sets
+- [x] `dict.len()` returns the number of entries
 
 ```kl
 ages = {"alice": 30, "bob": 25}
@@ -1071,11 +1313,11 @@ x = t.0                  # 1
 
 # 9. Closures
 
-- [ ] `(params) => expr` is a closure
-- [ ] `(params) =>\n  body` is a block-bodied closure
-- [ ] Captures variables by reference
-- [ ] First-class: can be passed, returned, stored
-- [ ] Type annotations on parameters: `(x: i32) => x * 2` — 🔶 partial
+- [x] `(params) => expr` is a closure
+- [x] `(params) =>\n  body` is a block-bodied closure
+- [x] Captures variables by reference
+- [x] First-class: can be passed, returned, stored
+- [~] Type annotations on parameters: `(x: i32) => x * 2` — 🔶 partial
 
 ```kl
 double = (x: i32) => x * 2
@@ -1093,14 +1335,35 @@ items.map((x) => x * 2)
 
 # 10. Async / Await
 
-- [ ] `async <expr>` spawns the expression on a new thread
-- [ ] `await task` joins and returns the result
-- [ ] Tasks are returned as `i64` handles
-- [ ] `async fn name():` — ❌ not implemented (use `async <expr>`)
+Kyle supports two forms of async:
+
+| Form | Description | Status |
+|---|---|---|
+| `async expr` | Spawns an expression as a concurrent task | ✅ Current (thread-based) |
+| `async fn name():` | Declares an async function (state machine) | ❌ Planned (work-stealing scheduler) |
+
+## 10.1 Expression Form (Current)
+
+- [x] `async <expr>` spawns the expression on a new thread
+- [x] `await task` joins and returns the result
+- [x] Tasks are returned as `i64` handles
 
 ```kl
 task = async expensive_computation()
 result = await task
+```
+
+## 10.2 Async Functions (Planned)
+
+- [ ] `async fn name():` declares an async function — ❌ not implemented
+- [ ] Uses a work-stealing scheduler (like Tokio) instead of OS threads
+- [ ] The function body is compiled as a state machine
+- [ ] `await` inside an `async fn` yields control to the scheduler
+
+```kl
+async fn fetch(url: str) -> str:
+    response = await http.get(url)
+    return response.body
 ```
 
 ---
@@ -1111,10 +1374,10 @@ Kyle has **no exceptions**. Errors are values.
 
 ## 11.1 The `T!` Return Type
 
-- [ ] `-> T!` declares a function that can return an error
-- [ ] Internally, this is `Option<T>` (None = error)
-- [ ] `return error("msg")` returns an error
-- [ ] `?` propagates the error from the calling function
+- [x] `-> T!` declares a function that can return an error
+- [x] Internally, this is `Option<T>` (None = error)
+- [x] `return error("msg")` returns an error
+- [x] `?` propagates the error from the calling function
 
 ```kl
 fn parse(s: str) -> i32!:
@@ -1129,9 +1392,9 @@ fn caller() -> i32!:
 
 ## 11.2 The `?` Operator
 
-- [ ] `expr?` extracts the value from `Option<T>`
-- [ ] If `None`, returns from the enclosing function with the same error
-- [ ] Only valid in functions with `T!` return type
+- [x] `expr?` extracts the value from a `T?` or `T!`
+- [x] If `None`/error, returns from the enclosing function with the same error
+- [x] Only valid in functions with `T!` return type
 
 ```kl
 fn read_file(path: str) -> str!:
@@ -1141,26 +1404,30 @@ fn read_file(path: str) -> str!:
     return content
 ```
 
-## 11.3 The `Option<T>` Type
+## 11.3 The `T?` Type (Optional Values)
 
-- [ ] `Option<T>` is `enum Option { Some(T), None }`
-- [ ] `Some(value)` constructs the present case
-- [ ] `None` constructs the absent case
-- [ ] Pattern-matched or accessed with `?.`
+- [x] `T?` is the only public syntax for optional values (sugar for internal `Option<T>`)
+- [x] `None` is the absent value
+- [x] Assigning a `T` to a `T?` implicitly wraps it
+- [x] Pattern-matched with `match` or accessed with `?.`
 
 ```kl
-x: Option<i32> = Some(42)
-y: Option<i32> = None
+x: i32? = None
+y: i32? = 42
 
 match x:
-    Some(n) => println("got " + str(n))
-    None    => println("nothing")
+    Some(n) : println("got " + str(n))
+    None    : println("nothing")
 ```
+
+**Note:** The `Option` enum exists internally, but the public syntax is `T?`.
+Use `None` for the absent case; `Some(value)` wrapping is automatic when
+assigning a value of type `T` to a `T?`.
 
 ## 11.4 Optional Chaining
 
-- [ ] `obj?.field` returns `None` if `obj` is `None`
-- [ ] `obj?.method()` returns `None` if `obj` is `None`
+- [~] `obj?.field` returns `None` if `obj` is `None`
+- [~] `obj?.method()` returns `None` if `obj` is `None`
 
 ```kl
 name = user?.name        # str or None
@@ -1173,33 +1440,34 @@ age = user?.age          # i32 or None
 
 ## 12.1 Import Forms
 
-- [ ] `import x` — imports the `x` module from the current project
-- [ ] `import x from y` — imports `x` from the `y` package (alias)
-- [ ] `from x import y` — imports `y` from module `x`
+- [x] `import x` — imports the `x` module
+- [x] `import path.to.module` — nested module path (maps to `path/to/module.kl`)
+- [x] `from x import y` — imports `y` from module `x`
 - [ ] `from x import y as z` — imports `y` as `z`
-- [ ] `import ~x` — relative import from current file
+- [x] `import ~x` — relative import from current file
 
 ```kl
 import io
 import math
+import collections.list           # nested path: collections/list.kl
 from str import capitalize as cap
 ```
 
 ## 12.2 Module Resolution
 
-- [ ] Module name maps to a file `x.kl` in:
+- [x] Module name maps to a file `x.kl` in:
   1. The current file's directory
   2. The project's `src/` directory
   3. `cwd/std/`
   4. The compiler's bundled `std/`
-- [ ] `~` prefix is replaced with the current file's directory
-- [ ] No nested module paths (single-segment names only)
+- [x] Nested paths (e.g. `a.b.c`) map to `a/b/c.kl` relative to a module root
+- [x] `~` prefix is replaced with the current file's directory
 
 ## 12.3 Visibility (Module-Level)
 
-- [ ] Module-level names are public by default
-- [ ] `_name` is protected (not re-exported)
-- [ ] `__name` is private (not importable)
+- [x] Module-level names are public by default
+- [x] `_name` is protected (not re-exported)
+- [x] `__name` is private (not importable)
 
 ---
 
@@ -1207,8 +1475,8 @@ from str import capitalize as cap
 
 ## 13.1 Concatenation
 
-- [ ] `s1 + s2` concatenates strings
-- [ ] `"prefix" + var` is a common pattern
+- [x] `s1 + s2` concatenates strings
+- [x] `"prefix" + var` is a common pattern
 
 ```kl
 greeting = "Hello, " + name + "!"
@@ -1216,8 +1484,8 @@ greeting = "Hello, " + name + "!"
 
 ## 13.2 Interpolation
 
-- [ ] `"text {expr} text"` interpolates the expression
-- [ ] The expression is converted to string via `str()`
+- [x] `"text {expr} text"` interpolates the expression
+- [x] The expression is converted to string via `str()`
 
 ```kl
 name = "World"
@@ -1228,18 +1496,18 @@ msg = "value is {x}"           # "value is 42"
 
 ## 13.3 Built-in String Functions
 
-- [ ] `len(s)` — character count
-- [ ] `to_upper(s)` — uppercase
-- [ ] `to_lower(s)` — lowercase
-- [ ] `trim(s)` — strip whitespace
-- [ ] `replace(s, old, new)` — replace all occurrences
-- [ ] `substr(s, start, count)` — substring
-- [ ] `char_at(s, i)` — character at index
-- [ ] `contains(s, sub)` — check if substring is present
-- [ ] `starts_with_str(s, prefix)` — std lib
-- [ ] `ends_with_str(s, suffix)` — std lib
-- [ ] `capitalize(s)` — std lib
-- [ ] `repeat_str(s, n)` — std lib
+- [x] `len(s)` — character count
+- [x] `to_upper(s)` — uppercase
+- [x] `to_lower(s)` — lowercase
+- [x] `trim(s)` — strip whitespace
+- [x] `replace(s, old, new)` — replace all occurrences
+- [x] `substr(s, start, count)` — substring
+- [x] `char_at(s, i)` — character at index
+- [x] `contains(s, sub)` — check if substring is present
+- [x] `starts_with_str(s, prefix)` — std lib
+- [x] `ends_with_str(s, suffix)` — std lib
+- [x] `capitalize(s)` — std lib
+- [x] `repeat_str(s, n)` — std lib
 
 ```kl
 s = "  Hello, World!  "
@@ -1297,6 +1565,14 @@ sub = substr(s, 2, 5)         # "Hello"
 | `round(f)` | `(f64) -> f64` | Round to nearest | 🔶 registered, no runtime |
 | `json_parse(s)` | `(str) -> dict<str, i64>` | Parse JSON object | ✅ (objects only) |
 | `json_stringify(d)` | `(dict<str, i64>) -> str` | Stringify JSON object | ✅ (objects only) |
+| `exit(code)` | `(i32) -> void` | Terminate process immediately | ❌ not implemented |
+| `eprint(s)` | `(str) -> void` | Print to stderr | ❌ not implemented |
+| `eprintln(s)` | `(str) -> void` | Print to stderr with newline | ❌ not implemented |
+| `panic(msg)` | `(str) -> void` | Runtime panic with message | ❌ not implemented |
+| `dbg(x)` | `(any) -> any` | Print expr + file:line, return value | ❌ not implemented |
+| `sizeof(T)` | `(type) -> i32` | Size of a type in bytes | ❌ not implemented |
+| `alignof(T)` | `(type) -> i32` | Alignment of a type | ❌ not implemented |
+| `offset_of(T, field)` | `(type, str) -> i32` | Offset of a field in bytes | ❌ not implemented |
 
 ---
 
@@ -1319,33 +1595,35 @@ sub = substr(s, 2, 5)         # "Hello"
 
 ```ebnf
 program            = { declaration } ;
-declaration        = import_decl | function_decl | class_decl | struct_decl
-                   | enum_decl | contract_decl | type_alias | variable_decl ;
+declaration        = import_decl | function_decl | class_decl
+                   | enum_decl | contract_decl | type_alias
+                   | variable_decl | const_decl | if_let_decl ;
 
-import_decl        = "import" identifier [ "from" identifier ]
-                   | "from" identifier "import" identifier [ "as" identifier ]
+import_decl        = "import" identifier { "." identifier }
+                   | "from" identifier { "." identifier } "import" identifier [ "as" identifier ]
                    | "import" "~" identifier ;
 
-function_decl      = [ "abs" ] "fn" identifier [ "<" type_params ">" ]
+function_decl      = [ "export" ] "fn" identifier [ "<" type_params ">" ]
                      "(" [ parameters ] ")" [ "->" type ] ":" block ;
 
-class_decl         = [ "abs" ] "class" identifier [ "<" type_params ">" ]
-                     [ "(" parameters ")" ] [ ":" identifier ] ":" block ;
-
-struct_decl        = "struct" identifier [ "<" type_params ">" ] ":" block ;
+class_decl         = [ "abstract" ] [ "final" ] "class" identifier [ "<" type_params ">" ]
+                     [ "(" parameters ")" ] [ ":" identifier [ "implements" identifier ] ] ":" block ;
 
 enum_decl          = "enum" identifier [ "<" type_params ">" ] ":" block ;
 
-contract_decl      = "contract" identifier ":" block ;
+contract_decl      = "contract" identifier [ "<" type_params ">" ] ":" block ;
 
 type_alias         = "type" identifier [ "<" type_params ">" ] "=" type ;
 
-variable_decl      = [ "mut" ] identifier [ ":" type ] "=" expression ;
+variable_decl      = identifier [ ":" type ] "=" expression ;
+mutable_decl       = identifier [ ":" type ] ":=" expression ;
+const_decl         = identifier [ ":" type ] "::=" expression ;
 
 block              = NEWLINE INDENT { statement } DEDENT ;
 
-statement          = variable_decl | const_decl | expression_stmt | if_stmt
-                   | while_stmt | for_stmt | match_stmt | return_stmt
+statement          = variable_decl | mutable_decl | expression_stmt
+                   | if_stmt | if_let_stmt | while_stmt | while_let_stmt
+                   | for_stmt | match_stmt | return_stmt
                    | break_stmt | continue_stmt | defer_stmt | guard_stmt
                    | unsafe_block | loop_block ;
 
@@ -1353,20 +1631,26 @@ if_stmt            = "if" expression ":" block
                      { "elif" expression ":" block }
                      [ "else" ":" block ] ;
 
+if_let_stmt        = "if" "let" pattern "=" expression ":" block
+                     [ "else" ":" block ] ;
+
 while_stmt         = "while" expression ":" block [ "else" ":" block ] ;
+while_let_stmt     = "while" "let" pattern "=" expression ":" block ;
 for_stmt           = "for" identifier "in" expression ":" block
                      [ "else" ":" block ] ;
 
 match_stmt         = "match" expression ":" { match_arm } ;
-match_arm          = pattern [ "if" expression ] "=>" expression ;
+match_arm          = pattern [ "if" expression ] ":" expression ;
 
 return_stmt        = "return" [ expression ] ;
-break_stmt         = "break" [ expression ] ;
-continue_stmt      = "continue" ;
+break_stmt         = "break" [ label ] [ expression ] ;
+continue_stmt      = "continue" [ label ] ;
 defer_stmt         = "defer" expression ;
 guard_stmt         = "guard" expression ":" block [ "else" ":" block ] ;
 unsafe_block       = "unsafe" ":" block ;
-loop_block         = "loop" ":" block ;
+loop_block         = label ":" "loop" ":" block ;
+
+label              = "'" identifier ;
 
 expression         = assignment_expr ;
 assignment_expr    = ternary_expr
@@ -1386,18 +1670,36 @@ multiplicative     = unary [ ("*" | "/" | "%" | "*%") unary ] ;
 unary              = [ "-" | "~" | "not" | "await" ] power ;
 power              = postfix [ "**" power ] ;
 postfix            = primary { ("." identifier | "[" expression "]" | "(" args ")"
-                                | "?" | "?." identifier | "..." ) } ;
+                                 | "?" | "?." identifier | "..." ) } ;
 
 primary            = literal | identifier | list_literal | dict_literal
-                   | tuple_literal | closure | "(" expression ")" ;
+                   | tuple_literal | closure | "(" expression ")"
+                   | "as" type | "is" type ;
 
-literal            = integer | float | string | char | "true" | "false" | "None" ;
+literal            = integer | float | string | char | "true" | "false"
+                   | "None" | "null" ;
 
 type               = primitive_type | user_type | generic_type
-                   | optional_type | error_type | dict_type ;
+                   | optional_type | error_type | dict_type
+                   | function_type | pointer_type ;
 
-primitive_type     = "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
-                   | "f32" | "f64" | "bool" | "str" | "char" | "void" ;
+primitive_type     = "i8" | "i16" | "i32" | "i64"
+                   | "u8" | "u16" | "u32" | "u64"
+                   | "f32" | "f64" | "bool" | "str" | "char" | "void" | "ptr" ;
+
+optional_type      = type "?" ;
+error_type         = type "!" ;
+function_type      = "(" [ type { "," type } ] ")" "->" type ;
+pointer_type       = "ptr" ;
+dict_type          = "{" type ":" type "}" ;
+
+assign_op          = "=" | "+=" | "-=" | "*=" | "/=" | "%="
+                   | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
+
+pattern            = literal | identifier | "_" | enum_variant pattern
+                   | "(" pattern { "," pattern } ")"
+                   | pattern "|" pattern
+                   | pattern "if" expression ;
 ```
 
 ---
@@ -1409,144 +1711,149 @@ primitive_type     = "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
 
 ## 17.1 Declarations
 
-- [ ] Immutable variable
-- [ ] Mutable variable
-- [ ] Constant
-- [ ] Typed annotation
-- [ ] Type inference
+- [x] Immutable variable (`=`)
+- [ ] Mutable variable (`:=`)
+- [ ] Constant (`::=`)
+- [x] Typed annotation
+- [x] Type inference
+- [ ] Destructuring declaration
 
 ## 17.2 Functions
 
-- [ ] Simple function
-- [ ] Generic function
-- [ ] Default-arg function
-- [ ] Error-returning function
-- [ ] Async (expression form)
-- [ ] Const function (compile-time)
+- [x] Simple function
+- [x] Generic function
+- [~] Default-arg function
+- [x] Error-returning function
+- [x] Async (expression form)
+- [ ] Async (function form)
+- [~] Const function (compile-time)
 - [ ] Abstract function
-- [ ] Public / protected / private visibility
 
 ## 17.3 Control Flow
 
-- [ ] If / elif / else
-- [ ] While
-- [ ] While-else
-- [ ] For-in-list
-- [ ] For-in-range
-- [ ] For-else
-- [ ] Loop
-- [ ] Break / continue
-- [ ] Match (literal patterns)
-- [ ] Match (identifier binding)
-- [ ] Match (enum variant)
-- [ ] Match (wildcard)
+- [x] If / elif / else
+- [x] While
+- [~] While-else
+- [x] For-in-list
+- [x] For-in-range
+- [~] For-else
+- [x] Loop
+- [x] Break / continue
+- [x] Match (literal patterns)
+- [x] Match (identifier binding)
+- [x] Match (enum variant)
+- [x] Match (wildcard)
 - [ ] Match (or-pattern)
-- [ ] Match (guard)
+- [~] Match (guard)
 - [ ] Match (is-type)
-- [ ] Match as expression
-- [ ] Defer
-- [ ] Guard
-- [ ] Unsafe block
+- [x] Match as expression
+- [x] Defer
+- [x] Guard
+- [x] Unsafe block
 
 ## 17.4 Data Structures
 
-- [ ] Struct
-- [ ] Generic struct
-- [ ] Enum (no payload)
-- [ ] Enum (with payload)
-- [ ] Class
-- [ ] Class with constructor args
-- [ ] Single inheritance
-- [ ] Method override (polymorphism)
-- [ ] Public / protected / private fields
-- [ ] Public / protected / private methods
-- [ ] Abstract class
-- [ ] Contract declaration
-- [ ] Contract implementation
+- [ ] Final class (replaces `struct`)
+- [ ] Generic final class
+- [x] Enum (no payload)
+- [x] Enum (with payload)
+- [x] Class
+- [x] Class with constructor args
+- [x] Single inheritance
+- [x] Method override (polymorphism)
+- [~] Public / protected / private fields
+- [x] Public / protected / private methods
+- [ ] Abstract class (`abstract class`)
+- [ ] Static methods
+- [ ] Properties (get/set)
+- [ ] `super` keyword
+- [x] Contract declaration
+- [x] Contract implementation
 - [ ] Generic contract
-- [ ] Type alias
+- [~] Type alias
 
 ## 17.5 Types & Values
 
-- [ ] i8, i16, i32, i64
-- [ ] u8, u16, u32, u64
-- [ ] f32, f64
-- [ ] bool
-- [ ] str
-- [ ] char
-- [ ] void (return type)
-- [ ] any
-- [ ] List literal
-- [ ] List indexing
-- [ ] List slicing
-- [ ] List spread
-- [ ] Dict literal (str keys)
-- [ ] Dict indexing
+- [x] i8, i16, i32, i64
+- [x] u8, u16, u32, u64
+- [x] f32, f64
+- [x] bool
+- [x] str
+- [x] char
+- [x] void (return type)
+- [ ] ptr (raw pointer)
+- [ ] T? (optional type)
+- [x] List literal
+- [x] List indexing
+- [~] List slicing
+- [x] List spread
+- [x] Dict literal (str keys)
+- [x] Dict indexing
 - [ ] Tuple
 
 ## 17.6 Operators
 
-- [ ] `+`, `-`, `*`, `/`, `%` arithmetic
-- [ ] `**` power
-- [ ] `+%`, `-%`, `*%` percent
-- [ ] `==`, `!=`, `<`, `>`, `<=`, `>=` comparison
-- [ ] `and`, `or`, `not` logical
-- [ ] `&`, `|`, `^`, `<<`, `>>`, `~` bitwise
-- [ ] `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=` assignment
-- [ ] `..` range
-- [ ] `...` spread
+- [x] `+`, `-`, `*`, `/`, `%` arithmetic
+- [~] `**` power
+- [~] `+%`, `-%`, `*%` percent
+- [x] `==`, `!=`, `<`, `>`, `<=`, `>=` comparison
+- [x] `and`, `or`, `not` logical
+- [x] `&`, `|`, `^`, `<<`, `>>`, `~` bitwise
+- [x] `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=` assignment
+- [x] `..` range
+- [x] `...` spread
 - [ ] `?:` ternary default — ❌
-- [ ] `?` error propagation
-- [ ] `?.` optional chain
+- [x] `?` error propagation
+- [x] `?.` optional chain
 
 ## 17.7 Error Handling
 
-- [ ] `T!` return type
-- [ ] `error("msg")` constructor
-- [ ] `?` propagation
-- [ ] `Option<T>` type
-- [ ] `Some` / `None` constructors
-- [ ] `?.` chaining
+- [x] `T!` return type
+- [x] `error("msg")` constructor
+- [x] `?` propagation
+- [x] `Option<T>` type
+- [~] `Some` / `None` constructors
+- [~] `?.` chaining
 
 ## 17.8 Built-ins
 
-- [ ] `print` / `println`
-- [ ] `print_int` / `println_int`
-- [ ] `print_err`
-- [ ] `len`
-- [ ] `str()` conversion
-- [ ] `int()` conversion
-- [ ] `float()` conversion
-- [ ] `bool()` conversion
-- [ ] `input` (no args)
-- [ ] `input(prompt)`
-- [ ] `range(n)` / `range(start, end)`
-- [ ] `open` / `close` / `read_str` / `write_str`
-- [ ] `sleep` / `now`
-- [ ] `assert` / `assert_eq` / `assert_ne` / `assert_str`
-- [ ] `to_upper` / `to_lower` / `trim` / `replace` / `substr` / `char_at` / `contains` / `ord`
-- [ ] `is_digit` / `is_alpha` / `is_alnum` / `is_whitespace` / `is_upper` / `is_lower`
-- [ ] `ceil` / `floor` / `round` — ❌ no runtime impl
-- [ ] `json_parse` / `json_stringify`
+- [x] `print` / `println`
+- [x] `print_int` / `println_int`
+- [~] `print_err`
+- [x] `len`
+- [x] `str()` conversion
+- [x] `int()` conversion
+- [x] `float()` conversion
+- [x] `bool()` conversion
+- [x] `input` (no args)
+- [x] `input(prompt)`
+- [x] `range(n)` / `range(start, end)`
+- [x] `open` / `close` / `read_str` / `write_str`
+- [x] `sleep` / `now`
+- [x] `assert` / `assert_eq` / `assert_ne` / `assert_str`
+- [x] `to_upper` / `to_lower` / `trim` / `replace` / `substr` / `char_at` / `contains` / `ord`
+- [x] `is_digit` / `is_alpha` / `is_alnum` / `is_whitespace` / `is_upper` / `is_lower`
+- [~] `ceil` / `floor` / `round` — ❌ no runtime impl
+- [x] `json_parse` / `json_stringify`
 
 ## 17.9 Standard Library
 
-- [ ] `core` — `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none`
-- [ ] `math` — `absolute`, `pow`, `sqrt`, `gcd`, `min`, `max`, `clamp`
-- [ ] `io` — `read_file`, `write_file`
-- [ ] `str` — `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str`
-- [ ] `testing` — `assert`, `assert_eq`, `assert_str`, `assert_ne`
-- [ ] `collections` — `list_sum`, `list_product`, `list_max`, `list_min`, `list_range`
-- [ ] `json` — `parse`, `stringify`
-- [ ] `time` — `timestamp`, `sleep_ms`, `seconds_since`
+- [~] `core` — `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none`
+- [~] `math` — `absolute`, `pow`, `sqrt`, `gcd`, `min`, `max`, `clamp`
+- [~] `io` — `read_file`, `write_file`
+- [~] `str` — `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str`
+- [~] `testing` — `assert`, `assert_eq`, `assert_str`, `assert_ne`
+- [~] `collections` — `list_sum`, `list_product`, `list_max`, `list_min`, `list_range`
+- [~] `json` — `parse`, `stringify`
+- [~] `time` — `timestamp`, `sleep_ms`, `seconds_since`
 
 ## 17.10 Modules
 
-- [ ] `import x`
+- [x] `import x`
 - [ ] `import x from y`
-- [ ] `from x import y`
+- [x] `from x import y`
 - [ ] `from x import y as z`
-- [ ] `import ~x` (relative)
+- [x] `import ~x` (relative)
 
 ## 17.11 Tooling
 
@@ -1582,23 +1889,32 @@ primitive_type     = "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
 | Classes (inheritance, polymorphism) | ✅ |
 | Public / protected / private visibility | ✅ |
 | Methods (public, private, protected) | ✅ |
-| Abstract classes | 🔶 (no `abs fn` enforcement) |
+| Abstract classes | ❌ (`abs` → `abstract`) |
 | Contracts | 🔶 (no generic constraints) |
 | Closures | ✅ |
-| Async / await | ✅ (expression form) |
+| Async / await | ✅ (expression form) / ❌ (async fn) |
 | Error values (`T!`, `?`) | ✅ |
-| Option chaining (`?.`) | ✅ |
+| `T?` optional type | ❌ (replaces public `Option<T>`) |
 | Default-with (`?:`) | ❌ |
 | Pattern matching | ✅ (literal, identifier, wildcard, enum) |
 | Or-patterns (`a \| b`) | ❌ |
 | Match guard (`if cond`) | 🔶 |
 | Is-type pattern (`is T`) | ❌ |
+| Destructuring (`(x, y) = expr`) | ❌ |
+| `if let` / `while let` | ❌ |
+| Labeled loops | ❌ |
+| `super` keyword | ❌ |
 | Properties (get/set) | ❌ |
+| Static methods | ❌ |
+| `final class` (replaces `struct`) | ❌ |
+| `:=` mutable syntax | ❌ |
+| `::=` constant syntax | ❌ |
+| Operator overloading | ❌ |
+| Move semantics (vs refcount) | ❌ |
 | FFI (`extern "C"`) | ❌ (parsed, no codegen) |
-| `async fn name():` declaration | ❌ |
 | Compile-time evaluation (`const fn`) | 🔶 type-checks only |
 | `Channel<T>` | ❌ |
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.3.0 · Last updated: 2026-06-28*

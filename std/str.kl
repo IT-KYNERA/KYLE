@@ -22,8 +22,8 @@ fn capitalize(s: str) -> str:
         first + rest
 
 fn repeat_str(s: str, times: i32) -> str:
-    mut result = ""
-    mut i = 0
+    result := ""
+    i := 0
     while i < times:
         result = result + s
         i = i + 1

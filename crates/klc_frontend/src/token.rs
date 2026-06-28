@@ -41,8 +41,9 @@ pub enum TokenKind {
     // -----------------------------------------------------------------------
     Fn,         // fn
     Class,      // class
-    Abs,        // abs
-    Struct,     // struct
+    Abstract,   // abstract
+    Final,      // final
+    Struct,     // struct (temporary alias for final class)
     Enum,       // enum
     Contract,   // contract
     If,         // if
@@ -73,8 +74,11 @@ pub enum TokenKind {
     As,         // as
     Get,        // get
     Set,        // set
-    Mut,        // mut
     Implements, // implements
+    // Note: Mut removed — use := (Walrus) instead
+
+    // Attributes
+    At,         // @
 
     // Logical
     And,        // &&
@@ -114,6 +118,10 @@ pub enum TokenKind {
     LessLessEquals,     // <<=
     GreaterGreaterEquals, // >>=
 
+    // Declaration & assignment
+    Walrus,         // :=
+    ConstDecl,      // ::=
+
     // Compound assignment
     PlusEquals,     // +=
     MinusEquals,    // -=
@@ -125,6 +133,8 @@ pub enum TokenKind {
     Dot,            // .
     DotDot,         // ..
     DotDotDot,      // ...
+    DotDotEquals,   // ..=
+    DotDotLess,     // ..<
     Comma,          // ,
     Colon,          // :
     Arrow,          // ->

@@ -1,7 +1,7 @@
 # Roadmap & Status
 
-> The phase-by-phase plan, the implementation matrix, and the v1.0 release
-> checklist. This is the single source of truth for "what's done, what's
+> The phase-by-phase evolution plan, the implementation matrix, and the v1.0
+> release checklist. This is the single source of truth for "what's done, what's
 > next, and what we'll ship at v1.0."
 
 ---
@@ -10,264 +10,443 @@
 
 | Phase | Focus | Status |
 |---|---|---|
-| **0–6** | Language design, compiler, all syntax features | ✅ Complete |
-| **7** | Cross-platform: macOS ARM + Linux ARM | ✅ Complete |
-| **8** | Distribution and tooling polish | ✅ Complete |
-| **9** | Backend & systems: FFI, HTTP, DB, ENV | 🔜 Next |
-| **10** | Std library ergonomics: iterators, collections | 📅 Planned |
-| **11** | Production hardening: errors, DWARF, TLS, WASM | 📅 Planned |
-| **12** | Self-hosting (compiler in Kyle) | ⏸️ Deferred |
-| **13** | Ecosystem: registry, framework, website | 📅 Future |
+| **1-2** | **Docs + AGENTS.md/README.md** | **Done** |
+| **3-4** | **Lexer + Parser** (new syntax: `:=`, `::=`, `T?`, `final class`, `abstract class`) | **Current** |
+| **5** | HIR (new crate) + desugaring | Planned |
+| **6** | Semantic analysis (updated) | Planned |
+| **7** | Move semantics (replaces refcounting) | Planned |
+| **8** | Backend release mode | Planned |
+| **9** | Async scheduler | Planned |
+| **10** | Iterators | Planned |
+| **11** | Package manager | Planned |
+| **12** | Tooling | Planned |
+| **13** | Borrow checker | Planned |
+| **14** | Alternative backends | Planned |
+
+**Priority order:** Docs and spec first, then lexer/parser, then semantic
+pipeline, then move semantics, then async/iterators, then tooling.
 
 ---
 
-## 2. Phase 0–6: The Language
+## 2. Phase 1-2: Docs + AGENTS.md/README.md
 
-**Status:** ✅ Complete. Every language feature listed in
-[`docs/01-language-reference.md`](01-language-reference.md) under the
-"Constructs" sections is implemented, type-checked, and codegenned. The
-test suite has 101 passing unit tests.
+**Status:** Done. All documentation has been rewritten to reflect the new
+variable syntax (`=`, `:=`, `::=`), type syntax (`T?`), and class keywords
+(`final class`, `abstract class`).
 
-Key milestones:
+### Key Milestones
 
-- ✅ Lexer + parser for full grammar
-- ✅ Type checker with generics, type inference, contracts
-- ✅ MIR with control flow, classes, generics
-- ✅ LLVM 18 codegen (inkwell)
-- ✅ Runtime: memory, string, list, dict, I/O, async
-- ✅ 8 standard library modules
-- ✅ Formatter, LSP, VS Code extension
-- ✅ Package manager (manifest)
-- ✅ 50+ working examples
+- AGENTS.md rewritten with new variable/type/keyword decisions
+- Language reference (docs/01-language-reference.md) updated to v0.3.0 with
+  full new syntax: `=`, `:=`, `::=`, `T?`, `T!`, `final class`, `abstract class`
+- Types/Errors/Memory doc updated for new optional syntax
+- Modules/Packages/Tooling doc updated
+- Compiler architecture doc updated with new pipeline
+- All Rust tests passing (101+)
 
 ---
 
-## 3. Phase 7: Cross-Platform Support
+## 3. Phase 3-4: Lexer + Parser
 
-**Status:** ✅ Complete. Two platform binaries are built and released
-automatically via GitHub Actions.
+**Status:** Lexer tokens are complete. Parser declaration-level syntax is
+complete. Statement-level parsing and advanced features are in progress.
 
-| Platform | Status | Notes |
-|---|---|---|
-| macOS ARM (Apple Silicon) | ✅ | Tested, primary dev platform |
-| Linux ARM (aarch64) | ✅ | Tested, CI runs on `ubuntu-24.04-arm` |
-| Linux x64 (x86_64) | 📅 | Planned (Phase 9+) |
-| macOS Intel (x86_64) | 📅 | Planned (Phase 9+) |
-| Windows x64 | 📅 | Planned (Phase 11+) |
+### 3.1 Lexer (Done)
+
+| Token | Status |
+|---|---|
+| `Walrus` (`:=`) for mutable declaration | Done |
+| `ConstDecl` (`::=`) for constant declaration | Done |
+| `Abstract` keyword | Done (both `abstract` and legacy `abs`) |
+| `Final` keyword (for `final class`) | Done |
+| `DotDotEquals` (`..=`) for inclusive ranges | Done |
+| `DotDotLess` (`..<`) for half-open ranges | Done |
+| `Mut` keyword | Removed |
+
+### 3.2 Lexer Remaining
+
+| Token | Status |
+|---|---|
+| `At` (`@`) for attribute syntax `#[attr]` | Not yet implemented |
+| `///` doc comments (currently `##`) | Not yet implemented |
+
+### 3.3 Parser (Done)
+
+| Construct | Status |
+|---|---|
+| `name = expr` (immutable declaration) | Done |
+| `name := expr` (mutable declaration) | Done |
+| `name ::= expr` (constant declaration) | Done |
+| `abstract class Name:` | Done |
+| `struct Name:` (temporary alias) | Done |
+| Type-annotated variables `name: T = expr` | Done |
+| Statement-level `=`, `:=`, `::=` | Done |
+
+### 3.4 Parser Remaining
+
+| Construct | Status |
+|---|---|
+| `final class Name:` with no inheritance | Not yet implemented (Final token exists) |
+| Destructuring `(x, y) = expr` | Not yet implemented |
+| `if let pattern = expr:` | Not yet implemented |
+| `while let pattern = expr:` | Not yet implemented |
+| Error recovery (panic mode, multiple errors) | Not yet implemented |
+
+### 3.5 Known Issues
+
+- `__name` visibility stripping in parser is confusing: the leading `__` prefix
+  is stripped from the identifier and used to set visibility. This should be
+  revisited for clarity.
+- `.kl` examples in `examples/` and `examples/kyle-test/` still use old syntax
+  (`mut` keyword instead of `:=`, `Option<T>` instead of `T?`, etc.). They need
+  to be rewritten.
+- `Final` keyword exists in the lexer, but `final class Name:` is not parsed.
+  Currently `struct` is kept as a temporary alias.
+- `@` token for attributes is missing from lexer.
+- Doc comments use `##`; should eventually support `///`.
 
 ---
 
-## 4. Phase 8: Distribution & Tooling Polish
+## 4. Phase 5: HIR (New Crate) + Desugaring
 
-**Status:** ✅ Complete. Everything in this phase is shipped in v0.2.2.
+**Status:** Planned.
 
 | Item | Status |
 |---|---|
-| One-line installer (`install.sh`) | ✅ |
-| `kl` and `klc` binary aliases | ✅ |
-| GitHub Actions CI on every push | ✅ |
-| Tag-based release pipeline | ✅ |
-| VS Code `.vsix` packaged in releases | ✅ |
-| LSP semantic tokens (variables colored) | ✅ |
-| Formatter (`kl fmt`) | ✅ |
-| Auto-generated documentation | ✅ (the 6 docs in `docs/`) |
-| Comprehensive README | ✅ |
+| Create `klc_hir` crate | Planned |
+| Define HIR types (after desugaring) | Planned |
+| Desugar `T?` to internal `Option<T>` | Planned |
+| Desugar `:=` to internal mut flag | Planned |
+| Pass HIR to semantic analysis | Planned |
 
 ---
 
-## 5. Phase 9: Backend & Systems
+## 5. Phase 6: Semantic Analysis (Updated)
 
-**Status:** 🔜 Next. The next major milestone.
-
-| Item | Priority | Status |
-|---|---|---|
-| FFI (`extern "C"`, `*T` raw pointers, `unsafe:` body lowering) | P0 | ❌ |
-| HTTP server + client (`http.Server`, `http.Request`, `http.Response`) | P0 | ❌ |
-| Process spawning (`process.spawn`, `process.exec`) | P1 | ❌ |
-| Environment variables (`env.get`, `env.set`) | P1 | ❌ |
-| File system (`fs.read`, `fs.write`, `fs.walk`) | P1 | ❌ |
-| Database drivers (`db.sqlite`, `db.postgres`) | P2 | ❌ |
-| Channels (`Channel<T>`, `ch.send`, `ch.recv`) | P2 | ❌ |
-| Release optimization (`--release` → `-O2`) | P1 | ❌ |
-
----
-
-## 6. Phase 10: Std Library Ergonomics
-
-**Status:** 📅 Planned.
+**Status:** Planned.
 
 | Item | Status |
 |---|---|
-| Iterator trait + `iter()` method on lists | ❌ |
-| `map`, `filter`, `fold`, `reduce` on lists | ❌ |
-| `zip`, `enumerate`, `flatten` | ❌ |
-| Custom sort (`sort_by`, `sort_with`) | ❌ |
-| `Option` and `Result` convenience methods | ❌ |
-| Real compile-time evaluation (`const fn`) | ❌ |
+| `T?` type checking | Planned |
+| `:=` mutability checking (replaces `mut`) | Planned |
+| `::=` constant evaluation checking | Planned |
+| Destructuring type checking | Planned |
+| `if let` / `while let` type checking | Planned |
+| Abstract method enforcement | Planned |
+| Or-patterns and match guard completion | Planned |
+| Default params | Planned |
+| Properties (get/set) | Planned |
 
 ---
 
-## 7. Phase 11: Production Hardening
+## 6. Phase 7: Move Semantics
 
-**Status:** 📅 Planned.
+**Status:** Planned. Replaces compiler-inferred refcounting with a proper
+move semantics model.
 
 | Item | Status |
 |---|---|
-| Ownership pass full coverage (no leaks) | ❌ |
-| Cycle detection in refcounting | ❌ |
-| DWARF debug info emission | ❌ |
-| Stack traces in panic messages | ❌ |
-| TLS / secure sockets | ❌ |
-| WASM target | ❌ |
-| Coroutine-based async (work-stealing) | ❌ |
+| Define Copy vs Move types | Planned |
+| Flow analysis for use-after-move detection | Planned |
+| Replace ownership pass (refcounting) with move analysis | Planned |
+| Implement `.clone()` for Move types | Planned |
+| Keep refcount only for `Rc`/`Arc` in stdlib | Planned |
+| Memory safety tests | Planned |
 
 ---
 
-## 8. Phase 12: Self-Hosting
+## 7. Phase 8: Backend Release Mode
 
-**Status:** ⏸️ Deferred until Phase 11 is done. The compiler cannot host
-itself until the language is fully stable.
+**Status:** Planned.
 
 | Item | Status |
 |---|---|
-| Lexer in Kyle (`examples/lexer.kl`) | ✅ exists |
-| Parser in Kyle (`examples/parser.kl`) | ✅ exists |
-| Semantic analyzer in Kyle (`examples/semantic.kl`) | ✅ exists |
-| Replace Rust compiler with Kyle compiler | ❌ |
+| Connect `--release` to `OptimizationLevel::Aggressive` | Planned |
+| Verify `-O2` / `-O3` works | Planned |
 
 ---
 
-## 9. Phase 13: Ecosystem
+## 8. Phase 9: Async Scheduler
 
-**Status:** 📅 Future.
+**Status:** Planned.
 
 | Item | Status |
 |---|---|
-| Central package registry | ❌ |
-| Web framework (Kyle web) | ❌ |
-| Documentation hosting site | ❌ |
-| Community Discord / forum | ❌ |
+| `async fn name():` syntax | Planned |
+| State machine generation | Planned |
+| Work-stealing scheduler (tokio-style) | Planned |
+| Maintain `async expr` as task in scheduler | Planned |
 
 ---
 
-## 10. Implementation Matrix (Language Features)
+## 9. Phase 10: Iterators
+
+**Status:** Planned.
+
+| Item | Status |
+|---|---|
+| Trait `Iterable<T>` in stdlib | Planned |
+| `iter()` on lists, dicts, ranges, strings | Planned |
+| `map`, `filter`, `fold`, `reduce`, `collect` | Planned |
+| Lazy evaluation | Planned |
+
+---
+
+## 10. Phase 11: Package Manager
+
+**Status:** Planned.
+
+| Item | Status |
+|---|---|
+| `kl.package` / `kl.lock` | Planned |
+| Version resolution (semver) | Planned |
+| `kl publish` + registry | Planned |
+| `kl doc` with `///` comments | Planned |
+
+---
+
+## 11. Phase 12: Tooling
+
+**Status:** Planned.
+
+| Item | Status |
+|---|---|
+| `#[test]` attribute -> `kl test` | Planned |
+| Formatter updated for new syntax | Planned |
+| LSP updated for new syntax | Planned |
+| VS Code extension updated | Planned |
+
+---
+
+## 12. Phase 13: Borrow Checker
+
+**Status:** Low priority.
+
+| Item | Status |
+|---|---|
+| `&T` and `&mut T` references | Planned |
+| Region inference (no lifetime annotations) | Planned |
+| Compatibility with move semantics | Planned |
+
+---
+
+## 13. Phase 14: Alternative Backends
+
+**Status:** Low priority.
+
+| Item | Status |
+|---|---|
+| Cranelift backend | Planned |
+| WASM target | Planned |
+
+---
+
+## 14. Feature Matrix
 
 | Feature | Phase | Status |
 |---|---|---|
-| Indentation-based blocks | 0 | ✅ |
-| Immutable / mut / const variables | 0 | ✅ |
-| i8/i16/i32/i64/u8/u16/u32/u64/f32/f64 | 0 | ✅ |
-| `bool`, `str`, `char`, `void`, `any` | 0 | ✅ |
-| Arithmetic, comparison, logical, bitwise operators | 0 | ✅ |
-| Functions (typed params, generic, return type) | 0 | ✅ |
-| If / elif / else | 0 | ✅ |
-| While, for-in-list, for-in-range | 0 | ✅ |
-| Loop, break, continue | 0 | ✅ |
-| Match (literal, identifier, wildcard, enum patterns) | 0 | ✅ |
-| Match as expression | 0 | ✅ |
-| Structs (generic) | 0 | ✅ |
-| Enums (generic, payload) | 0 | ✅ |
-| Classes (fields, methods, constructor) | 0 | ✅ |
-| Single inheritance | 0 | ✅ |
-| Method override (polymorphism) | 0 | ✅ |
-| Public / protected / private visibility | 8 | ✅ |
-| Abstract classes | 0 | ✅ (partial — no `abs fn` enforcement) |
-| Contracts (interfaces) | 0 | ✅ (no generic constraints) |
-| Closures | 0 | ✅ |
-| Async / await (expression form) | 0 | ✅ |
-| Lists (with spread, index, slice) | 0 | ✅ |
-| Dicts (string keys) | 0 | ✅ |
-| Error values (`T!`, `?`) | 0 | ✅ |
-| Optional chaining (`?.`) | 0 | ✅ |
-| Imports (4 forms + relative) | 0 | ✅ |
-| Type aliases | 0 | ✅ |
-| String interpolation | 0 | ✅ |
-| Built-in functions (~30) | 0 | ✅ |
-| Standard library (8 modules) | 0 | ✅ |
-| RAII / refcounting | 0 | ✅ |
-| Pattern: or-patterns (`a \| b`) | 10 | ❌ |
-| Pattern: match guard (`if cond`) | 10 | 🔶 parsed, not filtering |
-| Pattern: is-type (`x is T`) | 10 | ❌ |
-| Properties (get/set) | 9 | ❌ |
-| FFI (`extern "C"`) | 9 | ❌ |
-| Raw pointer types (`*T`) | 9 | ❌ |
-| `async fn name():` (function form) | 10 | ❌ |
-| `?:` default operator | 10 | ❌ |
-| `Channel<T>` (language-level) | 9 | ❌ |
-| Compile-time evaluation | 10 | 🔶 type-checks only |
-| `**` power operator (correct lowering) | 9 | 🔶 lowered as mul |
-| `+%`, `-%`, `*%` percent operators | 9 | 🔶 no semantic meaning |
+| Indentation-based blocks (4 spaces) | 1-2 | Done |
+| Immutable `name = value` | 1-2 | Done |
+| Mutable `name := value` | 1-2 | Done |
+| Constant `name ::= value` | 1-2 | Done |
+| `T?` optional type syntax | 1-2 | Done |
+| `T!` error-returning type | 1-2 | Done |
+| `final class` (lightweight, no inheritance) | 3-4 | Pending (token exists) |
+| `abstract class` | 3-4 | Done |
+| `struct` (temporary alias for `final class`) | 1-2 | Done |
+| `i8`/`i16`/`i32`/`i64`/`u8`/`u16`/`u32`/`u64`/`f32`/`f64` | 1-2 | Done |
+| `bool`, `str`, `char`, `void`, `any` | 1-2 | Done |
+| `ptr` raw pointer type | 3-4 | Pending |
+| Integer/float/string/char/boolean literals | 1-2 | Done |
+| `None` / `null` literals | 3-4 | Pending (null) |
+| Arithmetic, comparison, logical, bitwise operators | 1-2 | Done |
+| `..=` inclusive range | 3-4 | Done |
+| `..<` half-open range | 3-4 | Done |
+| Assignment operators (`+=`, `-=`, etc.) | 1-2 | Done |
+| Ternary operator (`cond ? a : b`) | 1-2 | Done |
+| Optional chaining (`?.`) | 1-2 | Done |
+| Error propagation (`?`) | 1-2 | Done |
+| Member access (`.field`, `.method()`, `[]`) | 1-2 | Done |
+| Functions (typed params, generic, return type) | 1-2 | Done |
+| Default argument values | 5 | Pending |
+| Variadic parameters (`...names`) | 5 | Pending |
+| Error-returning functions (`-> T!`) | 1-2 | Done |
+| Async expression (`async expr`) | 1-2 | Done |
+| Const functions (`const fn`) | 5 | Pending |
+| Public / protected / private visibility | 1-2 | Done |
+| If / elif / else | 1-2 | Done |
+| While loops | 1-2 | Done |
+| For-in-list, For-in-range | 1-2 | Done |
+| While-else, For-else | 5 | Pending |
+| Loop, break, continue | 1-2 | Done |
+| Match (patterns) | 1-2 | Done |
+| Match or-patterns (`a \| b`) | 6 | Pending |
+| Match guard (`if cond`) | 6 | Pending |
+| Match is-type (`x is T`) | 6 | Pending |
+| `if let pattern = expr:` | 3-4 | Pending |
+| `while let pattern = expr:` | 3-4 | Pending |
+| Destructuring `(x, y) = expr` | 3-4 | Pending |
+| Defer | 1-2 | Done |
+| Guard | 1-2 | Done |
+| Unsafe blocks | 1-2 | Done |
+| Enums (generic, with payload) | 1-2 | Done |
+| Classes (fields, methods, constructor) | 1-2 | Done |
+| Single inheritance + method override | 1-2 | Done |
+| Contracts (interfaces) | 1-2 | Done |
+| Type aliases | 1-2 | Done |
+| Properties (get/set) | 6 | Pending |
+| Closures (untyped params) | 1-2 | Done |
+| Closure typed params `(x: T) =>` | 5 | Pending |
+| Function pointer type `(T) -> U` | 6 | Pending |
+| Lists (literal, index, slice, spread) | 1-2 | Done |
+| Dicts (string keys, literal, index) | 1-2 | Done |
+| Tuples `(a, b, c)` | 5 | Pending |
+| Built-in functions | 1-2 | Done |
+| Standard library (8 modules) | 1-2 | Done |
+| Imports (`import x`, `from x import y`, `import ~x`) | 1-2 | Done |
+| Import alias (`import x as y`, `from x import y as z`) | 1-2 | Done |
+| RAII / compiler-inferred refcounting | 1-2 | Done |
+| String interpolation | 1-2 | Done |
+| `int()`, `float()`, `bool()` builtins | 1-2 | Done |
+| `range(n)`, `range(a, b)` | 1-2 | Done |
+| `this` instance reference | 1-2 | Done |
+| `super` keyword | 5 | Pending |
+| `as` casting | 6 | Pending |
+| `is` operator | 6 | Pending |
+| `#[attr]` attributes | 3-4 | Pending |
+| `///` doc comments | 3-4 | Pending |
+| Labeled loops | 5 | Pending |
+| Doc comments (`##`) | 1-2 | Done |
 
 ---
 
-## 11. Test Counts
+## 15. Test Counts
 
 | Suite | Count | Status |
 |---|---|---|
-| `klc_core` unit tests | varies | ✅ |
-| `klc_frontend` unit tests | 80 | ✅ |
-| `klc_semantic` unit tests | 17 | ✅ |
-| `klc_mir` unit tests | 4 | ✅ |
+| `klc_frontend` unit tests | 80 | All passing |
+| `klc_semantic` unit tests | 17 | All passing |
+| `klc_mir` unit tests | 4 | All passing |
 | `klc_runtime` unit tests | 0 | n/a (C-ABI) |
 | `klc_tools` unit tests | 0 | n/a (LSP) |
-| Example programs (`examples/*.kl`) | 55 | ✅ all compile |
-| Standard library test suite | 0 | 📅 Phase 11 |
-
-**Total unit tests:** 101 passing, 0 failing.
+| `klc_backend` unit tests | 0 | n/a |
+| `klc_core` unit tests | 0 | n/a |
+| `klc_driver` unit tests | 0 | n/a |
+| `klc_cli` unit tests | 0 | n/a |
+| Example programs (`examples/*.kl`) | 55+ | All compile (old syntax) |
+| End-to-end syntax tests (`examples/kyle-test/tests/`) | 12 | All pass `kl test` |
+| Total Rust unit tests | 101 | All passing |
 
 ---
 
-## 12. v1.0 Release Checklist
+## 16. v1.0 Release Checklist
 
 > A release v1.0 will be cut when every item below is checked.
 
-### 12.1 Language
+### 16.1 Phases 1-2: Documentation
 
-- [ ] All `01-language-reference.md` constructs marked ✅
-- [ ] `**` power operator correctly lowered
-- [ ] Match or-patterns (`a | b`)
-- [ ] Match guard `if cond` filtering
-- [ ] Compile-time evaluation works for `const fn`
-- [ ] No known syntax bugs
+- [x] AGENTS.md rewritten with new syntax
+- [x] Language reference updated to v0.3.0
+- [x] Types/Errors/Memory doc updated
+- [x] Modules/Packages/Tooling doc updated
+- [x] Compiler architecture doc updated
 
-### 12.2 Tooling
+### 16.2 Phase 3-4: Lexer + Parser
 
-- [ ] LSP semantic tokens stable
-- [ ] Formatter handles all valid code
-- [ ] VS Code extension published to marketplace
-- [ ] `kl completions` for bash, zsh, fish
+- [x] Walrus (`:=`), ConstDecl (`::=`) tokens
+- [x] Abstract, Final keyword tokens
+- [x] DotDotEquals (`..=`), DotDotLess (`..<`) tokens
+- [x] Declaration-level `=`, `:=`, `::=` parsing
+- [x] `abstract class Name:` parsing
+- [ ] `final class Name:` parsing
+- [ ] `@` (At) token for attributes
+- [ ] `///` doc comment lexing
+- [ ] Destructuring `(x, y) = expr`
+- [ ] `if let pattern = expr:`
+- [ ] `while let pattern = expr:`
+- [ ] Error recovery in parser
+- [ ] All .kl examples rewritten with new syntax
 
-### 12.3 Performance
+### 16.3 Phase 5: HIR + Desugaring
 
-- [ ] Release builds use `-O2` or `-O3`
-- [ ] Ownership pass has no known leaks
-- [ ] Cycle detection in refcounting
-- [ ] Standard library benchmarked against equivalent C/Rust code
+- [ ] `klc_hir` crate exists
+- [ ] `T?` desugared to internal `Option<T>`
+- [ ] `:=` desugared to internal mut flag
+- [ ] HIR passes to semantic analysis
 
-### 12.4 Platforms
+### 16.4 Phase 6: Semantic Analysis
 
-- [ ] Linux x64 binary released
-- [ ] macOS Intel binary released
-- [ ] Windows x64 binary released
-- [ ] CI runs on all four platforms
+- [ ] `T?` type checking
+- [ ] `:=` mutability checking
+- [ ] `::=` constant evaluation checking
+- [ ] Destructuring type checking
+- [ ] `if let` / `while let` type checking
+- [ ] Abstract method enforcement
+- [ ] Or-patterns and match guard filtering
+- [ ] Default params
+- [ ] Properties (get/set)
 
-### 12.5 Ecosystem
+### 16.5 Phase 7: Move Semantics
 
-- [ ] At least 3 third-party packages on the registry
-- [ ] `kl` aliases both stable
-- [ ] Website up with tutorials
-- [ ] Community Discord active
+- [ ] Copy vs Move type distinction
+- [ ] Use-after-move detection
+- [ ] Refcounting replaced by move analysis
+- [ ] `.clone()` for Move types
+- [ ] Memory safety tests
 
-### 12.6 Documentation
+### 16.6 Phase 8: Release Mode
 
-- [ ] All 6 docs reviewed for accuracy
+- [ ] `--release` uses `OptimizationLevel::Aggressive`
+- [ ] `-O2` / `-O3` verified
+
+### 16.7 Phase 9: Async Scheduler
+
+- [ ] `async fn name():` declaration syntax
+- [ ] State machine generation
+- [ ] Work-stealing scheduler
+- [ ] `async expr` integration
+
+### 16.8 Phase 10: Iterators
+
+- [ ] `Iterable<T>` trait in stdlib
+- [ ] `iter()` on core types
+- [ ] `map`, `filter`, `fold`, `reduce`, `collect`
+- [ ] Lazy evaluation
+
+### 16.9 Phase 11: Package Manager
+
+- [ ] `kl.package` / `kl.lock`
+- [ ] Semver version resolution
+- [ ] `kl publish` + registry
+- [ ] `kl doc` with `///`
+
+### 16.10 Phase 12: Tooling
+
+- [ ] `#[test]` attribute -> `kl test`
+- [ ] Formatter updated for new syntax
+- [ ] LSP updated for new syntax
+- [ ] VS Code extension updated
+
+### 16.11 Phase 13: Borrow Checker
+
+- [ ] `&T` and `&mut T` references
+- [ ] Region inference
+- [ ] Compatibility with move semantics
+
+### 16.12 Phase 14: Alternative Backends
+
+- [ ] Cranelift backend
+- [ ] WASM target
+
+### 16.13 Documentation
+
+- [ ] All docs reviewed for accuracy
 - [ ] Test matrix 100% green
-- [ ] Tutorial series published (beginner → advanced)
 - [ ] Migration guide for Python / Rust / Go developers
 
 ---
 
-## 13. Key Design Decisions (Frozen)
+## 17. Key Design Decisions (Frozen)
 
 These are **not** subject to change without a major version bump.
 
@@ -275,52 +454,76 @@ These are **not** subject to change without a major version bump.
 |---|---|
 | Block syntax | Indentation, 4 spaces |
 | Statement terminator | Newline (no semicolons) |
-| Variable mutability | `mut` keyword required to make mutable |
-| Constants | UPPERCASE convention, no keyword |
+| Variable mutability | `=` immutable, `:=` mutable, `::=` constant |
+| `mut` / `let` / `var` / `const` keywords | None — operator signals mutability |
 | Instance reference | `this` (not `self`) |
-| Optional type | `Option<T>` (not `T?`) |
+| Optional type | `T?` (sugar for internal `Option<T>`) |
 | Error type | `T!` return type |
 | Error propagation | `?` operator |
 | Exceptions | None — errors are values |
-| `let` / `var` keywords | None — `mut` keyword directly |
 | `{` `}` for blocks | None — indentation |
 | Visibility | Convention: `_` protected, `__` private, none public |
+| Class keyword | `final class` (no inheritance), `class` (inheritable) |
+| Abstract class | `abstract class` (not `abs class`) |
 | String encoding | Null-terminated UTF-8 bytes |
 | Integer overflow | Panic in debug, wrapping in release (planned) |
 | Entry point | `fn main(args: [str]) -> i32` in `src/main.kl` |
-| Memory | RAII + compiler-inferred refcounting (no GC, no manual free) |
+| Memory | Move semantics (planned), Copy types + Clone |
 | Compiler implementation | Pure Rust, LLVM 18 via `inkwell` |
-| Runtime implementation | Pure Rust with `#[unsafe(no_mangle)] extern "C"` |
+| Runtime implementation | Pure Rust with `extern "C"` |
 | CLI binary name | `kl` (primary), `klc` (legacy alias) |
 
 ---
 
-## 14. What's in the Next Release (v0.2.2)
+## 18. Current Release (v0.3.0)
 
-This is what was added since v0.2.1:
+### What was added since v0.2.2
 
-- **Bug fixes**
-  - `input("prompt")` now accepts 1 argument (was 0)
-  - `open(path, mode)` now correctly expects 2 arguments
-  - `read_str(fd, count)` now correctly expects 2 arguments
-  - `class X: Parent` (single colon) is now accepted by the parser
-  - Private methods (`__method`) are now blocked from outside the class
-  - Classes without a constructor get a synthetic default constructor
-  - Inheritance walks the parent chain for both fields and methods
-  - LSP autocompletion now uses the correct character position
-  - Error source label changed from `klc` to `kl`
+- **New variable syntax**
+  - `name = value` — immutable declaration (unchanged)
+  - `name := value` — mutable declaration (replaces `mut` keyword)
+  - `name ::= value` — constant declaration (replaces UPPERCASE convention)
+  - `mut` keyword removed from lexer and parser
 
-- **New features**
-  - 5 new example programs (`input_prompt_test`, `class_greet_test`,
-    `inheritance_test`, `polymorphism_test`, `private_method_test`)
-  - Private method convention: declare with `__name`, call with `this.name`
-  - Method override and dynamic dispatch through parent chain
+- **New type syntax**
+  - `T?` postfix syntax for optional types (replaces public `Option<T>`)
+  - `T!` stays as error-returning type
+
+- **New keywords and tokens**
+  - `Walrus` (`:=`) token for mutable declaration
+  - `ConstDecl` (`::=`) token for constant declaration
+  - `Abstract` keyword (both `abstract` and legacy `abs`)
+  - `Final` keyword (for `final class`)
+  - `DotDotEquals` (`..=`) for inclusive ranges
+  - `DotDotLess` (`..<`) for half-open ranges
+
+- **Parser updates**
+  - Declaration-level `=`, `:=`, `::=` for variable declarations
+  - Statement-level `=`, `:=`, `::=` for rebinding
+  - `abstract class Name:` support (with `abs` backward compat)
+  - `struct` kept as temporary alias for `final class`
 
 - **Documentation**
-  - 5 docs rewritten with full test matrix and checkboxes
-  - 6 docs total: vision, language reference, types/errors/memory, modules,
-    architecture, roadmap
+  - AGENTS.md completely rewritten as master context for AI agents
+  - Language reference (v0.3.0) with all new syntax documented
+  - Types/Errors/Memory document updated for `T?` and `T!`
+  - Modules/Packages/Tooling document updated
+  - Compiler architecture document updated
+  - Roadmap rewritten with new 14-phase evolution plan
+
+- **Tests**
+  - All 101 Rust unit tests passing
+  - 12 end-to-end syntax test files passing via `kl test`
+
+### Known Issues (v0.3.0)
+
+- `__name` visibility prefix stripping needs fixing
+- `.kl` examples not yet rewritten with new syntax
+- `Final` keyword exists in lexer but `final class` not fully parsed yet
+- `@` (At) token for attributes not yet implemented
+- `///` doc comments not yet implemented (using `##` instead)
+- Destructuring, `if let`, `while let` not yet implemented
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.3.0 · Last updated: 2026-06-28*

@@ -11,8 +11,8 @@ fn absolute64(n: i64) -> i64:
         n
 
 fn pow(base: i32, exp: i32) -> i32:
-    mut result = 1
-    mut i = 0
+    result := 1
+    i := 0
     while i < exp:
         result = result * base
         i = i + 1
@@ -22,16 +22,16 @@ fn sqrt(n: i32) -> i32:
     if n < 2:
         n
     else:
-        mut guess = n / 2
-        mut i = 0
+        guess := n / 2
+        i := 0
         while i < 20:
             guess = (guess + n / guess) / 2
             i = i + 1
         guess
 
 fn gcd(a: i32, b: i32) -> i32:
-    mut x = a
-    mut y = b
+    x := a
+    y := b
     while y != 0:
         temp = y
         y = x % y

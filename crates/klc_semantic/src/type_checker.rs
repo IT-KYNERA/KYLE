@@ -451,6 +451,13 @@ impl TypeChecker {
                                                     format!("'{}' expects 0 or 1 argument(s), got {}", name, arg_count))
                                             );
                                         }
+                                    } else if name == "range" {
+                                        if arg_count < 1 || arg_count > 2 {
+                                            self.reporter.report(
+                                                Diagnostic::error(ErrorCode::E0001,
+                                                    format!("'{}' expects 1 or 2 argument(s), got {}", name, arg_count))
+                                            );
+                                        }
                                     } else if arg_count != exp {
                                         self.reporter.report(
                                             Diagnostic::error(ErrorCode::E0001,
@@ -460,7 +467,29 @@ impl TypeChecker {
                                 }
                             }
                         }
-                        *ft.return_
+                        // Override return type for builtins
+                        if let Some(name) = Self::target_name(target) {
+                            match name {
+                                "print" | "println" | "print_err" | "print_int" | "println_int"
+                                | "sleep" | "assert" | "assert_eq" | "assert_str" => Type::Void,
+                                "len" => Type::I32,
+                                "str" => Type::Str,
+                                "int" => Type::I32,
+                                "float" => Type::F64,
+                                "bool" => Type::Bool,
+                                "input" => Type::Str,
+                                "range" => Type::List(Box::new(Type::I32)),
+                                "ceil" | "floor" | "round" => Type::F64,
+                                "open" | "read_str" | "write_str" | "close" => Type::I32,
+                                "now" => Type::I64,
+                                "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
+                                "json_stringify" => Type::Str,
+                                "error" => Type::Option(Box::new(Type::Void)),
+                                _ => *ft.return_,
+                            }
+                        } else {
+                            *ft.return_
+                        }
                     }
                     _ => {
                         if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
@@ -474,25 +503,7 @@ impl TypeChecker {
                                 }
                             }
                         }
-                        if let Expr::Identifier { name, .. } = target.as_ref() {
-                            match name.as_str() {
-                                "print" | "println" | "print_err" => Type::Void,
-                                "len" => Type::I32,
-                                "str" => Type::Str,
-                                "input" => Type::Str,
-                                "range" => Type::List(Box::new(Type::I32)),
-                                "open" | "read_str" | "write_str" | "close" => Type::I32,
-                                "sleep" => Type::Void,
-                                "now" => Type::I64,
-                                "assert" | "assert_eq" | "assert_str" => Type::Void,
-                                "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
-                                "json_stringify" => Type::Str,
-                                "error" => Type::Option(Box::new(Type::Void)),
-                                _ => Type::I32,
-                            }
-                        } else {
-                            Type::I32
-                        }
+                        Type::I32
                     }
                 }
             }
@@ -780,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_mutable_variable() {
-        let diags = check("mut x = 1\n");
+        let diags = check("x := 1\n");
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
 
@@ -799,7 +810,7 @@ mod tests {
     #[test]
     fn test_mutable_var_assign_in_fn() {
         // mutable var declared inside fn, then reassigned
-        let source = "fn f():\n    mut x = 1\n    x = 2\n";
+        let source = "fn f():\n    x := 1\n    x = 2\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
@@ -829,28 +840,28 @@ mod tests {
     #[test]
     fn test_assign_inside_while() {
         // A variable declared in fn body and assigned inside a while
-        let source = "fn f():\n    mut x = 0\n    while true:\n        x = 1\n";
+        let source = "fn f():\n    x := 0\n    while true:\n        x = 1\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
 
     #[test]
     fn test_while_condition_variable_ref() {
-        let source = "fn f():\n    mut x = 0\n    while x < 5:\n        42\n";
+        let source = "fn f():\n    x := 0\n    while x < 5:\n        42\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
 
     #[test]
     fn test_while_body_var_read() {
-        let source = "fn f():\n    mut x = 0\n    while true:\n        x\n";
+        let source = "fn f():\n    x := 0\n    while true:\n        x\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
 
     #[test]
     fn test_while_body_expr_read() {
-        let source = "fn f():\n    mut x = 0\n    while true:\n        x + 1\n";
+        let source = "fn f():\n    x := 0\n    while true:\n        x + 1\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }

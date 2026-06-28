@@ -189,9 +189,10 @@ pipeline is ready to ship additional platform binaries as they are built.
 ## Project Status
 
 See [`docs/05-roadmap-status.md`](05-roadmap-status.md) for the full breakdown
-of phases, feature matrix, and release checklist. Phases 0–8 are complete; the
-compiler, runtime, and tooling are in place. Phase 9 (FFI, HTTP, DB) is next.
+of phases, feature matrix, and release checklist. Phases 0–6 are complete;
+Phase 7 (Language Completion) is the current focus — finishing every syntax
+construct, fixing all known bugs, and turning all 🔶/❌ into ✅.
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.2.2 · Last updated: 2026-06-28*

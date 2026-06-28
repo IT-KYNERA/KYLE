@@ -343,4 +343,4 @@ highlighting and snippets only.
 
 ---
 
-*Version: v0.2.2 · Last updated: 2026-06-27*
+*Version: v0.3.0 · Last updated: 2026-06-28*

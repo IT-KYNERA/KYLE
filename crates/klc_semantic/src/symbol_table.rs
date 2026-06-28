@@ -71,6 +71,9 @@ impl SymbolTable {
             "char_at", "is_digit", "is_alpha", "is_alnum", "is_whitespace", "is_upper", "is_lower",
             "ord",
             "error",
+            "int", "float", "bool",
+            "print_int", "println_int",
+            "ceil", "floor", "round",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {
