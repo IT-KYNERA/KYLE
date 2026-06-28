@@ -1,7 +1,0 @@
-fn foo(x: i32) -> i32:
-    if x == 1:
-        return 1
-    return 0
-
-fn main():
-    println(str(foo(1)))

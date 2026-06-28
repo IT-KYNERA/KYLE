@@ -83,6 +83,95 @@ impl Pipeline {
             program.declarations.append(&mut rest);
         }
 
+        // Transitive import resolution: resolve imports within each cached
+        // module so that parent class declarations become available.
+        // For example, `from ~entities.employee import Employee` parses
+        // entities/employee.kl which itself has `from ~base import BaseEntity`.
+        // We need to resolve that inner import so BaseEntity's declaration
+        // is available when lowering Employee's class fields.
+        let cached_keys: Vec<String> = resolver.cache.keys().cloned().collect();
+        for cache_key in &cached_keys {
+            // Save resolver's source_dir and temporarily set it to the
+            // cached module's directory for correct relative resolution.
+            let old_source_dir = resolver.source_dir.clone();
+            let module_dir = {
+                if let Some(module) = resolver.cache.get(cache_key) {
+                    module.path.parent().map(|p| p.to_path_buf())
+                } else { None }
+            };
+            if let Some(ref dir) = module_dir {
+                resolver.source_dir = Some(dir.clone());
+            }
+
+            // Collect FromImport info from this cached module
+            let import_info: Vec<(usize, String, String, bool)> = {
+                if let Some(module) = resolver.cache.get(cache_key) {
+                    module.program.declarations.iter().enumerate()
+                        .filter_map(|(i, d)| {
+                            if let klc_core::ast::Decl::FromImport(fi) = d {
+                                Some((i, fi.module_name.clone(), fi.imported_name.clone(), fi.relative))
+                            } else { None }
+                        })
+                        .collect()
+                } else { Vec::new() }
+            };
+
+            // Resolve each import
+            let mut import_decls: Vec<(usize, Vec<klc_core::ast::Decl>)> = Vec::new();
+            for (i, mod_name, imported_name, rel) in import_info {
+                if let Ok(decl) = resolver.get_imported_declaration(&mod_name, &imported_name, rel) {
+                    import_decls.push((i, vec![decl]));
+                }
+            }
+
+            // Splice resolved declarations into the cached module
+            for (idx, decls) in import_decls.into_iter().rev() {
+                if let Some(module) = resolver.cache.get_mut(cache_key) {
+                    let mut rest = module.program.declarations.split_off(idx + 1);
+                    module.program.declarations.extend(decls);
+                    module.program.declarations.append(&mut rest);
+                }
+            }
+
+            resolver.source_dir = old_source_dir;
+        }
+
+        // Now pull any class declarations from cached modules that serve as
+        // parent classes for classes already in program.declarations but whose
+        // declarations aren't yet in the program.
+        loop {
+            let class_names: std::collections::HashSet<String> = program.declarations.iter()
+                .filter_map(|d| {
+                    if let klc_core::ast::Decl::Class(c) = d { Some(c.name.clone()) }
+                    else { None }
+                })
+                .collect();
+            let needed_parents: Vec<String> = program.declarations.iter()
+                .filter_map(|d| {
+                    if let klc_core::ast::Decl::Class(c) = d {
+                        c.parent.as_ref().and_then(|p| {
+                            if class_names.contains(p) { None } else { Some(p.clone()) }
+                        })
+                    } else { None }
+                })
+                .collect();
+
+            if needed_parents.is_empty() { break; }
+
+            let mut any_added = false;
+            for cached in resolver.cache.values() {
+                for cd in &cached.program.declarations {
+                    if let klc_core::ast::Decl::Class(pc) = cd {
+                        if needed_parents.contains(&pc.name) && !class_names.contains(&pc.name) {
+                            program.declarations.push(cd.clone());
+                            any_added = true;
+                        }
+                    }
+                }
+            }
+            if !any_added { break; }
+        }
+
         Ok(())
     }
 

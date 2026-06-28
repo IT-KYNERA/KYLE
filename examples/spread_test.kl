@@ -1,8 +1,0 @@
-fn main():
-    a = [1, 2, 3]
-    b = [...a, 4, 5]
-    println(b[0])
-    println(b[1])
-    println(b[2])
-    println(b[3])
-    println(b[4])

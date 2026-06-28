@@ -34,6 +34,32 @@ pub extern "C" fn kl_i64_to_str(val: i64) -> *const u8 {
     buf as *const u8
 }
 
+/// Convert an f64 to its string representation.
+/// Returns a heap-allocated null-terminated C string.
+/// Caller must free with kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_f64_to_str(val: f64) -> *const u8 {
+    // Use Rust's format to get the string, then copy to C string
+    let s = if val == val.floor() && val.is_finite() {
+        // No fractional part — use integer representation to avoid trailing .0
+        // But always include at least one decimal to signal this is a float
+        format!("{:.6}", val)
+    } else {
+        format!("{}", val)
+    };
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let buf = crate::kl_alloc((len + 1) as i64);
+    if buf.is_null() {
+        return std::ptr::null();
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, len);
+        *buf.add(len) = 0;
+    }
+    buf as *const u8
+}
+
 /// Parse a null-terminated C string as a signed integer (i64).
 ///
 /// Mirrors Rust's `str::parse::<i64>()` semantics: optional leading

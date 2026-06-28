@@ -1,6 +1,0 @@
-fn main():
-    s = "Hello World"
-    sub = substr(s, 0, 5)
-    println(sub)
-    sub2 = substr(s, 6, 5)
-    println(sub2)

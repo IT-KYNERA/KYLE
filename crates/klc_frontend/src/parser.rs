@@ -562,6 +562,26 @@ impl Parser {
                 span: self.span_from(start),
             });
         }
+        // Handle tuple type: (T, U, ...) → Tuple<T, U, ...>
+        if self.at(TokenKind::LParen) {
+            self.advance();
+            let mut elems = Vec::new();
+            if !self.at(TokenKind::RParen) {
+                elems.push(self.parse_type()?);
+                while self.at(TokenKind::Comma) {
+                    self.advance();
+                    if self.at(TokenKind::RParen) { break; }
+                    elems.push(self.parse_type()?);
+                }
+            }
+            self.expect(TokenKind::RParen)?;
+            // Tuples are represented as a generic with name "tuple" for now
+            return Ok(AstType::Generic {
+                name: "tuple".to_string(),
+                args: elems,
+                span: self.span_from(start),
+            });
+        }
         let name = self.eat_identifier();
         if name.is_empty() {
             let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
@@ -676,7 +696,15 @@ impl Parser {
         let tok = self.current()?;
         let expr = match &tok.kind {
             TokenKind::Integer(s) => {
-                let val = s.parse::<i64>().unwrap_or(0);
+                let val = if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    i64::from_str_radix(hex, 16).unwrap_or(0)
+                } else if let Some(bin) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
+                    i64::from_str_radix(bin, 2).unwrap_or(0)
+                } else if let Some(oct) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
+                    i64::from_str_radix(oct, 8).unwrap_or(0)
+                } else {
+                    s.parse::<i64>().unwrap_or(0)
+                };
                 self.advance();
                 Expr::Literal { value: Literal::Integer(val), span: self.span_from(start) }
             }
@@ -1766,27 +1794,27 @@ fn test():\n\
 
     #[test]
     fn test_hello_example() {
-        let source = include_str!("../../../examples/hello.kl");
-        assert!(parse(source).is_ok(), "hello.kl should parse");
+        let source = include_str!("../../../examples/src/main.kl");
+        assert!(parse(source).is_ok(), "main.kl should parse");
     }
 
     #[test]
     fn test_fibonacci_example() {
-        let source = include_str!("../../../examples/fibonacci.kl");
-        assert!(parse(source).is_ok(), "fibonacci.kl should parse");
+        let source = include_str!("../../../examples/src/utils/math.kl");
+        assert!(parse(source).is_ok(), "math.kl should parse");
     }
 
     #[test]
     fn test_user_example() {
-        let source = include_str!("../../../examples/user.kl");
-        assert!(parse(source).is_ok(), "user.kl should parse");
+        let source = include_str!("../../../examples/src/entities/employee.kl");
+        assert!(parse(source).is_ok(), "employee.kl should parse");
     }
 
     #[test]
     fn test_parser_example() {
-        let source = include_str!("../../../examples/parser.kl");
+        let source = include_str!("../../../examples/src/main.kl");
         if let Err(e) = parse(source) {
-            panic!("parser.kl parse error: {}", e);
+            panic!("main.kl parse error: {}", e);
         }
     }
 }

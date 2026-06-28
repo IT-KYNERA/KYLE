@@ -104,6 +104,7 @@ impl<'ctx> Codegen<'ctx> {
         let void_ty = self.context.void_type();
         let i64_ty = self.context.i64_type();
         let i32_ty = self.context.i32_type();
+        let f64_ty = self.context.f64_type();
         let ptr_ty = self.context.ptr_type(Default::default());
 
         // void kl_print_int(i64)
@@ -153,6 +154,12 @@ impl<'ctx> Codegen<'ctx> {
             let params = [i64_ty.into()];
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_i64_to_str", ft, None);
+        }
+        // ptr kl_f64_to_str(f64)
+        {
+            let params = [f64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_f64_to_str", ft, None);
         }
         // i32 kl_strlen(ptr)
         {
@@ -661,70 +668,148 @@ impl<'ctx> Codegen<'ctx> {
                         MirInst::BinaryOp { dest, op, left, right } => {
                             let l = self.value_to_llvm(left, &last_value_map)?;
                             let r = self.value_to_llvm(right, &last_value_map)?;
-                            let li = self.to_int_value(l);
-                            let ri = self.to_int_value(r);
 
-                            // For logical ops, truncate wider operands to i1 first
-                            let bool_ty = self.context.bool_type();
-                            let to_i1 = |val: inkwell::values::IntValue<'ctx>| {
-                                if val.get_type().get_bit_width() > 1 {
-                                    self.builder.build_int_truncate(val, bool_ty, "")
-                                } else {
-                                    Ok(val)
+                            // Check if either operand is float (handles comparison ops whose result is I32)
+                            let l_is_float = matches!(l, BasicValueEnum::FloatValue(_));
+                            let r_is_float = matches!(r, BasicValueEnum::FloatValue(_));
+                            let any_float = l_is_float || r_is_float;
+                            // Also check if destination is float type (for arithmetic)
+                            let dest_type = self.alloca_types.get(dest).or_else(|| self.field_ptr_types.get(dest));
+                            let is_float = dest_type.map_or(false, |t| matches!(t, BasicTypeEnum::FloatType(_)));
+
+                            let result = if any_float || is_float {
+                                let lf = self.to_float_value(l);
+                                let rf = self.to_float_value(r);
+                                match op {
+                                    MirBinaryOp::Add => self.builder.build_float_add(lf, rf, "")
+                                        .map_err(|e| format!("fadd: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Sub => self.builder.build_float_sub(lf, rf, "")
+                                        .map_err(|e| format!("fsub: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Mul => self.builder.build_float_mul(lf, rf, "")
+                                        .map_err(|e| format!("fmul: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Div => self.builder.build_float_div(lf, rf, "")
+                                        .map_err(|e| format!("fdiv: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Eq => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::OEQ, lf, rf, "")
+                                            .map_err(|e| format!("feq: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("feq-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    MirBinaryOp::Neq => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::ONE, lf, rf, "")
+                                            .map_err(|e| format!("fne: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("fne-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    MirBinaryOp::Lt => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::OLT, lf, rf, "")
+                                            .map_err(|e| format!("flt: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("flt-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    MirBinaryOp::Gt => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::OGT, lf, rf, "")
+                                            .map_err(|e| format!("fgt: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("fgt-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    MirBinaryOp::Le => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::OLE, lf, rf, "")
+                                            .map_err(|e| format!("fle: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("fle-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    MirBinaryOp::Ge => {
+                                        let cmp = self.builder.build_float_compare(
+                                            inkwell::FloatPredicate::OGE, lf, rf, "")
+                                            .map_err(|e| format!("fge: {}", e))?;
+                                        self.builder.build_int_z_extend(cmp,
+                                            self.context.i32_type(), "")
+                                            .map_err(|e| format!("fge-ext: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
+                                    _ => {
+                                        // Fallback: use int op for bitwise etc.
+                                        let li = self.to_int_value(l);
+                                        let ri = self.to_int_value(r);
+                                        self.builder.build_int_add(li, ri, "")
+                                            .map_err(|e| format!("int_add: {}", e))?
+                                            .as_basic_value_enum()
+                                    },
                                 }
-                            };
+                            } else {
+                                let li = self.to_int_value(l);
+                                let ri = self.to_int_value(r);
 
-                            let result = match op {
-                                MirBinaryOp::Add => self.builder.build_int_add(li, ri, "")
-                                    .map_err(|e| format!("add: {}", e))?,
-                                MirBinaryOp::Sub => self.builder.build_int_sub(li, ri, "")
-                                    .map_err(|e| format!("sub: {}", e))?,
-                                MirBinaryOp::Mul => self.builder.build_int_mul(li, ri, "")
-                                    .map_err(|e| format!("mul: {}", e))?,
-                                MirBinaryOp::Div => self.builder.build_int_signed_div(li, ri, "")
-                                    .map_err(|e| format!("div: {}", e))?,
-                                MirBinaryOp::Rem => self.builder.build_int_signed_rem(li, ri, "")
-                                    .map_err(|e| format!("rem: {}", e))?,
-                                MirBinaryOp::And => {
-                                    let l1 = to_i1(li)
-                                        .map_err(|e| format!("and-trunc: {}", e))?;
-                                    let r1 = to_i1(ri)
-                                        .map_err(|e| format!("and-trunc: {}", e))?;
-                                    self.builder.build_and(l1, r1, "")
+                                match op {
+                                    MirBinaryOp::Add => self.builder.build_int_add(li, ri, "")
+                                        .map_err(|e| format!("add: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Sub => self.builder.build_int_sub(li, ri, "")
+                                        .map_err(|e| format!("sub: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Mul => self.builder.build_int_mul(li, ri, "")
+                                        .map_err(|e| format!("mul: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Div => self.builder.build_int_signed_div(li, ri, "")
+                                        .map_err(|e| format!("div: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Rem => self.builder.build_int_signed_rem(li, ri, "")
+                                        .map_err(|e| format!("rem: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::And => self.builder.build_and(li, ri, "")
                                         .map_err(|e| format!("and: {}", e))?
-                                },
-                                MirBinaryOp::Or => {
-                                    let l1 = to_i1(li)
-                                        .map_err(|e| format!("or-trunc: {}", e))?;
-                                    let r1 = to_i1(ri)
-                                        .map_err(|e| format!("or-trunc: {}", e))?;
-                                    self.builder.build_or(l1, r1, "")
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Or => self.builder.build_or(li, ri, "")
                                         .map_err(|e| format!("or: {}", e))?
-                                },
-                                MirBinaryOp::Xor => {
-                                    let l1 = to_i1(li)
-                                        .map_err(|e| format!("xor-trunc: {}", e))?;
-                                    let r1 = to_i1(ri)
-                                        .map_err(|e| format!("xor-trunc: {}", e))?;
-                                    self.builder.build_xor(l1, r1, "")
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Xor => self.builder.build_xor(li, ri, "")
                                         .map_err(|e| format!("xor: {}", e))?
-                                },
-                                MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "")
-                                    .map_err(|e| format!("shl: {}", e))?,
-                                MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "")
-                                    .map_err(|e| format!("shr: {}", e))?,
-                                MirBinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, li, ri, "")
-                                    .map_err(|e| format!("eq: {}", e))?,
-                                MirBinaryOp::Neq => self.builder.build_int_compare(IntPredicate::NE, li, ri, "")
-                                    .map_err(|e| format!("neq: {}", e))?,
-                                MirBinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, li, ri, "")
-                                    .map_err(|e| format!("lt: {}", e))?,
-                                MirBinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, li, ri, "")
-                                    .map_err(|e| format!("gt: {}", e))?,
-                                MirBinaryOp::Le => self.builder.build_int_compare(IntPredicate::SLE, li, ri, "")
-                                    .map_err(|e| format!("le: {}", e))?,
-                                MirBinaryOp::Ge => self.builder.build_int_compare(IntPredicate::SGE, li, ri, "")
-                                    .map_err(|e| format!("ge: {}", e))?,
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "")
+                                        .map_err(|e| format!("shl: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "")
+                                        .map_err(|e| format!("shr: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Eq => self.builder.build_int_compare(IntPredicate::EQ, li, ri, "")
+                                        .map_err(|e| format!("eq: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Neq => self.builder.build_int_compare(IntPredicate::NE, li, ri, "")
+                                        .map_err(|e| format!("neq: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Lt => self.builder.build_int_compare(IntPredicate::SLT, li, ri, "")
+                                        .map_err(|e| format!("lt: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Gt => self.builder.build_int_compare(IntPredicate::SGT, li, ri, "")
+                                        .map_err(|e| format!("gt: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Le => self.builder.build_int_compare(IntPredicate::SLE, li, ri, "")
+                                        .map_err(|e| format!("le: {}", e))?
+                                        .as_basic_value_enum(),
+                                    MirBinaryOp::Ge => self.builder.build_int_compare(IntPredicate::SGE, li, ri, "")
+                                        .map_err(|e| format!("ge: {}", e))?
+                                        .as_basic_value_enum(),
+                                }
                             };
                             let result_val = result.as_basic_value_enum();
                             if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
@@ -1209,6 +1294,17 @@ impl<'ctx> Codegen<'ctx> {
                     .expect("ptrtoint")
             }
             _ => self.context.i32_type().const_zero(),
+        }
+    }
+
+    fn to_float_value(&self, val: BasicValueEnum<'ctx>) -> inkwell::values::FloatValue<'ctx> {
+        match val {
+            BasicValueEnum::FloatValue(f) => f,
+            BasicValueEnum::IntValue(i) => {
+                self.builder.build_signed_int_to_float(i, self.context.f64_type(), "")
+                    .expect("inttofloat")
+            }
+            _ => self.context.f64_type().const_zero(),
         }
     }
 

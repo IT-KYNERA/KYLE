@@ -1,599 +1,326 @@
-# Kyle Language — Roadmap & Status
+# Roadmap & Status
 
-> **Source of truth** for implementation status, phase tracking, and release planning.
-
----
-
-## Phase Overview
-
-```
-Phase 0-6:   Language Design + Compiler + Language Completion    ✅ Complete
-Phase 7:     Cross-Platform Support                              ✅ Complete
-Phase 8:     Distribution & Tooling Polish                        ✅ Complete
-Phase 9:     Backend & Systems (FFI, HTTP, DB, Net)               ⏸️ Next
-Phase 10:    Std Library & Ergonomics (Iterators, Collections)   📅 Planned
-Phase 11:    Production Hardening (Errors, Debug, Security)      📅 Planned
-Phase 12:    Self-Hosting                                         ⏸️ Deferred
-Phase 13:    Ecosystem (Registry, WASM, Framework)               📅 Future
-```
-
-**Memory model:** RAII + Compiler-Inferred Ownership (no garbage collector).
-
-**Goal for v1.0:** A developer can install Kyle, create a project, connect to
-PostgreSQL, build a REST API, serialize JSON, authenticate users, run tests,
-and deploy to production — simply and with good performance.
+> The phase-by-phase plan, the implementation matrix, and the v1.0 release
+> checklist. This is the single source of truth for "what's done, what's
+> next, and what we'll ship at v1.0."
 
 ---
 
-## Phase 0: Language Design ✅
+## 1. Phase Overview
 
-All specification documents written and frozen.
-
-- [x] Language vision and philosophy
-- [x] Formal grammar (EBNF)
-- [x] Type system design
-- [x] Error system design
-- [x] Module system design
-- [x] Memory model (RAII + Ownership Inference)
-- [x] Compiler architecture plan
-
----
-
-## Phase 1: Compiler Frontend ✅
-
-- [x] Lexer (80+ token types, INDENT/DEDENT, escapes, char literals)
-- [x] Parser (recursive descent, 12 precedence levels, all declarations)
-- [x] AST (all node types: Program, Decl×9, Stmt×14, Expr×25+, Pattern, Type)
-- [x] Span tracking (real line/column/offset for all nodes)
+| Phase | Focus | Status |
+|---|---|---|
+| **0–6** | Language design, compiler, all syntax features | ✅ Complete |
+| **7** | Cross-platform: macOS ARM + Linux ARM | ✅ Complete |
+| **8** | Distribution and tooling polish | ✅ Complete |
+| **9** | Backend & systems: FFI, HTTP, DB, ENV | 🔜 Next |
+| **10** | Std library ergonomics: iterators, collections | 📅 Planned |
+| **11** | Production hardening: errors, DWARF, TLS, WASM | 📅 Planned |
+| **12** | Self-hosting (compiler in Kyle) | ⏸️ Deferred |
+| **13** | Ecosystem: registry, framework, website | 📅 Future |
 
 ---
 
-## Phase 2: Semantic Analysis ✅
+## 2. Phase 0–6: The Language
 
-- [x] Symbol table + scope resolution
-- [x] Type inference (Hindley-Milner)
-- [x] Type checking with diagnostics
-- [x] Generics (type params, fresh var instantiation)
-- [x] Contracts (validation, `impl` keyword)
-- [x] Error types (`!` return, `?` operator)
-- [x] Optional types (`None`, `?.` chain)
-- [x] Pattern binding in match
-- [x] Variable auto-declare (`ident = expr`)
+**Status:** ✅ Complete. Every language feature listed in
+[`docs/01-language-reference.md`](01-language-reference.md) under the
+"Constructs" sections is implemented, type-checked, and codegenned. The
+test suite has 101 passing unit tests.
 
----
+Key milestones:
 
-## Phase 3: MIR + Backend ✅
-
-- [x] MIR definition (MirValue, MirInst, MirFunction, MirModule)
-- [x] AST → MIR lowering (all constructs)
-- [x] Constant folding + dead code elimination
-- [x] Ownership inference pass (RAII retain/release)
-- [x] LLVM 18.1 codegen via inkwell (opaque pointers)
-- [x] Struct pass-by-reference (pointer ABI)
-- [x] Enum tagged unions
-- [x] Closures (FnAddr + CallIndirect)
-- [x] Async/await (AsyncSpawn + AsyncAwait via thread spawn)
-- [x] Object file emission + native linking (clang)
-- [x] LLVM IR verification (dumps IR on failure)
+- ✅ Lexer + parser for full grammar
+- ✅ Type checker with generics, type inference, contracts
+- ✅ MIR with control flow, classes, generics
+- ✅ LLVM 18 codegen (inkwell)
+- ✅ Runtime: memory, string, list, dict, I/O, async
+- ✅ 8 standard library modules
+- ✅ Formatter, LSP, VS Code extension
+- ✅ Package manager (manifest)
+- ✅ 50+ working examples
 
 ---
 
-## Phase 4-5: Runtime, Std Library, Tooling ✅
+## 3. Phase 7: Cross-Platform Support
 
-### Runtime (klc_runtime/)
-- [x] print/println, str representation
-- [x] kl_alloc / kl_free (RAII heap)
-- [x] String ops: contains, to_upper, to_lower, trim, replace, concat, input
-- [x] Char ops: char_at, is_digit, is_alpha, is_alnum, is_whitespace, is_upper, is_lower, ord
-- [x] File I/O: open, read_str, write_str, close
-- [x] Time: sleep, now
-- [x] List ops: new, add, get, len, pop, slice, extend, range
-- [x] Dict ops: new, set, get, len, free
-- [x] Thread spawn/join (kl_spawn_thread, kl_join_thread)
-- [x] Async runtime + Channel<T>
-- [x] Panic handler + entry_point wrapper
+**Status:** ✅ Complete. Two platform binaries are built and released
+automatically via GitHub Actions.
 
-### Standard Library (std/)
-- [x] std/core.kl — Option<T>, unwrap_or, is_some, is_none
-- [x] std/math.kl — abs, pow, sqrt, gcd, min, max, clamp
-- [x] std/io.kl — File read/write wrappers
-- [x] std/testing.kl — assert, assert_eq, assert_str, assert_ne
-- [x] std/str.kl — starts_with, ends_with, capitalize, repeat_str
-- [x] std/collections.kl — list_sum, list_product, list_max, list_min, list_range
-- [x] std/json.kl — json_parse + json_stringify (via runtime FFI)
-- [x] std/time.kl — timestamp, sleep_ms, seconds_since
-
-### Tooling
-- [x] CLI: `kl` (primary) + `klc` (legacy) — build, run, check, parse, mir, fmt, test, new, add, remove, info, lsp
-- [x] Package manager: kl.toml manifest, kl.lock, add/remove/info
-- [x] Formatter: pretty-printer + comment preservation
-- [x] LSP: documentSymbol, workspace/symbol, signatureHelp, findReferences, codeAction, completion, definition, hover, dot-completions, scope-aware completions
-- [x] VS Code extension: syntax highlighting, LSP client, commands, snippets, .vsix packaged (kl-0.2.0.vsix)
-- [x] CI pipeline (.github/workflows/ci.yml)
+| Platform | Status | Notes |
+|---|---|---|
+| macOS ARM (Apple Silicon) | ✅ | Tested, primary dev platform |
+| Linux ARM (aarch64) | ✅ | Tested, CI runs on `ubuntu-24.04-arm` |
+| Linux x64 (x86_64) | 📅 | Planned (Phase 9+) |
+| macOS Intel (x86_64) | 📅 | Planned (Phase 9+) |
+| Windows x64 | 📅 | Planned (Phase 11+) |
 
 ---
 
-## Phase 6: Language Completion ✅
+## 4. Phase 8: Distribution & Tooling Polish
 
-All language syntax generates working code end-to-end.
+**Status:** ✅ Complete. Everything in this phase is shipped in v0.2.2.
 
-### P0 — Core features
-- [x] For loops (list + range + for-else)
-- [x] Generics (structs + functions, monomorphization)
-- [x] Error handling (`!` / `?` operator)
-- [x] String interpolation (concat + `str()`)
-- [x] Optional chaining (`?.`)
-- [x] While-else
-
-### P1 — Secondary features
-- [x] Defer (LIFO lowering)
-- [x] Guard (early return via CondBr)
-- [x] Type aliases (with chained resolution)
-- [x] Dict/Map literals + indexing + `.len()`
-- [x] Spread operator (`...` in list literals)
-- [x] Range slicing (`list[start..end]`)
-- [x] Ternary operator (`cond ? a : b`)
-- [x] Match-expression (expression context)
-- [x] const fn (type-checker validation)
-
-### P3 — Standard library
-- [x] All 8 std modules (see Phase 4-5 above)
+| Item | Status |
+|---|---|
+| One-line installer (`install.sh`) | ✅ |
+| `kl` and `klc` binary aliases | ✅ |
+| GitHub Actions CI on every push | ✅ |
+| Tag-based release pipeline | ✅ |
+| VS Code `.vsix` packaged in releases | ✅ |
+| LSP semantic tokens (variables colored) | ✅ |
+| Formatter (`kl fmt`) | ✅ |
+| Auto-generated documentation | ✅ (the 6 docs in `docs/`) |
+| Comprehensive README | ✅ |
 
 ---
 
-## Phase 7: Cross-Platform Support 🔶
+## 5. Phase 9: Backend & Systems
 
-```
-[ ] Platform       Status
- бок macOS ARM      ✅ Working (linker warning fixed)
- бок Linux ARM      ✅ Working (Docker)
- бок macOS Intel   ❌ Untested
- бок Linux x64      ❌ Untested
- бок Windows x64   ❌ Untested
- бок Windows ARM   ❌ Untested
-```
+**Status:** 🔜 Next. The next major milestone.
 
-### Tasks
-- [x] Runtime I/O cross-platform (std::fs + std::io)
-- [x] Target triple auto-detection (LLVM get_default_triple)
-- [x] Test on macOS Apple Silicon ✅
-- [x] Test on Linux ARM ✅
-- [ ] Linker — multiplatform support (detect clang/gcc/link.exe)
-- [ ] CLI — `.exe` extension on Windows
-- [ ] LLVM paths — platform-specific config
-- [ ] VS Code — Windows binary detection
-- [ ] Test on Linux x64
-- [ ] Test on macOS Intel
-- [ ] Test on Windows x64
+| Item | Priority | Status |
+|---|---|---|
+| FFI (`extern "C"`, `*T` raw pointers, `unsafe:` body lowering) | P0 | ❌ |
+| HTTP server + client (`http.Server`, `http.Request`, `http.Response`) | P0 | ❌ |
+| Process spawning (`process.spawn`, `process.exec`) | P1 | ❌ |
+| Environment variables (`env.get`, `env.set`) | P1 | ❌ |
+| File system (`fs.read`, `fs.write`, `fs.walk`) | P1 | ❌ |
+| Database drivers (`db.sqlite`, `db.postgres`) | P2 | ❌ |
+| Channels (`Channel<T>`, `ch.send`, `ch.recv`) | P2 | ❌ |
+| Release optimization (`--release` → `-O2`) | P1 | ❌ |
 
 ---
 
-## Phase 8: Distribution & Tooling Polish ✅
+## 6. Phase 10: Std Library Ergonomics
 
-### P0 — VS Code Extension
-- [x] Syntax highlighting (TextMate grammar)
-- [x] Language config (brackets, auto-closing, indentation)
-- [x] LSP client (launches `kl lsp`)
-- [x] Commands (run/build/check via terminal)
-- [x] Snippets (20 snippets)
-- [x] Extension icon (PNG 128×128 + 16×16)
-- [x] .vsix packaged (kl-0.2.0.vsix, 14 files)
+**Status:** 📅 Planned.
 
-### P1 — LSP Completion
-- [x] Basic completion (44 builtins, 8 Decl types, 33 keywords, prefix filter)
-- [x] Dot-triggered completion (struct.field, object.method, str/list/dict methods)
-- [x] Scope-aware completion (params, auto-declared, block walks)
-- [x] Go-to-definition (8 declaration types)
-- [x] Hover (function sigs + builtin docs + identifier info)
-- [x] Error squiggles (diagnostics → VS Code via publishDiagnostics notification)
-- [ ] Completion resolve provider
-- [x] Compile-on-save (type-check on save via didSave handler)
-- [x] LSP rename (textDocument/rename + prepareRename)
-- [x] LSP formatting (via formatter, textDocument/formatting handler)
-
-### P2 — Build & Project
-- [x] `kl new` creates professional template (src/main.kl with args, tests/, .gitignore, kl.toml)
-- [x] Build output to `target/debug/` and `target/release/`
-- [x] `--release` flag on `kl build` and `kl run`
-- [x] `.gitignore` (target/, *.klc-build/, kl.lock)
-- [x] CLI tab completion (`kl completions bash|zsh|fish`)
-
-### P3 — Branding
-- [x] SVG logo
-- [x] PNG icons (128×128, 16×16)
-- [ ] kl-lang.org website
-- [ ] Homebrew tap
-
-### P4 — CI
-- [x] GitHub Actions CI (build + tests + examples)
+| Item | Status |
+|---|---|
+| Iterator trait + `iter()` method on lists | ❌ |
+| `map`, `filter`, `fold`, `reduce` on lists | ❌ |
+| `zip`, `enumerate`, `flatten` | ❌ |
+| Custom sort (`sort_by`, `sort_with`) | ❌ |
+| `Option` and `Result` convenience methods | ❌ |
+| Real compile-time evaluation (`const fn`) | ❌ |
 
 ---
 
-## Phase 9: Backend & Systems ⏸️ Next
+## 7. Phase 11: Production Hardening
 
-**Goal:** Enable Kyle to build backend services — HTTP APIs, database apps, CLI
-tools. This is the phase that makes Kyle **usable for real projects**.
+**Status:** 📅 Planned.
 
-### P0 — FFI (Foreign Function Interface) — CRITICAL
-Without FFI, Kyle cannot call C libraries (libpq, sqlite3, system APIs).
-
-- [ ] `extern "C"` block declarations
-- [ ] Raw pointer types (`*T`, `*void`)
-- [ ] `unsafe` blocks (already parsed, needs lowering)
-- [ ] C struct interop (passing structs to/from C functions)
-- [ ] Linking with external C libraries (`-l<lib>` flag)
-
-```kl
-extern "C":
-    fn PQconnectdb(conninfo: str) -> *PGconn
-
-unsafe:
-    conn = PQconnectdb("postgresql://localhost/app")
-```
-
-### P1 — HTTP Server & Sockets — CRITICAL
-- [ ] TCP server/listen (`std/net.kl`)
-- [ ] TCP client connect
-- [ ] HTTP server (GET, POST, PUT, PATCH, DELETE)
-- [ ] HTTP routing + path params
-- [ ] HTTP middleware (chain of handlers)
-- [ ] Async I/O for concurrent connections
-
-```kl
-import http
-
-app = http.Server()
-app.get("/users", get_users)
-app.listen(8080)
-```
-
-### P1 — HTTP Client — CRITICAL
-- [ ] `http.get(url)`, `http.post(url, body)`
-- [ ] Request/response objects
-- [ ] Headers, query params, JSON body
-
-### P2 — Database Drivers — CRITICAL
-- [ ] SQLite driver (via FFI to libsqlite3)
-- [ ] PostgreSQL driver (via FFI to libpq)
-- [ ] Connection pooling
-- [ ] Parameterized queries (SQL injection prevention)
-- [ ] Transaction support
-
-```kl
-import db
-
-pool = db.sqlite.open("app.db")
-row = pool.query_one("SELECT * FROM users WHERE id = ?", [id])?
-```
-
-### P2 — Environment Variables — ESSENTIAL
-- [ ] `env.get("VAR")` runtime function
-- [ ] `.env` file parsing
-- [ ] Type conversion helpers (`env.get_int`, `env.get_bool`)
-
-### P2 — Process Spawning — ESSENTIAL
-- [ ] `process.run(cmd, args)` → stdout/stderr capture
-- [ ] Exit code handling
-- [ ] Pipe/stream inheritance
-
-```kl
-import process
-output = process.run("git", ["status"])?
-```
-
-### P3 — JSON Auto-Serialization — HIGH
-- [ ] `json.stringify(struct_instance)` → automatic schema inference
-- [ ] `json.parse::<T>(str)` → automatic struct deserialization
-- [ ] No boilerplate annotations needed (zero-cost derive)
-
-```kl
-struct User:
-    name: str
-    age: i32
-
-u = User(name: "Ana", age: 30)
-s = json.stringify(u)  # {"name":"Ana","age":30}
-```
-
-### P3 — Release Optimization — HIGH
-- [ ] `--release` flag activates LLVM O2/O3 (currently always O0/Default)
-- [ ] Dead code elimination in release
-- [ ] Bounds check removal in release
-- [ ] Benchmark: release vs debug performance comparison
-
-### Status: LSP Intelligent Autocompletion ✅ (already done)
-- [x] Dot-triggered completions (struct/class/enum/str/list/dict fields + methods)
-- [x] Scope-aware completions (params, auto-declared, block walks)
+| Item | Status |
+|---|---|
+| Ownership pass full coverage (no leaks) | ❌ |
+| Cycle detection in refcounting | ❌ |
+| DWARF debug info emission | ❌ |
+| Stack traces in panic messages | ❌ |
+| TLS / secure sockets | ❌ |
+| WASM target | ❌ |
+| Coroutine-based async (work-stealing) | ❌ |
 
 ---
 
-## Phase 10: Std Library & Ergonomics 📅 Planned
+## 8. Phase 12: Self-Hosting
 
-**Goal:** Make Kyle productive for everyday programming — iterators, functional
-operations, richer collections, logging, configuration.
+**Status:** ⏸️ Deferred until Phase 11 is done. The compiler cannot host
+itself until the language is fully stable.
 
-### P0 — Iterators — CRITICAL
-- [ ] Iterator protocol (`.iter()` on lists, dicts, strings)
-- [ ] Lazy evaluation (no intermediate allocations)
-- [ ] Iterator chaining (`.iter().map(...).filter(...).collect()`)
-
-### P0 — Functional Operations — CRITICAL
-- [ ] `map(fn)`, `filter(fn)`, `reduce(fn, init)`
-- [ ] `find(fn)`, `any(fn)`, `all(fn)`
-- [ ] `first()`, `last()`, `skip(n)`, `take(n)`
-- [ ] `collect()` → list
-
-```kl
-squares = [1, 2, 3, 4, 5].iter().map(x => x * x).collect()
-evens = [1, 2, 3, 4, 5].filter(x => x % 2 == 0)
-sum = [1, 2, 3].reduce((a, b) => a + b, 0)
-```
-
-### P1 — Advanced Collections — HIGH
-- [ ] HashMap (hash table with O(1) lookup)
-- [ ] HashSet (unique elements)
-- [ ] Queue (FIFO)
-- [ ] Deque (double-ended)
-- [ ] BinaryHeap (priority queue)
-
-### P1 — Logging — HIGH
-- [ ] `log.info(msg)`, `log.warn(msg)`, `log.error(msg)`, `log.debug(msg)`
-- [ ] Log levels (configurable via env or config file)
-- [ ] Structured logging (JSON output option)
-
-### P1 — Configuration — HIGH
-- [ ] Config file reading (TOML/JSON)
-- [ ] Environment variable integration
-- [ ] Secret management (read from env, never log)
-
-### P2 — Contracts with Generic Constraints — MEDIUM
-- [ ] `fn sort<T: Comparable>(items: [T])` — type bound syntax
-- [ ] Constraint checking at monomorphization
-- [ ] Built-in traits: Comparable, Hashable, Iterable
-
-### P2 — Filesystem Utilities — MEDIUM
-- [ ] `fs.Path` — path manipulation (join, parent, stem, extension)
-- [ ] `fs.exists(path)`, `fs.is_dir(path)`, `fs.is_file(path)`
-- [ ] `fs.mkdir(path)`, `fs.rmdir(path)`, `fs.copy(src, dst)`
-- [ ] `fs.read_dir(path)` → list of entries
-
-### P2 — Const Evaluation — MEDIUM
-- [ ] Real `const fn` execution at compile time
-- [ ] Const generic parameters
-- [ ] Compile-time assertions
-
-### P3 — Password Hashing — MEDIUM
-- [ ] Argon2 (via FFI or runtime implementation)
-- [ ] BCrypt (via FFI)
-- [ ] Salt generation utilities
-
-### P3 — JWT — MEDIUM
-- [ ] JWT generation (HS256, RS256)
-- [ ] JWT validation + decode
-- [ ] Claims struct serialization
+| Item | Status |
+|---|---|
+| Lexer in Kyle (`examples/lexer.kl`) | ✅ exists |
+| Parser in Kyle (`examples/parser.kl`) | ✅ exists |
+| Semantic analyzer in Kyle (`examples/semantic.kl`) | ✅ exists |
+| Replace Rust compiler with Kyle compiler | ❌ |
 
 ---
 
-## Phase 11: Production Hardening 📅 Planned
+## 9. Phase 13: Ecosystem
 
-**Goal:** Make Kyle trustworthy for production — debugging, error quality,
-testing, security.
+**Status:** 📅 Future.
 
-### P0 — Error Messages — CRITICAL
-- [ ] Structured error codes (E0001, E0002, ...)
-- [ ] Exact span + caret pointing to the error
-- [ ] Suggestions ("did you mean...?")
-- [ ] Color output (terminal-aware)
-- [ ] Error catalog documentation
-
-### P0 — Debugging (DWARF) — CRITICAL
-- [ ] Emit DWARF debug info in LLVM codegen
-- [ ] `gdb` / `lldb` breakpoint support
-- [ ] Variable inspection in debugger
-- [ ] `--debug` flag (default) vs `--release` (strips debug info)
-
-### P1 — Testing Framework — HIGH
-- [ ] `kl test` compiles and runs tests (currently only type-checks)
-- [ ] Test runner with assertions + output
-- [ ] 100+ integration tests (examples verified via CI)
-- [ ] Fuzz testing for lexer + parser
-- [ ] Standard library test suite
-- [ ] Runtime tests (RAII, async, channels)
-
-### P1 — Query Builder / Lightweight ORM — HIGH
-- [ ] Type-safe SQL query builder
-- [ ] CRUD operations
-- [ ] Basic migrations
-- [ ] Schema inference from structs
-
-### P2 — TLS/SSL — MEDIUM
-- [ ] TLS for HTTP server (HTTPS)
-- [ ] TLS for HTTP client
-- [ ] Certificate management
-
-### P2 — WebAssembly Compilation — MEDIUM
-- [ ] `kl build --target wasm` → .wasm output
-- [ ] WASI support (file system, network)
-- [ ] Browser interop (JS FFI)
+| Item | Status |
+|---|---|
+| Central package registry | ❌ |
+| Web framework (Kyle web) | ❌ |
+| Documentation hosting site | ❌ |
+| Community Discord / forum | ❌ |
 
 ---
 
-## Phase 12: Self-Hosting ⏸️ Deferred
+## 10. Implementation Matrix (Language Features)
 
-Rewrite the Kyle compiler in Kyle itself. Deferred until the language is stable
-and the std library is rich enough.
-
-- [x] Lexer in Kyle (examples/lexer.kl) ✅
-- [x] Parser in Kyle (examples/parser.kl) ✅
-- [x] Semantic analyzer in Kyle (examples/semantic.kl) ✅
-- [ ] MIR lowering in Kyle
-- [ ] LLVM codegen in Kyle
-- [ ] Self-compilation test (`kl build compiler.kl` produces working `kl`)
-
----
-
-## Phase 13: Ecosystem 📅 Future
-
-- [ ] Package registry (`kl publish`, `kl install`, `kl search`)
-- [ ] Official backend web framework
-- [ ] Frontend framework (via WASM)
-- [ ] Community templates and examples
-- [ ] Documentation website (kl-lang.org)
-- [ ] Package signing + verification
-
----
-
-## Implementation Status Matrix
-
-### Language Features (End-to-End)
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Variables (let/mut/const) | ✅ | Immutable by default |
-| Functions | ✅ | With generics, contracts, error types |
-| If/elif/else | ✅ | |
-| While / While-else | ✅ | |
-| Loop | ✅ | Infinite loop with break |
-| For (list) / For (range) / For-else | ✅ | |
-| Match (stmt + expr) | ✅ | With patterns + guards |
-| Return / Break | ✅ | |
-| Defer | ✅ | LIFO lowering |
-| Guard | ✅ | Early return via CondBr |
-| Unsafe | ✅ | Parsed (FFI lowering pending Phase 9) |
-| Struct | ✅ | With generics, pass-by-reference |
-| Enum | ✅ | With payloads, tagged union |
-| Class | ✅ | With constructors, methods, inheritance |
-| Method dispatch | ✅ | `this` param dedup |
-| Closure | ✅ | `(x) => body`, FnAddr + CallIndirect |
-| Async/await | ✅ | Thread-based (kl_spawn_thread/kl_join_thread) |
-| Generics (structs + functions) | ✅ | Monomorphization |
-| Error types (! / ?) | ✅ | Option-based lowering |
-| Optional chaining (?.) | ✅ | |
-| Contracts | ✅ | Validation + impl (no codegen constraints) |
-| Type aliases | ✅ | Chained resolution |
-| String interpolation | ✅ | Via concat + str() |
-| Dict/Map literals | ✅ | Indexing + .len() |
-| Spread operator (...) | ✅ | List literals |
-| Range slicing (list[a..b]) | ✅ | |
-| Ternary (? :) | ✅ | |
-| const fn | ✅ | Type-checker validation (no compile-time eval yet) |
-
-### Not Yet Implemented
-
-| Feature | Phase | Priority |
-|---------|-------|----------|
-| FFI (extern "C" + unsafe lowering) | 9 | P0 Critical |
-| HTTP Server + Client | 9 | P1 Critical |
-| Database Drivers (SQLite, Postgres) | 9 | P2 Critical |
-| ENV variables | 9 | P2 Essential |
-| Process spawning | 9 | P2 Essential |
-| JSON auto-serialization | 9 | P3 High |
-| Release optimization (O2/O3) | 9 | P3 High |
-| Iterators (.iter()) | 10 | P0 Critical |
-| Functional ops (map/filter/reduce) | 10 | P0 Critical |
-| HashMap / HashSet / Queue / Deque | 10 | P1 High |
-| Logging | 10 | P1 High |
-| Config files + env | 10 | P1 High |
-| Contracts with generic constraints | 10 | P2 Medium |
-| Filesystem utilities | 10 | P2 Medium |
-| Const evaluation (real compile-time) | 10 | P2 Medium |
-| Password hashing (Argon2/BCrypt) | 10 | P3 Medium |
-| JWT | 10 | P3 Medium |
-| Structured error messages | 11 | P0 Critical |
-| DWARF debug info | 11 | P0 Critical |
-| Test runner (compile + execute) | 11 | P1 High |
-| Query Builder / ORM | 11 | P1 High |
-| TLS/SSL | 11 | P2 Medium |
-| WebAssembly target | 11 | P2 Medium |
-| Package registry | 13 | Future |
-| Official backend framework | 13 | Future |
-
-### Cross-Platform Support
-
-| Platform | Status |
-|----------|--------|
-| macOS Apple Silicon (aarch64) | ✅ |
-| Linux ARM (aarch64, Docker) | ✅ |
-| macOS Intel (x86_64) | ❌ |
-| Linux x86_64 | ❌ |
-| Windows x86_64 | ❌ |
-
-### Distribution
-
-| Feature | Status |
-|---------|--------|
-| `kl` binary (primary) | ✅ |
-| `klc` binary (legacy) | ✅ |
-| install.sh (curl \| sh) | ✅ |
-| GitHub Actions CI | ✅ |
-| VS Code .vsix | ✅ (kl-0.2.0.vsix) |
-| VS Code Marketplace | ❌ |
-| Homebrew tap | ❌ |
-| kl-lang.org website | ❌ |
-| Linux x64 binaries | ❌ |
-| Windows binaries | ❌ |
-
-### Testing
-
-| Metric | Value |
-|--------|-------|
-| Unit tests | 101 (0 failures) |
-| Integration tests (examples) | 51+ (all run correctly; error_test returns 1 deliberately) |
-| Standard library tests | 0 (Phase 11) |
-| Fuzz tests | 0 (Phase 11) |
+| Feature | Phase | Status |
+|---|---|---|
+| Indentation-based blocks | 0 | ✅ |
+| Immutable / mut / const variables | 0 | ✅ |
+| i8/i16/i32/i64/u8/u16/u32/u64/f32/f64 | 0 | ✅ |
+| `bool`, `str`, `char`, `void`, `any` | 0 | ✅ |
+| Arithmetic, comparison, logical, bitwise operators | 0 | ✅ |
+| Functions (typed params, generic, return type) | 0 | ✅ |
+| If / elif / else | 0 | ✅ |
+| While, for-in-list, for-in-range | 0 | ✅ |
+| Loop, break, continue | 0 | ✅ |
+| Match (literal, identifier, wildcard, enum patterns) | 0 | ✅ |
+| Match as expression | 0 | ✅ |
+| Structs (generic) | 0 | ✅ |
+| Enums (generic, payload) | 0 | ✅ |
+| Classes (fields, methods, constructor) | 0 | ✅ |
+| Single inheritance | 0 | ✅ |
+| Method override (polymorphism) | 0 | ✅ |
+| Public / protected / private visibility | 8 | ✅ |
+| Abstract classes | 0 | ✅ (partial — no `abs fn` enforcement) |
+| Contracts (interfaces) | 0 | ✅ (no generic constraints) |
+| Closures | 0 | ✅ |
+| Async / await (expression form) | 0 | ✅ |
+| Lists (with spread, index, slice) | 0 | ✅ |
+| Dicts (string keys) | 0 | ✅ |
+| Error values (`T!`, `?`) | 0 | ✅ |
+| Optional chaining (`?.`) | 0 | ✅ |
+| Imports (4 forms + relative) | 0 | ✅ |
+| Type aliases | 0 | ✅ |
+| String interpolation | 0 | ✅ |
+| Built-in functions (~30) | 0 | ✅ |
+| Standard library (8 modules) | 0 | ✅ |
+| RAII / refcounting | 0 | ✅ |
+| Pattern: or-patterns (`a \| b`) | 10 | ❌ |
+| Pattern: match guard (`if cond`) | 10 | 🔶 parsed, not filtering |
+| Pattern: is-type (`x is T`) | 10 | ❌ |
+| Properties (get/set) | 9 | ❌ |
+| FFI (`extern "C"`) | 9 | ❌ |
+| Raw pointer types (`*T`) | 9 | ❌ |
+| `async fn name():` (function form) | 10 | ❌ |
+| `?:` default operator | 10 | ❌ |
+| `Channel<T>` (language-level) | 9 | ❌ |
+| Compile-time evaluation | 10 | 🔶 type-checks only |
+| `**` power operator (correct lowering) | 9 | 🔶 lowered as mul |
+| `+%`, `-%`, `*%` percent operators | 9 | 🔶 no semantic meaning |
 
 ---
 
-## v1.0 Release Checklist
+## 11. Test Counts
 
-A developer must be able to:
+| Suite | Count | Status |
+|---|---|---|
+| `klc_core` unit tests | varies | ✅ |
+| `klc_frontend` unit tests | 80 | ✅ |
+| `klc_semantic` unit tests | 17 | ✅ |
+| `klc_mir` unit tests | 4 | ✅ |
+| `klc_runtime` unit tests | 0 | n/a (C-ABI) |
+| `klc_tools` unit tests | 0 | n/a (LSP) |
+| Example programs (`examples/*.kl`) | 55 | ✅ all compile |
+| Standard library test suite | 0 | 📅 Phase 11 |
 
-1. [x] Install Kyle (curl install.sh)
-2. [x] Create a project (`kl new myapp`)
-3. [ ] Connect to PostgreSQL (Phase 9 P2)
-4. [ ] Create a REST API (Phase 9 P1)
-5. [ ] Serialize JSON automatically (Phase 9 P3)
-6. [ ] Authenticate users with JWT (Phase 10 P3)
-7. [x] Run tests (`kl test`)
-8. [ ] Deploy to production (Phase 7 + 11)
-
-**Current state:** Phases 0-8 complete. Phase 9 (Backend
-& Systems) is the critical next milestone — it unlocks real-world usage.
+**Total unit tests:** 101 passing, 0 failing.
 
 ---
 
-## Key Design Decisions (frozen)
+## 12. v1.0 Release Checklist
+
+> A release v1.0 will be cut when every item below is checked.
+
+### 12.1 Language
+
+- [ ] All `01-language-reference.md` constructs marked ✅
+- [ ] `**` power operator correctly lowered
+- [ ] Match or-patterns (`a | b`)
+- [ ] Match guard `if cond` filtering
+- [ ] Compile-time evaluation works for `const fn`
+- [ ] No known syntax bugs
+
+### 12.2 Tooling
+
+- [ ] LSP semantic tokens stable
+- [ ] Formatter handles all valid code
+- [ ] VS Code extension published to marketplace
+- [ ] `kl completions` for bash, zsh, fish
+
+### 12.3 Performance
+
+- [ ] Release builds use `-O2` or `-O3`
+- [ ] Ownership pass has no known leaks
+- [ ] Cycle detection in refcounting
+- [ ] Standard library benchmarked against equivalent C/Rust code
+
+### 12.4 Platforms
+
+- [ ] Linux x64 binary released
+- [ ] macOS Intel binary released
+- [ ] Windows x64 binary released
+- [ ] CI runs on all four platforms
+
+### 12.5 Ecosystem
+
+- [ ] At least 3 third-party packages on the registry
+- [ ] `kl` aliases both stable
+- [ ] Website up with tutorials
+- [ ] Community Discord active
+
+### 12.6 Documentation
+
+- [ ] All 6 docs reviewed for accuracy
+- [ ] Test matrix 100% green
+- [ ] Tutorial series published (beginner → advanced)
+- [ ] Migration guide for Python / Rust / Go developers
+
+---
+
+## 13. Key Design Decisions (Frozen)
+
+These are **not** subject to change without a major version bump.
 
 | Decision | Choice |
-|----------|--------|
-| Blocks | Indentation (4 spaces) |
-| Semicolons | None — newline terminates statements |
-| Variables | Immutable by default, `mut` for mutable |
-| Constants | UPPERCASE, compile-time, no `mut` |
+|---|---|
+| Block syntax | Indentation, 4 spaces |
+| Statement terminator | Newline (no semicolons) |
+| Variable mutability | `mut` keyword required to make mutable |
+| Constants | UPPERCASE convention, no keyword |
 | Instance reference | `this` (not `self`) |
-| Optionals | `Option<T>` (not `T?`) |
-| Error propagation | `?` (for errors only) |
-| Abstract | `abs class` / `abs fn` |
-| Visibility | Convention (`_` protected, `__` private) |
-| Exceptions | None — explicit errors with `!` and `match` |
-| `let`/`var` | None — `mut` keyword directly |
-| `{}` for blocks | None — indentation |
-| Export | None — visibility by naming |
-| String encoding | UTF-8 |
-| Integer overflow | Panic in debug, wrapping in release |
+| Optional type | `Option<T>` (not `T?`) |
+| Error type | `T!` return type |
+| Error propagation | `?` operator |
+| Exceptions | None — errors are values |
+| `let` / `var` keywords | None — `mut` keyword directly |
+| `{` `}` for blocks | None — indentation |
+| Visibility | Convention: `_` protected, `__` private, none public |
+| String encoding | Null-terminated UTF-8 bytes |
+| Integer overflow | Panic in debug, wrapping in release (planned) |
 | Entry point | `fn main(args: [str]) -> i32` in `src/main.kl` |
-| Memory | RAII + Compiler-Inferred Ownership (no GC) |
+| Memory | RAII + compiler-inferred refcounting (no GC, no manual free) |
+| Compiler implementation | Pure Rust, LLVM 18 via `inkwell` |
+| Runtime implementation | Pure Rust with `#[unsafe(no_mangle)] extern "C"` |
+| CLI binary name | `kl` (primary), `klc` (legacy alias) |
 
 ---
 
-## Version
+## 14. What's in the Next Release (v0.2.2)
 
-```
-Roadmap & Status v1.0
-Last updated: 2026-06-26
-Tests: 101 unit tests, 0 failures
-Examples: 51+ examples, all run correctly
-Phase 6: COMPLETE — all language features generate working code
-Phase 7-8: COMPLETE — cross-platform + distribution polish
-Phase 9: NEXT — backend & systems (FFI, HTTP, DB) is the critical milestone
-```
+This is what was added since v0.2.1:
+
+- **Bug fixes**
+  - `input("prompt")` now accepts 1 argument (was 0)
+  - `open(path, mode)` now correctly expects 2 arguments
+  - `read_str(fd, count)` now correctly expects 2 arguments
+  - `class X: Parent` (single colon) is now accepted by the parser
+  - Private methods (`__method`) are now blocked from outside the class
+  - Classes without a constructor get a synthetic default constructor
+  - Inheritance walks the parent chain for both fields and methods
+  - LSP autocompletion now uses the correct character position
+  - Error source label changed from `klc` to `kl`
+
+- **New features**
+  - 5 new example programs (`input_prompt_test`, `class_greet_test`,
+    `inheritance_test`, `polymorphism_test`, `private_method_test`)
+  - Private method convention: declare with `__name`, call with `this.name`
+  - Method override and dynamic dispatch through parent chain
+
+- **Documentation**
+  - 5 docs rewritten with full test matrix and checkboxes
+  - 6 docs total: vision, language reference, types/errors/memory, modules,
+    architecture, roadmap
+
+---
+
+*Version: v0.2.2 · Last updated: 2026-06-27*

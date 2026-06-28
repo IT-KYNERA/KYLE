@@ -1,6 +1,0 @@
-fn main(args: [str]) -> i32:
-    x = 42
-    match x:
-        y:
-            println(y)
-    0

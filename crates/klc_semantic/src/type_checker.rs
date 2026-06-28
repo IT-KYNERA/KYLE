@@ -68,6 +68,7 @@ impl TypeChecker {
             "ord" => Some(1),
             "is_digit" | "is_alpha" | "is_alnum" => Some(1),
             "is_whitespace" | "is_upper" | "is_lower" => Some(1),
+            "error" => Some(1),
             "assert" => Some(1),
             "assert_eq" | "assert_str" | "assert_ne" => Some(2),
             "range" => Some(2),
@@ -486,6 +487,7 @@ impl TypeChecker {
                                 "assert" | "assert_eq" | "assert_str" => Type::Void,
                                 "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
                                 "json_stringify" => Type::Str,
+                                "error" => Type::Option(Box::new(Type::Void)),
                                 _ => Type::I32,
                             }
                         } else {
@@ -706,12 +708,20 @@ impl TypeChecker {
                             Type::List(Box::new(Type::I32))
                         }
                     }
+                    "dict" => {
+                        let k = args.first().map(|k| self.resolve_ast_type(k)).unwrap_or(Type::Str);
+                        let v = args.get(1).map(|v| self.resolve_ast_type(v)).unwrap_or(Type::I64);
+                        Type::Dict(Box::new(k), Box::new(v))
+                    }
                     "Option" => {
                         if let Some(inner) = args.first() {
                             Type::Option(Box::new(self.resolve_ast_type(inner)))
                         } else {
                             Type::Option(Box::new(Type::Void))
                         }
+                    }
+                    "tuple" => {
+                        Type::Tuple(args.iter().map(|a| self.resolve_ast_type(a)).collect())
                     }
                     _ => Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect()),
                 }

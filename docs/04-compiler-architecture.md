@@ -1,169 +1,276 @@
-# Kyle Compiler Architecture
+# Compiler Architecture
 
-> The 9-crate pipeline, repository layout, and runtime internals.
+> How the Kyle compiler is organized: the 9 Rust crates, the 7-stage
+> pipeline, and the runtime it links against.
 
 ---
 
-## Pipeline
+## 1. The Pipeline
 
 ```
-Source (.kl)
-    │
-    ▼
-[Lexer]        klc_frontend/src/lexer.rs    — text → tokens
-    │
-    ▼
-[Parser]       klc_frontend/src/parser.rs   — tokens → AST
-    │
-    ▼
-[Semantic]     klc_semantic/                 — resolve symbols, check types
-    │
-    ▼
-[MIR Lowering] klc_mir/src/lower.rs          — AST → MIR (our IR)
-    │
-    ▼
-[Optimizer]    klc_mir/src/optimize.rs       — constant folding, DCE
-    │
-    ▼
-[Ownership]    klc_mir/src/ownership.rs      — RAII retain/release inference
-    │
-    ▼
-[Codegen]      klc_backend/src/codegen.rs   — MIR → LLVM IR (inkwell)
-    │
-    ▼
-[Linker]       klc_backend/src/linker.rs     — .o + runtime → native binary
+   ┌──────────┐    ┌───────┐    ┌────────┐    ┌──────────┐    ┌─────────┐
+   │  Source  │ →  │ Lexer │ →  │ Parser │ →  │ Semantic │ →  │   MIR   │
+   │  .kl     │    │       │    │        │    │  + Types │    │ Lowering│
+   └──────────┘    └───────┘    └────────┘    └──────────┘    └────┬────┘
+                                                                     │
+   ┌──────────┐    ┌─────────┐    ┌─────────┐    ┌──────────┐         │
+   │  Binary  │ ←  │  Linker │ ←  │  LLVM   │ ←  │Optimize+ │ ←───────┘
+   │ kl       │    │         │    │ Codegen │    │Ownership │
+   └──────────┘    └─────────┘    └─────────┘    └──────────┘
 ```
 
----
-
-## Crates
-
-| Crate | Responsibility | Key Files |
-|-------|---------------|-----------|
-| `klc_core` | AST, Span, Types, SourceMap, Diagnostics | `ast.rs` (1076 lines), `types.rs`, `span.rs`, `diagnostic.rs` |
-| `klc_frontend` | Lexer + Parser | `lexer.rs` (809 lines), `parser.rs` (1353 lines), `token.rs` |
-| `klc_semantic` | Symbol resolution, type checking | `type_checker.rs` (1380 lines), `symbol_table.rs`, `scope.rs` |
-| `klc_mir` | MIR definition, lowering, optimization, ownership | `mir.rs`, `lower.rs` (860+ lines), `optimize.rs`, `ownership.rs` |
-| `klc_backend` | LLVM codegen + linking | `codegen.rs` (479 lines), `linker.rs` |
-| `klc_driver` | Pipeline orchestration | `pipeline.rs` (217 lines) |
-| `klc_cli` | CLI binary (`kl` + `klc`) | `main.rs` (505 lines) |
-| `klc_runtime` | RAII runtime, async, channels, string/list/dict ops | `string.rs`, `io.rs`, `list.rs`, `dict.rs`, `thread.rs`, `async_.rs`, `channel.rs`, `error.rs` |
-| `klc_tools` | LSP, formatter, package manager | `lsp.rs`, `formatter.rs`, `package/manifest.rs`, `package/lock.rs`, `package/project.rs` |
+Each stage is implemented as a separate Rust crate and is independently
+testable. The output of each stage is a complete, self-contained
+representation that the next stage consumes.
 
 ---
 
-## Repository Layout
+## 2. The Nine Crates
 
 ```
 kl/
-├── AGENTS.md                  — AI agent context (session log, state)
-├── Cargo.toml                 — Rust workspace root
-├── kl.toml                    — Kyle project manifest
-├── .cargo/config.toml         — LLVM config (Linux)
-├── .github/workflows/ci.yml   — CI pipeline
-│
-├── crates/                    — 9 Rust crates
-│   ├── klc_core/              — AST, Span, Types, Diagnostics
-│   ├── klc_frontend/          — Lexer + Parser
-│   ├── klc_semantic/          — Type checker, symbol resolver
-│   ├── klc_mir/               — MIR definition, lowering, optimization
-│   ├── klc_backend/           — LLVM codegen (inkwell), linker
-│   ├── klc_driver/            — Pipeline orchestration
-│   ├── klc_cli/               — CLI binary (kl + klc)
-│   ├── klc_runtime/           — RAII runtime, async, channels, I/O
-│   └── klc_tools/             — LSP, formatter, package manager
-│
-├── docs/                      — 6 specification documents
-├── examples/                  — 50+ example .kl programs
-├── std/                       — Standard library (8 .kl modules)
-└── vscode-kl/                 — VS Code extension (.vsix)
+├── crates/
+│   ├── klc_core/        ← AST, span, types, diagnostics
+│   ├── klc_frontend/    ← Lexer, parser
+│   ├── klc_semantic/    ← Symbol table, type checker, scope resolver
+│   ├── klc_mir/         ← MIR definition, lowering, optimizer, ownership
+│   ├── klc_backend/     ← LLVM 18 codegen (inkwell), linker driver
+│   ├── klc_driver/      ← Pipeline orchestrator (klc::run)
+│   ├── klc_cli/         ← Command-line interface (the `kl` binary)
+│   ├── klc_runtime/     ← C-ABI runtime (memory, string, list, dict, io, async)
+│   └── klc_tools/       ← LSP server, formatter, package manager
 ```
+
+| Crate | Purpose | Inputs | Outputs |
+|---|---|---|---|
+| `klc_core` | Foundation types | (none) | AST nodes, type system, source maps, diagnostic reporters |
+| `klc_frontend` | Lexing + parsing | Source string | `Program` (AST) |
+| `klc_semantic` | Name resolution + type checking | `Program` | `Program` (typed) + `SymbolTable` |
+| `klc_mir` | Mid-level IR + passes | `Program` | `MirModule` (functions, types, control flow) |
+| `klc_backend` | LLVM codegen + linking | `MirModule` | Native executable |
+| `klc_driver` | Glue between stages | (none) | `klc::run(source, options) -> Result` |
+| `klc_cli` | Command-line tool | argv | Compiled binary, stdout/stderr |
+| `klc_runtime` | C-ABI runtime library | (linked at compile time) | Provides memory, I/O, string ops to compiled Kyle code |
+| `klc_tools` | Out-of-band tools (LSP, fmt) | Source string | LSP responses, formatted source |
 
 ---
 
-## Runtime Crate (klc_runtime/src/)
+## 3. Stage 1: Lexer (`klc_frontend::lexer`)
+
+Converts source text into a stream of tokens.
+
+**Output:** `Vec<Token>` with `TokenKind` and `Span` for each token.
+
+**Recognized token kinds:**
+
+- 38 keywords (`fn`, `class`, `if`, `match`, `mut`, `and`, `or`, ...)
+- Literals: integer (decimal, hex `0x`, binary `0b`, with `_` separators), float, string (with `{...}` interpolation), char, `true`, `false`, `None`
+- Identifiers (alphanumeric + `_`, starting with letter or `_`)
+- Operators: arithmetic, comparison, logical, bitwise, assignment, range, spread, ternary, optional chain, error prop
+- Indentation: `INDENT` and `DEDENT` (the lexer implements Python-style indent/dedent based on leading whitespace)
+- Punctuation: `(`, `)`, `[`, `]`, `{`, `}`, `,`, `:` (with no space), `;` (optional)
+
+The lexer does **not** validate syntax — it just tokenizes. Syntax errors
+are detected by the parser.
+
+---
+
+## 4. Stage 2: Parser (`klc_frontend::parser`)
+
+Builds an AST from the token stream.
+
+**Output:** `Program { declarations: Vec<Decl> }`
+
+**Parser type:** Recursive descent with one token of lookahead. Each
+declaration and statement is parsed by a dedicated `parse_*` method.
+
+**Indentation-based blocks:** The parser uses the `INDENT`/`DEDENT` tokens
+from the lexer to identify block bodies. There is no `end` keyword and no
+`{` `}` braces.
+
+**Error recovery:** The parser reports the first syntax error and stops. It
+does not attempt to recover and report multiple errors.
+
+---
+
+## 5. Stage 3: Semantic Analysis (`klc_semantic`)
+
+Resolves names to symbols and checks types.
+
+Three sub-phases:
+
+### 5.1 Scope Resolution
+
+Walks the AST building a `SymbolTable` — a stack of scopes, one per block
+and one per class. Every name reference is resolved to a `Symbol` that
+records its kind (variable, function, class, etc.) and its type.
+
+### 5.2 Type Checking
+
+Verifies that every expression has a well-defined type, that assignments
+match, and that function calls pass the right number of types of arguments.
+
+### 5.3 Contract Validation
+
+For each class that declares `class X: Contract`, verifies that `X`
+provides all the methods declared in `Contract`. (Generic contracts are
+not yet supported.)
+
+**Output:** A typed `Program`, a `SymbolTable`, and a list of
+`Diagnostic` (errors and warnings).
+
+---
+
+## 6. Stage 4: MIR Lowering (`klc_mir::lower`)
+
+Converts the typed AST into Kyle's Mid-level Intermediate Representation
+(MIR). MIR is a simpler, more uniform form that is easier to analyze and
+optimize.
+
+**Output:** `MirModule { functions: Vec<MirFunction> }`
+
+**Key design:** MIR is **not** LLVM IR. It is Kyle's own IR, designed
+specifically for Kyle's semantics. The backend translates MIR → LLVM IR.
+
+**Special handling in the lowerer:**
+
+- Builtin functions are resolved to runtime calls (`print` → `kl_print`,
+  `len` → `kl_strlen`, etc.)
+- String interpolation is decomposed into `kl_concat` calls
+- `async <expr>` is wrapped in a `kl_spawn_thread` call
+- `await <handle>` is lowered to `kl_join_thread`
+- Method dispatch on classes is resolved via the `method_table`
+- Inheritance is handled via the `class_parent_map` chain walk
+- Default constructor is synthesized if the class has none
+
+---
+
+## 7. Stage 5: MIR Optimization (`klc_mir::optimize`)
+
+Constant-folding and dead-code elimination passes on the MIR.
+
+**Currently implemented:**
+
+- Constant folding: `2 + 3` → `5` at MIR level
+- Unreachable-code elimination after unconditional `return` / `break`
+
+**Planned (Phase 10):**
+
+- Loop-invariant code motion
+- Strength reduction
+- Function inlining
+
+---
+
+## 8. Stage 6: Ownership Pass (`klc_mir::ownership`)
+
+Inserts `kl_retain` / `kl_release` calls to manage refcounting automatically.
+
+**Tracked operations (currently):**
+
+- `kl_concat` results (string concatenation allocates)
+- `kl_list_new` / `kl_dict_new` results
+- Direct `kl_alloc` results
+
+**Known limitation:** Forwarded values (e.g. `let y = f(x); use(y)`) are
+conservatively considered leaks. This will be addressed in Phase 11.
+
+---
+
+## 9. Stage 7: LLVM Codegen (`klc_backend`)
+
+Translates MIR to LLVM IR using `inkwell` (Rust bindings for LLVM 18), then
+invokes the LLVM toolchain to compile to an object file, and links the
+runtime library to produce the final executable.
+
+**Output:** A native binary in `target/<debug|release>/<name>`.
+
+**Optimization level:** Currently `Default` (LLVM's default). The `--release`
+flag is accepted but does not yet switch to `O2`/`O3` — this is planned for
+Phase 9.
+
+**Linker:** Uses the system linker (`cc`) for the final link step. The
+runtime library `libklc_runtime.a` is linked statically.
+
+---
+
+## 10. The Runtime (`klc_runtime`)
+
+A static C-ABI library linked into every compiled Kyle program. It
+provides the primitive operations that the compiler lowers calls to.
 
 | File | Responsibility |
-|------|---------------|
-| `string.rs` | String ops: contains, to_upper, to_lower, trim, replace, concat, input, char ops, ord |
-| `io.rs` | File I/O: open, read_str, write_str, close, sleep, now |
-| `list.rs` | List ops: new, add, get, len, pop, slice, extend, range |
-| `dict.rs` | Dict ops: new, set, get, len, free |
-| `thread.rs` | Thread spawn/join (kl_spawn_thread, kl_join_thread) |
-| `async_.rs` | Async runtime (work-stealing pool — target design; current impl is thread-based) |
-| `channel.rs` | Channel<T> for inter-thread communication |
-| `error.rs` | Error handling, panic handler |
-| `lib.rs` | Runtime entry point, kl_alloc/kl_free, entry_point wrapper |
+|---|---|
+| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — refcounting heap |
+| `string.rs` | `kl_concat`, `kl_strlen`, `kl_str_to_*`, `kl_i64_to_str`, `kl_str_to_i64` |
+| `list.rs` | `kl_list_new`, `kl_list_push`, `kl_list_pop`, `kl_list_get`, `kl_list_set`, `kl_list_len`, `kl_list_slice`, `kl_list_extend` |
+| `dict.rs` | `kl_dict_new`, `kl_dict_set`, `kl_dict_get`, `kl_dict_len` |
+| `io.rs` | `kl_print`, `kl_println`, `kl_print_int`, `kl_input`, `kl_input_with_prompt`, `kl_open`, `kl_read_str`, `kl_write_str`, `kl_close` |
+| `async_.rs` | `kl_spawn_thread`, `kl_join_thread` — async/await runtime |
+| `channel.rs` | (planned) `Channel<T>` for inter-thread communication |
+| `thread.rs` | OS thread spawning primitives |
+| `panic.rs` | Panic handler for `assert` failures |
+| `task.rs` | Async task internals |
+| `error.rs` | Error reporting helpers |
+| `lib.rs` | Public re-exports |
 
-### Memory Management
-
-The runtime provides `kl_alloc(size)` and `kl_free(ptr)` for RAII heap allocation.
-The compiler's Ownership Inference Pass (`klc_mir/src/ownership.rs`) automatically
-inserts `kl_release` calls at block exits — the developer never writes `free`.
-
-Key runtime ABI functions:
-
-```
-kl_alloc(size: i64) -> *void      — heap allocation
-kl_free(ptr: *void)                — heap deallocation
-kl_retain(ptr: *void)              — increment reference count
-kl_release(ptr: *void)            — decrement + free if zero
-kl_print(str, len) / kl_println   — output
-kl_str_concat(a, a_len, b, b_len) — string concatenation
-kl_list_new() / kl_list_add(...)  — list operations
-kl_dict_new() / kl_dict_set(...)  — dict operations
-kl_spawn_thread(fn, arg) -> handle — async task spawn
-kl_join_thread(handle) -> result   — async task await
-```
+The runtime is written in **pure Rust** with `#[unsafe(no_mangle)]` and
+`extern "C"` to expose a C-ABI. There is no C or C++ in the runtime.
 
 ---
 
-## Standard Library (std/)
+## 11. The Standard Library (`std/`)
 
-8 flat `.kl` modules (no subdirectories):
+Eight `.kl` modules, all written in Kyle itself:
 
-| File | Contents |
-|------|----------|
-| `core.kl` | Option<T>, unwrap_or, is_some, is_none |
-| `math.kl` | abs, pow, sqrt, gcd, min, max, clamp |
-| `io.kl` | File read/write wrappers |
-| `str.kl` | starts_with, ends_with, capitalize, repeat_str |
-| `testing.kl` | assert, assert_eq, assert_str, assert_ne |
-| `collections.kl` | list_sum, list_product, list_max, list_min, list_range |
-| `json.kl` | json_parse + json_stringify (via runtime FFI) |
-| `time.kl` | timestamp, sleep_ms, seconds_since |
-
----
-
-## Compilation Modes
-
-| Mode | Command | Optimization | Output |
-|------|---------|-------------|--------|
-| Debug (default) | `kl build` / `kl run` | O0 / Default | `target/debug/<name>` |
-| Release | `kl build --release` | O2/O3 (Phase 9) | `target/release/<name>` |
-
-**Note:** Currently both modes use LLVM `OptimizationLevel::Default`. Full O2/O3
-optimization for release mode is planned for Phase 9.
+| Module | Purpose |
+|---|---|
+| `core` | `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none` |
+| `math` | `absolute`, `pow`, `sqrt`, `gcd`, `min`, `max`, `clamp` |
+| `io` | `read_file`, `write_file` (file convenience wrappers) |
+| `str` | `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str` |
+| `testing` | `assert`, `assert_eq`, `assert_ne`, `assert_str` |
+| `collections` | `list_sum`, `list_product`, `list_max`, `list_min`, `list_range` |
+| `json` | `parse`, `stringify` (wrappers around the `json_*` builtins) |
+| `time` | `timestamp`, `sleep_ms`, `seconds_since` |
 
 ---
 
-## Development Commands
+## 12. Compilation Modes
+
+| Mode | Trigger | Optimization | Output |
+|---|---|---|---|
+| Debug | default | None (`-O0`) | `target/debug/<name>` |
+| Release | `--release` | Default (planned: `-O2` or `-O3`) | `target/release/<name>` |
+
+Both modes link the same `libklc_runtime.a`. The difference is in the
+optimization level passed to LLVM.
+
+---
+
+## 13. Development Commands
 
 ```bash
-cargo build --workspace                    # Build all crates
-cargo run --bin kl -- run <file.kl>        # Compile and run
-cargo run --bin kl -- build <file.kl>       # Compile to native binary
-cargo run --bin kl -- check <file.kl>      # Type-check only
-cargo run --bin kl -- fmt <file.kl>        # Format source
-cargo run --bin kl -- lsp                   # Start LSP server
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools  # 101 tests
+# Build all crates
+cargo build --workspace
+
+# Run all 101 unit tests
+cargo test -p klc_core -p klc_frontend -p klc_semantic \
+          -p klc_mir -p klc_runtime -p klc_tools
+
+# Build the kl binary in release mode
+cargo build --release --bin kl
+
+# Type-check a file without building
+./target/release/kl check examples/hello.kl
+
+# Run a file
+./target/release/kl run examples/hello.kl
+
+# Format source
+./target/release/kl fmt src/main.kl
 ```
 
 ---
 
-## Version
-
-```
-Compiler Architecture v2.0
-Last updated: 2026-06-26
-```
+*Version: v0.2.2 · Last updated: 2026-06-27*

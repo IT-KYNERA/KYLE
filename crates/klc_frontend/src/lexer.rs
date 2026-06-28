@@ -260,7 +260,6 @@ impl Lexer {
             "false" => TokenKind::False,
             "None" => TokenKind::None,
             "ok" => TokenKind::OkKw,
-            "error" => TokenKind::ErrKw,
             "extern" => TokenKind::Extern,
             "import" => TokenKind::Import,
             "from" => TokenKind::From,
@@ -595,7 +594,7 @@ mod tests {
             TokenKind::Match, TokenKind::Return, TokenKind::Break, TokenKind::Defer,
             TokenKind::Guard, TokenKind::Unsafe, TokenKind::Async, TokenKind::Await,
             TokenKind::Const, TokenKind::Loop, TokenKind::Type, TokenKind::None,
-            TokenKind::OkKw, TokenKind::ErrKw, TokenKind::Extern,
+            TokenKind::OkKw, TokenKind::Identifier("error".to_string()), TokenKind::Extern,
             TokenKind::Eof,
         ]);
     }

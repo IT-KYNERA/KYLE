@@ -70,6 +70,7 @@ impl SymbolTable {
             "contains", "to_upper", "to_lower", "trim", "replace", "substr",
             "char_at", "is_digit", "is_alpha", "is_alnum", "is_whitespace", "is_upper", "is_lower",
             "ord",
+            "error",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {
