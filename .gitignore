@@ -16,6 +16,8 @@ build/
 # === Examples — only .kl source files are tracked ===
 /examples/*
 !/examples/*.kl
+!/examples/**/*.kl
+!/examples/kl.toml
 
 # === VS Code extension ===
 vscode-kl/node_modules/
