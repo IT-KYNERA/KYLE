@@ -29,14 +29,11 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 | **Windows** | x64 | [Build from source](#build-from-source) |
 
 ```bash
-# Download and install (Linux/macOS):
-curl -LO https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-linux-arm64.tar.gz
-tar -xzf kl-v0.4.0-linux-arm64.tar.gz
-sudo cp kl /usr/local/bin/kl
-
-# Verify:
-kl --version
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
+
+The script auto-detects your OS and architecture, downloads the correct binary,
+and installs it to `/usr/local/bin/kl` (or `~/.kl/bin/kl` if not writable).
 
 ### VS Code Extension
 
