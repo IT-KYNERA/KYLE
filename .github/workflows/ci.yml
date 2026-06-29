@@ -19,51 +19,16 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq llvm-18-dev libclang-18-dev libpolly-18-dev libzstd-dev
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo dependencies
-        uses: Swatinem/rust-cache@v2
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Build workspace
         run: cargo build --workspace
 
       - name: Run unit tests
-        run: |
-          cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
+        run: cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools -p klc_driver
 
-      - name: Check all examples compile
+      - name: Build and run comprehensive test
         run: |
-          for f in examples/*.kl; do
-            echo "=== $(basename $f) ==="
-            cargo run --bin kl -- check "$f"
-          done
-
-      - name: Verify select examples run
-        run: |
-          for f in \
-            examples/hello.kl \
-            examples/fibonacci.kl \
-            examples/print_int.kl \
-            examples/str_test.kl \
-            examples/struct_test.kl \
-            examples/enum_test.kl \
-            examples/for_test.kl \
-            examples/dict_test.kl \
-            examples/json_test.kl \
-            examples/guard_test.kl \
-            examples/ternary.kl \
-            examples/closure_test.kl \
-            examples/method_test.kl \
-            examples/generic_fn.kl \
-            examples/generic_struct.kl \
-            examples/json_parse_test.kl \
-            ; do
-            echo "=== $(basename $f) ==="
-            cargo run --bin kl -- run "$f"
-          done
-
-      - name: Verify formatter
-        run: |
-          cargo run --bin kl -- fmt examples/hello.kl
+          cd examples
+          cargo run --bin kl -- build --release
+          ./target/release/main

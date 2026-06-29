@@ -17,7 +17,7 @@ jobs:
       - name: Install LLVM 18 (Linux ARM)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev 2>&1
+          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Build kl (release)
@@ -28,8 +28,34 @@ jobs:
           mkdir -p dist
           cp target/release/kl dist/kl
           chmod +x dist/kl
-          cd dist
-          tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl
+          cd dist && tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl
+
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+
+  build-linux-x64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Linux x64)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+
+      - name: Build kl (release)
+        run: cargo build --bin kl --release
+
+      - name: Package tarball
+        run: |
+          mkdir -p dist
+          cp target/release/kl dist/kl
+          chmod +x dist/kl
+          cd dist && tar czf kl-${{ github.ref_name }}-linux-x64.tar.gz kl
 
       - name: Upload Release Asset
         env:
@@ -44,7 +70,7 @@ jobs:
 
       - name: Install LLVM 18
         run: |
-          brew install llvm@18 2>&1
+          brew install llvm@18
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
 
       - name: Build kl (release)
@@ -55,11 +81,37 @@ jobs:
           mkdir -p dist
           cp target/release/kl dist/kl
           chmod +x dist/kl
-          cd dist
-          tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl
+          cd dist && tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl
 
       - name: Upload Release Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Windows)
+        run: |
+          choco install llvm --version 18.1.0 -y
+          echo "LLVM_SYS_181_PREFIX=C:\Program Files\LLVM" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build kl (release)
+        run: cargo build --bin kl --release
+
+      - name: Package zip
+        run: |
+          mkdir dist -Force
+          Copy-Item target/release/kl.exe dist/kl.exe
+          cd dist
+          Compress-Archive -Path kl.exe -DestinationPath kl-${{ github.ref_name }}-windows-x64.zip
+        shell: pwsh
+
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} dist/kl-*.zip --clobber
