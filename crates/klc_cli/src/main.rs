@@ -128,7 +128,7 @@ fn cmd_new(args: &[String]) {
 
     // src/main.kl — professional entry point with args
     let main_kl = [
-        "fn main(args: [str]) -> i32:",
+        "fn main(args: [str]) i32:",
         &format!("    println(\"Hello from {} v0.1.0!\")", project_name),
         "    println(\"args: \" + str(len(args)))",
         "    return 0",
@@ -140,7 +140,7 @@ fn cmd_new(args: &[String]) {
 
     // src/lib.kl — library module
     let lib_kl = format!(
-        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\nfn greet(name: str) -> str:\n    \"Hello, \" + name + \"!\"\n",
+        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\nfn greet(name: str) str:\n    \"Hello, \" + name + \"!\"\n",
         project_name
     );
     fs::write(project_dir.join("src").join("lib.kl"), &lib_kl).unwrap_or_else(|e| {
@@ -150,7 +150,7 @@ fn cmd_new(args: &[String]) {
 
     // tests/test_main.kl — test stub
     let test_kl = format!(
-        "# Tests for {}\nimport {{ greet }} from \"src/lib\"\n\nfn test_greet() -> i32:\n    assert_str(greet(\"World\"), \"Hello, World!\")\n    println(\"test_greet PASS\")\n    0\n",
+        "# Tests for {}\nimport {{ greet }} from \"src/lib\"\n\nfn test_greet() i32:\n    assert_str(greet(\"World\"), \"Hello, World!\")\n    println(\"test_greet PASS\")\n    0\n",
         project_name
     );
     fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl).unwrap_or_else(|e| {
@@ -340,7 +340,9 @@ fn print_usage() {
 
 fn cmd_build(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    if args.len() < 3 || args[2].starts_with("--") {
+    // Find the first positional argument (skip flags like --release)
+    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--"));
+    if file_arg.is_none() {
         // Project mode
         if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
             if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
@@ -352,7 +354,12 @@ fn cmd_build(args: &[String]) {
                 let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
                 let output = exe_path(&build_dir.join("main"));
                 let _ = fs::create_dir_all(&build_dir);
-                match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir) {
+                let build_result = if release {
+                    klc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, &file, &output, &build_dir)
+                } else {
+                    klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir)
+                };
+                match build_result {
                     Ok(()) => {
                         println!("Build complete: {}", output.display());
                         let lock_path = project_root.join("kl.lock");
@@ -377,15 +384,21 @@ fn cmd_build(args: &[String]) {
         }
         return;
     }
-    // Single-file mode: output to target/debug/<name>
-    let source = load_source(args, 2);
-    let file = &args[2];
+    // Single-file mode
+    let file = file_arg.unwrap();
+    let file_idx = args.iter().position(|a| a == file).unwrap();
+    let source = ensure_main(&load_source(args, file_idx));
     let file_stem = std::path::Path::new(file).file_stem()
         .unwrap_or_default().to_string_lossy().to_string();
-    let build_dir = std::path::Path::new("target").join("debug");
+    let build_dir = std::path::Path::new("target").join(if release { "release" } else { "debug" });
     let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir) {
+    let build_result = if release {
+        klc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, file, &output, &build_dir)
+    } else {
+        klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir)
+    };
+    match build_result {
         Ok(()) => {
             println!("Build complete: {}", output.display());
         }
@@ -398,7 +411,8 @@ fn cmd_build(args: &[String]) {
 
 fn cmd_run(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    if args.len() < 3 || args[2].starts_with("--") {
+    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--"));
+    if file_arg.is_none() {
         // Project mode
         if let Some(project_root) = klc_tools::package::find_project_root(&std::env::current_dir().unwrap()) {
             if let Some(source_path) = klc_tools::package::main_source_path(&project_root) {
@@ -410,7 +424,12 @@ fn cmd_run(args: &[String]) {
                 let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
                 let output = exe_path(&build_dir.join("main"));
                 let _ = fs::create_dir_all(&build_dir);
-                match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir) {
+                let run_result = if release {
+                    klc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, &file, &output, &build_dir)
+                } else {
+                    klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir)
+                };
+                match run_result {
                     Ok(()) => {
                         let status = std::process::Command::new(&output)
                             .args(args.iter().skip(2))
@@ -432,15 +451,21 @@ fn cmd_run(args: &[String]) {
         }
         return;
     }
-    // Single-file mode: output to target/debug/<name>
-    let source = load_source(args, 2);
-    let file = &args[2];
+    // Single-file mode
+    let file = file_arg.unwrap();
+    let file_idx = args.iter().position(|a| a == file).unwrap();
+    let source = ensure_main(&load_source(args, file_idx));
     let file_stem = std::path::Path::new(file).file_stem()
         .unwrap_or_default().to_string_lossy().to_string();
-    let build_dir = std::path::Path::new("target").join("debug");
+    let build_dir = std::path::Path::new("target").join(if release { "release" } else { "debug" });
     let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
-    match klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir) {
+    let run_result = if release {
+        klc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, file, &output, &build_dir)
+    } else {
+        klc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir)
+    };
+    match run_result {
         Ok(()) => {
             let status = std::process::Command::new(&output)
                 .args(args.iter().skip(3))
@@ -694,5 +719,26 @@ fn load_source(args: &[String], index: usize) -> String {
             eprintln!("Error reading '{}': {}", path, e);
             process::exit(1);
         }
+    }
+}
+
+/// If the source doesn't have a `fn main`, wrap it in an implicit main
+/// so the file can run like a Python script.
+fn ensure_main(source: &str) -> String {
+    if source.contains("fn main(") || source.contains("fn main ") {
+        source.to_string()
+    } else {
+        let body: String = source.lines()
+            .map(|l| {
+                let t = l.trim();
+                if t.is_empty() || t.starts_with('#') {
+                    l.to_string()
+                } else {
+                    format!("    {}", l)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("fn main() i32:\n{}\n    0", body)
     }
 }

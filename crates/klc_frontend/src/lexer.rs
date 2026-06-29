@@ -302,6 +302,8 @@ impl Lexer {
             "and" => TokenKind::And,
             "or" => TokenKind::Or,
             "not" => TokenKind::Bang,
+            "is" => TokenKind::Is,
+            "super" => TokenKind::Super,
             _ => TokenKind::Identifier(word.to_string()),
         }
     }
@@ -863,7 +865,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_tokens() {
-        let source = "fn add(x: i32, y: i32) -> i32:\n    x + y\n";
+        let source = "fn add(x: i32, y: i32) i32:\n    x + y\n";
         let kinds = tokenize(source);
         let expected = vec![
             TokenKind::Fn,
@@ -877,7 +879,6 @@ mod tests {
             TokenKind::Colon,
             TokenKind::Identifier("i32".into()),
             TokenKind::RParen,
-            TokenKind::Arrow,
             TokenKind::Identifier("i32".into()),
             TokenKind::Colon,
             TokenKind::Newline,

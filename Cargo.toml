@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/klc_core",
     "crates/klc_frontend",
+    "crates/klc_hir",
     "crates/klc_semantic",
     "crates/klc_mir",
     "crates/klc_backend",

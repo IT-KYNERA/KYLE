@@ -133,7 +133,7 @@ The leading underscores are stripped from the import name.
 fn __internal_helper():
     # ...
 
-fn uppercase(s: str) -> str:
+fn uppercase(s: str) str:
     return __internal_helper() + s
 ```
 

@@ -1,11 +1,11 @@
-fn starts_with_str(s: str, prefix: str) -> bool:
+fn starts_with_str(s: str, prefix: str) bool:
     lp = len(prefix)
     if lp > len(s):
         false
     else:
         substr(s, 0, lp) == prefix
 
-fn ends_with_str(s: str, suffix: str) -> bool:
+fn ends_with_str(s: str, suffix: str) bool:
     ls = len(suffix)
     ls2 = len(s)
     if ls > ls2:
@@ -13,7 +13,7 @@ fn ends_with_str(s: str, suffix: str) -> bool:
     else:
         substr(s, ls2 - ls, ls) == suffix
 
-fn capitalize(s: str) -> str:
+fn capitalize(s: str) str:
     if len(s) == 0:
         s
     else:
@@ -21,7 +21,7 @@ fn capitalize(s: str) -> str:
         rest = substr(s, 1, len(s) - 1)
         first + rest
 
-fn repeat_str(s: str, times: i32) -> str:
+fn repeat_str(s: str, times: i32) str:
     result := ""
     i := 0
     while i < times:

@@ -11,4 +11,4 @@
 pub mod mir;
 pub mod lower;
 pub mod optimize;
-pub mod ownership;
+pub mod move_analysis;

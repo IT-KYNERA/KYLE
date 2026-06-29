@@ -1,6 +1,6 @@
 # Compiler Architecture
 
-> How the Kyle compiler is organized: the 9 Rust crates, the 9-stage
+> How the Kyle compiler is organized: the 9 Rust crates, the 8-stage
 > pipeline, and the runtime it links against.
 
 ---
@@ -14,8 +14,8 @@
    └──────────┘    └───────┘    └────────┘    └────────┘    └──────────┘    └────┬───┘
                                                                                   │
    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-   │  Binary  │ ←  │  Linker  │ ←  │ Codegen  │ ←  │   SSA    │ ←  │  Move    │ ←─┘
-   │   .kl    │    │          │    │(LLVM 18) │    │  Lower   │    │ Analysis │
+   │  Binary  │ ←  │  Linker  │ ←  │ Codegen  │ ←  │  Move    │ ←  │ Optimize │ ←─┘
+   │   .kl    │    │          │    │(LLVM 18) │    │ Analysis │    │          │
    └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
 ```
 
@@ -34,7 +34,7 @@ kl/
 │   ├── klc_frontend/    ← Lexer, parser
 │   ├── klc_hir/         ← HIR definition, builder, HIR-level validation
 │   ├── klc_semantic/    ← Symbol table, type checker, scope resolver
-│   ├── klc_mir/         ← MIR definition, lowering, optimizer, move analysis, SSA
+│   ├── klc_mir/         ← MIR definition, lowering, optimizer, move analysis
 │   ├── klc_backend/     ← LLVM 18 codegen (inkwell), linker driver
 │   ├── klc_driver/      ← Pipeline orchestrator (klc::run)
 │   ├── klc_cli/         ← Command-line interface (the `kl` binary)
@@ -138,18 +138,18 @@ than the raw AST.
 
 Three sub-phases:
 
-### 5.1 Scope Resolution
+### 6.1 Scope Resolution
 
 Walks the HIR building a `SymbolTable` — a stack of scopes, one per block
 and one per class. Every name reference is resolved to a `Symbol` that
 records its kind (variable, function, class, etc.) and its type.
 
-### 5.2 Type Checking
+### 6.2 Type Checking
 
 Verifies that every expression has a well-defined type, that assignments
 match, and that function calls pass the right number and types of arguments.
 
-### 5.3 Contract Validation
+### 6.3 Contract Validation
 
 For each class that declares `class X: Contract`, verifies that `X`
 provides all the methods declared in `Contract`. (Generic contracts are
@@ -201,7 +201,7 @@ Constant-folding and dead-code elimination passes on the MIR.
 
 ---
 
-## 9. Stage 7: Move Analysis (`klc_mir::move_check`)
+## 9. Stage 7: Move Analysis (`klc_mir::move_analysis`)
 
 Performs move-semantics analysis on the MIR to ensure that no value is
 used after it has been moved. Eliminates the need for refcounting.
@@ -228,25 +228,7 @@ used after it has been moved. Eliminates the need for refcounting.
 
 ---
 
-## 10. Stage 8: SSA Lowering (`klc_mir::ssa`)
-
-Lowers the moved-checked MIR into Static Single Assignment (SSA) form,
-which is the primary input for LLVM codegen.
-
-**Transformations:**
-
-- Each mutable variable is decomposed into a chain of SSA values, one per
-  assignment
-- Phi (φ) nodes are inserted at join points in the control-flow graph
-- Moves are translated to value forwarding (no runtime copy unless the
-  type requires `Clone`)
-
-**Output:** `SsaModule { functions: Vec<SsaFunction> }` — a representation
-ready for LLVM IR generation.
-
----
-
-## 11. Stage 9: LLVM Codegen (`klc_backend`)
+## 10. Stage 8: LLVM Codegen (`klc_backend`)
 
 Translates MIR to LLVM IR using `inkwell` (Rust bindings for LLVM 18), then
 invokes the LLVM toolchain to compile to an object file, and links the
@@ -263,21 +245,20 @@ runtime library `libklc_runtime.a` is linked statically.
 
 ---
 
-## 12. The Runtime (`klc_runtime`)
+## 11. The Runtime (`klc_runtime`)
 
 A static C-ABI library linked into every compiled Kyle program. It
 provides the primitive operations that the compiler lowers calls to.
-The runtime is being migrated from refcounting to move semantics;
-refcounting functions remain for backward compatibility during the
-transition (Phase 6).
+The runtime uses move semantics. Refcounting functions (kl_retain/kl_release)
+remain available for future Rc/Arc use in the stdlib.
 
 | File | Responsibility |
 |---|---|
-| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — heap management (refcounting legacy) |
+| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — heap management (reserved for future Rc/Arc) |
 | `string.rs` | `kl_concat`, `kl_strlen`, `kl_str_to_*`, `kl_i64_to_str`, `kl_str_to_i64` |
 | `list.rs` | `kl_list_new`, `kl_list_push`, `kl_list_pop`, `kl_list_get`, `kl_list_set`, `kl_list_len`, `kl_list_slice`, `kl_list_extend` |
 | `dict.rs` | `kl_dict_new`, `kl_dict_set`, `kl_dict_get`, `kl_dict_len` |
-| `io.rs` | `kl_print`, `kl_println`, `kl_print_int`, `kl_input`, `kl_input_with_prompt`, `kl_open`, `kl_read_str`, `kl_write_str`, `kl_close` |
+| `io.rs` | `kl_print`, `kl_println`, `kl_input`, `kl_input_with_prompt`, `kl_open`, `kl_read_str`, `kl_write_str`, `kl_close` |
 | `async_.rs` | `kl_spawn_thread`, `kl_join_thread` — async/await runtime |
 | `channel.rs` | (planned) `Channel<T>` for inter-thread communication |
 | `thread.rs` | OS thread spawning primitives |
@@ -291,7 +272,7 @@ The runtime is written in **pure Rust** with `#[unsafe(no_mangle)]` and
 
 ---
 
-## 13. The Standard Library (`std/`)
+## 12. The Standard Library (`std/`)
 
 Eight `.kl` modules, all written in Kyle itself. The public syntax for
 optional types is `T?` (internally represented as `Option<T>`).
@@ -309,19 +290,19 @@ optional types is `T?` (internally represented as `Option<T>`).
 
 ---
 
-## 14. Compilation Modes
+## 13. Compilation Modes
 
 | Mode | Trigger | Optimization | Output |
 |---|---|---|---|
 | Debug | default | None (`-O0`) | `target/debug/<name>` |
-| Release | `--release` | Default (planned: `-O2` or `-O3`) | `target/release/<name>` |
+| Release | --release | Aggressive (O2/O3) | target/release/<name> |
 
 Both modes link the same `libklc_runtime.a`. The difference is in the
 optimization level passed to LLVM.
 
 ---
 
-## 15. Development Commands
+## 14. Development Commands
 
 ```bash
 # Build all crates
@@ -346,4 +327,4 @@ cargo build --release --bin kl
 
 ---
 
-*Version: v0.3.0 · Last updated: 2026-06-28*
+*Version: v0.4.0 · Last updated: 2026-06-29*

@@ -1,5 +1,5 @@
 use klc_core::ast::*;
-use klc_core::types::Type;
+use klc_core::types::{Type, FunctionType};
 use klc_core::diagnostic::{Diagnostic, ErrorCode, DiagnosticReporter};
 use crate::symbol_table::{SymbolTable, Symbol, SymKind};
 
@@ -148,6 +148,11 @@ impl ScopeResolver {
                     self.bind_pattern(arg);
                 }
             }
+            Pattern::Or { patterns, .. } => {
+                for p in patterns {
+                    self.bind_pattern(p);
+                }
+            }
             _ => {}
         }
     }
@@ -159,7 +164,7 @@ impl ScopeResolver {
             Stmt::Constant(_) => {}
             Stmt::Expression(e) => { self.resolve_expr(e); }
             Stmt::Return(e) => { if let Some(e) = e { self.resolve_expr(e); } }
-            Stmt::Break(e) => { if let Some(e) = e { self.resolve_expr(e); } }
+            Stmt::Break(e, _) => { if let Some(e) = e { self.resolve_expr(e); } }
             Stmt::If(s) => {
                 self.resolve_expr(&s.condition);
                 self.resolve_block(&s.body);
@@ -216,7 +221,7 @@ impl ScopeResolver {
                 self.resolve_block(&g.body);
             }
             Stmt::Unsafe(u) => { self.resolve_block(&u.body); }
-            Stmt::Continue => {}
+            Stmt::Continue(_) => {}
         }
     }
 
@@ -366,6 +371,15 @@ impl ScopeResolver {
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
             AstType::Dict { key, value, .. } => Type::Dict(Box::new(self.resolve_ast_type(key)), Box::new(self.resolve_ast_type(value))),
+            AstType::FnPtr { params, return_, .. } => {
+                Type::Function(FunctionType {
+                    is_async: false,
+                    is_const: false,
+                    params: params.iter().map(|p| self.resolve_ast_type(p)).collect(),
+                    return_: Box::new(self.resolve_ast_type(return_)),
+                    fallible: false,
+                })
+            }
         }
     }
 }

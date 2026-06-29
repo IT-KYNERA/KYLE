@@ -23,17 +23,17 @@ Written in **Rust**, compiled via **LLVM 18**.
 ## Current Phase: Evolution to v1.0
 
 The language is undergoing a major evolution. The complete plan is at
-[`EXECUTION-PLAN.md`](EXECUTION-PLAN.md). Current focus is **Phase 5**:
-HIR (High-Level Intermediate Representation) crate creation.
+[`docs/05-roadmap-status.md`](docs/05-roadmap-status.md). Current focus is
+finishing **Phase 6** (Semantic) and **Phase 7** (Move Semantics).
 
 | Phase | Focus | Status |
 |---|---|---|
 | **1–2** | Documentation + Spec updates | ✅ Done |
 | **3** | Lexer (`:=`, `::=`, `T?`, `final class`) | ✅ Done |
-| **4** | **Parser** (destructuring, error recovery) | **✅ Done** |
-| **5** | **HIR — High-Level IR** | **🔜 Current** |
-| 6 | Semantic | 📅 |
-| 7 | Move semantics (replaces refcounting) | 📅 |
+| **4** | **Parser** (destructuring, error recovery) | ✅ Done |
+| **5** | **HIR — High-Level IR** | ✅ Done |
+| **6** | **Semantic** | **🔜 10/13** |
+| **7** | **Move Semantics** | **🔜 11/13** |
 | 8+ | Async scheduler, iterators, tooling | 📅 |
 
 See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
@@ -86,7 +86,7 @@ See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 | [`docs/03-modules-packages-tooling.md`](docs/03-modules-packages-tooling.md) | Modules, packages, CLI, VS Code |
 | [`docs/04-compiler-architecture.md`](docs/04-compiler-architecture.md) | 9-crate pipeline, runtime internals |
 | [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) | Feature matrix, phase details, release checklist |
-| [`EXECUTION-PLAN.md`](EXECUTION-PLAN.md) | **Master evolution plan** (Phase 1–14) |
+| [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) | **Master roadmap** (phases, priorities, v1.0 checklist) |
 
 ---
 

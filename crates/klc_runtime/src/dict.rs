@@ -95,3 +95,13 @@ pub extern "C" fn kl_json_stringify(dict: *mut std::ffi::c_void) -> *mut u8 {
     let ptr = c_str.into_bytes_with_nul().leak().as_mut_ptr();
     ptr
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_clone_dict(dict: *mut std::ffi::c_void) -> *mut std::ffi::c_void {
+    if dict.is_null() {
+        return std::ptr::null_mut();
+    }
+    let map = unsafe { &*(dict as *const HashMap<String, i64>) };
+    let cloned = Box::new(map.clone());
+    Box::into_raw(cloned) as *mut std::ffi::c_void
+}

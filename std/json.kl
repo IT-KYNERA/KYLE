@@ -1,5 +1,5 @@
-fn parse(json_str: str) -> Dict<str, i64>:
+fn parse(json_str: str) dict<str, i64>:
     json_parse(json_str)
 
-fn stringify(d: Dict<str, i64>) -> str:
+fn stringify(d: dict<str, i64>) str:
     json_stringify(d)

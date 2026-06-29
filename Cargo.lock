@@ -345,6 +345,7 @@ dependencies = [
  "klc_backend",
  "klc_core",
  "klc_frontend",
+ "klc_hir",
  "klc_mir",
  "klc_semantic",
  "klc_tools",
@@ -352,6 +353,13 @@ dependencies = [
 
 [[package]]
 name = "klc_frontend"
+version = "0.2.2"
+dependencies = [
+ "klc_core",
+]
+
+[[package]]
+name = "klc_hir"
 version = "0.2.2"
 dependencies = [
  "klc_core",

@@ -1,16 +1,16 @@
-fn absolute(n: i32) -> i32:
+fn absolute(n: i32) i32:
     if n < 0:
         -n
     else:
         n
 
-fn absolute64(n: i64) -> i64:
+fn absolute64(n: i64) i64:
     if n < 0:
         -n
     else:
         n
 
-fn pow(base: i32, exp: i32) -> i32:
+fn pow(base: i32, exp: i32) i32:
     result := 1
     i := 0
     while i < exp:
@@ -18,7 +18,7 @@ fn pow(base: i32, exp: i32) -> i32:
         i = i + 1
     result
 
-fn sqrt(n: i32) -> i32:
+fn sqrt(n: i32) i32:
     if n < 2:
         n
     else:
@@ -29,7 +29,7 @@ fn sqrt(n: i32) -> i32:
             i = i + 1
         guess
 
-fn gcd(a: i32, b: i32) -> i32:
+fn gcd(a: i32, b: i32) i32:
     x := a
     y := b
     while y != 0:
@@ -38,19 +38,19 @@ fn gcd(a: i32, b: i32) -> i32:
         x = temp
     x
 
-fn min(a: i32, b: i32) -> i32:
+fn min(a: i32, b: i32) i32:
     if a < b:
         a
     else:
         b
 
-fn max(a: i32, b: i32) -> i32:
+fn max(a: i32, b: i32) i32:
     if a > b:
         a
     else:
         b
 
-fn clamp(value: i32, low: i32, high: i32) -> i32:
+fn clamp(value: i32, low: i32, high: i32) i32:
     if value < low:
         low
     elif value > high:

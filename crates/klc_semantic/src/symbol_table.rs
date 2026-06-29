@@ -72,7 +72,7 @@ impl SymbolTable {
             "ord",
             "error",
             "int", "float", "bool",
-            "print_int", "println_int",
+
             "ceil", "floor", "round",
         ];
         for &name in &runtime_fns {

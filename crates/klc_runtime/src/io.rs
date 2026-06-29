@@ -47,16 +47,7 @@ pub extern "C" fn kl_println(ptr: *const u8, len: i32) {
     write_stdout(b"\n");
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn kl_print_int(val: i64) {
-    write_int(val);
-}
 
-#[unsafe(no_mangle)]
-pub extern "C" fn kl_println_int(val: i64) {
-    write_int(val);
-    write_stdout(b"\n");
-}
 
 /// Read a line from stdin, return heap-allocated null-terminated string.
 /// Caller must free with kl_free.

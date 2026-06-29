@@ -296,39 +296,39 @@ impl LanguageServer {
             ("float", "float(value) — Convert to float"),
             ("bool", "bool(value) — Convert to boolean"),
             ("input", "input() — Read line from stdin"),
-            ("open", "open(path) -> i64 — Open file"),
-            ("read_str", "read_str(fd) -> str — Read file content"),
+            ("open", "open(path) i64 — Open file"),
+            ("read_str", "read_str(fd) str — Read file content"),
             ("write_str", "write_str(fd, str) — Write to file"),
             ("close", "close(fd) — Close file"),
             ("sleep", "sleep(ms) — Sleep in milliseconds"),
-            ("now", "now() -> i64 — Current timestamp"),
-            ("contains", "contains(str, substr) -> bool"),
-            ("to_upper", "to_upper(str) -> str"),
-            ("to_lower", "to_lower(str) -> str"),
-            ("trim", "trim(str) -> str"),
-            ("replace", "replace(str, from, to) -> str"),
-            ("substr", "substr(str, start, len) -> str"),
-            ("char_at", "char_at(str, index) -> char"),
-            ("ord", "ord(c) -> i32 — Char to ASCII code"),
-            ("is_digit", "is_digit(c) -> bool"),
-            ("is_alpha", "is_alpha(c) -> bool"),
-            ("is_alnum", "is_alnum(c) -> bool"),
-            ("is_whitespace", "is_whitespace(c) -> bool"),
-            ("is_upper", "is_upper(c) -> bool"),
-            ("is_lower", "is_lower(c) -> bool"),
+            ("now", "now() i64 — Current timestamp"),
+            ("contains", "contains(str, substr) bool"),
+            ("to_upper", "to_upper(str) str"),
+            ("to_lower", "to_lower(str) str"),
+            ("trim", "trim(str) str"),
+            ("replace", "replace(str, from, to) str"),
+            ("substr", "substr(str, start, len) str"),
+            ("char_at", "char_at(str, index) char"),
+            ("ord", "ord(c) i32 — Char to ASCII code"),
+            ("is_digit", "is_digit(c) bool"),
+            ("is_alpha", "is_alpha(c) bool"),
+            ("is_alnum", "is_alnum(c) bool"),
+            ("is_whitespace", "is_whitespace(c) bool"),
+            ("is_upper", "is_upper(c) bool"),
+            ("is_lower", "is_lower(c) bool"),
             ("assert", "assert(condition)"),
             ("assert_eq", "assert_eq(a, b)"),
             ("assert_str", "assert_str(a, b)"),
             ("assert_ne", "assert_ne(a, b)"),
-            ("range", "range(start, end) -> [i32]"),
-            ("json_parse", "json_parse(str) -> i64"),
-            ("json_stringify", "json_stringify(value) -> str"),
+            ("range", "range(start, end) [i32]"),
+            ("json_parse", "json_parse(str) i64"),
+            ("json_stringify", "json_stringify(value) str"),
             ("list_push", "list_push(list, value)"),
-            ("list_pop", "list_pop(list) -> i64"),
-            ("list_len", "list_len(list) -> i32"),
-            ("ceil", "ceil(f64) -> f64"),
-            ("floor", "floor(f64) -> f64"),
-            ("round", "round(f64) -> f64"),
+            ("list_pop", "list_pop(list) i64"),
+            ("list_len", "list_len(list) i32"),
+            ("ceil", "ceil(f64) f64"),
+            ("floor", "floor(f64) f64"),
+            ("round", "round(f64) f64"),
         ];
         for (label, detail) in builtins {
             if prefix.is_empty() || label.starts_with(&prefix) || label.to_lowercase().starts_with(&prefix_lower) {
@@ -503,7 +503,7 @@ impl LanguageServer {
                     .collect();
                 let mut info = format!("**fn {}({})", f.name, params.join(", "));
                 if let Some(rt) = &f.return_type {
-                    info.push_str(&format!(" -> {}", Self::fmt_ast_type(rt)));
+                    info.push_str(&format!(" {}", Self::fmt_ast_type(rt)));
                 }
                 info.push(')');
                 info
@@ -576,39 +576,39 @@ impl LanguageServer {
             "float" => "`float(value)` — Convert to float",
             "bool" => "`bool(value)` — Convert to boolean",
             "input" => "`input()` — Read a line from stdin",
-            "open" => "`open(path) -> i64` — Open a file, returns file descriptor",
-            "read_str" => "`read_str(fd) -> str` — Read file content as string",
+            "open" => "`open(path) i64` — Open a file, returns file descriptor",
+            "read_str" => "`read_str(fd) str` — Read file content as string",
             "write_str" => "`write_str(fd, str)` — Write string to file",
             "close" => "`close(fd)` — Close a file descriptor",
             "sleep" => "`sleep(ms)` — Sleep for given milliseconds",
-            "now" => "`now() -> i64` — Current Unix timestamp in milliseconds",
-            "contains" => "`contains(str, substr) -> bool` — Check if string contains substring",
-            "to_upper" => "`to_upper(str) -> str` — Convert string to uppercase",
-            "to_lower" => "`to_lower(str) -> str` — Convert string to lowercase",
-            "trim" => "`trim(str) -> str` — Remove leading/trailing whitespace",
-            "replace" => "`replace(str, from, to) -> str` — Replace all occurrences",
-            "substr" => "`substr(str, start, len) -> str` — Extract substring",
-            "char_at" => "`char_at(str, index) -> char` — Get character at index",
-            "ord" => "`ord(c) -> i32` — Get ASCII code of character",
-            "is_digit" => "`is_digit(c) -> bool` — Check if char is a digit",
-            "is_alpha" => "`is_alpha(c) -> bool` — Check if char is alphabetic",
-            "is_alnum" => "`is_alnum(c) -> bool` — Check if char is alphanumeric",
-            "is_whitespace" => "`is_whitespace(c) -> bool` — Check if char is whitespace",
-            "is_upper" => "`is_upper(c) -> bool` — Check if char is uppercase",
-            "is_lower" => "`is_lower(c) -> bool` — Check if char is lowercase",
+            "now" => "`now() i64` — Current Unix timestamp in milliseconds",
+            "contains" => "`contains(str, substr) bool` — Check if string contains substring",
+            "to_upper" => "`to_upper(str) str` — Convert string to uppercase",
+            "to_lower" => "`to_lower(str) str` — Convert string to lowercase",
+            "trim" => "`trim(str) str` — Remove leading/trailing whitespace",
+            "replace" => "`replace(str, from, to) str` — Replace all occurrences",
+            "substr" => "`substr(str, start, len) str` — Extract substring",
+            "char_at" => "`char_at(str, index) char` — Get character at index",
+            "ord" => "`ord(c) i32` — Get ASCII code of character",
+            "is_digit" => "`is_digit(c) bool` — Check if char is a digit",
+            "is_alpha" => "`is_alpha(c) bool` — Check if char is alphabetic",
+            "is_alnum" => "`is_alnum(c) bool` — Check if char is alphanumeric",
+            "is_whitespace" => "`is_whitespace(c) bool` — Check if char is whitespace",
+            "is_upper" => "`is_upper(c) bool` — Check if char is uppercase",
+            "is_lower" => "`is_lower(c) bool` — Check if char is lowercase",
             "assert" => "`assert(condition)` — Assert condition is true",
             "assert_eq" => "`assert_eq(a, b)` — Assert values are equal",
             "assert_str" => "`assert_str(a, b)` — Assert strings are equal",
             "assert_ne" => "`assert_ne(a, b)` — Assert values are not equal",
-            "range" => "`range(start, end) -> [i32]` — Create a range list",
+            "range" => "`range(start, end) [i32]` — Create a range list",
             "json_parse" => "`json_parse(str)` — Parse JSON string",
-            "json_stringify" => "`json_stringify(value) -> str` — Convert to JSON string",
+            "json_stringify" => "`json_stringify(value) str` — Convert to JSON string",
             "list_push" => "`list_push(list, value)` — Push value to list (mutates)",
-            "list_pop" => "`list_pop(list) -> i64` — Pop last value from list",
-            "list_len" => "`list_len(list) -> i32` — Get list length",
-            "ceil" => "`ceil(f64) -> f64` — Round up to nearest integer",
-            "floor" => "`floor(f64) -> f64` — Round down to nearest integer",
-            "round" => "`round(f64) -> f64` — Round to nearest integer",
+            "list_pop" => "`list_pop(list) i64` — Pop last value from list",
+            "list_len" => "`list_len(list) i32` — Get list length",
+            "ceil" => "`ceil(f64) f64` — Round up to nearest integer",
+            "floor" => "`floor(f64) f64` — Round down to nearest integer",
+            "round" => "`round(f64) f64` — Round to nearest integer",
             _ => return None,
         };
         Some(info.to_string())
@@ -948,6 +948,7 @@ impl LanguageServer {
             AstType::Optional { inner, .. } => Self::ast_type_name(inner),
             AstType::Error { inner, .. } => Self::ast_type_name(inner),
             AstType::Dict { .. } => "dict".to_string(),
+            AstType::FnPtr { .. } => "fn_ptr".to_string(),
         }
     }
 
@@ -1139,30 +1140,30 @@ impl LanguageServer {
             }
             Type::Str => {
                 Some(vec![
-                    CompletionItem { label: "contains".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn contains(substr: str) -> bool".into()), sort_text: Some("1contains".into()), ..Default::default() },
-                    CompletionItem { label: "to_upper".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_upper() -> str".into()), sort_text: Some("2to_upper".into()), ..Default::default() },
-                    CompletionItem { label: "to_lower".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_lower() -> str".into()), sort_text: Some("3to_lower".into()), ..Default::default() },
-                    CompletionItem { label: "trim".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn trim() -> str".into()), sort_text: Some("4trim".into()), ..Default::default() },
-                    CompletionItem { label: "replace".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn replace(from: str, to: str) -> str".into()), sort_text: Some("5replace".into()), ..Default::default() },
-                    CompletionItem { label: "substr".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn substr(start: i64, len: i64) -> str".into()), sort_text: Some("6substr".into()), ..Default::default() },
-                    CompletionItem { label: "char_at".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn char_at(index: i64) -> char".into()), sort_text: Some("7char_at".into()), ..Default::default() },
-                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("8len".into()), ..Default::default() },
+                    CompletionItem { label: "contains".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn contains(substr: str) bool".into()), sort_text: Some("1contains".into()), ..Default::default() },
+                    CompletionItem { label: "to_upper".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_upper() str".into()), sort_text: Some("2to_upper".into()), ..Default::default() },
+                    CompletionItem { label: "to_lower".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn to_lower() str".into()), sort_text: Some("3to_lower".into()), ..Default::default() },
+                    CompletionItem { label: "trim".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn trim() str".into()), sort_text: Some("4trim".into()), ..Default::default() },
+                    CompletionItem { label: "replace".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn replace(from: str, to: str) str".into()), sort_text: Some("5replace".into()), ..Default::default() },
+                    CompletionItem { label: "substr".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn substr(start: i64, len: i64) str".into()), sort_text: Some("6substr".into()), ..Default::default() },
+                    CompletionItem { label: "char_at".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn char_at(index: i64) char".into()), sort_text: Some("7char_at".into()), ..Default::default() },
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() i32".into()), sort_text: Some("8len".into()), ..Default::default() },
                 ])
             }
             Type::List(_) => {
                 Some(vec![
                     CompletionItem { label: "push".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn push(value)".into()), sort_text: Some("1push".into()), ..Default::default() },
-                    CompletionItem { label: "pop".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn pop() -> i64".into()), sort_text: Some("2pop".into()), ..Default::default() },
-                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("3len".into()), ..Default::default() },
+                    CompletionItem { label: "pop".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn pop() i64".into()), sort_text: Some("2pop".into()), ..Default::default() },
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() i32".into()), sort_text: Some("3len".into()), ..Default::default() },
                 ])
             }
             Type::Dict(_, _) => {
                 Some(vec![
-                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() -> i32".into()), sort_text: Some("1len".into()), ..Default::default() },
+                    CompletionItem { label: "len".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn len() i32".into()), sort_text: Some("1len".into()), ..Default::default() },
                     CompletionItem { label: "get".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn get(key)".into()), sort_text: Some("2get".into()), ..Default::default() },
                     CompletionItem { label: "set".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn set(key, value)".into()), sort_text: Some("3set".into()), ..Default::default() },
-                    CompletionItem { label: "keys".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn keys() -> [str]".into()), sort_text: Some("4keys".into()), ..Default::default() },
-                    CompletionItem { label: "values".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn values() -> [T]".into()), sort_text: Some("5values".into()), ..Default::default() },
+                    CompletionItem { label: "keys".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn keys() [str]".into()), sort_text: Some("4keys".into()), ..Default::default() },
+                    CompletionItem { label: "values".into(), kind: Some(CompletionItemKind::METHOD), detail: Some("fn values() [T]".into()), sort_text: Some("5values".into()), ..Default::default() },
                 ])
             }
             _ => None,
@@ -1180,6 +1181,10 @@ impl LanguageServer {
             AstType::Optional { inner, .. } => format!("{}?", Self::fmt_ast_type(inner)),
             AstType::Error { inner, .. } => format!("{}!", Self::fmt_ast_type(inner)),
             AstType::Dict { key, value, .. } => format!("Dict<{}, {}>", Self::fmt_ast_type(key), Self::fmt_ast_type(value)),
+            AstType::FnPtr { params, return_, .. } => {
+                let args: Vec<String> = params.iter().map(Self::fmt_ast_type).collect();
+                format!("fn({}) {}", args.join(", "), Self::fmt_ast_type(return_))
+            }
         }
     }
 
@@ -1739,7 +1744,7 @@ impl LanguageServer {
                         Self::walk_semantic_expr(e, tokens, symbols);
                     }
                 }
-                Stmt::Break(ret) => {
+                Stmt::Break(ret, _label) => {
                     if let Some(e) = ret {
                         Self::walk_semantic_expr(e, tokens, symbols);
                     }
@@ -1799,7 +1804,7 @@ impl LanguageServer {
                 Stmt::Defer(ds) => {
                     Self::walk_semantic_expr(&ds.call, tokens, symbols);
                 }
-                Stmt::Continue => {}
+                Stmt::Continue(_) => {}
             }
         }
     }
@@ -1954,6 +1959,12 @@ impl LanguageServer {
             AstType::Dict { key, value, .. } => {
                 Self::walk_semantic_type(key, tokens, symbols);
                 Self::walk_semantic_type(value, tokens, symbols);
+            }
+            AstType::FnPtr { params, return_, .. } => {
+                for p in params {
+                    Self::walk_semantic_type(p, tokens, symbols);
+                }
+                Self::walk_semantic_type(return_, tokens, symbols);
             }
         }
     }

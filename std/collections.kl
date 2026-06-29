@@ -1,4 +1,4 @@
-fn list_sum(items: list<i32>) -> i32:
+fn list_sum(items: list<i32>) i32:
     total := 0
     i := 0
     while i < len(items):
@@ -6,7 +6,7 @@ fn list_sum(items: list<i32>) -> i32:
         i = i + 1
     total
 
-fn list_product(items: list<i32>) -> i32:
+fn list_product(items: list<i32>) i32:
     result := 1
     i := 0
     while i < len(items):
@@ -14,7 +14,7 @@ fn list_product(items: list<i32>) -> i32:
         i = i + 1
     result
 
-fn list_max(items: list<i32>) -> i32:
+fn list_max(items: list<i32>) i32:
     result := items[0]
     i := 1
     while i < len(items):
@@ -23,7 +23,7 @@ fn list_max(items: list<i32>) -> i32:
         i = i + 1
     result
 
-fn list_min(items: list<i32>) -> i32:
+fn list_min(items: list<i32>) i32:
     result := items[0]
     i := 1
     while i < len(items):
@@ -32,7 +32,7 @@ fn list_min(items: list<i32>) -> i32:
         i = i + 1
     result
 
-fn list_range(start: i32, end: i32) -> list<i32>:
+fn list_range(start: i32, end: i32) list<i32>:
     result: list<i32> := []
     i := start
     while i < end:

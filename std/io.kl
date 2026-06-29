@@ -1,4 +1,4 @@
-fn read_file(path: str) -> str:
+fn read_file(path: str) str:
     fd = open(path, 0)
     if fd >= 0:
         content = read_str(fd, 4096)
@@ -7,7 +7,7 @@ fn read_file(path: str) -> str:
     else:
         ""
 
-fn write_file(path: str, content: str) -> i32:
+fn write_file(path: str, content: str) i32:
     fd = open(path, 1)
     if fd >= 0:
         result = write_str(fd, content)

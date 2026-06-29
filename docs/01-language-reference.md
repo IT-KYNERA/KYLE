@@ -35,14 +35,14 @@ how each piece behaves. Every construct includes:
 Every Kyle program has exactly one entry point, `main`, in `src/main.kl` for
 project mode or the top of the file for single-file mode.
 
-- [x] `fn main(args: [str]) -> i32:` declaration recognized as entry point
+- [x] `fn main(args: [str]) i32:` declaration recognized as entry point
 - [x] `args: [str]` is the list of command-line arguments
 - [x] Return value is the process exit code (`0` = success, non-zero = failure)
-- [x] `fn main() -> i32:` (no args) is also accepted
+- [x] `fn main() i32:` (no args) is also accepted
 - [x] `klc-backend` generates a C-style `main` wrapper that calls the Kyle `main`
 
 ```kl
-fn main(args: [str]) -> i32:
+fn main(args: [str]) i32:
     println("Hello, World!")
     return 0
 ```
@@ -206,6 +206,10 @@ in one line. No `let` keyword — the syntax is direct.
 | `T?` | Optional T | `i32?` means `i32 \| None` |
 | `T!` | Error-returning T | `i32!` = `Result<T, Error>` |
 | `final class Name { ... }` | Inline struct type | (structural typing) |
+
+> **Method-call syntax:** `list`, `dict`, and `str` types support method-call
+> syntax via `.` notation (e.g. `items.add(v)`, `dict.len()`, `s.upper()`).
+> See §14.5 for the complete reference.
 
 ## 3.3 Optional Type `T?`
 
@@ -515,7 +519,7 @@ greeting = user?.greet()?.upper()
 - [x] Propagates the `None`/error case as the function's return
 
 ```kl
-fn parse_num(s: str) -> i32!:
+fn parse_num(s: str) i32!:
     n = int(s)?
     if n < 0:
         return error("negative")
@@ -530,6 +534,19 @@ fn parse_num(s: str) -> i32!:
 - [x] `obj[index]` indexes a list or dict
 - [x] `obj[start..end]` slices a list
 
+**`this` is implicit in methods.** Method bodies use `this.field` to access
+fields and `this.method()` to call other methods, but `this` is **not**
+declared as a parameter — the compiler adds it automatically.
+
+```kyle
+class Circle: Shape:
+    radius: f64
+    Circle(r: f64):
+        this.radius = r
+    fn area() f64:
+        3.14 * this.radius * this.radius
+```
+
 ```kl
 p = Point { x: 1, y: 2 }
 p.x = 10
@@ -538,16 +555,43 @@ first = items[0]
 slice = items[1..3]      # [2, 3]
 ```
 
-## 4.12 Function Pointer Type
+## 4.12 Function Pointer Type (`fn(T) U`)
 
-- [ ] `(T, U) -> V` is the type of a function that takes `T, U` and returns `V`
-- [ ] Used for callbacks, closures, and higher-order functions
+The `fn(T) U` syntax declares a function pointer type. `T` is the parameter types and `U` is the return type.
+For void return (no return value), omit the return type. For async function pointers, add `async`.
 
-```kl
-type Callback = (i32) -> str
-fn apply(x: i32, f: (i32) -> i32) -> i32:
-    return f(x)
+```kyle
+# Sin parámetros, sin retorno
+mostrar : fn(str) := (texto) => print(texto)
+
+# Con retorno
+duplicar : fn(i32) i32 := (x) => x * 2
+
+# Múltiples parámetros
+sumar : fn(i32, i32) i32 := (a, b) => a + b
+
+# Async function pointer
+fetch_url : fn(str) str async := async (url) => http.get(url)
+
+# Callback como parámetro
+fn ordenar<T>(lista: list<T>, compare: fn(T, T) bool):
+    ...
+
+# Genérico
+fn ejecutar(tarea: fn() i32 async) i32:
+    await tarea()
 ```
+
+| Sintaxis | Significado | Ejemplo |
+| :--- | :--- | :--- |
+| `fn() R` | Toma `void`, retorna `R` | `fn() i32` |
+| `fn(A) R` | Toma `A`, retorna `R` | `fn(str) i32` |
+| `fn(A, B) R` | Toma `A, B`, retorna `R` | `fn(i32, str) bool` |
+| `fn(...) async` | Idem pero async | `fn(str) str async` |
+
+**Status:** ✅ `AstType::FnPtr` existe en AST. Parseo básico implementado.
+            🔶 Falta: type checking completo, codegen como puntero C-ABI,
+            closures asignables a variables `fn(...)`.
 
 ## 4.13 Operator Overloading
 
@@ -585,13 +629,13 @@ From highest to lowest:
 
 ## 5.1 Function Declaration
 
-- [x] `fn name(params) -> RetType:` declares a function
+- [x] `fn name(params) RetType:` declares a function
 - [x] `fn name(params):` (no return type) returns `void`
-- [x] `fn name<T>(params) -> T:` declares a generic function
+- [x] `fn name<T>(params) T:` declares a generic function
 - [x] Function body is an indented block
 
 ```kl
-fn add(a: i32, b: i32) -> i32:
+fn add(a: i32, b: i32) i32:
     return a + b
 
 fn greet(name: str):
@@ -607,7 +651,7 @@ fn greet(name: str):
 - [ ] Variadic: `...names: T` — ❌ not implemented
 
 ```kl
-fn add(a: i32, b: i32) -> i32:
+fn add(a: i32, b: i32) i32:
     return a + b
 ```
 
@@ -625,11 +669,11 @@ fn process(id: i32):
 - [x] Reaching the end of a non-void function without `return` is a compile error
 
 ```kl
-fn add(a: i32, b: i32) -> i32:
+fn add(a: i32, b: i32) i32:
     return a + b
 
 # equivalent (implicit return)
-fn add(a: i32, b: i32) -> i32:
+fn add(a: i32, b: i32) i32:
     a + b
 ```
 
@@ -640,22 +684,22 @@ fn add(a: i32, b: i32) -> i32:
 - [x] Generics are monomorphized (one specialized function per type combination)
 
 ```kl
-fn identity<T>(x: T) -> T:
+fn identity<T>(x: T) T:
     return x
 
-fn pair<T, U>(a: T, b: U) -> (T?, U?):
+fn pair<T, U>(a: T, b: U) (T?, U?):
     return (a, b)              # returns a tuple (see §8.3)
 ```
 
 ## 5.5 Error-Returning Functions
 
-- [x] `-> T!` declares a function that can return an error
+- [x] `T!` declares a function that can return an error
 - [x] Internally represented as `Option<T>` (None = error)
 - [x] `return error(msg)` returns an error
 - [x] `?` propagates `None` as the function's return
 
 ```kl
-fn read_int() -> i32!:
+fn read_int() i32!:
     line = input("enter number: ")
     n = int(line)?
     return n
@@ -681,7 +725,7 @@ result = await task
 - [~] Real compile-time evaluation — 🔶 partial (type-checks only, not evaluated)
 
 ```kl
-const fn double(x: i32) -> i32:
+const fn double(x: i32) i32:
     return x * 2
 ```
 
@@ -886,14 +930,14 @@ function exits.
 
 ```kl
 # Without defer — file leak if parse fails:
-fn read_file(path: str) -> str!:
+fn read_file(path: str) str!:
     fd = open(path, 0)?
     data = read_str(fd, 4096)?        # if this fails...
     close(fd)                          # ...this never runs! LEAK.
     return data
 
 # With defer — cleanup always runs:
-fn read_file(path: str) -> str!:
+fn read_file(path: str) str!:
     fd = open(path, 0)?
     defer close(fd)                    # runs no matter what
     data = read_str(fd, 4096)?
@@ -938,7 +982,7 @@ fn process_order(order: Order):
     charge(order)
 
 # With guard — flat, one validation per line:
-fn process_order(order: Order) -> i32!:
+fn process_order(order: Order) i32!:
     guard order.is_valid() else:
         return error("invalid order")
     guard order.user != null else:
@@ -965,10 +1009,10 @@ that needs careful review.
 
 ```kl
 extern "C":
-    fn malloc(size: i32) -> ptr
+    fn malloc(size: i32) ptr
     fn free(p: ptr)
 
-fn my_alloc(size: i32) -> ptr:
+fn my_alloc(size: i32) ptr:
     unsafe:
         p = malloc(size)
         if p == null:
@@ -1065,6 +1109,15 @@ match v:
 - [x] `instance.field` and `instance.method()` work
 - [x] `this` refers to the current instance
 
+**Constructor:** Defined with the class name (like C#/Java), no `fn` keyword.
+
+```kyle
+class Person:
+    name: str
+    Person(name: str):
+        this.name = name
+```
+
 ```kl
 class Counter:
     count: i32
@@ -1072,7 +1125,7 @@ class Counter:
     Counter(start: i32):
         this.count = start
 
-    fn increment() -> i32:
+    fn increment() i32:
         this.count = this.count + 1
         return this.count
 
@@ -1142,7 +1195,7 @@ class Bank:
 
 ```kl
 abstract class Shape:
-    fn area() -> f64
+    fn area() f64
 
 class Circle: Shape
     radius: f64
@@ -1150,7 +1203,7 @@ class Circle: Shape
     Circle(r: f64):
         this.radius = r
 
-    fn area() -> f64:
+    fn area() f64:
         return 3.14159 * this.radius * this.radius
 ```
 
@@ -1163,10 +1216,10 @@ class Circle: Shape
 
 ```kl
 class MathUtils:
-    static fn square(x: i32) -> i32:
+    static fn square(x: i32) i32:
         return x * x
 
-    static fn cube(x: i32) -> i32:
+    static fn cube(x: i32) i32:
         return square(x) * x      # calls static method
 
 result = MathUtils.square(5)      # 25
@@ -1182,7 +1235,7 @@ result = MathUtils.square(5)      # 25
 
 ```kl
 contract Greeter:
-    fn greet(name: str) -> str
+    fn greet(name: str) str
 
 class Person: Greeter
     name: str
@@ -1190,7 +1243,7 @@ class Person: Greeter
     Person(name: str):
         this.name = name
 
-    fn greet(name: str) -> str:
+    fn greet(name: str) str:
         return "Hello, " + name + ", I'm " + this.name
 ```
 
@@ -1202,7 +1255,7 @@ class Person: Greeter
 ```kl
 type IntList = [i32]
 type StringMap = dict<str, str>
-type Callback<T> = (T) -> void
+type Callback<T> = (T) void
 ```
 
 ## 7.11 Properties
@@ -1225,11 +1278,11 @@ class Account:
         this.__balance = initial
 
     # Read-only computed property
-    get is_overdrawn() -> bool:
+    get is_overdrawn() bool:
         return this.__balance < 0
 
     # Read-write property with validation
-    get balance() -> i32:
+    get balance() i32:
         return this.__balance
 
     set balance(value: i32):
@@ -1350,7 +1403,7 @@ result = await task
 - [ ] `await` inside an `async fn` yields control to the scheduler
 
 ```kl
-async fn fetch(url: str) -> str:
+async fn fetch(url: str) str:
     response = await http.get(url)
     return response.body
 ```
@@ -1363,18 +1416,18 @@ Kyle has **no exceptions**. Errors are values.
 
 ## 11.1 The `T!` Return Type
 
-- [x] `-> T!` declares a function that can return an error
+- [x] `T!` declares a function that can return an error
 - [x] Internally, this is `Option<T>` (None = error)
 - [x] `return error("msg")` returns an error
 - [x] `?` propagates the error from the calling function
 
 ```kl
-fn parse(s: str) -> i32!:
+fn parse(s: str) i32!:
     if s == "":
         return error("empty string")
     return int(s)?         # int() can fail; propagate
 
-fn caller() -> i32!:
+fn caller() i32!:
     n = parse("42")?       # propagate error if parse fails
     return n * 2
 ```
@@ -1386,7 +1439,7 @@ fn caller() -> i32!:
 - [x] Only valid in functions with `T!` return type
 
 ```kl
-fn read_file(path: str) -> str!:
+fn read_file(path: str) str!:
     fd = open(path, 0)?
     content = read_str(fd, 4096)?
     close(fd)
@@ -1511,57 +1564,150 @@ sub = substr(s, 2, 5)         # "Hello"
 
 | Function | Signature | Description | Status |
 |---|---|---|---|
-| `print(s)` | `(str) -> void` | Print to stdout | ✅ |
-| `println(s)` | `(str) -> void` | Print with newline | ✅ |
-| `print_int(n)` | `(i32) -> void` | Print integer | ✅ |
-| `println_int(n)` | `(i32) -> void` | Print integer with newline | ✅ |
-| `print_err(s)` | `(str) -> void` | Print to stderr | 🔶 registered, no `kl_print_err` |
-| `len(x)` | `([T]) -> i32` or `(str) -> i32` | Length of list or string | ✅ |
-| `str(x)` | `(any) -> str` | Convert to string | ✅ (i64 only) |
-| `int(s)` | `(str) -> i32!` | Parse string to integer | 🔶 registered, no runtime impl |
-| `float(s)` | `(str) -> f64!` | Parse string to float | 🔶 registered, no runtime impl |
-| `bool(x)` | `(any) -> bool` | Convert to boolean | 🔶 registered, no runtime impl |
-| `input()` | `() -> str` | Read line from stdin | ✅ |
-| `input(prompt)` | `(str) -> str` | Print prompt, read line | ✅ |
-| `range(n)` | `(i32) -> [i32]` | Create range `[0, n)` | ✅ |
-| `range(start, end)` | `(i32, i32) -> [i32]` | Create range `[start, end)` | 🔶 partial |
-| `open(path, mode)` | `(str, i32) -> i32` | Open file, return fd | ✅ |
-| `close(fd)` | `(i32) -> void` | Close file descriptor | ✅ |
-| `read_str(fd, count)` | `(i32, i32) -> str` | Read bytes from fd | ✅ |
-| `write_str(fd, s)` | `(i32, str) -> i32` | Write string to fd | ✅ |
-| `sleep(ms)` | `(i32) -> void` | Sleep for ms milliseconds | ✅ |
-| `now()` | `() -> i32` | Current unix timestamp (seconds) | ✅ |
-| `assert(cond)` | `(bool) -> void` | Panic if false | ✅ |
-| `assert_eq(a, b)` | `(any, any) -> void` | Panic if not equal | ✅ |
-| `assert_ne(a, b)` | `(any, any) -> void` | Panic if equal | 🔶 registered, no runtime |
-| `assert_str(a, b)` | `(str, str) -> void` | Panic if strings differ | ✅ |
-| `to_upper(s)` | `(str) -> str` | Uppercase | ✅ |
-| `to_lower(s)` | `(str) -> str` | Lowercase | ✅ |
-| `trim(s)` | `(str) -> str` | Strip whitespace | ✅ |
-| `replace(s, old, new)` | `(str, str, str) -> str` | Replace all | ✅ |
-| `substr(s, start, count)` | `(str, i32, i32) -> str` | Substring | ✅ |
-| `char_at(s, i)` | `(str, i32) -> char` | Char at index | ✅ |
-| `contains(s, sub)` | `(str, str) -> bool` | Contains substring | ✅ |
-| `ord(c)` | `(char) -> i32` | Char to ASCII code | ✅ |
-| `is_digit(c)` | `(char) -> bool` | Is digit | ✅ |
-| `is_alpha(c)` | `(char) -> bool` | Is letter | ✅ |
-| `is_alnum(c)` | `(char) -> bool` | Is alphanumeric | ✅ |
-| `is_whitespace(c)` | `(char) -> bool` | Is whitespace | ✅ |
-| `is_upper(c)` | `(char) -> bool` | Is uppercase | ✅ |
-| `is_lower(c)` | `(char) -> bool` | Is lowercase | ✅ |
-| `ceil(f)` | `(f64) -> f64` | Round up | 🔶 registered, no runtime |
-| `floor(f)` | `(f64) -> f64` | Round down | 🔶 registered, no runtime |
-| `round(f)` | `(f64) -> f64` | Round to nearest | 🔶 registered, no runtime |
-| `json_parse(s)` | `(str) -> dict<str, i64>` | Parse JSON object | ✅ (objects only) |
-| `json_stringify(d)` | `(dict<str, i64>) -> str` | Stringify JSON object | ✅ (objects only) |
-| `exit(code)` | `(i32) -> void` | Terminate process immediately | ❌ not implemented |
-| `eprint(s)` | `(str) -> void` | Print to stderr | ❌ not implemented |
-| `eprintln(s)` | `(str) -> void` | Print to stderr with newline | ❌ not implemented |
-| `panic(msg)` | `(str) -> void` | Runtime panic with message | ❌ not implemented |
-| `dbg(x)` | `(any) -> any` | Print expr + file:line, return value | ❌ not implemented |
-| `sizeof(T)` | `(type) -> i32` | Size of a type in bytes | ❌ not implemented |
-| `alignof(T)` | `(type) -> i32` | Alignment of a type | ❌ not implemented |
-| `offset_of(T, field)` | `(type, str) -> i32` | Offset of a field in bytes | ❌ not implemented |
+| `print(s)` | `(str) void` | Print to stdout | ✅ |
+| `println(s)` | `(str) void` | Print with newline | ✅ |
+| `print_err(s)` | `(str) void` | Print to stderr | 🔶 registered, no `kl_print_err` |
+| `len(x)` | `([T]) i32` or `(str) i32` | Length of list or string | ✅ |
+| `str(x)` | `(any) str` | Convert to string | ✅ (i64 only) |
+| `int(s)` | `(str) i32!` | Parse string to integer | 🔶 registered, no runtime impl |
+| `float(s)` | `(str) f64!` | Parse string to float | 🔶 registered, no runtime impl |
+| `bool(x)` | `(any) bool` | Convert to boolean | 🔶 registered, no runtime impl |
+| `input()` | `() str` | Read line from stdin | ✅ |
+| `input(prompt)` | `(str) str` | Print prompt, read line | ✅ |
+| `range(n)` | `(i32) [i32]` | Create range `[0, n)` | ✅ |
+| `range(start, end)` | `(i32, i32) [i32]` | Create range `[start, end)` | 🔶 partial |
+| `open(path, mode)` | `(str, i32) i32` | Open file, return fd | ✅ |
+| `close(fd)` | `(i32) void` | Close file descriptor | ✅ |
+| `read_str(fd, count)` | `(i32, i32) str` | Read bytes from fd | ✅ |
+| `write_str(fd, s)` | `(i32, str) i32` | Write string to fd | ✅ |
+| `sleep(ms)` | `(i32) void` | Sleep for ms milliseconds | ✅ |
+| `now()` | `() i32` | Current unix timestamp (seconds) | ✅ |
+| `assert(cond)` | `(bool) void` | Panic if false | ✅ |
+| `assert_eq(a, b)` | `(any, any) void` | Panic if not equal | ✅ |
+| `assert_ne(a, b)` | `(any, any) void` | Panic if equal | 🔶 registered, no runtime |
+| `assert_str(a, b)` | `(str, str) void` | Panic if strings differ | ✅ |
+| `to_upper(s)` | `(str) str` | Uppercase | ✅ |
+| `to_lower(s)` | `(str) str` | Lowercase | ✅ |
+| `trim(s)` | `(str) str` | Strip whitespace | ✅ |
+| `replace(s, old, new)` | `(str, str, str) str` | Replace all | ✅ |
+| `substr(s, start, count)` | `(str, i32, i32) str` | Substring | ✅ |
+| `char_at(s, i)` | `(str, i32) char` | Char at index | ✅ |
+| `contains(s, sub)` | `(str, str) bool` | Contains substring | ✅ |
+| `ord(c)` | `(char) i32` | Char to ASCII code | ✅ |
+| `is_digit(c)` | `(char) bool` | Is digit | ✅ |
+| `is_alpha(c)` | `(char) bool` | Is letter | ✅ |
+| `is_alnum(c)` | `(char) bool` | Is alphanumeric | ✅ |
+| `is_whitespace(c)` | `(char) bool` | Is whitespace | ✅ |
+| `is_upper(c)` | `(char) bool` | Is uppercase | ✅ |
+| `is_lower(c)` | `(char) bool` | Is lowercase | ✅ |
+| `ceil(f)` | `(f64) f64` | Round up | 🔶 registered, no runtime |
+| `floor(f)` | `(f64) f64` | Round down | 🔶 registered, no runtime |
+| `round(f)` | `(f64) f64` | Round to nearest | 🔶 registered, no runtime |
+| `json_parse(s)` | `(str) dict<str, i64>` | Parse JSON object | ✅ (objects only) |
+| `json_stringify(d)` | `(dict<str, i64>) str` | Stringify JSON object | ✅ (objects only) |
+| `exit(code)` | `(i32) void` | Terminate process immediately | ❌ not implemented |
+| `eprint(s)` | `(str) void` | Print to stderr | ❌ not implemented |
+| `eprintln(s)` | `(str) void` | Print to stderr with newline | ❌ not implemented |
+| `panic(msg)` | `(str) void` | Runtime panic with message | ❌ not implemented |
+| `dbg(x)` | `(any) any` | Print expr + file:line, return value | ❌ not implemented |
+| `sizeof(T)` | `(type) i32` | Size of a type in bytes | ❌ not implemented |
+| `alignof(T)` | `(type) i32` | Alignment of a type | ❌ not implemented |
+| `offset_of(T, field)` | `(type, str) i32` | Offset of a field in bytes | ❌ not implemented |
+
+---
+
+## 14.5 Built-in Type Methods
+
+Built-in types (`str`, `list`, `dict`) support method-call syntax via `.` notation,
+which is translated to runtime function calls by the compiler.
+
+> **Note on old-style functions:** The standalone `list_push()`, `list_pop()`
+> style functions are **deprecated**. Use method-call syntax instead.
+
+---
+
+### 14.5.1 List Methods
+
+| Method | Signature | Description | Status |
+| :--- | :--- | :--- | :--- |
+| `.add(v)` | `(T) void` | Append element to end | ✅ |
+| `.pop()` | `() T` | Remove and return last element | ✅ |
+| `.len()` | `() i64` | Number of elements | ✅ |
+| `.get(i)` | `(i64) T` | Get element at index (panics if out of bounds) | 🔶 Planned |
+| `.set(i, v)` | `(i64, T) void` | Set element at index | 🔶 Planned |
+| `.clone()` | `() [T]` | Deep copy of the list | ✅ |
+| `.insert(i, v)` | `(i64, T) void` | Insert at index, shifting elements right | 🔶 Planned |
+| `.remove(v)` | `(T) void` | Remove first occurrence of value | 🔶 Planned |
+| `.remove_at(i)` | `(i64) T` | Remove and return element at index | 🔶 Planned |
+| `.clear()` | `() void` | Remove all elements | 🔶 Planned |
+| `.contains(v)` | `(T) bool` | Check if value exists in list | 🔶 Planned |
+| `.find(v)` | `(T) i64?` | Find index of first occurrence (returns `None` if not found) | 🔶 Planned |
+| `.sort()` | `() void` | Sort in-place | 🔶 Planned |
+| `.reverse()` | `() void` | Reverse in-place | 🔶 Planned |
+| `.pop_first()` | `() T` | Remove and return first element | 🔶 Planned |
+| `.extend(other)` | `([T]) void` | Append all elements from another list | 🔶 Planned |
+
+Examples:
+```kyle
+items := [1, 2, 3]
+items.add(4)                 # [1, 2, 3, 4]
+assert(items.len() == 4)
+last = items.pop()           # 4; items is [1, 2, 3]
+copied = items.clone()       # deep copy
+```
+
+---
+
+### 14.5.2 Dict Methods
+
+| Method | Signature | Description | Status |
+| :--- | :--- | :--- | :--- |
+| `.len()` | `() i64` | Number of key-value entries | ✅ |
+| `.clone()` | `() {K:V}` | Deep copy of the dict | ✅ |
+| `.get(k)` | `(str) V?` | Look up key (returns `None` if missing) | 🔶 Planned |
+| `.set(k, v)` | `(str, V) void` | Set key-value pair | 🔶 Planned |
+| `.contains(k)` | `(str) bool` | Check if key exists | 🔶 Planned |
+| `.keys()` | `() [str]` | Return list of all keys | 🔶 Planned |
+| `.values()` | `() [V]` | Return list of all values | 🔶 Planned |
+| `.clear()` | `() void` | Remove all entries | 🔶 Planned |
+
+Examples:
+```kyle
+ages = {"alice": 30, "bob": 25}
+assert(ages.len() == 2)
+copied = ages.clone()        # deep copy
+```
+
+---
+
+### 14.5.3 String Methods
+
+| Method | Signature | Description | Status |
+| :--- | :--- | :--- | :--- |
+| `.len()` | `() i32` | Number of characters (bytes) | ✅ |
+| `.upper()` | `() str` | Uppercase copy | ✅ |
+| `.lower()` | `() str` | Lowercase copy | ✅ |
+| `.trim()` | `() str` | Strip leading/trailing whitespace | ✅ |
+| `.contains(s)` | `(str) bool` | Check if substring exists | ✅ |
+| `.replace(a, b)` | `(str, str) str` | Replace all occurrences of `a` with `b` | ✅ |
+| `.char_at(i)` | `(i32) char` | Character at index | 🔶 Planned |
+| `.is_digit()` | `() bool` | Check if string is all digits | 🔶 Planned |
+| `.is_alpha()` | `() bool` | Check if string is all letters | 🔶 Planned |
+| `.is_alnum()` | `() bool` | Check if string is alphanumeric | 🔶 Planned |
+| `.clone()` | `() str` | Deep copy of the string | ✅ |
+
+Examples:
+```kyle
+s := "  Hello, World!  "
+assert(s.len() == 17)
+assert(s.upper() == "  HELLO, WORLD!  ")
+assert(s.trim() == "Hello, World!")
+assert(s.contains("World"))
+assert(s.replace("World", "Kyle") == "  Hello, Kyle!  ")
+
+name := "Kyle"
+assert(name.clone() == name)
+```
 
 ---
 
@@ -1593,7 +1739,7 @@ import_decl        = "import" identifier { "." identifier }
                    | "import" "~" identifier ;
 
 function_decl      = [ "export" ] "fn" identifier [ "<" type_params ">" ]
-                     "(" [ parameters ] ")" [ "->" type ] ":" block ;
+                      "(" [ parameters ] ")" [ type ] ":" block ;
 
 class_decl         = [ "abstract" ] [ "final" ] "class" identifier [ "<" type_params ">" ]
                      [ "(" parameters ")" ] [ ":" identifier [ "implements" identifier ] ] ":" block ;
@@ -1678,7 +1824,7 @@ primitive_type     = "i8" | "i16" | "i32" | "i64"
 
 optional_type      = type "?" ;
 error_type         = type "!" ;
-function_type      = "(" [ type { "," type } ] ")" "->" type ;
+function_type      = "(" [ type { "," type } ] ")" type ;
 pointer_type       = "ptr" ;
 dict_type          = "{" type ":" type "}" ;
 
@@ -1806,7 +1952,7 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 ## 17.8 Built-ins
 
 - [x] `print` / `println`
-- [x] `print_int` / `println_int`
+
 - [ ] `print_err` — ❌ not tested
 - [x] `len` (str, list, dict)
 - [x] `str()` conversion
@@ -1914,4 +2060,4 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 
 ---
 
-*Version: v0.3.0 · Last updated: 2026-06-28*
+*Version: v0.4.0 · Last updated: 2026-06-29*

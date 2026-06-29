@@ -90,12 +90,12 @@ Generics are **monomorphized** — the compiler generates one specialized copy
 of the function or struct for each type combination used at a call site.
 
 ```kl
-fn identity<T>(x: T) -> T:
+fn identity<T>(x: T) T:
     return x
 
 # Compiler generates:
-#   identity_i32(x: i32) -> i32
-#   identity_str(x: str) -> str
+#   identity_i32(x: i32) i32
+#   identity_str(x: str) str
 ```
 
 **Trade-off:** monomorphization produces faster code (everything is concrete)
@@ -140,12 +140,12 @@ values.
 
 ### 2.1 The `T!` Return Type
 
-A function with `-> T!` returns either `T` (success) or an error. Internally
+A function with `T!` returns either `T` (success) or an error. Internally
 this is represented as `Option<T>` in the runtime, where `Some(v)` is success
 and `None` is the error.
 
 ```kl
-fn parse(s: str) -> i32!:
+fn parse(s: str) i32!:
     if s == "":
         return error("empty string")
     n = int(s)?
@@ -164,7 +164,7 @@ If the value is `None`/error, the current function returns immediately with
 that value.
 
 ```kl
-fn read_int(path: str) -> i32!:
+fn read_int(path: str) i32!:
     fd = open(path, 0)?           # propagate error if open fails
     line = read_str(fd, 4096)?    # propagate error if read fails
     close(fd)
@@ -226,7 +226,7 @@ Kyle's error model does not include:
 
 Kyle is moving from a **reference-counted** model to **move semantics by
 default** (Phase 6). This section documents the *target* memory model. The
-current implementation still uses refcounting for heap values; the transition
+current implementation uses move semantics; the transition
 is underway.
 
 ### 3.1 Core Principle: Move by Default, Copy on Intent
@@ -293,7 +293,7 @@ final class Point:
     x: i32
     y: i32
 
-fn distance(a: Point, b: Point) -> f64:
+fn distance(a: Point, b: Point) f64:
     # `a` and `b` are pointers in the LLVM IR
     dx = a.x - b.x
     dy = a.y - b.y
@@ -371,8 +371,7 @@ able to call C libraries directly from Kyle (Phase 9).
 |---|---|
 | `void kl_print(const u8* s, i32 len)` | `print(s)` |
 | `void kl_println(const u8* s, i32 len)` | `println(s)` |
-| `void kl_print_int(i64 v)` | `print_int(v)` |
-| `void kl_println_int(i64 v)` | `println_int(v)` |
+
 | `u8* kl_i64_to_str(i64 v)` | `str(v)` |
 | `i64 kl_str_to_i64(const u8* s)` | `int(s)` (planned) |
 | `i32 kl_strlen(const u8* s)` | `len(s)` for strings |
@@ -424,9 +423,9 @@ able to call C libraries directly from Kyle (Phase 9).
 
 ```kl
 extern "C":
-    fn PQconnectdb(conninfo: str) -> *PGconn
-    fn PQexec(conn: *PGconn, query: str) -> *PGresult
-    fn PQresultStatus(res: *PGresult) -> i32
+    fn PQconnectdb(conninfo: str) *PGconn
+    fn PQexec(conn: *PGconn, query: str) *PGresult
+    fn PQresultStatus(res: *PGresult) i32
 ```
 
 FFI declarations are parsed but not yet lowered to function calls. The

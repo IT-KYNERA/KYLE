@@ -378,6 +378,27 @@ pub extern "C" fn kl_substr(s: *const u8, start: i64, count: i64) -> *const u8 {
     buf as *const u8
 }
 
+/// Clone a heap-allocated string.
+/// Returns a new heap-allocated copy; caller must free with kl_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_clone_str(s: *const u8) -> *const u8 {
+    if s.is_null() {
+        return std::ptr::null();
+    }
+    let len = kl_strlen(s);
+    let buf = crate::kl_alloc((len + 1) as i64);
+    if buf.is_null() {
+        return std::ptr::null();
+    }
+    unsafe {
+        for i in 0..len as usize {
+            *buf.add(i) = *s.add(i);
+        }
+        *buf.add(len as usize) = 0;
+    }
+    buf as *const u8
+}
+
 /// Compare two C strings for equality.
 #[unsafe(no_mangle)]
 pub extern "C" fn kl_eq_str(a: *const u8, b: *const u8) -> i32 {

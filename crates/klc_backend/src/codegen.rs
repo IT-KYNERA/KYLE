@@ -107,18 +107,6 @@ impl<'ctx> Codegen<'ctx> {
         let f64_ty = self.context.f64_type();
         let ptr_ty = self.context.ptr_type(Default::default());
 
-        // void kl_print_int(i64)
-        {
-            let params = [i64_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
-            self.module.add_function("kl_print_int", ft, None);
-        }
-        // void kl_println_int(i64)
-        {
-            let params = [i64_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
-            self.module.add_function("kl_println_int", ft, None);
-        }
         // void kl_print(ptr, i32)
         {
             let params = [ptr_ty.into(), i32_ty.into()];
@@ -142,12 +130,6 @@ impl<'ctx> Codegen<'ctx> {
             let params = [ptr_ty.into()];
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_free", ft, None);
-        }
-        // void kl_release(ptr)
-        {
-            let params = [ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
-            self.module.add_function("kl_release", ft, None);
         }
         // ptr kl_i64_to_str(i64)
         {
@@ -303,6 +285,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("kl_list_len", ft, None);
         }
+        // i64 kl_list_sum(ptr), kl_list_product(ptr), kl_list_max(ptr), kl_list_min(ptr)
+        for name in &["kl_list_sum", "kl_list_product", "kl_list_max", "kl_list_min"] {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function(name, ft, None);
+        }
+        // void kl_list_reverse(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_list_reverse", ft, None);
+        }
         // ptr kl_list_slice(ptr, i64, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
@@ -373,17 +367,22 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_init_args", ft, None);
         }
-        // i64 kl_spawn_thread(ptr, i64)  — spawn a thread running extern "C" fn(i64) -> i64
+        // i64 kl_spawn_task(ptr, i64)  — spawn async task running extern "C" fn(i64) -> i64
         {
             let params = [ptr_ty.into(), i64_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_spawn_thread", ft, None);
+            self.module.add_function("kl_spawn_task", ft, None);
         }
-        // i64 kl_join_thread(i64)  — join a thread, return result
+        // i64 kl_await_task(i64)  — await task completion, return result
         {
             let params = [i64_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_join_thread", ft, None);
+            self.module.add_function("kl_await_task", ft, None);
+        }
+        // void kl_yield()  — cooperative yield hint
+        {
+            let ft = void_ty.fn_type(&[], false);
+            self.module.add_function("kl_yield", ft, None);
         }
         // ptr kl_dict_new()
         {
@@ -437,6 +436,24 @@ impl<'ctx> Codegen<'ctx> {
             let params = [ptr_ty.into()];
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_json_stringify", ft, None);
+        }
+        // ptr kl_clone_str(ptr) — deep-copy a heap-allocated string
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_clone_str", ft, None);
+        }
+        // ptr kl_clone_list(ptr) — shallow-copy a list
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_clone_list", ft, None);
+        }
+        // ptr kl_clone_dict(ptr) — shallow-copy a dict
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("kl_clone_dict", ft, None);
         }
     }
 
@@ -855,8 +872,8 @@ impl<'ctx> Codegen<'ctx> {
                         }
                         MirInst::Call { dest, name, args } => {
                             let runtime_name = match name.as_str() {
-                                "print" => "kl_print_int",
-                                "println" => "kl_println_int",
+                                "print" => "kl_print",
+                                "println" => "kl_println",
                                 "contains" => "kl_str_contains",
                                 "to_upper" => "kl_str_to_upper",
                                 "to_lower" => "kl_str_to_lower",
@@ -1054,6 +1071,18 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("ptrtoint: {}", e))?
                                         .as_basic_value_enum()
                                 }
+                                (BasicValueEnum::IntValue(int_val), BasicTypeEnum::FloatType(f)) => {
+                                    // Integer → Float: sitofp
+                                    self.builder.build_signed_int_to_float(*int_val, *f, "_sitofp")
+                                        .map_err(|e| format!("sitofp: {}", e))?
+                                        .as_basic_value_enum()
+                                }
+                                (BasicValueEnum::FloatValue(float_val), BasicTypeEnum::IntType(i)) => {
+                                    // Float → Integer: fptosi
+                                    self.builder.build_float_to_signed_int(*float_val, *i, "_fptosi")
+                                        .map_err(|e| format!("fptosi: {}", e))?
+                                        .as_basic_value_enum()
+                                }
                                 _ => self.context.i32_type().const_zero().as_basic_value_enum(),
                             };
                             if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
@@ -1102,8 +1131,8 @@ impl<'ctx> Codegen<'ctx> {
                         }
                         MirInst::AsyncSpawn { dest, function_name, arg } => {
                             let arg_val = self.value_to_llvm(arg, &last_value_map)?;
-                            let spawn_fn = self.module.get_function("kl_spawn_thread")
-                                .ok_or_else(|| "kl_spawn_thread not declared".to_string())?;
+                            let spawn_fn = self.module.get_function("kl_spawn_task")
+                                .ok_or_else(|| "kl_spawn_task not declared".to_string())?;
                             // Get the function pointer of the async wrapper
                             let fn_val = self.fn_value_map.get(function_name)
                                 .ok_or_else(|| format!("async function {} not found", function_name))?;
@@ -1125,8 +1154,8 @@ impl<'ctx> Codegen<'ctx> {
                         }
                         MirInst::AsyncAwait { dest, handle } => {
                             let handle_val = self.load_value(*handle, &last_value_map)?;
-                            let join_fn = self.module.get_function("kl_join_thread")
-                                .ok_or_else(|| "kl_join_thread not declared".to_string())?;
+                            let join_fn = self.module.get_function("kl_await_task")
+                                .ok_or_else(|| "kl_await_task not declared".to_string())?;
                             let args_meta: Vec<inkwell::values::BasicMetadataValueEnum> = vec![handle_val.into()];
                             let call_result = self.builder.build_call(join_fn, &args_meta, "_async_join")
                                 .map_err(|e| format!("async_join: {}", e))?;

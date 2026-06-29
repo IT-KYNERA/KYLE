@@ -15,7 +15,16 @@ impl Optimizer {
         self.const_eval(module);
         for func in &mut module.functions {
             self.constant_fold(func);
-            self.dead_code_elim(func);
+            // Compute move_locals: locals with Move-type allocas
+            let move_locals: HashSet<usize> = func.basic_blocks.iter()
+                .flat_map(|b| b.insts.iter())
+                .filter_map(|inst| {
+                    if let MirInst::Alloca { dest, type_, .. } = inst {
+                        if crate::mir::is_move_type(type_) { Some(*dest) } else { None }
+                    } else { None }
+                })
+                .collect();
+            self.dead_code_elim(func, &move_locals);
             self.remove_unreachable_blocks(func);
         }
     }
@@ -325,7 +334,7 @@ impl Optimizer {
     }
 
     /// Dead code elimination: remove stores whose value is never loaded.
-    fn dead_code_elim(&self, func: &mut MirFunction) {
+    fn dead_code_elim(&self, func: &mut MirFunction, move_locals: &HashSet<usize>) {
         // Simple DCE: find locals that are stored but never used
         let mut stored = HashSet::new();
         let mut used = HashSet::new();
@@ -406,6 +415,12 @@ impl Optimizer {
         for bb in &mut func.basic_blocks {
             bb.insts.retain(|inst| {
                 match inst {
+                    MirInst::Store { dest, value: MirValue::Local(src) } => {
+                        // Keep store if dest is used OR if transferring ownership of a Move type.
+                        // Otherwise DCE could remove the store, preventing ownership transfer
+                        // and causing double-free when both src and dest are freed.
+                        used.contains(dest) || move_locals.contains(src)
+                    }
                     MirInst::Store { dest, .. } => used.contains(dest),
                     MirInst::Alloca { dest, .. } => used.contains(dest) || stored.contains(dest),
                     _ => true,
@@ -581,7 +596,8 @@ mod tests {
         func.basic_blocks.push(MirBasicBlock::new("done"));
 
         let opt = Optimizer::new();
-        opt.dead_code_elim(&mut func);
+        let empty: HashSet<usize> = HashSet::new();
+        opt.dead_code_elim(&mut func, &empty);
 
         // Entry block should keep cond store but drop dead store
         let kept_stores: Vec<_> = func.basic_blocks[0].insts.iter()

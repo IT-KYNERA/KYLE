@@ -72,6 +72,8 @@ pub enum TokenKind {
     Import,     // import
     From,       // from
     As,         // as
+    Is,         // is (type test)
+    Super,      // super (parent class reference)
     Get,        // get
     Set,        // set
     Implements, // implements

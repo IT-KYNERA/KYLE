@@ -39,8 +39,8 @@ These are the four north-stars. Every design decision is checked against them.
 ## Design Principles
 
 1. **No garbage collector, no manual `free()`.** Memory is reclaimed at scope
-   exit (RAII) using compiler-inferred ownership, with runtime refcounting as
-   the safety net. The developer never writes `malloc` or `delete` and never
+   exit using move semantics by default, with explicit Rc/Arc from the stdlib
+   for shared ownership. The developer never writes `malloc` or `delete` and never
    sees a GC pause.
 
 2. **No exceptions, no null.** Errors are values (`T!` return type) propagated
@@ -94,7 +94,7 @@ These are the four north-stars. Every design decision is checked against them.
 | `pass` | Empty bodies are just empty indentation |
 | `interface` / `trait` | `class X implements Y` for the same purpose |
 | `impl` block | Methods live inside the class/struct |
-| Garbage collector | RAII + refcounting, fully deterministic |
+| Garbage collector | Move semantics + explicit Rc/Arc, fully deterministic |
 | `void` as a value | `void` is a return type, not a value |
 | Header files | One source file per module, period |
 
@@ -124,7 +124,7 @@ These are the four north-stars. Every design decision is checked against them.
 import io
 
 contract Greeter:
-    fn greet(name: str) -> str
+    fn greet(name: str) str
 
 class Person: Greeter
     name: str
@@ -132,10 +132,10 @@ class Person: Greeter
     Person(name: str):
         this.name = name
 
-    fn greet(name: str) -> str:
+    fn greet(name: str) str:
         return "Hello, " + name + "! I'm " + this.name + "."
 
-fn main(args: [str]) -> i32:
+fn main(args: [str]) i32:
     p = Person("Kyle")
     io.println(p.greet("World"))
     return 0

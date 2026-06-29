@@ -1,8 +1,8 @@
-fn timestamp() -> i64:
+fn timestamp() i64:
     now()
 
 fn sleep_ms(ms: i32):
     sleep(ms)
 
-fn seconds_since(start: i64) -> i64:
+fn seconds_since(start: i64) i64:
     (now() - start) / 1000

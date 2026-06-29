@@ -119,6 +119,15 @@ impl Formatter {
                 self.write_type(out, value);
                 out.push('>');
             }
+            AstType::FnPtr { params, return_, .. } => {
+                out.push('(');
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 { out.push_str(", "); }
+                    self.write_type(out, p);
+                }
+                out.push_str(") ");
+                self.write_type(out, return_);
+            }
         }
     }
 
@@ -170,7 +179,11 @@ impl Formatter {
         } else {
             write!(out, "from {} ", fi.module_name).unwrap();
         }
-        writeln!(out, "import {}", fi.imported_name).unwrap();
+        write!(out, "import {}", fi.imported_name).unwrap();
+        if let Some(alias) = &fi.alias {
+            write!(out, " as {}", alias).unwrap();
+        }
+        out.push('\n');
     }
 
     fn write_variable(&mut self, out: &mut String, v: &VariableDecl, depth: usize) {
@@ -233,7 +246,7 @@ impl Formatter {
         self.write_params(out, &f.params);
         out.push(')');
         if let Some(rt) = &f.return_type {
-            write!(out, " -> ").unwrap();
+            write!(out, " ").unwrap();
             self.write_type(out, rt);
         }
         out.push_str(":\n");
@@ -335,7 +348,7 @@ impl Formatter {
             self.write_params(out, &method.params);
             out.push(')');
             if let Some(rt) = &method.return_type {
-                write!(out, " -> ").unwrap();
+                write!(out, " ").unwrap();
                 self.write_type(out, rt);
             }
             out.push('\n');
@@ -418,11 +431,11 @@ impl Formatter {
                     self.write_block(out, el, depth + 1);
                 }
             }
-            Stmt::Break(_) => {
+            Stmt::Break(_, _) => {
                 self.indent(out, depth);
                 out.push_str("break\n");
             }
-            Stmt::Continue => {
+            Stmt::Continue(_) => {
                 self.indent(out, depth);
                 out.push_str("continue\n");
             }
@@ -492,6 +505,12 @@ impl Formatter {
             Pattern::IsType { type_, .. } => {
                 write!(out, "is ").unwrap();
                 self.write_type(out, type_);
+            }
+            Pattern::Or { patterns, .. } => {
+                for (i, p) in patterns.iter().enumerate() {
+                    if i > 0 { out.push_str(" | "); }
+                    self.write_pattern(out, p);
+                }
             }
         }
     }
@@ -718,6 +737,7 @@ impl Formatter {
             BinaryOp::Shl => "<<",
             BinaryOp::Shr => ">>",
             BinaryOp::Is => "is",
+            BinaryOp::As => "as",
             BinaryOp::Assign => "=",
             BinaryOp::AddAssign => "+=",
             BinaryOp::SubAssign => "-=",
@@ -764,8 +784,8 @@ fn stmt_span(stmt: &Stmt) -> klc_core::span::Span {
         Stmt::Unsafe(s) => s.span,
         Stmt::Defer(s) => s.span,
         Stmt::BindingIf(s) => s.span,
-        Stmt::Break(_) => klc_core::span::Span::dummy(),
-        Stmt::Continue => klc_core::span::Span::dummy(),
+        Stmt::Break(_, _) => klc_core::span::Span::dummy(),
+        Stmt::Continue(_) => klc_core::span::Span::dummy(),
         Stmt::WhileBind(s) => s.span,
         Stmt::Constant(c) => c.span,
     }

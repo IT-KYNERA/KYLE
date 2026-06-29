@@ -9,6 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Linux ARM)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+
+      - name: Build kl (release)
+        run: cargo build --bin kl --release
+
+      - name: Package tarball
+        run: |
+          mkdir -p dist/kl/lib
+          cp target/release/kl dist/kl/
+          chmod +x dist/kl/kl
+          cd dist
+          tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl/
+
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+
   build-macos-arm64:
     runs-on: macos-latest
     steps:

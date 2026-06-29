@@ -11,6 +11,7 @@ pub struct TypeChecker {
     symbols: SymbolTable,
     pub fn_return_types: HashMap<String, Type>,
     fn_const_flags: HashMap<String, bool>,
+    current_fn: Option<String>,
 }
 
 impl Default for TypeChecker {
@@ -26,6 +27,7 @@ impl TypeChecker {
             symbols: SymbolTable::new(),
             fn_return_types: HashMap::new(),
             fn_const_flags: HashMap::new(),
+            current_fn: None,
         }
     }
 
@@ -50,7 +52,7 @@ impl TypeChecker {
     fn builtin_expected_args(name: &str) -> Option<usize> {
         match name {
             "print" | "println" | "print_err" => Some(1),
-            "print_int" | "println_int" => Some(1),
+
             "str" | "int" | "float" | "bool" => Some(1),
             "len" => Some(1),
             "input" => Some(0),
@@ -110,17 +112,32 @@ impl TypeChecker {
                 Decl::Variable(v) => { self.check_variable(v); }
                 Decl::Constant(c) => {
                     let ty = self.infer_expr(&c.value);
+                    self.check_const_expr(&c.value, &c.name);
                     let _ = self.symbols.insert(c.name.clone(), Symbol::new(c.name.clone(), SymKind::Constant(ty)));
                 }
+                Decl::Class(c) => { self.check_class(c); }
+                Decl::AbstractClass(c) => { self.check_abstract_class(c); }
                 _ => {}
             }
         }
     }
 
     fn check_function(&mut self, f: &FunctionDecl) {
+        self.current_fn = Some(f.name.clone());
         self.symbols.push_scope();
         for param in &f.params {
             let ty = self.resolve_ast_type(&param.type_);
+            // Type-check default expression against declared parameter type
+            if let Some(default) = &param.default {
+                let default_ty = self.infer_expr(default);
+                if !self.types_match(&default_ty, &ty) {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001,
+                            format!("default value type '{}' does not match parameter '{}' type '{}'",
+                                default_ty, param.name, ty))
+                    );
+                }
+            }
             let _ = self.symbols.insert(param.name.clone(),
                 Symbol::new_var(param.name.clone(), Some(ty), false));
         }
@@ -129,6 +146,61 @@ impl TypeChecker {
                 self.check_const_block(body, &f.name);
             } else {
                 self.check_block(body);
+            }
+        }
+        self.symbols.pop_scope();
+        self.current_fn = None;
+    }
+
+    fn check_class(&mut self, c: &ClassDecl) {
+        self.symbols.push_scope();
+        let _ = self.symbols.insert("this".to_string(),
+            Symbol::new_var("this".to_string(), Some(Type::Named(c.name.clone())), false));
+        for member in &c.members {
+            if let ClassMember::Method(f) = member {
+                self.check_function(f);
+            }
+        }
+        // If this class has a parent, enforce that all abstract methods are implemented
+        if let Some(parent_name) = &c.parent {
+            if let Some(parent_sym) = self.symbols.lookup(parent_name) {
+                if let SymKind::Class(parent_class) = &parent_sym.kind {
+                    let abstract_methods: Vec<&FunctionDecl> = parent_class.members.iter()
+                        .filter_map(|m| {
+                            if let ClassMember::Method(f) = m {
+                                if f.is_abstract { Some(f) } else { None }
+                            } else { None }
+                        })
+                        .collect();
+                    for abstract_fn in &abstract_methods {
+                        let implemented = c.members.iter().any(|m| {
+                            if let ClassMember::Method(f) = m {
+                                f.name == abstract_fn.name
+                            } else { false }
+                        });
+                        if !implemented {
+                            self.reporter.report(
+                                Diagnostic::error(ErrorCode::E0001,
+                                    format!("class '{}' must implement abstract method '{}' from parent '{}'",
+                                        c.name, abstract_fn.name, parent_name))
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        self.symbols.pop_scope();
+    }
+
+    fn check_abstract_class(&mut self, c: &AbstractClassDecl) {
+        self.symbols.push_scope();
+        let _ = self.symbols.insert("this".to_string(),
+            Symbol::new_var("this".to_string(), Some(Type::Named(c.name.clone())), false));
+        for member in &c.members {
+            if let ClassMember::Method(f) = member {
+                if !f.is_abstract {
+                    self.check_function(f);
+                }
             }
         }
         self.symbols.pop_scope();
@@ -170,16 +242,15 @@ impl TypeChecker {
         }
     }
 
-    fn check_const_expr(&mut self, expr: &Expr, fn_name: &str) {
+    fn check_const_expr(&mut self, expr: &Expr, context: &str) {
         match expr {
             Expr::Literal { .. } | Expr::Identifier { .. } => {}
             Expr::Binary { left, right, .. } => {
-                self.check_const_expr(left, fn_name);
-                self.check_const_expr(right, fn_name);
+                self.check_const_expr(left, context);
+                self.check_const_expr(right, context);
             }
-            Expr::Unary { operand, .. } => self.check_const_expr(operand, fn_name),
+            Expr::Unary { operand, .. } => self.check_const_expr(operand, context),
             Expr::FunctionCall { target, arguments, .. } => {
-                // Allow calls to other const fns and pure builtins
                 let is_const_call = if let Expr::Identifier { name, .. } = target.as_ref() {
                     let pure_builtins = ["len", "str"];
                     pure_builtins.contains(&name.as_str())
@@ -189,29 +260,28 @@ impl TypeChecker {
                 };
                 if !is_const_call {
                     self.reporter.report(
-                        Diagnostic::error(ErrorCode::E0001, format!("const fn '{}' cannot call runtime function", fn_name))
+                        Diagnostic::error(ErrorCode::E0001, format!("constant expression in '{}' cannot call runtime function", context))
                     );
                 }
                 for arg in arguments {
-                    self.check_const_expr(arg, fn_name);
+                    self.check_const_expr(arg, context);
                 }
             }
             Expr::Ternary { cond, then_expr, else_expr, .. } => {
-                self.check_const_expr(cond, fn_name);
-                self.check_const_expr(then_expr, fn_name);
-                self.check_const_expr(else_expr, fn_name);
+                self.check_const_expr(cond, context);
+                self.check_const_expr(then_expr, context);
+                self.check_const_expr(else_expr, context);
             }
             Expr::Assignment { target, value, .. } => {
-                self.check_const_expr(target, fn_name);
-                self.check_const_expr(value, fn_name);
+                self.check_const_expr(target, context);
+                self.check_const_expr(value, context);
             }
             Expr::List { elements, .. } => {
-                for e in elements { self.check_const_expr(e, fn_name); }
+                for e in elements { self.check_const_expr(e, context); }
             }
-            // Disallow all other expressions in const fn
             _ => {
                 self.reporter.report(
-                    Diagnostic::error(ErrorCode::E0001, format!("const fn '{}' contains unsupported expression", fn_name))
+                    Diagnostic::error(ErrorCode::E0001, format!("unsupported expression in constant '{}'", context))
                 );
             }
         }
@@ -274,6 +344,23 @@ impl TypeChecker {
                     self.bind_pattern(arg, match_type);
                 }
             }
+            Pattern::Tuple { elements, .. } => {
+                if let Some(Type::Tuple(types)) = match_type {
+                    for (i, elem) in elements.iter().enumerate() {
+                        let elem_type = types.get(i).cloned();
+                        self.bind_pattern(elem, elem_type.as_ref());
+                    }
+                } else {
+                    for elem in elements {
+                        self.bind_pattern(elem, match_type);
+                    }
+                }
+            }
+            Pattern::Or { patterns, .. } => {
+                for p in patterns {
+                    self.bind_pattern(p, match_type);
+                }
+            }
             _ => {}
         }
     }
@@ -282,11 +369,29 @@ impl TypeChecker {
         match stmt {
             Stmt::Variable(v) => { self.check_variable(v); }
             Stmt::TypedVariable(v) => { self.check_variable(v); }
-            Stmt::Constant(_) => {}
+            Stmt::Constant(c) => {
+                self.infer_expr(&c.value);
+                self.check_const_expr(&c.value, &c.name);
+            }
             Stmt::Expression(e) => { self.infer_expr(e); }
-            Stmt::Return(e) => { if let Some(e) = e { self.infer_expr(e); } }
-            Stmt::Break(e) => { if let Some(e) = e { self.infer_expr(e); } }
-            Stmt::Continue => {}
+            Stmt::Return(e) => {
+                if let Some(e) = e {
+                    let expr_type = self.infer_expr(e);
+                    if let Some(ref fn_name) = self.current_fn {
+                        if let Some(expected) = self.fn_return_types.get(fn_name) {
+                            if &expr_type != expected && *expected != Type::Void {
+                                self.reporter.report(
+                                    Diagnostic::error(ErrorCode::E0001,
+                                        format!("expected return type '{}', found '{}'",
+                                            expected, expr_type))
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            Stmt::Break(e, _) => { if let Some(e) = e { self.infer_expr(e); } }
+            Stmt::Continue(_) => {}
             Stmt::If(s) => {
                 self.infer_expr(&s.condition);
                 self.check_block(&s.body);
@@ -294,8 +399,12 @@ impl TypeChecker {
                 if let Some(el) = &s.else_branch { self.check_block(el); }
             }
             Stmt::BindingIf(b) => {
-                self.infer_expr(&b.value);
+                let val_type = self.infer_expr(&b.value);
+                self.symbols.push_scope();
+                let _ = self.symbols.insert(b.name.clone(),
+                    Symbol::new_var(b.name.clone(), Some(val_type), false));
                 self.check_block(&b.body);
+                self.symbols.pop_scope();
                 if let Some(el) = &b.else_branch { self.check_block(el); }
             }
             Stmt::While(w) => {
@@ -304,8 +413,17 @@ impl TypeChecker {
                 if let Some(el) = &w.else_branch { self.check_block(el); }
             }
             Stmt::WhileBind(w) => {
-                self.infer_expr(&w.iterable);
+                let iter_type = self.infer_expr(&w.iterable);
+                self.symbols.push_scope();
+                let var_type = match &iter_type {
+                    Type::List(inner) => inner.as_ref().clone(),
+                    Type::Option(inner) => inner.as_ref().clone(),
+                    _ => iter_type.clone(),
+                };
+                let _ = self.symbols.insert(w.name.clone(),
+                    Symbol::new_var(w.name.clone(), Some(var_type), false));
                 self.check_block(&w.body);
+                self.symbols.pop_scope();
             }
             Stmt::For(f) => {
                 let iter_type = self.infer_expr(&f.iterable);
@@ -384,8 +502,16 @@ impl TypeChecker {
                     Type::I32
                 }
             }
-            Expr::Binary { left, right, operator, .. } => {
+            Expr::Binary { left, right, operator, span } => {
                 let lt = self.infer_expr(left);
+                if matches!(operator, BinaryOp::As) {
+                    if let Expr::Identifier { name, .. } = right.as_ref() {
+                        let type_ast = AstType::User { name: name.clone(), span: *span };
+                        return self.resolve_ast_type(&type_ast);
+                    } else {
+                        return Type::I32;
+                    }
+                }
                 let rt = self.infer_expr(right);
                 match operator {
                     BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem
@@ -400,6 +526,9 @@ impl TypeChecker {
                     BinaryOp::Eq | BinaryOp::Neq | BinaryOp::Lt | BinaryOp::Gt
                     | BinaryOp::Le | BinaryOp::Ge
                     | BinaryOp::And | BinaryOp::Or | BinaryOp::Is => Type::Bool,
+                    BinaryOp::As => {
+                        unreachable!("As is handled before infer_expr(right)")
+                    }
                     BinaryOp::Assign | BinaryOp::AddAssign | BinaryOp::SubAssign
                     | BinaryOp::MulAssign | BinaryOp::DivAssign | BinaryOp::RemAssign
                     | BinaryOp::BitAndAssign | BinaryOp::BitOrAssign | BinaryOp::BitXorAssign
@@ -439,19 +568,47 @@ impl TypeChecker {
                 let fn_type = self.infer_expr(target);
                 for arg in arguments { self.infer_expr(arg); }
                 let arg_count = arguments.len();
-                match fn_type {
-                    Type::Function(ft) => {
-                        // For user-defined functions, check arg count against params
-                        // Builtins have empty params, so use hardcoded expected count
-                        if !ft.params.is_empty() {
-                            if arg_count != ft.params.len() {
-                                let name = Self::target_name(target).unwrap_or("function");
-                                self.reporter.report(
-                                    Diagnostic::error(ErrorCode::E0001,
-                                        format!("'{}' expects {} argument(s), got {}", name, ft.params.len(), arg_count))
-                                );
-                            }
-                        } else {
+                    match fn_type {
+                        Type::Function(ft) => {
+                            // For user-defined functions, check arg count against params
+                            // Builtins have empty params, so use hardcoded expected count
+                            if !ft.params.is_empty() {
+                                let has_variadic = Self::target_name(target)
+                                    .and_then(|name| self.symbols.lookup(name))
+                                    .and_then(|sym| {
+                                        if let SymKind::Function(f) = &sym.kind {
+                                            Some(f.params.last().map(|p| p.variadic).unwrap_or(false))
+                                        } else { None }
+                                    })
+                                    .unwrap_or(false);
+                                let required_count = Self::target_name(target)
+                                    .and_then(|name| self.symbols.lookup(name))
+                                    .and_then(|sym| {
+                                        if let SymKind::Function(f) = &sym.kind {
+                                            Some(f.params.iter()
+                                                .filter(|p| p.default.is_none() && !p.variadic)
+                                                .count())
+                                        } else { None }
+                                    })
+                                    .unwrap_or(ft.params.len());
+                                let max_count = if has_variadic { usize::MAX } else { ft.params.len() };
+                                if arg_count < required_count || arg_count > max_count {
+                                    let name = Self::target_name(target).unwrap_or("function");
+                                    if has_variadic {
+                                        self.reporter.report(
+                                            Diagnostic::error(ErrorCode::E0001,
+                                                format!("'{}' expects at least {} argument(s), got {}",
+                                                    name, required_count, arg_count))
+                                        );
+                                    } else {
+                                        self.reporter.report(
+                                            Diagnostic::error(ErrorCode::E0001,
+                                                format!("'{}' expects {}-{} argument(s), got {}",
+                                                    name, required_count, ft.params.len(), arg_count))
+                                        );
+                                    }
+                                }
+                            } else {
                             // Builtin — check with hardcoded expected counts
                             if let Some(name) = Self::target_name(target) {
                                 if let Some(exp) = Self::builtin_expected_args(name) {
@@ -481,7 +638,7 @@ impl TypeChecker {
                         // Override return type for builtins
                         if let Some(name) = Self::target_name(target) {
                             match name {
-                                "print" | "println" | "print_err" | "print_int" | "println_int"
+                                "print" | "println" | "print_err"
                                 | "sleep" | "assert" | "assert_eq" | "assert_str" => Type::Void,
                                 "len" => Type::I32,
                                 "str" => Type::Str,
@@ -590,19 +747,13 @@ impl TypeChecker {
                     params: param_types, return_: Box::new(ret), fallible: false,
                 })
             }
-            Expr::Await { expression, .. } => {
-                let inner = self.infer_expr(expression);
-                match inner {
-                    Type::Function(ft) => *ft.return_,
-                    _ => inner,
-                }
+            Expr::Await { expression: _, .. } => {
+                // Await on an async task handle returns i64 (the widened result)
+                Type::I64
             }
-            Expr::Async { expression, .. } => {
-                let ret = self.infer_expr(expression);
-                Type::Function(FunctionType {
-                    is_async: true, is_const: false,
-                    params: vec![], return_: Box::new(ret), fallible: false,
-                })
+            Expr::Async { .. } => {
+                // async expr returns a task handle (i64), not a function
+                Type::I64
             }
             Expr::Spread { expression, .. } => self.infer_expr(expression),
             Expr::Index { target, index, .. } => {
@@ -751,6 +902,15 @@ impl TypeChecker {
             AstType::Optional { inner, .. } => Type::Option(Box::new(self.resolve_ast_type(inner))),
             AstType::Error { inner, .. } => Type::Error(Box::new(self.resolve_ast_type(inner))),
             AstType::Dict { key, value, .. } => Type::Dict(Box::new(self.resolve_ast_type(key)), Box::new(self.resolve_ast_type(value))),
+            AstType::FnPtr { params, return_, .. } => {
+                Type::Function(FunctionType {
+                    is_async: false,
+                    is_const: false,
+                    params: params.iter().map(|p| self.resolve_ast_type(p)).collect(),
+                    return_: Box::new(self.resolve_ast_type(return_)),
+                    fallible: false,
+                })
+            }
         }
     }
 
@@ -808,7 +968,7 @@ mod tests {
 
     #[test]
     fn test_function_call() {
-        let source = "fn add(a: i32, b: i32) -> i32:\n    a + b\n";
+        let source = "fn add(a: i32, b: i32) i32:\n    a + b\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
@@ -879,7 +1039,7 @@ mod tests {
 
     #[test]
     fn test_const_fn_no_errors() {
-        let source = "const fn factorial(n: i32) -> i32:\n    if n <= 1:\n        1\n    else:\n        n * factorial(n - 1)\n";
+        let source = "const fn factorial(n: i32) i32:\n    if n <= 1:\n        1\n    else:\n        n * factorial(n - 1)\n";
         let diags = check(source);
         assert!(diags.is_empty(), "const fn should have no errors, got: {:?}", diags);
     }

@@ -182,6 +182,25 @@ pub extern "C" fn kl_list_slice(list: *mut KlList, start: i64, end: i64) -> *mut
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn kl_clone_list(list: *const KlList) -> *mut KlList {
+    if list.is_null() {
+        return std::ptr::null_mut();
+    }
+    let result = kl_list_new();
+    if result.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            kl_list_push(result, val);
+        }
+    }
+    result
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn kl_list_extend(dest: *mut KlList, src: *mut KlList) {
     if dest.is_null() || src.is_null() { return; }
     unsafe {
@@ -189,6 +208,237 @@ pub extern "C" fn kl_list_extend(dest: *mut KlList, src: *mut KlList) {
         for i in 0..src_len {
             let val = std::ptr::read((*src).data.add(i as usize));
             kl_list_push(dest, val);
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_pop_first(list: *mut KlList) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        if (*list).len <= 0 { return 0; }
+        let val = std::ptr::read((*list).data);
+        let len = (*list).len as usize;
+        // Shift all elements left by one
+        for i in 1..len {
+            let src = (*list).data.add(i);
+            let dst = (*list).data.add(i - 1);
+            std::ptr::write(dst, std::ptr::read(src));
+        }
+        (*list).len -= 1;
+        val
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_clear(list: *mut KlList) {
+    if list.is_null() { return; }
+    unsafe {
+        (*list).len = 0;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_contains(list: *const KlList, val: i64) -> i32 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let v = std::ptr::read((*list).data.add(i as usize));
+            if v == val { return 1; }
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_insert(list: *mut KlList, index: i64, val: i64) {
+    if list.is_null() { return; }
+    unsafe {
+        let len = (*list).len;
+        let idx = if index < 0 { 0 } else if index > len { len } else { index };
+        // Ensure capacity
+        if len >= (*list).cap {
+            let new_cap = (*list).cap * 2;
+            let new_data = kl_alloc((new_cap * std::mem::size_of::<i64>() as i64) as i64) as *mut i64;
+            if new_data.is_null() { return; }
+            std::ptr::copy_nonoverlapping((*list).data, new_data, len as usize);
+            kl_free((*list).data as *mut u8);
+            (*list).data = new_data;
+            (*list).cap = new_cap;
+        }
+        // Shift elements right to make room
+        for i in (idx as usize..len as usize).rev() {
+            let src = (*list).data.add(i);
+            let dst = (*list).data.add(i + 1);
+            std::ptr::write(dst, std::ptr::read(src));
+        }
+        // Insert new value
+        std::ptr::write((*list).data.add(idx as usize), val);
+        (*list).len += 1;
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_remove_at(list: *mut KlList, index: i64) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        if len <= 0 || index < 0 || index >= len { return 0; }
+        let idx = index as usize;
+        let val = std::ptr::read((*list).data.add(idx));
+        // Shift elements left
+        for i in (idx + 1)..len as usize {
+            let src = (*list).data.add(i);
+            let dst = (*list).data.add(i - 1);
+            std::ptr::write(dst, std::ptr::read(src));
+        }
+        (*list).len -= 1;
+        val
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_sum(list: *const KlList) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        let mut total: i64 = 0;
+        for i in 0..len {
+            total += std::ptr::read((*list).data.add(i as usize));
+        }
+        total
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_product(list: *const KlList) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        let mut total: i64 = 1;
+        for i in 0..len {
+            total *= std::ptr::read((*list).data.add(i as usize));
+        }
+        total
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_max(list: *const KlList) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        if len <= 0 { return 0; }
+        let mut max = std::ptr::read((*list).data);
+        for i in 1..len {
+            let v = std::ptr::read((*list).data.add(i as usize));
+            if v > max { max = v; }
+        }
+        max
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_min(list: *const KlList) -> i64 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        if len <= 0 { return 0; }
+        let mut min = std::ptr::read((*list).data);
+        for i in 1..len {
+            let v = std::ptr::read((*list).data.add(i as usize));
+            if v < min { min = v; }
+        }
+        min
+    }
+}
+
+/// Type of a function pointer used by map/filter/fold.
+type FnI64 = unsafe extern "C" fn(i64) -> i64;
+type FnI64I64 = unsafe extern "C" fn(i64, i64) -> i64;
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_map(list: *const KlList, fn_ptr: Option<FnI64>) -> *mut KlList {
+    if list.is_null() || fn_ptr.is_none() { return std::ptr::null_mut(); }
+    let f = fn_ptr.unwrap();
+    let result = kl_list_new();
+    if result.is_null() { return result; }
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            let mapped = f(val);
+            kl_list_push(result, mapped);
+        }
+    }
+    result
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_filter(list: *const KlList, fn_ptr: Option<FnI64>) -> *mut KlList {
+    if list.is_null() || fn_ptr.is_none() { return std::ptr::null_mut(); }
+    let f = fn_ptr.unwrap();
+    let result = kl_list_new();
+    if result.is_null() { return result; }
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            let keep = f(val);
+            if keep != 0 {
+                kl_list_push(result, val);
+            }
+        }
+    }
+    result
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_fold(list: *const KlList, init: i64, fn_ptr: Option<FnI64I64>) -> i64 {
+    if list.is_null() || fn_ptr.is_none() { return init; }
+    let f = fn_ptr.unwrap();
+    let mut acc = init;
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            acc = f(acc, val);
+        }
+    }
+    acc
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_reduce(list: *const KlList, fn_ptr: Option<FnI64I64>) -> i64 {
+    if list.is_null() || fn_ptr.is_none() { return 0; }
+    let f = fn_ptr.unwrap();
+    unsafe {
+        let len = (*list).len;
+        if len <= 0 { return 0; }
+        let mut acc = std::ptr::read((*list).data);
+        for i in 1..len {
+            let val = std::ptr::read((*list).data.add(i as usize));
+            acc = f(acc, val);
+        }
+        acc
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_list_reverse(list: *mut KlList) {
+    if list.is_null() { return; }
+    unsafe {
+        let len = (*list).len;
+        if len <= 1 { return; }
+        let mut i = 0;
+        let mut j = len - 1;
+        while i < j {
+            let tmp = std::ptr::read((*list).data.add(i as usize));
+            std::ptr::write((*list).data.add(i as usize), std::ptr::read((*list).data.add(j as usize)));
+            std::ptr::write((*list).data.add(j as usize), tmp);
+            i += 1;
+            j -= 1;
         }
     }
 }

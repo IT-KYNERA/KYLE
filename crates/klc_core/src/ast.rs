@@ -31,6 +31,7 @@ pub enum AstType {
     Optional { inner: Box<AstType>, span: Span },
     Error { inner: Box<AstType>, span: Span },
     Dict { key: Box<AstType>, value: Box<AstType>, span: Span },
+    FnPtr { params: Vec<AstType>, return_: Box<AstType>, span: Span },
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +46,7 @@ pub enum Pattern {
     EnumVariant { enum_name: String, variant: String, args: Vec<Pattern>, span: Span },
     IsType { type_: AstType, span: Span },
     Tuple { elements: Vec<Pattern>, span: Span },
+    Or { patterns: Vec<Pattern>, span: Span },
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +65,7 @@ pub struct Import {
 pub struct FromImport {
     pub module_name: String,
     pub imported_name: String,
+    pub alias: Option<String>,
     pub relative: bool,
     pub span: Span,
 }
@@ -277,6 +280,7 @@ pub struct WhileStmt {
     pub condition: Box<Expr>,
     pub body: Block,
     pub else_branch: Option<Block>,
+    pub label: Option<String>,
     pub span: Span,
 }
 
@@ -294,6 +298,7 @@ pub struct ForStmt {
     pub iterable: Box<Expr>,
     pub body: Block,
     pub else_branch: Option<Block>,
+    pub label: Option<String>,
     pub span: Span,
 }
 
@@ -342,8 +347,8 @@ pub enum Stmt {
     Constant(ConstantDecl),
     Expression(Expr),
     Return(Option<Box<Expr>>),
-    Break(Option<Box<Expr>>),
-    Continue,
+    Break(Option<Box<Expr>>, Option<String>),
+    Continue(Option<String>),
     If(IfStmt),
     BindingIf(BindingIf),
     While(WhileStmt),
@@ -448,6 +453,7 @@ pub enum Expr {
     },
     Loop {
         body: Block,
+        label: Option<String>,
         span: Span,
     },
     ErrorProp {
@@ -475,7 +481,7 @@ pub enum Expr {
 // Operators
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -500,6 +506,7 @@ pub enum BinaryOp {
     Shl,
     Shr,
     Is,
+    As,
     Assign,
     AddAssign,
     SubAssign,
@@ -514,7 +521,7 @@ pub enum BinaryOp {
     Range,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UnaryOp {
     Not,
     Neg,
@@ -600,9 +607,15 @@ impl DisplayDepth for Import {
 impl DisplayDepth for FromImport {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         write_indent(f, d)?;
-        writeln!(f, "FromImport module=\"{}\" name=\"{}\"{}",
-            self.module_name, self.imported_name,
-            if self.relative { " relative" } else { "" })
+        if let Some(alias) = &self.alias {
+            writeln!(f, "FromImport module=\"{}\" name=\"{}\" as=\"{}\"{}",
+                self.module_name, self.imported_name, alias,
+                if self.relative { " relative" } else { "" })
+        } else {
+            writeln!(f, "FromImport module=\"{}\" name=\"{}\"{}",
+                self.module_name, self.imported_name,
+                if self.relative { " relative" } else { "" })
+        }
     }
 }
 
@@ -845,18 +858,24 @@ impl DisplayDepth for Stmt {
                     writeln!(f, "Return (void)")
                 }
             }
-            Stmt::Break(v) => {
+            Stmt::Break(v, l) => {
                 write_indent(f, d)?;
-                if let Some(val) = v {
+                if let Some(label) = l {
+                    writeln!(f, "Break label=\"{}\"", label)
+                } else if let Some(val) = v {
                     writeln!(f, "Break")?;
                     val.fmt_depth(f, d + 1)
                 } else {
                     writeln!(f, "Break")
                 }
             }
-            Stmt::Continue => {
+            Stmt::Continue(l) => {
                 write_indent(f, d)?;
-                writeln!(f, "Continue")
+                if let Some(label) = l {
+                    writeln!(f, "Continue label=\"{}\"", label)
+                } else {
+                    writeln!(f, "Continue")
+                }
             }
             Stmt::If(s) => {
                 write_indent(f, d)?;
@@ -886,7 +905,11 @@ impl DisplayDepth for Stmt {
             }
             Stmt::While(s) => {
                 write_indent(f, d)?;
-                writeln!(f, "While")?;
+                if let Some(label) = &s.label {
+                    writeln!(f, "While label=\"{}\"", label)?;
+                } else {
+                    writeln!(f, "While")?;
+                }
                 s.condition.fmt_depth(f, d + 1)?;
                 display_block(f, d + 1, "body:", &s.body)?;
                 if let Some(el) = &s.else_branch {
@@ -903,7 +926,11 @@ impl DisplayDepth for Stmt {
             }
             Stmt::For(s) => {
                 write_indent(f, d)?;
-                writeln!(f, "For var=\"{}\"", s.variable)?;
+                if let Some(label) = &s.label {
+                    writeln!(f, "For var=\"{}\" label=\"{}\"", s.variable, label)?;
+                } else {
+                    writeln!(f, "For var=\"{}\"", s.variable)?;
+                }
                 s.iterable.fmt_depth(f, d + 1)?;
                 display_block(f, d + 1, "body:", &s.body)?;
                 if let Some(el) = &s.else_branch {
@@ -988,6 +1015,14 @@ impl DisplayDepth for Pattern {
             Pattern::IsType { type_, .. } => {
                 write_indent(f, d)?;
                 writeln!(f, "Pattern::IsType \"{}\"", type_)
+            }
+            Pattern::Or { patterns, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "Pattern::Or ({} patterns)", patterns.len())?;
+                for p in patterns {
+                    p.fmt_depth(f, d + 1)?;
+                }
+                Ok(())
             }
         }
     }
@@ -1122,9 +1157,13 @@ impl DisplayDepth for Expr {
                 writeln!(f, "OptionalChain \"{}\"", property)?;
                 target.fmt_depth(f, d + 1)
             }
-            Expr::Loop { body, .. } => {
+            Expr::Loop { body, label, .. } => {
                 write_indent(f, d)?;
-                writeln!(f, "Loop")?;
+                if let Some(label) = label {
+                    writeln!(f, "Loop label=\"{}\"", label)?;
+                } else {
+                    writeln!(f, "Loop")?;
+                }
                 display_block(f, d + 1, "body:", body)
             }
             Expr::ErrorProp { expression, .. } => {
@@ -1198,6 +1237,14 @@ impl fmt::Display for AstType {
             AstType::Optional { inner, .. } => write!(f, "Option<{}>", inner),
             AstType::Error { inner, .. } => write!(f, "Result<{}>", inner),
             AstType::Dict { key, value, .. } => write!(f, "Dict<{}, {}>", key, value),
+            AstType::FnPtr { params, return_, .. } => {
+                write!(f, "(")?;
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 { write!(f, ", ")?; }
+                    write!(f, "{}", p)?;
+                }
+                write!(f, ") -> {}", return_)
+            }
         }
     }
 }

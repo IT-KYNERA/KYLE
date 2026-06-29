@@ -46,6 +46,16 @@ impl Type {
             AstType::Dict { key, value, .. } => {
                 Type::Dict(Box::new(Type::from_ast_type(key)), Box::new(Type::from_ast_type(value)))
             }
+            AstType::FnPtr { params, return_, .. } => {
+                let param_types = params.iter().map(|p| Type::from_ast_type(p)).collect();
+                Type::Function(FunctionType {
+                    is_async: false,
+                    is_const: false,
+                    params: param_types,
+                    return_: Box::new(Type::from_ast_type(return_)),
+                    fallible: false,
+                })
+            }
         }
     }
 
