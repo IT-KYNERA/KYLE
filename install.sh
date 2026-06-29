@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -eu
 
 REPO="IT-KYNERA/KYLE"
 VERSION="v0.4.0"
