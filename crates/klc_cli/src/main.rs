@@ -127,21 +127,19 @@ fn cmd_new(args: &[String]) {
         });
     }
 
-    // src/main.kl — professional entry point with args
-    let main_kl = [
-        "fn main(args: [str]) i32:",
-        &format!("    println(\"Hello from {} v0.1.0!\")", project_name),
-        "    println(\"args: \" + str(len(args)))",
-        "    return 0",
-    ].join("\n") + "\n";
+    // src/main.kl — entry point that imports from lib
+    let main_kl = format!(
+        "# {} — entry point\nfrom lib import greet\n\nfn main() i32:\n    println(greet(\"World\"))\n    0\n",
+        project_name
+    );
     fs::write(project_dir.join("src").join("main.kl"), &main_kl).unwrap_or_else(|e| {
         eprintln!("Error writing src/main.kl: {}", e);
         process::exit(1);
     });
 
-    // src/lib.kl — library module
+    // src/lib.kl — library module with a simple function
     let lib_kl = format!(
-        "# {} — library module\n# Import with: import {{ greet }} from \"src/lib\"\n\nfn greet(name: str) str:\n    \"Hello, \" + name + \"!\"\n",
+        "# {} — library module\n# Import with: from lib import greet\n\nfn greet(name: str) str:\n    \"Hello, \" + name + \"!\"\n",
         project_name
     );
     fs::write(project_dir.join("src").join("lib.kl"), &lib_kl).unwrap_or_else(|e| {
@@ -151,7 +149,7 @@ fn cmd_new(args: &[String]) {
 
     // tests/test_main.kl — test stub
     let test_kl = format!(
-        "# Tests for {}\nimport {{ greet }} from \"src/lib\"\n\nfn test_greet() i32:\n    assert_str(greet(\"World\"), \"Hello, World!\")\n    println(\"test_greet PASS\")\n    0\n",
+        "# Tests for {}\nfrom lib import greet\n\nfn test_greet() i32:\n    result := greet(\"World\")\n    assert(result == \"Hello, World!\")\n    println(\"test_greet PASS\")\n    0\n",
         project_name
     );
     fs::write(project_dir.join("tests").join("test_main.kl"), &test_kl).unwrap_or_else(|e| {
