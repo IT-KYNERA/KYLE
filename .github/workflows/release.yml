@@ -16,8 +16,8 @@ jobs:
 
       - name: Install LLVM 18 (Linux ARM)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev 2>&1
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Build kl (release)
@@ -25,11 +25,11 @@ jobs:
 
       - name: Package tarball
         run: |
-          mkdir -p dist/kl/lib
-          cp target/release/kl dist/kl/
-          chmod +x dist/kl/kl
+          mkdir -p dist
+          cp target/release/kl dist/kl
+          chmod +x dist/kl
           cd dist
-          tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl/
+          tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl
 
       - name: Upload Release Asset
         env:
@@ -43,52 +43,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install LLVM 18
-        env:
-          HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
-          HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: |
           brew install llvm@18 2>&1
-          brew link --overwrite llvm@18 2>&1 || true
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
 
-      - name: Verify LLVM
-        run: |
-          echo "LLVM_SYS_181_PREFIX=$LLVM_SYS_181_PREFIX"
-          "$LLVM_SYS_181_PREFIX/bin/llvm-config" --version
-
       - name: Build kl (release)
-        run: |
-          cargo build --bin kl --release \
-            --config 'env.LLVM_SYS_181_PREFIX=""'
-
-      - name: Build runtime static library
-        run: cargo build -p klc_runtime --release
-
-      - name: Package VS Code extension
-        run: |
-          cd vscode-kl
-          npm install 2>&1
-          npx @vscode/vsce package 2>&1
+        run: cargo build --bin kl --release
 
       - name: Package tarball
         run: |
-          mkdir -p dist/kl/lib dist/kl/vscode
-          cp target/release/kl dist/kl/
-          cp target/release/libklc_runtime.a dist/kl/lib/
-          cp install.sh uninstall.sh dist/kl/
-          cp vscode-kl/kl-*.vsix dist/kl/vscode/
-          chmod +x dist/kl/install.sh dist/kl/uninstall.sh
+          mkdir -p dist
+          cp target/release/kl dist/kl
+          chmod +x dist/kl
           cd dist
-          tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl/
+          tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl
 
-      - name: Create Release
+      - name: Upload Release Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Delete existing release and tag if re-running (e.g., after force-push)
-          gh release delete ${{ github.ref_name }} --yes 2>/dev/null || true
-          gh release create ${{ github.ref_name }} \
-            dist/kl-*.tar.gz \
-            vscode-kl/kl-*.vsix \
-            --title "kl ${{ github.ref_name }}" \
-            --notes "See commit history for changes."
+          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
