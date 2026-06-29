@@ -708,7 +708,8 @@ fn cmd_uninstall() {
     let home = std::env::var("HOME").unwrap_or_default();
     let targets = [
         ("/usr/local/bin/kl", "/usr/local/lib/kl/libklc_runtime.a"),
-        (&format!("{}/.kl/bin/kl", home), &format!("{}/.kl/lib/libklc_runtime.a", home)),
+        (&format!("{}/.kl/bin/kl", home), &format!("{}/.kl/lib/kl/libklc_runtime.a", home)),
+        ("", &format!("{}/.kl/lib/libklc_runtime.a", home)), // old location
     ];
     let mut uninstalled = false;
     for (bin, lib) in &targets {

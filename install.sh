@@ -61,9 +61,9 @@ if [ -w /usr/local/bin ]; then
   mv "$BIN" /usr/local/bin/kl
   mv /tmp/kl/lib/libklc_runtime.a /usr/local/lib/kl/
 else
-  mkdir -p "$HOME/.kl/bin" "$HOME/.kl/lib"
+  mkdir -p "$HOME/.kl/bin" "$HOME/.kl/lib/kl"
   mv "$BIN" "$HOME/.kl/bin/kl"
-  mv /tmp/kl/lib/libklc_runtime.a "$HOME/.kl/lib/"
+  mv /tmp/kl/lib/libklc_runtime.a "$HOME/.kl/lib/kl/"
 fi
 
 rm -rf "/tmp/$ASSET" "/tmp/kl"
