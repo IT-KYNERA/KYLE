@@ -27,6 +27,14 @@ Esto genera: `target/release/kl`
 ./target/release/kl run examples/src/main.kl
 ```
 
+## URL del release actual
+
+**v0.4.0:** https://github.com/IT-KYNERA/KYLE/releases/tag/v0.4.0
+
+**Descargas directas:**
+- Linux ARM64: `kl-v0.4.0-linux-arm64.tar.gz`
+- macOS ARM64: `kl-v0.4.0-macos-arm64.tar.gz`
+
 ## 3. Subir release a GitHub
 
 ### Opción A: Manual (rápida)
