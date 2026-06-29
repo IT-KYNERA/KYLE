@@ -57,17 +57,14 @@ chmod +x "$BIN"
 # Install
 if [ -w /usr/local/bin ]; then
   mv "$BIN" /usr/local/bin/kl
-  echo "Installed to /usr/local/bin/kl"
 else
   mkdir -p "$HOME/.kl/bin"
   mv "$BIN" "$HOME/.kl/bin/kl"
-  echo "Installed to $HOME/.kl/bin/kl"
-  echo "Add to your shell profile: export PATH=\"\$HOME/.kl/bin:\$PATH\""
 fi
 
 rm -f "/tmp/$ASSET"
+
 echo ""
-echo "Kyle $VERSION ready."
-kl --version 2>/dev/null || echo "Run 'kl --version' to verify."
-echo ""
-echo "To uninstall later: curl -fsSL $URL | bash -s uninstall"
+echo "Kyle $VERSION installed."
+echo "Create a project:  kl new myapp"
+echo "Run it:           kl run myapp/src/main.kl"
