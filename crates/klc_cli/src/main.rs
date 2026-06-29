@@ -707,16 +707,25 @@ fn cmd_info(args: &[String]) {
 }
 
 fn cmd_uninstall() {
-    let paths = ["/usr/local/bin/kl", &format!("{}/.kl/bin/kl", std::env::var("HOME").unwrap_or_default())];
+    let home = std::env::var("HOME").unwrap_or_default();
+    let targets = [
+        ("/usr/local/bin/kl", "/usr/local/lib/kl/libklc_runtime.a"),
+        (&format!("{}/.kl/bin/kl", home), &format!("{}/.kl/lib/libklc_runtime.a", home)),
+    ];
     let mut uninstalled = false;
-    for path in &paths {
-        if std::path::Path::new(path).exists() {
-            if let Err(e) = std::fs::remove_file(path) {
-                eprintln!("Error removing {}: {}", path, e);
-            } else {
-                println!("Removed {}", path);
-                uninstalled = true;
+    for (bin, lib) in &targets {
+        if std::path::Path::new(bin).exists() {
+            let _ = std::fs::remove_file(bin);
+            println!("Removed {}", bin);
+            uninstalled = true;
+        }
+        if std::path::Path::new(lib).exists() {
+            let _ = std::fs::remove_file(lib);
+            // Also try to remove the empty lib/kl directory
+            if let Some(parent) = std::path::Path::new(lib).parent() {
+                let _ = std::fs::remove_dir(parent);
             }
+            println!("Removed {}", lib);
         }
     }
     if uninstalled {

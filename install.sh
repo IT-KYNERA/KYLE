@@ -51,18 +51,22 @@ curl -fsSL "$URL" -o "/tmp/$ASSET"
 
 # Extract
 tar -xzf "/tmp/$ASSET" -C /tmp
-BIN="/tmp/kl"
+
+# Install binary
+BIN="/tmp/kl/kl"
 chmod +x "$BIN"
 
-# Install
 if [ -w /usr/local/bin ]; then
+  mkdir -p /usr/local/lib/kl
   mv "$BIN" /usr/local/bin/kl
+  mv /tmp/kl/lib/libklc_runtime.a /usr/local/lib/kl/
 else
-  mkdir -p "$HOME/.kl/bin"
+  mkdir -p "$HOME/.kl/bin" "$HOME/.kl/lib"
   mv "$BIN" "$HOME/.kl/bin/kl"
+  mv /tmp/kl/lib/libklc_runtime.a "$HOME/.kl/lib/"
 fi
 
-rm -f "/tmp/$ASSET"
+rm -rf "/tmp/$ASSET" "/tmp/kl"
 
 echo ""
 echo "Kyle $VERSION installed."
