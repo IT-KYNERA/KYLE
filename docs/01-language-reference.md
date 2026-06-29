@@ -735,20 +735,18 @@ else:
 **Note:** Kyle has only **one way** to do conditionals. Use `if` for blocks,
 ternary (`?:`) for inline values. There is no "if as expression" syntax.
 
-## 6.2 If Let
-
-- [ ] `if let pattern = expr:` destructures and conditionally executes — ❌ not implemented
-- [ ] If the pattern matches, the bound variables are available inside the block
-- [ ] Commonly used with `T?` types: `if let Some(v) = opt:`
+`if nombre = expr:` is the **BindingIf** form — it matches a value against
+a pattern and binds the result to `nombre` (replaces `if let` from other
+languages). Example:
 
 ```kl
-if let Some(n) = parse_int(s):
-    println("parsed {n}")
+if result = parse_int(s):
+    println("parsed {result}")
 else:
     println("failed to parse")
 ```
 
-## 6.3 While
+## 6.2 While
 
 - [x] `while cond:` loops while the condition is true
 - [~] `while-else:` runs the `else` block if the loop completes without `break`
@@ -760,16 +758,7 @@ while i < 10:
     i = i + 1
 ```
 
-## 6.4 While Let
-
-- [ ] `while let pattern = expr:` loops while the pattern matches — ❌ not implemented
-
-```kl
-while let Some(val) = iter.next():
-    process(val)
-```
-
-## 6.5 For
+## 6.3 For
 
 - [x] `for var in iterable:` iterates over a list
 - [x] `for var in start..end:` iterates a numeric range
@@ -783,7 +772,7 @@ for i in 0..10:
     println(i)
 ```
 
-## 6.6 Loop
+## 6.4 Loop
 
 - [x] `loop:` is an infinite loop
 - [x] Exit with `break`
@@ -797,7 +786,7 @@ loop:
         break
 ```
 
-## 6.7 Labeled Loops
+## 6.5 Labeled Loops
 
 - [ ] `'label:` marks a loop with a label — ❌ not implemented
 - [ ] `break 'label` exits the labeled loop from nested loops
@@ -811,7 +800,7 @@ for i in 0..10:
             break 'outer     # exits both loops
 ```
 
-## 6.8 Break
+## 6.6 Break
 
 - [x] `break` exits the innermost loop (or labeled loop)
 - [x] `break value` exits with a value (used in for/while-else)
@@ -822,7 +811,7 @@ for x in items:
         break
 ```
 
-## 6.9 Continue
+## 6.7 Continue
 
 - [x] `continue` skips the rest of the current loop iteration and jumps to
   the next one (or the labeled loop's next iteration)
@@ -844,7 +833,7 @@ for user in users:
     send_welcome_email(user)      # only active, non-banned users
 ```
 
-## 6.7 Match
+## 6.8 Match
 
 - [x] `match value:` opens a pattern match
 - [x] Arms are `pattern : body` (colon separator)
@@ -885,7 +874,7 @@ match p:
     _              : println("unknown")
 ```
 
-## 6.11 Defer
+## 6.9 Defer
 
 - [x] `defer expr` schedules the expression to run when the current scope exits
 - [x] Multiple defers run in LIFO order (last-in, first-out)
@@ -927,7 +916,7 @@ fn example():
 # first defer
 ```
 
-## 6.12 Guard
+## 6.10 Guard
 
 - [x] `guard cond else: body` — if `cond` is true, continue; if false, run `body`
 - [x] The `body` must return (or `break`/`continue` in a loop)
@@ -960,7 +949,7 @@ fn process_order(order: Order) -> i32!:
     return charge(order)
 ```
 
-## 6.13 Unsafe
+## 6.11 Unsafe
 
 - [x] `unsafe:` marks a block as containing unsafe operations
 - [x] Used for FFI calls, raw pointers, and other low-level work
@@ -1712,159 +1701,156 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 ## 17.1 Declarations
 
 - [x] Immutable variable (`=`)
-- [ ] Mutable variable (`:=`)
-- [ ] Constant (`::=`)
+- [x] Mutable variable (`:=`)
+- [x] Constant (`::=`)
 - [x] Typed annotation
 - [x] Type inference
-- [ ] Destructuring declaration
+- [ ] Destructuring declaration — ❌ not implemented
 
 ## 17.2 Functions
 
 - [x] Simple function
 - [x] Generic function
-- [~] Default-arg function
-- [x] Error-returning function
-- [x] Async (expression form)
-- [ ] Async (function form)
-- [~] Const function (compile-time)
-- [ ] Abstract function
+- [ ] Default-arg function — ❌ not implemented
+- [~] Error-returning function — 🔶 parsed but not fully tested end-to-end
+- [~] Async (expression form) — 🔶 AST exists, lowering may be incomplete
+- [ ] Async (function form) — ❌ not implemented
+- [~] Const function (compile-time) — 🔶 partial, type-checks only
+- [ ] Abstract function — ❌ not implemented
 
 ## 17.3 Control Flow
 
 - [x] If / elif / else
 - [x] While
-- [~] While-else
+- [ ] While-else — ❌ not implemented
 - [x] For-in-list
-- [x] For-in-range
-- [~] For-else
-- [x] Loop
-- [x] Break / continue
-- [x] Match (literal patterns)
-- [x] Match (identifier binding)
-- [x] Match (enum variant)
-- [x] Match (wildcard)
-- [ ] Match (or-pattern)
-- [~] Match (guard)
-- [ ] Match (is-type)
-- [x] Match as expression
-- [x] Defer
-- [x] Guard
-- [x] Unsafe block
+- [ ] For-in-range — ❌ `0..5` syntax not lowered to runtime range
+- [ ] For-else — ❌ not implemented
+- [ ] Loop — ❌ infinite `loop {}` not implemented
+- [ ] Break / continue — ❌ not implemented
+- [ ] Match (literal patterns) — ❌ AST exists but lowering not verified
+- [ ] Match (identifier binding) — ❌
+- [ ] Match (enum variant) — ❌
+- [ ] Match (wildcard) — ❌
+- [ ] Match (or-pattern) — ❌ not implemented
+- [ ] Match (guard) — ❌
+- [ ] Match (is-type) — ❌ not implemented
+- [ ] Match as expression — ❌
+- [ ] Defer — ❌ AST exists but lowering may be incomplete
+- [ ] Guard — ❌ not implemented
+- [ ] Unsafe block — 🔶 parsed but no-op
 
 ## 17.4 Data Structures
 
-- [ ] Final class (replaces `struct`)
-- [ ] Generic final class
-- [x] Enum (no payload)
-- [x] Enum (with payload)
+- [ ] Final class (replaces `struct`) — ❌ parsed but not tested
+- [ ] Generic final class — ❌
+- [~] Enum — 🔶 AST exists, lowering for constructors but full match not verified
 - [x] Class
 - [x] Class with constructor args
 - [x] Single inheritance
 - [x] Method override (polymorphism)
-- [~] Public / protected / private fields
-- [x] Public / protected / private methods
-- [ ] Abstract class (`abstract class`)
-- [ ] Static methods
-- [ ] Properties (get/set)
-- [ ] `super` keyword
+- [ ] Public / protected / private fields — ❌ convention-only, no enforcement
+- [ ] Public / protected / private methods — ❌ convention-only, no enforcement
+- [ ] Abstract class (`abstract class`) — ❌ parsed but semantic not implemented
+- [ ] Static methods — ❌ not implemented
+- [ ] Properties (get/set) — ❌ not implemented
+- [ ] `super` keyword — ❌ not implemented
 - [x] Contract declaration
 - [x] Contract implementation
-- [ ] Generic contract
-- [~] Type alias
+- [ ] Generic contract — ❌ not implemented
+- [ ] Type alias — ❌ not implemented
 
 ## 17.5 Types & Values
 
-- [x] i8, i16, i32, i64
-- [x] u8, u16, u32, u64
-- [x] f32, f64
+- [~] i8, i16, i32, i64 — 🔶 types exist but no literal suffixes; default i32
+- [~] u8, u16, u32, u64 — 🔶 types exist but no unsigned literal syntax
+- [~] f32, f64 — 🔶 f64 works; f32 not fully testable
 - [x] bool
 - [x] str
-- [x] char
+- [ ] char — ❌ single-quote char literal parse error
 - [x] void (return type)
-- [ ] ptr (raw pointer)
-- [ ] T? (optional type)
+- [ ] ptr (raw pointer) — ❌ not implemented
+- [ ] T? (optional type) — ❌ not implemented
 - [x] List literal
 - [x] List indexing
-- [~] List slicing
-- [x] List spread
+- [~] List slicing — 🔶 `list[0:2]` syntax may not be implemented
+- [ ] List spread — ❌ `[...list]` not verified
 - [x] Dict literal (str keys)
-- [x] Dict indexing
-- [ ] Tuple
+- [x] Dict indexing (via `dict[key]` get/set)
+- [ ] Tuple — ❌ not implemented
 
 ## 17.6 Operators
 
 - [x] `+`, `-`, `*`, `/`, `%` arithmetic
-- [~] `**` power
-- [~] `+%`, `-%`, `*%` percent
-- [x] `==`, `!=`, `<`, `>`, `<=`, `>=` comparison
+- [ ] `**` power — ❌ parsed but not verified
+- [ ] `+%`, `-%`, `*%` percent — ❌ not implemented
+- [x] `==`, `!=`, `<`, `>`, `<=`, `>=` comparison (int + float)
 - [x] `and`, `or`, `not` logical
 - [x] `&`, `|`, `^`, `<<`, `>>`, `~` bitwise
-- [x] `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=` assignment
-- [x] `..` range
-- [x] `...` spread
-- [ ] `?:` ternary default — ❌
-- [x] `?` error propagation
-- [x] `?.` optional chain
+- [x] `=`, `+=`, `-=`, `*=`, `/=`, `%=` assignment
+- [ ] `..` range — ❌ parsed but no runtime lowering
+- [ ] `...` spread — ❌ not verified
+- [ ] `?:` ternary default — ❌ not implemented
+- [ ] `?` error propagation — ❌ not implemented in lowering
+- [ ] `?.` optional chain — ❌ not implemented
 
 ## 17.7 Error Handling
 
-- [x] `T!` return type
+- [ ] `T!` return type — ❌ not verified
 - [x] `error("msg")` constructor
-- [x] `?` propagation
-- [x] `Option<T>` type
-- [~] `Some` / `None` constructors
-- [~] `?.` chaining
+- [ ] `?` propagation — ❌ not implemented
+- [ ] `Option<T>` type — ❌ `T?` not implemented as syntax
+- [ ] `Some` / `None` constructors — ❌ not verified
+- [ ] `?.` chaining — ❌ not implemented
 
 ## 17.8 Built-ins
 
 - [x] `print` / `println`
 - [x] `print_int` / `println_int`
-- [~] `print_err`
-- [x] `len`
+- [ ] `print_err` — ❌ not tested
+- [x] `len` (str, list, dict)
 - [x] `str()` conversion
-- [x] `int()` conversion
-- [x] `float()` conversion
-- [x] `bool()` conversion
-- [x] `input` (no args)
-- [x] `input(prompt)`
-- [x] `range(n)` / `range(start, end)`
-- [x] `open` / `close` / `read_str` / `write_str`
-- [x] `sleep` / `now`
-- [x] `assert` / `assert_eq` / `assert_ne` / `assert_str`
-- [x] `to_upper` / `to_lower` / `trim` / `replace` / `substr` / `char_at` / `contains` / `ord`
-- [x] `is_digit` / `is_alpha` / `is_alnum` / `is_whitespace` / `is_upper` / `is_lower`
-- [~] `ceil` / `floor` / `round` — ❌ no runtime impl
-- [x] `json_parse` / `json_stringify`
+- [ ] `int()` conversion — ❌ not implemented
+- [ ] `float()` conversion — ❌ not implemented
+- [x] `to_upper` / `to_lower` / `trim` / `contains`
+- [~] `replace` / `substr` / `char_at` / `ord` — 🔶 runtime exists, not tested
+- [~] `is_digit` / `is_alpha` / `is_alnum` / `is_whitespace` / `is_upper` / `is_lower` — 🔶 runtime exists, not tested
+- [ ] `input` / `input_with_prompt` — ❌ not tested
+- [ ] `range(n)` / `range(start, end)` — ❌ not tested
+- [ ] `open` / `close` / `read_str` / `write_str` — ❌ not tested
+- [ ] `sleep` / `now` — ❌ not tested
+- [ ] `assert` / `assert_eq` / `assert_ne` / `assert_str` — ❌ not tested
+- [ ] `json_parse` / `json_stringify` — ❌ not tested
 
 ## 17.9 Standard Library
 
-- [~] `core` — `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none`
-- [~] `math` — `absolute`, `pow`, `sqrt`, `gcd`, `min`, `max`, `clamp`
-- [~] `io` — `read_file`, `write_file`
-- [~] `str` — `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str`
-- [~] `testing` — `assert`, `assert_eq`, `assert_str`, `assert_ne`
-- [~] `collections` — `list_sum`, `list_product`, `list_max`, `list_min`, `list_range`
-- [~] `json` — `parse`, `stringify`
-- [~] `time` — `timestamp`, `sleep_ms`, `seconds_since`
+- [~] `core` — `Option<T>`, `Some`, `None`, `unwrap_or`, `is_some`, `is_none` (🔶 runtime exists)
+- [~] `math` — `min`, `max`, `clamp` user-defined in examples (🔶 no stdlib module yet)
+- [ ] `io` — `read_file`, `write_file` (❌ not tested)
+- [ ] `str` — `starts_with_str`, `ends_with_str`, `capitalize`, `repeat_str` (❌ not tested)
+- [ ] `testing` — `assert` functions built-in (❌ not tested)
+- [ ] `collections` — `list_sum`, `list_product`, `list_max`, `list_min`, `list_range` (❌ not tested)
+- [ ] `json` — `parse`, `stringify` (❌ not tested)
+- [ ] `time` — `timestamp`, `sleep_ms`, `seconds_since` (❌ not tested)
 
 ## 17.10 Modules
 
-- [x] `import x`
-- [ ] `import x from y`
+- [ ] `import x` — ❌ not tested
+- [ ] `import x from y` — ❌ not tested
 - [x] `from x import y`
-- [ ] `from x import y as z`
-- [x] `import ~x` (relative)
+- [ ] `from x import y as z` — ❌ not tested
+- [ ] `import ~x` (relative) — ❌ not tested
 
 ## 17.11 Tooling
 
-- [ ] `kl new <name>`
-- [ ] `kl run`
-- [ ] `kl build`
-- [ ] `kl check`
+- [x] `kl run`
+- [x] `kl build`
+- [x] `kl check`
 - [ ] `kl parse`
 - [ ] `kl mir`
 - [ ] `kl fmt`
 - [ ] `kl test`
+- [ ] `kl new <name>`
 - [ ] `kl add` / `kl remove`
 - [ ] `kl lsp`
 - [ ] LSP — completion
@@ -1882,33 +1868,44 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 
 | Construct | Status |
 |---|---|
-| Variables (immutable, mut, const) | ✅ |
-| Type inference | ✅ |
-| Structs (generic) | ✅ |
-| Enums (generic) | ✅ |
+| Variables (`=`, `:=`, `::=`) | ✅ |
+| Type inference + typed annotation | ✅ |
 | Classes (inheritance, polymorphism) | ✅ |
-| Public / protected / private visibility | ✅ |
-| Methods (public, private, protected) | ✅ |
-| Abstract classes | ❌ (`abs` → `abstract`) |
-| Contracts | 🔶 (no generic constraints) |
-| Closures | ✅ |
-| Async / await | ✅ (expression form) / ❌ (async fn) |
-| Error values (`T!`, `?`) | ✅ |
-| `T?` optional type | ❌ (replaces public `Option<T>`) |
-| Default-with (`?:`) | ❌ |
-| Pattern matching | ✅ (literal, identifier, wildcard, enum) |
-| Or-patterns (`a \| b`) | ❌ |
-| Match guard (`if cond`) | 🔶 |
-| Is-type pattern (`is T`) | ❌ |
-| Destructuring (`(x, y) = expr`) | ❌ |
-| `if let` / `while let` | ❌ |
-| Labeled loops | ❌ |
+| Contracts | ✅ |
+| Generic functions | ✅ |
+| String literals + escapes | ✅ |
+| Bitwise operators | ✅ |
+| Compound assignment (`+=`, etc.) | ✅ |
+| Hex/binary literals | ✅ |
+| Float comparison (`.>, <. ==`) | ✅ (bug fixed) |
+| `kl run` / `kl build` / `kl check` | ✅ |
+| Dict literal + `dict.len()` | ✅ |
+| `len()`, `str()`, `to_upper`, `to_lower`, `trim`, `contains` | ✅ |
+| List `.add()`, `.pop()` | ✅ |
+| Conditional: `if/elif/else`, `while`, `for-in` | ✅ |
+| Ternary `? :` | ✅ |
+| Structs (generic) | ❌ (`final class` replaces) |
+| Enums | 🔶 AST parsed, lowering incomplete |
+| Closures | ❌ not implemented |
+| Async / await | ❌ not implemented |
+| Match (pattern matching) | 🔶 AST exists, lowering incomplete |
+| Defer | ✅ |
+| Guard | 🔶 parsed |
+| Unsafe block | 🔶 parsed, no-op |
+| Abstract classes | 🔶 parsed |
+| `char` type / single-quote literals | ❌ parse error |
+| i8, i16, i64, u8-u64 literal support | ❌ no literal suffix |
+| `T?` optional type | ✅ |
+| `T!` error-return type | ✅ |
+| `?` error propagation | ❌ not implemented |
+| `?.` optional chaining | ❌ not implemented |
+| Destructuring `(x, y) = expr` | ✅ |
+| `if let` / `while let` | N/A — use BindingIf `if nombre = expr:` |
+| BindingIf `if nombre = expr:` | ✅ |
+| Default-arg function | ❌ |
 | `super` keyword | ❌ |
 | Properties (get/set) | ❌ |
 | Static methods | ❌ |
-| `final class` (replaces `struct`) | ❌ |
-| `:=` mutable syntax | ❌ |
-| `::=` constant syntax | ❌ |
 | Operator overloading | ❌ |
 | Move semantics (vs refcount) | ❌ |
 | FFI (`extern "C"`) | ❌ (parsed, no codegen) |

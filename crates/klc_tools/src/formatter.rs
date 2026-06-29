@@ -480,6 +480,22 @@ impl Formatter {
         self.write_block(out, &s.body, depth + 1);
     }
 
+    fn write_pattern(&mut self, out: &mut String, pattern: &Pattern) {
+        match pattern {
+            Pattern::Identifier { name, .. } => out.push_str(name),
+            Pattern::Literal { value, .. } => self.write_literal(out, value),
+            Pattern::Wildcard { .. } => out.push('_'),
+            Pattern::Tuple { .. } => out.push_str("()"),
+            Pattern::EnumVariant { enum_name, variant, .. } => {
+                write!(out, "{}.{}", enum_name, variant).unwrap();
+            }
+            Pattern::IsType { type_, .. } => {
+                write!(out, "is ").unwrap();
+                self.write_type(out, type_);
+            }
+        }
+    }
+
     fn write_match(&mut self, out: &mut String, s: &MatchStmt, depth: usize) {
         self.indent(out, depth);
         write!(out, "match ").unwrap();
@@ -487,18 +503,7 @@ impl Formatter {
         out.push_str(":\n");
         for arm in &s.arms {
             self.indent(out, depth + 1);
-            match &arm.pattern {
-                Pattern::Identifier { name, .. } => out.push_str(name),
-                Pattern::Literal { value, .. } => self.write_literal(out, value),
-                Pattern::Wildcard { .. } => out.push('_'),
-                Pattern::EnumVariant { enum_name, variant, .. } => {
-                    write!(out, "{}.{}", enum_name, variant).unwrap();
-                }
-                Pattern::IsType { type_, .. } => {
-                    write!(out, "is ").unwrap();
-                    self.write_type(out, type_);
-                }
-            }
+            self.write_pattern(out, &arm.pattern);
             if let Some(guard) = &arm.guard {
                 write!(out, " if ").unwrap();
                 self.write_expr(out, guard);
@@ -579,18 +584,7 @@ impl Formatter {
                 out.push_str(":\n");
                 for arm in arms {
                     self.indent(out, 1);
-                    match &arm.pattern {
-                        Pattern::Identifier { name, .. } => out.push_str(name),
-                        Pattern::Literal { value, .. } => self.write_literal(out, value),
-                        Pattern::Wildcard { .. } => out.push('_'),
-                        Pattern::EnumVariant { enum_name, variant, .. } => {
-                            write!(out, "{}.{}", enum_name, variant).unwrap();
-                        }
-                        Pattern::IsType { type_, .. } => {
-                            write!(out, "is ").unwrap();
-                            self.write_type(out, type_);
-                        }
-                    }
+                    self.write_pattern(out, &arm.pattern);
                     if let Some(g) = &arm.guard {
                         write!(out, " if ").unwrap();
                         self.write_expr(out, g);

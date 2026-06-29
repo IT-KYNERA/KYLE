@@ -42,7 +42,8 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 - [x] Añadir `ptr` type, `null` literal, `as` casting
 - [x] Añadir `is` operator section
 - [x] Añadir function pointer type `(T) -> U`
-- [x] Añadir `if let` / `while let`
+- [x] Añadir `if nombre = expr:` — binding if (ya existía, refina el concepto)
+- [x] Añadir `T!` como syntax de error-returning type
 - [x] Añadir doc comments (`##`)
 - [x] Añadir attributes (`#[test]`, `#[inline]`)
 - [x] Añadir `exit()`, `eprintln()`, `panic()`, `dbg()` builtins
@@ -116,20 +117,20 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 
 ---
 
-## Fase 4: Parser (🔜 EN PROGRESO)
+## Fase 4: Parser (✅ COMPLETADA)
 
-**Duración estimada:** 4–5 días
+**Duración estimada:** 4–5 días · **Real:** ~2 días
 
 ### 4.1 Nuevas sintaxis
 - [x] `name := expr` — parsing de variable mutable
 - [x] `name ::= expr` — parsing de constante
-- [ ] `T?` postfix en tipos — parsing de opcional
+- [x] `T?` postfix en tipos — parsing de opcional (con genéricos: `list<i32>?`)
+- [x] `T!` postfix en tipos — parsing de error-returning type
 - [x] `final class Name:` — clase sin herencia
 - [x] `abstract class Name:` — clase abstracta
-- [ ] `::= expr` en constantes (global scope) — ya cubierto por parse_decl
-- [ ] Destructuring: `(x, y) = expr`
-- [ ] `if let pattern = expr:` — if-let
-- [ ] `while let pattern = expr:` — while-let
+- [x] `::= expr` en constantes (global scope) — cubierto por parse_decl
+- [x] `if nombre = expr:` — BindingIf (reemplaza `if let`, ya existía)
+- [x] Destructuring: `(x, y) = expr`
 
 ### 4.2 Modificaciones existentes
 - [x] Eliminar parsing de `mut` keyword en variables
@@ -137,8 +138,8 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 - [x] `struct` → `final class` (o alias y deprecation warning)
 
 ### 4.3 Error recovery
-- [ ] Implementar modo pánico en parser (no parar en primer error)
-- [ ] Reportar múltiples errores
+- [x] Implementar modo pánico en parser (no parar en primer error)
+- [x] Reportar múltiples errores
 
 ---
 
@@ -159,11 +160,11 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 
 **Duración estimada:** 3–4 días
 
-- [ ] `T?` type checking
+- [ ] `T?` type checking (parsing listo, falta semántica)
 - [ ] `:=` mutability checking (reemplazar `mut`)
 - [ ] `::=` constant evaluation checking
 - [ ] Destructuring type checking
-- [ ] `if let` / `while let` type checking
+- [ ] `if nombre = expr:` — BindingIf type checking
 - [ ] Abstract method enforcement
 - [ ] Or-patterns y guard en match (terminar implementación)
 - [ ] Default params
@@ -235,19 +236,11 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 - [ ] LSP updated for new syntax
 - [ ] VS Code extension updated
 
----
 
-## Fase 13: Borrow Checker (⭐ Baja)
-
-**Duración estimada:** 2–3 semanas
-
-- [ ] `&T` y `&mut T` references
-- [ ] Region inference (no lifetime annotations)
-- [ ] Compatibilidad con move semantics
 
 ---
 
-## Fase 14: Backends Alternativos (⭐ Baja)
+## Fase 13: Backends Alternativos (⭐ Baja)
 
 **Duración estimada:** 2–4 semanas
 
@@ -261,7 +254,7 @@ Actualizar todos los documentos para reflejar las nuevas decisiones de diseño.
 ```
 Fase 1-2: Docs + Spec    ✅ COMPLETADO
 Fase 3:   Lexer          ✅ COMPLETADO
-Fase 4:   Parser         🔜 EN PROGRESO (4.1 items restantes)
+Fase 4:   Parser         ✅ COMPLETADO
 Fase 5:   HIR            📅
 Fase 6:   Semantic       📅
 Fase 7:   Move Semantics 📅 (bloqueante)
@@ -270,24 +263,27 @@ Fase 9:   Async          📅
 Fase 10:  Iterators      📅
 Fase 11:  Package Mgr    📅
 Fase 12:  Tooling        📅
-Fase 13:  Borrow Checker 📅
-Fase 14:  Backends       📅
+Fase 13:  Backends       📅
 ```
 
 ---
 
 ## Estado Actual (v0.3.0)
 
-### Completado
+### Completado (v0.3.0 → v0.4.0)
 - ✅ 6 documentos actualizados con nueva sintaxis
 - ✅ AGENTS.md como pilar central
-- ✅ Token: Walrus, ConstDecl, Abstract, Final, At, DotDotEquals, DotDotLess; Mut eliminado
+- ✅ Token: Walrus, ConstDecl, Abstract, Final, At, DotDotEquals, DotDotLess, Bang (T!); Mut eliminado
 - ✅ Lexer: `:=`, `::=`, `..=`, `..<`, `@`, `abstract`, `final`; `mut` eliminado; `##` doc comments
-- ✅ Parser: `=`, `:=`, `::=` en decl y stmt; `abstract class`, `final class`
-- ✅ 102 tests Rust pasando
+- ✅ Parser: `=`, `:=`, `::=` en decl y stmt; `abstract class`, `final class`; `T?`/`T!` postfix; BindingIf; destructuring `(x, y) = expr`
+- ✅ Error recovery: modo pánico, reporte de múltiples errores
+- ✅ MIR: desagüe de `if let`/`while let` eliminado (no aplica en Kyle)
+- ✅ Fixes: compound assignment, hex/binary literals, bitwise ops truncation, float comparison
+- ✅ Ejemplos: `examples/src/main.kl` con 23 tests, `strings.kl`/`math.kl` actualizados a `:=`
+- ✅ 104 tests Rust pasando, build limpio (sin warnings de klc_frontend)
 
-### Siguiente
-- Parser: `T?` postfix, destructuring, if-let, while-let, error recovery
+### Siguiente (Fase 5)
+- Crear crate `klc_hir` y pasar desugaring a HIR
 
 ---
 

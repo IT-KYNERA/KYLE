@@ -421,6 +421,17 @@ impl TypeChecker {
                     if self.symbols.lookup(name).is_none() {
                         let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(ty.clone())));
                     }
+                } else if let Expr::Tuple { elements: target_elems, .. } = target.as_ref() {
+                    if let Expr::Tuple { elements: value_elems, .. } = value.as_ref() {
+                        for (target_elem, value_elem) in target_elems.iter().zip(value_elems.iter()) {
+                            let elem_ty = self.infer_expr(value_elem);
+                            if let Expr::Identifier { name, .. } = target_elem {
+                                if self.symbols.lookup(name).is_none() {
+                                    let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(elem_ty)));
+                                }
+                            }
+                        }
+                    }
                 }
                 ty
             }

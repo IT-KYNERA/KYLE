@@ -254,13 +254,23 @@ impl ScopeResolver {
                             }
                             _ => {}
                         }
+                    } else {
+                        let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), None));
+                    }
+                    self.resolve_expr(value);
+                } else if let Expr::Tuple { elements, .. } = target.as_ref() {
+                    for elem in elements {
+                        if let Expr::Identifier { name, .. } = elem {
+                            if self.symbols.lookup(name).is_none() {
+                                let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), None));
+                            }
+                        }
+                    }
+                    self.resolve_expr(value);
                 } else {
-                    // First use of a name in assignment: auto-declare as immutable variable.
-                    let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), None));
+                    self.resolve_expr(target);
+                    self.resolve_expr(value);
                 }
-                }
-                self.resolve_expr(target);
-                self.resolve_expr(value);
             }
             Expr::FunctionCall { target, arguments, .. } => {
                 self.resolve_expr(target);

@@ -11,11 +11,54 @@ use crate::token::{Token, TokenKind};
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    errors: Vec<String>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, pos: 0 }
+        Self { tokens, pos: 0, errors: vec![] }
+    }
+
+    fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    fn error(&mut self, msg: String) {
+        self.errors.push(msg);
+    }
+
+    /// Return true if the current token starts a statement.
+    fn at_stmt_start(&self) -> bool {
+        self.current().map_or(false, |t| matches!(t.kind,
+            TokenKind::If | TokenKind::While | TokenKind::For | TokenKind::Match
+            | TokenKind::Loop | TokenKind::Return | TokenKind::Break
+            | TokenKind::Continue | TokenKind::Fn
+        ))
+    }
+
+    /// Skip tokens until a synchronization point: dedent, eof, newline,
+    /// or a keyword that begins a statement or declaration.
+    fn sync_to_stmt_boundary(&mut self) {
+        // Always advance past the token that caused the error first.
+        self.advance();
+        let mut safety = 0;
+        while safety < 100 {
+            safety += 1;
+            if self.pos >= self.tokens.len() {
+                return;
+            }
+            if self.at(TokenKind::Dedent) || self.at(TokenKind::Eof) {
+                return;
+            }
+            if self.at(TokenKind::Newline) || self.at(TokenKind::Indent) {
+                self.advance();
+                return;
+            }
+            if self.at_stmt_start() {
+                return;
+            }
+            self.advance();
+        }
     }
 
     /// Build a span covering from `start_pos` (token index at start) to the
@@ -40,16 +83,26 @@ impl Parser {
             if self.at(TokenKind::Eof) {
                 break;
             }
-            if self.at(TokenKind::Newline) {
+            if self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
                 self.advance();
                 continue;
             }
-            declarations.push(self.parse_decl()?);
+            match self.parse_decl() {
+                Ok(decl) => declarations.push(decl),
+                Err(msg) => {
+                    self.error(msg);
+                    self.sync_to_stmt_boundary();
+                }
+            }
         }
-        Ok(Program {
-            declarations,
-            span: self.span_from(start),
-        })
+        if self.has_errors() {
+            Err(self.errors.join("\n"))
+        } else {
+            Ok(Program {
+                declarations,
+                span: self.span_from(start),
+            })
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -577,7 +630,7 @@ impl Parser {
             let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
             return Err(format!("expected type name, found {}", found));
         }
-        if self.at(TokenKind::Less) {
+        let mut base = if self.at(TokenKind::Less) {
             self.advance();
             let mut args = Vec::new();
             args.push(self.parse_type()?);
@@ -586,13 +639,22 @@ impl Parser {
                 args.push(self.parse_type()?);
             }
             self.expect(TokenKind::Greater)?;
-            Ok(AstType::Generic { name, args, span: self.span_from(start) })
-        } else if self.at(TokenKind::Question) {
-            self.advance();
-            Ok(AstType::Optional { inner: Box::new(AstType::User { name, span: self.span_from(start) }), span: self.span_from(start) })
+            AstType::Generic { name, args, span: self.span_from(start) }
         } else {
-            Ok(AstType::User { name, span: self.span_from(start) })
+            AstType::User { name, span: self.span_from(start) }
+        };
+        // Postfix `?` for optional types: T?, list<i32>?
+        if self.at(TokenKind::Question) {
+            self.advance();
+            base = AstType::Optional { inner: Box::new(base), span: self.span_from(start) };
         }
+        // Postfix `!` for error-returning types: T!, list<i32>!
+        // (already uses AstType::Error which exists)
+        if self.at(TokenKind::Bang) {
+            self.advance();
+            base = AstType::Error { inner: Box::new(base), span: self.span_from(start) };
+        }
+        Ok(base)
     }
 
     // -----------------------------------------------------------------------
@@ -747,18 +809,38 @@ impl Parser {
                         let body = self.parse_expr()?;
                         Expr::Closure { params, body: Box::new(body), span: self.span_from(start) }
                     } else {
-                        // Not a closure — backtrack and parse as parenthesized expression
+                        // Not a closure — backtrack and try tuple or parenthesized expr
                         self.pos = saved;
-                        let expr = self.parse_expr()?;
-                        self.expect(TokenKind::RParen)?;
-                        expr
+                        let first = self.parse_expr()?;
+                        if self.at(TokenKind::Comma) {
+                            let mut elements = vec![first];
+                            while self.at(TokenKind::Comma) {
+                                self.advance();
+                                elements.push(self.parse_expr()?);
+                            }
+                            self.expect(TokenKind::RParen)?;
+                            Expr::Tuple { elements, span: self.span_from(start) }
+                        } else {
+                            self.expect(TokenKind::RParen)?;
+                            first
+                        }
                     }
                 } else {
-                    // Not a closure — backtrack and parse as parenthesized expression
+                    // Not a closure — try tuple or parenthesized expr
                     self.pos = saved;
-                    let expr = self.parse_expr()?;
-                    self.expect(TokenKind::RParen)?;
-                    expr
+                    let first = self.parse_expr()?;
+                    if self.at(TokenKind::Comma) {
+                        let mut elements = vec![first];
+                        while self.at(TokenKind::Comma) {
+                            self.advance();
+                            elements.push(self.parse_expr()?);
+                        }
+                        self.expect(TokenKind::RParen)?;
+                        Expr::Tuple { elements, span: self.span_from(start) }
+                    } else {
+                        self.expect(TokenKind::RParen)?;
+                        first
+                    }
                 }
             }
             TokenKind::LBracket => {
@@ -879,20 +961,39 @@ impl Parser {
 
     fn parse_block(&mut self) -> Result<Block, String> {
         let start = self.pos;
-        // Single-line body: `: stmt` (no Newline/Indent) — parse one statement and stop.
         let single_line = !self.at(TokenKind::Newline);
         if self.at(TokenKind::Newline) { self.advance(); }
         if self.at(TokenKind::Indent) { self.advance(); }
         let mut statements = Vec::new();
+        let mut had_error = false;
         loop {
             if self.at(TokenKind::Dedent) { self.advance(); break; }
             if self.at(TokenKind::Eof) { break; }
-            // Newlines between statements are ignored.
             if self.at(TokenKind::Newline) { self.advance(); continue; }
-            statements.push(self.parse_stmt()?);
+            match self.parse_stmt() {
+                Ok(stmt) => statements.push(stmt),
+                Err(msg) => {
+                    had_error = true;
+                    self.error(msg);
+                    if !single_line {
+                        self.sync_to_stmt_boundary();
+                    }
+                }
+            }
             if single_line { break; }
         }
+        if had_error && !single_line {
+            // After recovering within the block, return an empty block — the
+            // caller will see the error but we've already consumed all tokens
+            // up to the dedent/eof. Return the partially-parsed block anyway
+            // so the outer level can continue.
+            return Ok(Block { statements, span: self.span_from(start) });
+        }
         if single_line {
+            if had_error {
+                // Single-line body: can't recover, propagate upward
+                return Err(self.errors.join("\n"));
+            }
             while self.at(TokenKind::Newline) {
                 self.advance();
             }
@@ -1000,6 +1101,10 @@ impl Parser {
                 name, type_: None, value: Box::new(value), is_mutable: false, span: self.span_from(start),
             }));
         }
+        // Destructuring: `(x, y) = expr` or `(x, y) := expr`
+        if self.peek_destructure() {
+            return self.parse_destructure();
+        }
         // Binding-if or assignment: `ident = expr [: block]`
         if self.at_identifier() && self.peek_equals() {
             let start = self.pos;
@@ -1032,13 +1137,14 @@ impl Parser {
     fn parse_if(&mut self) -> Result<Stmt, String> {
         let start = self.pos;
         self.advance();
+        // `if name = expr:` — BindingIf
+        if self.peek_equals() {
+            return self.parse_binding_if();
+        }
         let condition = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
         let body = self.parse_block()?;
-        // Consume newlines between if/elif body and next elif/else (supports blank lines)
-        while self.at(TokenKind::Newline) {
-            self.advance();
-        }
+        while self.at(TokenKind::Newline) { self.advance(); }
         let mut elif_branches = Vec::new();
         let mut else_branch = None;
         while self.at(TokenKind::Elif) {
@@ -1047,9 +1153,7 @@ impl Parser {
             let cond = self.parse_expr()?;
             self.expect(TokenKind::Colon)?;
             let body = self.parse_block()?;
-            while self.at(TokenKind::Newline) {
-                self.advance();
-            }
+            while self.at(TokenKind::Newline) { self.advance(); }
             elif_branches.push(ElifBranch {
                 condition: Box::new(cond),
                 body,
@@ -1310,6 +1414,58 @@ impl Parser {
     fn peek_equals(&self) -> bool {
         if !self.at_identifier() { return false; }
         self.tokens.get(self.pos + 1).map_or(false, |t| t.is(&TokenKind::Equals))
+    }
+
+    /// Returns true if the current position looks like a destructuring assignment:
+    /// `(ident, ...) =|:= expr`
+    fn peek_destructure(&self) -> bool {
+        if !self.at(TokenKind::LParen) { return false; }
+        if self.tokens.get(self.pos + 1).map_or(false, |t| matches!(&t.kind, TokenKind::Identifier(_)))
+            && self.tokens.get(self.pos + 2).map_or(false, |t| t.is(&TokenKind::Comma))
+        {
+            let mut depth = 1;
+            let mut i = self.pos + 1;
+            while i < self.tokens.len() && depth > 0 {
+                if self.tokens[i].is(&TokenKind::LParen) { depth += 1; }
+                else if self.tokens[i].is(&TokenKind::RParen) { depth -= 1; }
+                i += 1;
+            }
+            if depth == 0 && i < self.tokens.len() {
+                let next = &self.tokens[i];
+                return next.is(&TokenKind::Equals) || next.is(&TokenKind::Walrus);
+            }
+        }
+        false
+    }
+
+    /// Parse destructuring: `(x, y) = expr` or `(x, y) := expr`
+    fn parse_destructure(&mut self) -> Result<Stmt, String> {
+        let start = self.pos;
+        self.advance(); // '('
+        let mut elements = Vec::new();
+        loop {
+            let name = self.eat_identifier();
+            if name.is_empty() {
+                return Err("expected identifier in destructuring pattern".to_string());
+            }
+            elements.push(Expr::Identifier { name, span: self.span_from(start) });
+            if self.at(TokenKind::Comma) { self.advance(); }
+            else { break; }
+        }
+        self.expect(TokenKind::RParen)?;
+        let is_mutable = self.at(TokenKind::Walrus);
+        if self.at(TokenKind::Equals) || is_mutable {
+            self.advance();
+            let value = self.parse_expr()?;
+            Ok(Stmt::Expression(Expr::Assignment {
+                target: Box::new(Expr::Tuple { elements, span: self.span_from(start) }),
+                operator: None,
+                value: Box::new(value),
+                span: self.span_from(start),
+            }))
+        } else {
+            Err("expected '=' or ':=' after destructuring pattern".to_string())
+        }
     }
 
     /// Returns true if the next token is `:=` (Walrus) — mutable declaration.
@@ -1643,6 +1799,26 @@ fn test():\n\
     while running:\n\
         process()\n";
         assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_destructure_assign() {
+        let source = "fn test():\n    (x, y) = (1, 2)\n    print(x)\n";
+        let result = parse(source);
+        match &result {
+            Ok(_) => {},
+            Err(e) => panic!("destructure assign parse failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_destructure_mut() {
+        let source = "fn test():\n    (x, y) := (1, 2)\n";
+        let result = parse(source);
+        match &result {
+            Ok(_) => {},
+            Err(e) => panic!("destructure mut parse failed: {}", e),
+        }
     }
 
     #[test]

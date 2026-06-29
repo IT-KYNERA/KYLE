@@ -273,24 +273,6 @@ pub struct BindingIf {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct IfLet {
-    pub pattern: Pattern,
-    pub value: Box<Expr>,
-    pub body: Block,
-    pub else_branch: Option<Block>,
-    pub span: Span,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct WhileLet {
-    pub pattern: Pattern,
-    pub value: Box<Expr>,
-    pub body: Block,
-    pub else_branch: Option<Block>,
-    pub span: Span,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct WhileStmt {
     pub condition: Box<Expr>,
     pub body: Block,
@@ -989,7 +971,19 @@ impl DisplayDepth for Pattern {
             }
             Pattern::EnumVariant { enum_name, variant, args, .. } => {
                 write_indent(f, d)?;
-                writeln!(f, "Pattern::EnumVariant {}.{} ({} args)", enum_name, variant, args.len())
+                writeln!(f, "Pattern::EnumVariant {}.{} ({} args)", enum_name, variant, args.len())?;
+                for arg in args {
+                    arg.fmt_depth(f, d + 1)?;
+                }
+                Ok(())
+            }
+            Pattern::Tuple { elements, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "Pattern::Tuple ({} elements)", elements.len())?;
+                for element in elements {
+                    element.fmt_depth(f, d + 1)?;
+                }
+                Ok(())
             }
             Pattern::IsType { type_, .. } => {
                 write_indent(f, d)?;

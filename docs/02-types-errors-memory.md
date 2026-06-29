@@ -268,8 +268,6 @@ The compiler's **move checker** (Phase 6) tracks:
    b = a           # a is moved
    a = [4, 5, 6]   # re-initialization is fine
    ```
-4. **Borrows** — `&expr` creates a temporary reference without moving
-   (planned, see §3.8)
 
 ### 3.3 What Happens at Scope Exit
 
@@ -328,8 +326,8 @@ stored as static constant data in the binary's `.rodata` section. You cannot
 free them, and you don't need to.
 
 When a string literal is assigned to a variable, the compiler treats it as
-a `&str` (borrow) — no allocation, no move. Concatenation results (e.g.
-`"a" + "b"`) produce owned strings via `kl_concat`.
+a static string reference — no allocation, no move. Concatenation results
+(e.g. `"a" + "b"`) produce owned strings via `kl_concat`.
 
 ### 3.7 Refcounting: Legacy Mechanism
 
@@ -349,28 +347,7 @@ After Phase 6, reference counting will remain only in the stdlib types
 `Rc<T>` and `Arc<T>` for shared ownership scenarios where single-owner
 semantics do not apply.
 
-### 3.8 Borrow Checker (Planned — Phase 13)
-
-Kyle is adopting a **borrow checker** similar to Rust's, but with a
-simpler annotation model:
-
-- `&T` — immutable borrow (shared reference, read-only)
-- `&mut T` — mutable borrow (exclusive reference, read-write)
-
-The borrow checker enforces the standard rules:
-
-1. **Aliasing XOR mutability** — you may have unlimited `&T` or exactly one
-   `&mut T`, but not both
-2. **No dangling references** — borrows cannot outlive the value they
-   reference
-3. **No moving while borrowed** — a value cannot be moved out (assigned to
-   another owner) while any borrow is live
-
-This is planned for Phase 13. Until then, the compiler takes a conservative
-approach: heap types are reference-counted, and borrows are not enforced
-at compile time.
-
-### 3.9 Summary of Memory Operations
+### 3.8 Summary of Memory Operations
 
 | Operation | Copy types | Move types |
 |---|---|---|

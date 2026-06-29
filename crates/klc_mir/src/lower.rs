@@ -2958,7 +2958,6 @@ impl Lowerer {
                     });
 
                     if matches!(&target_type, MirType::Dict(_, _)) {
-                        // Dict assignment: dict[key] = val → kl_dict_set(dict, key, val)
                         let key_arg = if let MirValue::Local(id) = MirValue::Local(idx_val) {
                             if ctx.local_types.get(&id).map(|t| *t == MirType::Str).unwrap_or(false) {
                                 MirValue::Local(id)
@@ -2978,7 +2977,6 @@ impl Lowerer {
                             ],
                         });
                     } else {
-                        // List assignment: list[idx] = val → kl_list_set(list, idx, val)
                         let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
                         ctx.current_block.insts.push(MirInst::Cast {
                             dest: idx_i64,
@@ -3039,6 +3037,23 @@ impl Lowerer {
                                 ctx.current_block.insts.push(MirInst::Store {
                                     dest: field_ptr,
                                     value: MirValue::Local(val_local),
+                                });
+                            }
+                        }
+                    }
+                } else if let Expr::Tuple { elements: target_elems, .. } = target.as_ref() {
+                    // Destructuring: (x, y) = (a, b)
+                    if let Expr::Tuple { elements: value_elems, .. } = value.as_ref() {
+                        for (target_elem, value_elem) in target_elems.iter().zip(value_elems.iter()) {
+                            ctx = self.lower_expr(ctx, value_elem);
+                            let elem_val = ctx.next_local - 1;
+                            if let Expr::Identifier { name, .. } = target_elem {
+                                let var_type = ctx.local_types.get(&elem_val).cloned().unwrap_or(MirType::I32);
+                                let local = ctx.alloc_local(name, var_type);
+                                ctx.locals.insert(name.clone(), local);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: local,
+                                    value: MirValue::Local(elem_val),
                                 });
                             }
                         }

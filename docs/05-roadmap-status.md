@@ -86,11 +86,9 @@ complete. Statement-level parsing and advanced features are in progress.
 
 | Construct | Status |
 |---|---|
-| `final class Name:` with no inheritance | Not yet implemented (Final token exists) |
-| Destructuring `(x, y) = expr` | Not yet implemented |
-| `if let pattern = expr:` | Not yet implemented |
-| `while let pattern = expr:` | Not yet implemented |
-| Error recovery (panic mode, multiple errors) | Not yet implemented |
+| `final class Name:` with no inheritance | ✅ Done |
+| Destructuring `(x, y) = expr` | ✅ Done |
+| Error recovery (panic mode, multiple errors) | ✅ Done |
 
 ### 3.5 Known Issues
 
@@ -98,10 +96,7 @@ complete. Statement-level parsing and advanced features are in progress.
   is stripped from the identifier and used to set visibility. This should be
   revisited for clarity.
 - `.kl` examples in `examples/` and `examples/kyle-test/` still use old syntax
-  (`mut` keyword instead of `:=`, `Option<T>` instead of `T?`, etc.). They need
-  to be rewritten.
-- `Final` keyword exists in the lexer, but `final class Name:` is not parsed.
-  Currently `struct` is kept as a temporary alias.
+  (`Option<T>` instead of `T?`, etc.). They need to be rewritten.
 - `@` token for attributes is missing from lexer.
 - Doc comments use `##`; should eventually support `///`.
 
@@ -131,7 +126,6 @@ complete. Statement-level parsing and advanced features are in progress.
 | `:=` mutability checking (replaces `mut`) | Planned |
 | `::=` constant evaluation checking | Planned |
 | Destructuring type checking | Planned |
-| `if let` / `while let` type checking | Planned |
 | Abstract method enforcement | Planned |
 | Or-patterns and match guard completion | Planned |
 | Default params | Planned |
@@ -218,19 +212,9 @@ move semantics model.
 
 ---
 
-## 12. Phase 13: Borrow Checker
-
-**Status:** Low priority.
-
-| Item | Status |
-|---|---|
-| `&T` and `&mut T` references | Planned |
-| Region inference (no lifetime annotations) | Planned |
-| Compatibility with move semantics | Planned |
-
 ---
 
-## 13. Phase 14: Alternative Backends
+## 12. Phase 14: Alternative Backends
 
 **Status:** Low priority.
 
@@ -283,9 +267,7 @@ move semantics model.
 | Match or-patterns (`a \| b`) | 6 | Pending |
 | Match guard (`if cond`) | 6 | Pending |
 | Match is-type (`x is T`) | 6 | Pending |
-| `if let pattern = expr:` | 3-4 | Pending |
-| `while let pattern = expr:` | 3-4 | Pending |
-| Destructuring `(x, y) = expr` | 3-4 | Pending |
+| Destructuring `(x, y) = expr` | 3-4 | Done |
 | Defer | 1-2 | Done |
 | Guard | 1-2 | Done |
 | Unsafe blocks | 1-2 | Done |
@@ -358,13 +340,11 @@ move semantics model.
 - [x] DotDotEquals (`..=`), DotDotLess (`..<`) tokens
 - [x] Declaration-level `=`, `:=`, `::=` parsing
 - [x] `abstract class Name:` parsing
-- [ ] `final class Name:` parsing
+- [x] `final class Name:` parsing
 - [ ] `@` (At) token for attributes
 - [ ] `///` doc comment lexing
-- [ ] Destructuring `(x, y) = expr`
-- [ ] `if let pattern = expr:`
-- [ ] `while let pattern = expr:`
-- [ ] Error recovery in parser
+- [x] Destructuring `(x, y) = expr`
+- [x] Error recovery in parser
 - [ ] All .kl examples rewritten with new syntax
 
 ### 16.3 Phase 5: HIR + Desugaring
@@ -380,7 +360,6 @@ move semantics model.
 - [ ] `:=` mutability checking
 - [ ] `::=` constant evaluation checking
 - [ ] Destructuring type checking
-- [ ] `if let` / `while let` type checking
 - [ ] Abstract method enforcement
 - [ ] Or-patterns and match guard filtering
 - [ ] Default params
@@ -427,13 +406,7 @@ move semantics model.
 - [ ] LSP updated for new syntax
 - [ ] VS Code extension updated
 
-### 16.11 Phase 13: Borrow Checker
-
-- [ ] `&T` and `&mut T` references
-- [ ] Region inference
-- [ ] Compatibility with move semantics
-
-### 16.12 Phase 14: Alternative Backends
+### 16.11 Phase 14: Alternative Backends
 
 - [ ] Cranelift backend
 - [ ] WASM target
@@ -519,10 +492,8 @@ These are **not** subject to change without a major version bump.
 
 - `__name` visibility prefix stripping needs fixing
 - `.kl` examples not yet rewritten with new syntax
-- `Final` keyword exists in lexer but `final class` not fully parsed yet
 - `@` (At) token for attributes not yet implemented
 - `///` doc comments not yet implemented (using `##` instead)
-- Destructuring, `if let`, `while let` not yet implemented
 
 ---
 

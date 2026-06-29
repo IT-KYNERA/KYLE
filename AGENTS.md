@@ -23,16 +23,18 @@ Written in **Rust**, compiled via **LLVM 18**.
 ## Current Phase: Evolution to v1.0
 
 The language is undergoing a major evolution. The complete plan is at
-[`EXECUTION-PLAN.md`](EXECUTION-PLAN.md). Current focus is **Phase 1–2**:
-documentation updates and foundational syntax changes.
+[`EXECUTION-PLAN.md`](EXECUTION-PLAN.md). Current focus is **Phase 5**:
+HIR (High-Level Intermediate Representation) crate creation.
 
 | Phase | Focus | Status |
 |---|---|---|
-| **1–2** | **Documentation + Spec updates** | **🔜 Current** |
-| 3–4 | Lexer + Parser (new syntax: `:=`, `::=`, `T?`, `final class`, `abstract class`) | 📅 |
-| 5 | Semantic + HIR | 📅 |
-| 6 | Move semantics (replaces refcounting) | 📅 |
-| 7+ | Async scheduler, iterators, tooling | 📅 |
+| **1–2** | Documentation + Spec updates | ✅ Done |
+| **3** | Lexer (`:=`, `::=`, `T?`, `final class`) | ✅ Done |
+| **4** | **Parser** (destructuring, error recovery) | **✅ Done** |
+| **5** | **HIR — High-Level IR** | **🔜 Current** |
+| 6 | Semantic | 📅 |
+| 7 | Move semantics (replaces refcounting) | 📅 |
+| 8+ | Async scheduler, iterators, tooling | 📅 |
 
 See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 
