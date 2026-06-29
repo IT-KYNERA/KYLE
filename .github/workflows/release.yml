@@ -89,21 +89,36 @@ jobs:
         run: |
           gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
 
-  # Windows disabled — LLVM 18 installation on Windows runner needs work.
-  # build-windows-x64:
-  #   runs-on: windows-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install LLVM 18 (Windows)
-  #       run: choco install llvm -y --version 18.1.6
-  #     - name: Build kl (release)
-  #       run: cargo build --bin kl --release
-  #     - name: Package
-  #       run: |
-  #         mkdir dist -Force
-  #         Copy-Item target/release/kl.exe dist/kl.exe
-  #         Compress-Archive -Path dist/kl.exe -DestinationPath dist/kl-${{ github.ref_name }}-windows-x64.zip
-  #     - name: Upload
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       run: gh release upload ${{ github.ref_name }} dist/kl-*.zip --clobber
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Windows)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.0/LLVM-18.1.0-win64.exe"
+          $out = "$env:TEMP\LLVM-18.1.0-win64.exe"
+          Write-Host "Downloading LLVM 18.1.0..."
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Invoke-WebRequest -Uri $url -OutFile $out
+          Write-Host "Installing LLVM 18.1.0..."
+          Start-Process -FilePath $out -ArgumentList "/S" -Wait -NoNewWindow
+          echo "LLVM_SYS_181_PREFIX=C:\Program Files\LLVM" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build kl (release)
+        run: cargo build --bin kl --release
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          mkdir dist -Force
+          Copy-Item target/release/kl.exe dist/kl.exe
+          cd dist
+          Compress-Archive -Path kl.exe -DestinationPath kl-${{ github.ref_name }}-windows-x64.zip
+
+      - name: Upload Release Asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} dist/kl-*.zip --clobber
