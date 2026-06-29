@@ -1,0 +1,10 @@
+name = "kyle-syntax-test"
+version = "0.1.0"
+edition = "1"
+description = "Comprehensive syntax test for Kyle"
+
+[compiler]
+optimization = "O2"
+target = "native"
+
+[dependencies]
