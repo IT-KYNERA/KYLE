@@ -87,6 +87,8 @@ impl Linker {
             if let Some(exe_dir) = exe_path.parent() {
                 // /usr/local/bin/kl → /usr/local/lib/kl/libklc_runtime.a
                 paths.push(exe_dir.join("../lib/kl/libklc_runtime.a"));
+                // ~/.kl/bin/kl → ~/.kl/lib/libklc_runtime.a
+                paths.push(exe_dir.join("../lib/libklc_runtime.a"));
                 // Alongside binary
                 paths.push(exe_dir.join("libklc_runtime.a"));
             }
