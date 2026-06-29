@@ -4,6 +4,24 @@ set -eu
 REPO="IT-KYNERA/KYLE"
 VERSION="v0.4.0"
 
+# --- Uninstall mode ---
+if [ "${1:-}" = "uninstall" ]; then
+  if [ -f /usr/local/bin/kl ]; then
+    echo "Removing kl from /usr/local/bin..."
+    rm -f /usr/local/bin/kl
+    echo "kl uninstalled."
+  elif [ -f "$HOME/.kl/bin/kl" ]; then
+    echo "Removing kl from $HOME/.kl/bin..."
+    rm -f "$HOME/.kl/bin/kl"
+    echo "kl uninstalled."
+  else
+    echo "kl is not installed."
+  fi
+  exit 0
+fi
+
+# --- Install mode ---
+
 # Detect OS and architecture
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
@@ -27,14 +45,16 @@ esac
 
 URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET"
 
-echo "Downloading Kyle $VERSION for $OS-$ARCH..."
+# Download
+echo "Downloading Kyle $VERSION..."
 curl -fsSL "$URL" -o "/tmp/$ASSET"
 
-echo "Extracting..."
+# Extract
 tar -xzf "/tmp/$ASSET" -C /tmp
-
-echo "Installing..."
 BIN="/tmp/kl"
+chmod +x "$BIN"
+
+# Install
 if [ -w /usr/local/bin ]; then
   mv "$BIN" /usr/local/bin/kl
   echo "Installed to /usr/local/bin/kl"
@@ -42,10 +62,12 @@ else
   mkdir -p "$HOME/.kl/bin"
   mv "$BIN" "$HOME/.kl/bin/kl"
   echo "Installed to $HOME/.kl/bin/kl"
-  echo "Add to PATH: export PATH=\"\$HOME/.kl/bin:\$PATH\""
+  echo "Add to your shell profile: export PATH=\"\$HOME/.kl/bin:\$PATH\""
 fi
 
 rm -f "/tmp/$ASSET"
 echo ""
-echo "Kyle $VERSION installed successfully!"
-kl --version
+echo "Kyle $VERSION ready."
+kl --version 2>/dev/null || echo "Run 'kl --version' to verify."
+echo ""
+echo "To uninstall later: curl -fsSL $URL | bash -s uninstall"

@@ -42,6 +42,7 @@ fn main() {
         "add" => cmd_add(&args),
         "remove" => cmd_remove(&args),
         "info" => cmd_info(&args),
+        "uninstall" => cmd_uninstall(),
         "lsp" => cmd_lsp(&args),
         "completions" => cmd_completions(&args),
         "help" | "-h" => {
@@ -702,6 +703,26 @@ fn cmd_info(args: &[String]) {
             eprintln!("Error: {}", e);
             process::exit(1);
         }
+    }
+}
+
+fn cmd_uninstall() {
+    let paths = ["/usr/local/bin/kl", &format!("{}/.kl/bin/kl", std::env::var("HOME").unwrap_or_default())];
+    let mut uninstalled = false;
+    for path in &paths {
+        if std::path::Path::new(path).exists() {
+            if let Err(e) = std::fs::remove_file(path) {
+                eprintln!("Error removing {}: {}", path, e);
+            } else {
+                println!("Removed {}", path);
+                uninstalled = true;
+            }
+        }
+    }
+    if uninstalled {
+        println!("kl uninstalled.");
+    } else {
+        println!("kl is not installed.");
     }
 }
 
