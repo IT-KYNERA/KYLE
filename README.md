@@ -22,19 +22,20 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
 ## Download
 
-| Platform | Arch | Link |
-| :--- | :--- | :--- |
-| **Linux** | ARM64 | [kl-v0.4.0-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-linux-arm64.tar.gz) |
-| **Linux** | x64 | [kl-v0.4.0-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-linux-x64.tar.gz) |
-| **macOS** | ARM64 | [kl-v0.4.0-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-macos-arm64.tar.gz) |
-| **Windows** | x64 | [Build from source](#build-from-source) |
+### Compiler (`kl`)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
-The script auto-detects your OS and architecture, downloads the correct binary,
-and installs it to `/usr/local/bin/kl` (or `~/.kl/bin/kl` if not writable).
+Auto-detects OS/arch, downloads binary to `/usr/local/bin/kl` (or `~/.kl/bin/kl`).
+
+| Platform | Arch | Direct link |
+| :--- | :--- | :--- |
+| **Linux** | ARM64 | [kl-v0.4.0-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-linux-arm64.tar.gz) |
+| **Linux** | x64 | [kl-v0.4.0-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-linux-x64.tar.gz) |
+| **macOS** | ARM64 | [kl-v0.4.0-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.4.0/kl-v0.4.0-macos-arm64.tar.gz) |
+| **Windows** | x64 | [Build from source](#build-from-source) |
 
 ### VS Code Extension
 
@@ -42,30 +43,22 @@ and installs it to `/usr/local/bin/kl` (or `~/.kl/bin/kl` if not writable).
 
 **Syntax highlighting, LSP diagnostics, snippets, debugging, testing UI, and more.**
 
-#### Install from VSIX (current)
-
-1. Download the latest `.vsix` from the [Releases page](https://github.com/IT-KYNERA/KYLE/releases)
-2. In VS Code, open the Command Palette (`Cmd+Shift+P`) → `Extensions: Install from VSIX...`
-3. Select the downloaded `.kl-*.vsix` file
-4. Reload VS Code
-
-#### Install from GitHub Actions (bleeding edge)
-
-1. Go to the [Actions tab](https://github.com/IT-KYNERA/KYLE/actions) → latest CI run
-2. Scroll to **Artifacts** → download `kl-vscode-extension`
-3. Unzip → `Extensions: Install from VSIX...` → select the `.vsix`
-
-#### Build from source
-
+**One-command install** (requires VS Code `code` CLI in PATH):
 ```bash
-git clone https://github.com/IT-KYNERA/KYLE.git
-cd KYLE/vscode-kl
-npm install
-npx @vscode/vsce package
-# → kl-0.3.0.vsix created — install via Extensions: Install from VSIX...
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-kl/install-extension.sh | sh
 ```
 
-**Requirements:** VS Code ^1.85, Node.js 20+, and the `kl` binary in PATH.
+The script downloads the latest VSIX from GitHub Releases and installs it via `code --install-extension`.
+
+#### Alternative install methods
+
+| Method | Steps |
+|--------|-------|
+| **VSIX from Releases** | Download `.vsix` from [Releases page](https://github.com/IT-KYNERA/KYLE/releases) → VS Code: `Extensions: Install from VSIX...` |
+| **VSIX from CI** | [Actions tab](https://github.com/IT-KYNERA/KYLE/actions) → latest run → artifact `kl-vscode-extension` → unzip → Install from VSIX |
+| **Build from source** | `git clone ... && cd vscode-kl && npm install && npx @vscode/vsce package` → Install from VSIX |
+
+**Requirements:** VS Code ^1.85 and the `kl` binary in PATH.
 
 ---
 
