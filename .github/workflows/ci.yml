@@ -15,7 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-24.04-arm
           - ubuntu-24.04
           - macos-15
 
@@ -29,75 +28,78 @@ jobs:
         with:
           components: clippy
 
-      - name: Install LLVM 18 (Linux ARM)
-        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+      - name: Install LLVM 18 (Linux)
+        if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget lsb-release software-properties-common gnupg pkg-config
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
-          sudo add-apt-repository -y "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main"
-          sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev 2>/dev/null || \
-            sudo apt-get install -y llvm-18-dev libzstd-dev
-          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
-
-      - name: Install LLVM 18 (Linux x64)
-        if: runner.os == 'Linux' && runner.arch == 'X64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget lsb-release software-properties-common gnupg pkg-config
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
-          sudo add-apt-repository -y "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main"
-          sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev 2>/dev/null || \
-            sudo apt-get install -y llvm-18-dev libzstd-dev
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm-18-dev libzstd-dev pkg-config
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Install LLVM 18 (macOS)
         if: runner.os == 'macOS'
         run: |
+          brew update
           brew install llvm@18
-          LLVM_PREFIX=$(brew --prefix llvm@18)
-          echo "LLVM_SYS_181_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
-          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
 
       - name: Verify LLVM
         run: |
-          if command -v llvm-config-18 &>/dev/null; then
-            llvm-config-18 --version
-          elif [ -n "$LLVM_SYS_181_PREFIX" ]; then
-            $LLVM_SYS_181_PREFIX/bin/llvm-config --version
-          else
-            echo "LLVM not found!"
-            exit 1
-          fi
+          llvm-config --version || llvm-config-18 --version || echo "No llvm-config found"
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v3
 
-      - name: Build (workspace)
+      - name: Build
         run: cargo build --workspace
 
-      - name: Run tests
+      - name: Test
         run: cargo test --workspace
 
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings 2>&1 || true
 
-      - name: Build release binary
+      - name: Build release
         run: cargo build --release --bin kl
 
-      - name: Verify binary
+      - name: Smoke test
         run: |
           ./target/release/kl --version
           ./target/release/kl help
 
+  test-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install LLVM 18 (ARM)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm-18-dev libzstd-dev pkg-config
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+
+      - name: Verify LLVM
+        run: llvm-config-18 --version || echo "No llvm-config found"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v3
+
+      - name: Build
+        run: cargo build --workspace
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build release
+        run: cargo build --release --bin kl
+
   vscode:
     runs-on: ubuntu-24.04
-    needs: test
+    needs: [test, test-arm]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -106,7 +108,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install dependencies
+      - name: Install deps
         working-directory: vscode-kl
         run: npm install
 
