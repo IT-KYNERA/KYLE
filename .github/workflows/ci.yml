@@ -8,7 +8,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  LLVM_VERSION: "18"
 
 jobs:
   test:
@@ -19,7 +18,6 @@ jobs:
           - ubuntu-24.04-arm
           - ubuntu-24.04
           - macos-15
-        # Add windows-latest when LLVM 18 package is available on Windows
 
     runs-on: ${{ matrix.os }}
 
@@ -29,61 +27,74 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy
 
       - name: Install LLVM 18 (Linux ARM)
         if: runner.os == 'Linux' && runner.arch == 'ARM64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+          sudo apt-get install -y wget lsb-release software-properties-common gnupg pkg-config
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository -y "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main"
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev 2>/dev/null || \
+            sudo apt-get install -y llvm-18-dev libzstd-dev
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Install LLVM 18 (Linux x64)
         if: runner.os == 'Linux' && runner.arch == 'X64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+          sudo apt-get install -y wget lsb-release software-properties-common gnupg pkg-config
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository -y "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-18 main"
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev 2>/dev/null || \
+            sudo apt-get install -y llvm-18-dev libzstd-dev
+          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Install LLVM 18 (macOS)
         if: runner.os == 'macOS'
         run: |
           brew install llvm@18
-          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+          LLVM_PREFIX=$(brew --prefix llvm@18)
+          echo "LLVM_SYS_181_PREFIX=$LLVM_PREFIX" >> $GITHUB_ENV
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
 
-      - name: Cache Cargo dependencies
+      - name: Verify LLVM
+        run: |
+          if command -v llvm-config-18 &>/dev/null; then
+            llvm-config-18 --version
+          elif [ -n "$LLVM_SYS_181_PREFIX" ]; then
+            $LLVM_SYS_181_PREFIX/bin/llvm-config --version
+          else
+            echo "LLVM not found!"
+            exit 1
+          fi
+
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build
+      - name: Build (workspace)
         run: cargo build --workspace
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
       - name: Run tests
         run: cargo test --workspace
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
-      - name: Check clippy
+      - name: Clippy
         run: cargo clippy --workspace -- -D warnings 2>&1 || true
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
-      - name: Build release
+      - name: Build release binary
         run: cargo build --release --bin kl
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
-      - name: Verify binary works
+      - name: Verify binary
         run: |
           ./target/release/kl --version
           ./target/release/kl help
 
-  # VS Code extension packaging (runs on ubuntu only)
   vscode:
     runs-on: ubuntu-24.04
     needs: test
@@ -93,21 +104,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
-      - name: Install VS Code extension dependencies
+      - name: Install dependencies
         working-directory: vscode-kl
         run: npm install
 
-      - name: TypeScript type-check
+      - name: TypeScript check
         working-directory: vscode-kl
         run: npx -p typescript tsc --noEmit
 
-      - name: Package VS Code extension
+      - name: Package VSIX
         working-directory: vscode-kl
         run: npx @vscode/vsce package --out kl-${{ github.sha }}.vsix
 
-      - name: Upload VSIX artifact
+      - name: Upload VSIX
         uses: actions/upload-artifact@v4
         with:
           name: kl-vscode-extension
