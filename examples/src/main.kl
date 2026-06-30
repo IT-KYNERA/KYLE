@@ -57,6 +57,8 @@ class Circle: Shape:
         this.radius = r
     fn area() f64:
         3.14 * this.radius * this.radius
+    fn describe() str:
+        "Circle(" + str(this.radius) + ")"
 
 class Box:
     value: i32
@@ -149,6 +151,7 @@ fn main() i32:
     # 8. Classes
     c := Circle(5.0)
     assert(c.area() > 78.0)
+    assert(c.describe() == "Circle(5)")
 
     # 9. Properties
     b := Box(42)
