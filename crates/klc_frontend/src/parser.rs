@@ -313,48 +313,40 @@ impl Parser {
         } else {
             vec![]
         };
-        let mut contracts = Vec::new();
 
-        // `implements Contract1, Contract2`
-        if self.at(TokenKind::Implements) {
+        // `class Name :: Parent, Contract1, Contract2:`
+        // `::` is lexed as two consecutive Colons (not ConstDecl)
+        let mut parent: Option<String> = None;
+        let mut contracts: Vec<String> = Vec::new();
+
+        if self.at(TokenKind::Colon) {
+            let saved = self.pos;
             self.advance();
-            contracts.push(self.eat_identifier());
-            while self.at(TokenKind::Comma) {
+            if self.at(TokenKind::Colon) {  // second colon → :: syntax
                 self.advance();
-                contracts.push(self.eat_identifier());
+                // Parse comma-separated list of identifiers
+                let mut items: Vec<String> = Vec::new();
+                if self.at_identifier() {
+                    items.push(self.eat_identifier());
+                    while self.at(TokenKind::Comma) {
+                        self.advance();
+                        if self.at_identifier() {
+                            items.push(self.eat_identifier());
+                        } else { break; }
+                    }
+                }
+                // First item = parent (if it exists), rest = contracts
+                if !items.is_empty() {
+                    parent = Some(items.remove(0));
+                    contracts = items;
+                }
+            } else {
+                // Single colon without :: — simple class, no parent/contracts
+                self.pos = saved;
             }
         }
 
-        // Check for inheritance: `class Dog : Animal` or `class Dog : Animal:`
-        let parent = if self.at(TokenKind::Colon) {
-            let saved = self.pos;
-            self.advance();
-            if self.at_identifier() {
-                let parent_name = self.eat_identifier();
-                // `implements` after parent
-                if self.at(TokenKind::Implements) {
-                    self.advance();
-                    contracts.push(self.eat_identifier());
-                    while self.at(TokenKind::Comma) {
-                        self.advance();
-                        contracts.push(self.eat_identifier());
-                    }
-                }
-                // `class Dog : Animal:` — optional second colon, then body
-                if self.at(TokenKind::Colon) {
-                    self.advance();
-                }
-                // Body starts (either right after `:` or on next line)
-                if self.at(TokenKind::Newline) || self.at(TokenKind::Indent) {
-                    let members = self.parse_class_members()?;
-                    return self.make_class_decl(start, name, type_params.clone(), Some(parent_name), contracts, members, is_abstract);
-                }
-            }
-            self.pos = saved;
-            None
-        } else {
-            None
-        };
+        // Expect body start
         self.expect(TokenKind::Colon)?;
         let members = self.parse_class_members()?;
         self.make_class_decl(start, name, type_params, parent, contracts, members, is_abstract)

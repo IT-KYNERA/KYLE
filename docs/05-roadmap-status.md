@@ -40,7 +40,7 @@ Cada decisión de diseño debe alinearse con estos principios. Si no los cumple,
 | `T!` se **mantiene** | Azúcar para `Result<T, Error>`. No se renombra. |
 | `struct` eliminado | Usar `final class` para estructuras ligeras sin herencia. |
 | `class` se mantiene | Con herencia. `final class` sin herencia. |
-| `contract` se mantiene | No se renombra a `trait`. `class X: Contract`. |
+| `contract` se mantiene | No se renombra a `trait`. `class X :: Contract`. |
 | `abstract class` reemplaza `abs class` | Claridad: no se puede instanciar. |
 
 ### 2.3 Binding If/While — SIN `let`

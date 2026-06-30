@@ -1098,24 +1098,55 @@ match v:
 
 ## 7.4 Classes
 
-- [x] `class Name:` declares a class (supports inheritance)
+- [x] `class Name:` declares a class with no parent or contracts
 - [x] `class Name(args):` declares a class with constructor parameters
-- [x] `class Name: Parent` declares inheritance from `Parent`
-- [x] `class Name: Contract` declares implementation of `Contract`
-- [x] `class Name: Parent implements Contract` does both
+- [x] `class Name :: Parent` declares inheritance from `Parent`
+- [x] `class Name :: Contract` declares implementation of `Contract`
+- [x] `class Name :: Parent, Contract1, Contract2` does both
 - [x] Fields are declared inside the class
 - [x] Methods are `fn name():` inside the class
 - [x] `Name(args)` invokes the constructor
 - [x] `instance.field` and `instance.method()` work
 - [x] `this` refers to the current instance
 
+**Syntax:** `class Name :: [Parent,] [Contract...]:`
+
+`::` separates the class name from the list of parent class and contracts.
+The compiler determines at semantic time which names are classes vs contracts.
+Multiple items are separated by commas. No `implements` keyword needed.
+
+```kyle
+# Simple class (no parent, no contracts)
+class Point:
+    x: i32
+    y: i32
+
+# With parent and contracts
+class Circle :: Shape, Drawable, Serializable:
+    radius: f64
+    Circle(r: f64):
+        this.radius = r
+    fn area() f64:
+        3.14 * this.radius * this.radius
+    fn draw() str:
+        "Circle(r=" + str(this.radius) + ")"
+```
+
 **Constructor:** Defined with the class name (like C#/Java), no `fn` keyword.
+Multiple constructors are supported via parameter overloading.
 
 ```kyle
 class Person:
     name: str
+    age: i32
+
+    Person(name: str, age: i32):
+        this.name = name
+        this.age = age
+
     Person(name: str):
         this.name = name
+        this.age = 0
 ```
 
 ```kl

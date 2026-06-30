@@ -51,7 +51,7 @@ fn color_name(c: Color) str:
 class Shape:
     fn area() f64: 0.0
 
-class Circle: Shape:
+class Circle :: Shape:
     radius: f64
     Circle(r: f64):
         this.radius = r
