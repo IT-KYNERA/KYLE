@@ -32,7 +32,9 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq llvm-18-dev libzstd-dev pkg-config
+          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev pkg-config
+          # Verify Polly is findable
+          ls /usr/lib/llvm-18/lib/libPolly* 2>/dev/null || echo "No Polly static lib found"
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Install LLVM 18 (macOS)
@@ -78,7 +80,9 @@ jobs:
       - name: Install LLVM 18 (ARM)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq llvm-18-dev libzstd-dev pkg-config
+          sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev pkg-config || \
+            sudo apt-get install -y -qq llvm-18-dev libzstd-dev pkg-config
+          ls /usr/lib/llvm-18/lib/libPolly* 2>/dev/null || echo "No Polly static lib found"
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
       - name: Verify LLVM
