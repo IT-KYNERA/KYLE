@@ -160,9 +160,9 @@ pi = 3.14              # f64
 A destructuring declaration unpacks a compound value into multiple variables
 in one line. No `let` keyword — the syntax is direct.
 
-- [ ] Tuple destructuring: `(x, y) = expr` — ❌ not implemented
-- [ ] `(x, y) = (1, "hi")` unpacks into `x = 1`, `y = "hi"`
-- [ ] Works with any value that has `.0`, `.1`, ... accessors
+- [x] Tuple destructuring: `(x, y) = expr` — ✅ working
+- [x] `(x, y) = (1, "hi")` unpacks into `x = 1`, `y = "hi"`
+- [x] Works with any value that has `.0`, `.1`, ... accessors
 
 ```kl
 (x, y) = (1, "hello")   # x = 1, y = "hello"
@@ -217,9 +217,9 @@ in one line. No `let` keyword — the syntax is direct.
 `None`". This is the **only** way to express optional values — `Option<T>`
 is not exposed as a public syntax.
 
-- [ ] `T?` postfix syntax in type annotations — ❌ not implemented
-- [ ] `None` is the absent value (from stdlib, always available)
-- [ ] `some_value` is constructed implicitly by assigning a `T` to a `T?` variable
+- [x] `T?` postfix syntax in type annotations — ✅ working
+- [x] `None` is the absent value (from stdlib, always available)
+- [x] `some_value` is constructed implicitly by assigning a `T` to a `T?` variable
 
 ```kl
 name: str? = None          # optional string, currently absent
@@ -228,7 +228,7 @@ age: i32? = 42             # age is an optional i32 containing 42
 
 ## 3.4 The `ptr` Type
 
-- [ ] `ptr` is an opaque pointer (raw memory address) — ❌ not implemented
+- [ ] `ptr` is an opaque pointer (raw memory address) — 🔶 partial
 - [ ] No arithmetic on `ptr` without `unsafe:`
 - [ ] Used for FFI with C libraries
 
@@ -241,8 +241,8 @@ p: ptr = null              # null pointer
 - [x] Decimal: `42`, `1_000_000`
 - [x] Hexadecimal: `0xFF`, `0xDEAD_BEEF`
 - [x] Binary: `0b1010`, `0b1100_0011`
-- [~] Underscores as digit separators
-- [~] Suffix annotation: `42i8`, `42u32`, `42i64`
+- [x] Underscores as digit separators
+- [x] Suffix annotation: `42i8`, `42u32`, `42i64`
 
 ```kl
 x = 42           # i32
@@ -255,7 +255,7 @@ b: u8 = 255      # u8
 ## 3.6 Float Literals
 
 - [x] Decimal: `3.14`, `0.5`, `1.0`
-- [~] Scientific: `1e10`, `2.5e-3`
+- [x] Scientific: `1e10`, `2.5e-3`
 - [x] Suffix annotation: `3.14f32`, `2.5f64`
 
 ```kl
@@ -323,12 +323,12 @@ p: ptr = null
 
 ## 3.12 Explicit Cast `as`
 
-- [ ] `expr as Type` performs an explicit type cast — ❌ not implemented
-- [ ] Integer-to-integer: `x as i64` widens or narrows
-- [ ] Float-to-integer: `3.14 as i32` truncates
-- [ ] Integer-to-float: `42 as f64`
-- [ ] Pointer-to-integer: `p as i64` (in `unsafe:`)
-- [ ] Integer-to-pointer: `addr as ptr` (in `unsafe:`)
+- [x] `expr as Type` performs an explicit type cast — ✅ working
+- [x] Integer-to-integer: `x as i64` widens or narrows
+- [x] Float-to-integer: `3.14 as i32` truncates
+- [x] Integer-to-float: `42 as f64`
+- [x] Pointer-to-integer: `p as i64` (in `unsafe:`)
+- [x] Integer-to-pointer: `addr as ptr` (in `unsafe:`)
 
 ```kl
 x: i64 = 42 as i64
@@ -337,7 +337,7 @@ y: i32 = 3.14 as i32   # 3 (truncation)
 
 ## 3.13 Type Check `is`
 
-- [ ] `value is Type` returns `true` if the value has the given type — ❌ not implemented
+- [ ] `value is Type` returns `true` if the value has the given type — 🔶 partial
 - [ ] Used in match patterns: `x is str => ...`
 - [ ] Useful for `T?` types: `x is None => ...`
 
@@ -647,8 +647,8 @@ fn greet(name: str):
 - [x] `name: type` declares a typed parameter
 - [x] `name` (untyped) infers from the body
 - [x] Parameters are **immutable** by default (like all bindings)
-- [ ] Default values: `name: type = default` — ❌ not implemented
-- [ ] Variadic: `...names: T` — ❌ not implemented
+- [x] Default values: `name: type = default` — ✅ working
+- [x] Variadic: `...names: T` — ✅ working
 
 ```kl
 fn add(a: i32, b: i32) i32:
@@ -707,10 +707,10 @@ fn read_int() i32!:
 
 ## 5.6 Async Functions (Expression-Form)
 
-- [~] `async expr` spawns `expr` on a new thread
-- [~] Returns a task handle (i64)
+- [x] `async expr` spawns `expr` on a new thread
+- [x] Returns a task handle (i64)
 - [x] `await task` joins the thread and returns its result
-- [ ] `async fn name():` form — ❌ not implemented (use `async <expr>` instead)
+- [ ] `async fn name():` form — 🔶 partial (use `async <expr>` instead)
 
 ```kl
 task = async compute_something()
@@ -719,10 +719,10 @@ result = await task
 
 ## 5.7 Const Functions
 
-- [~] `const fn name():` declares a function callable at compile time
-- [~] Only allowed in constant expressions
-- [~] Body must use only const-allowed operations (literals, other const fns)
-- [~] Real compile-time evaluation — 🔶 partial (type-checks only, not evaluated)
+- [x] `const fn name():` declares a function callable at compile time
+- [x] Only allowed in constant expressions
+- [x] Body must use only const-allowed operations (literals, other const fns)
+- [x] Real compile-time evaluation — ✅ working
 
 ```kl
 const fn double(x: i32) i32:
@@ -731,8 +731,8 @@ const fn double(x: i32) i32:
 
 ## 5.8 Abstract Functions
 
-- [ ] `abstract fn name():` declares an abstract function — ❌ not implemented
-- [ ] Only `abstract class` exists; `abstract fn` is not yet a syntax
+- [ ] `abstract fn name():` declares an abstract function — 🔶 partial
+- [x] `abstract fn` is parsed and lowered — 🔶 partial
 
 ## 5.9 Function Visibility
 
@@ -806,7 +806,7 @@ while i < 10:
 
 - [x] `for var in iterable:` iterates over a list
 - [x] `for var in start..end:` iterates a numeric range
-- [~] `for-else:` runs the `else` block if the loop completes without `break`
+- [ ] `for-else:` runs the `else` block if the loop completes without `break` — ❌ not implemented
 
 ```kl
 for item in items:
@@ -832,7 +832,7 @@ loop:
 
 ## 6.5 Labeled Loops
 
-- [ ] `'label:` marks a loop with a label — ❌ not implemented
+- [ ] `'label:` marks a loop with a label — 🔶 partial
 - [ ] `break 'label` exits the labeled loop from nested loops
 - [ ] `continue 'label` continues the labeled loop from nested loops
 
@@ -882,9 +882,9 @@ for user in users:
 - [x] `match value:` opens a pattern match
 - [x] Arms are `pattern : body` (colon separator)
 - [x] Patterns: literal, identifier binding, wildcard `_`, enum variant
-- [ ] `1 | 2 :` or-patterns — ❌ not implemented
-- [~] `if cond` guard — 🔶 partial (parsed, not used for filtering)
-- [ ] `is type` is-type pattern — ❌ not implemented in lowering
+- [x] `1 | 2 :` or-patterns — ✅ working
+- [x] `if cond` guard — ✅ working
+- [ ] `is type` is-type pattern — 🔶 partial
 - [x] Match as expression returns a value
 
 ```kl
@@ -1034,13 +1034,13 @@ operational effect.
 inherited. This replaces what was `struct` in earlier versions — it is the
 simplest form of a user-defined data type.
 
-- [ ] `final class Name:` declares a final class (replaces `struct`) — ❌ not implemented
+- [x] `final class Name:` declares a final class (replaces `struct`) — ✅ working
 - [ ] `final class Name<T>:` declares a generic final class
-- [ ] Fields are `name: type` declarations
-- [ ] `Name { x: 1, y: 2 }` creates an instance via literal syntax
-- [ ] `.field` accesses a field
-- [ ] `.field = value` assigns a field
-- [ ] Passed by reference (no copy overhead)
+- [x] Fields are `name: type` declarations
+- [x] `Name { x: 1, y: 2 }` creates an instance via literal syntax
+- [x] `.field` accesses a field
+- [x] `.field = value` assigns a field
+- [x] Passed by reference (no copy overhead)
 
 ```kl
 final class Point:
@@ -1171,7 +1171,7 @@ c.increment()
 - [x] Child inherits all parent methods
 - [x] Child can override a parent method by re-declaring it
 - [x] Method dispatch follows the inheritance chain at call time
-- [ ] `super.method()` calls the parent's overridden method — ❌ not implemented
+- [ ] `super.method()` calls the parent's overridden method — 🔶 partial
 
 ```kl
 class Animal:
@@ -1218,7 +1218,7 @@ class Bank:
 
 ## 7.7 Abstract Classes
 
-- [ ] `abstract class Name:` declares an abstract class (cannot be instantiated) — ❌ not implemented
+- [x] `abstract class Name:` declares an abstract class (cannot be instantiated) — ✅ working
 - [x] `abs class Name:` is a temporary alias for `abstract class`
 - [x] Subclasses must inherit and provide all methods
 - [~] Abstract method enforcement — 🔶 partial (class can be abstract, but no
@@ -1261,8 +1261,8 @@ result = MathUtils.square(5)      # 25
 - [x] `contract Name:` declares a contract (interface)
 - [x] Contracts list method signatures (no bodies)
 - [x] `class X: Contract` declares that `X` implements the contract
-- [ ] Generic contracts `contract Name<T>:` — ❌ not implemented
-- [ ] `impl` keyword — ❌ not used; `class X: Contract` does the impl
+- [x] Generic contracts `contract Name<T>:` — ✅ working
+- [x] `impl` keyword — ✅ not used; `class X: Contract` does the impl
 
 ```kl
 contract Greeter:
@@ -1280,8 +1280,8 @@ class Person: Greeter
 
 ## 7.10 Type Aliases
 
-- [~] `type Alias = T` declares a type alias
-- [~] `type Alias<T> = T<T>` declares a generic type alias
+- [x] `type Alias = T` declares a type alias
+- [x] `type Alias<T> = T<T>` declares a generic type alias
 
 ```kl
 type IntList = [i32]
@@ -1295,9 +1295,9 @@ Properties are fields with custom **getter** and/or **setter** logic. The
 caller uses normal field-access syntax (`obj.prop`), but the compiler inserts
 calls to the getter or setter.
 
-- [ ] `get:` defines a read accessor — ❌ not implemented
-- [ ] `set:` defines a write accessor — ❌ not implemented
-- [ ] `name: type` with no get/set is a normal field
+- [x] `get:` defines a read accessor — ✅ working
+- [x] `set:` defines a write accessor — ✅ working
+- [x] `name: type` with no get/set is a normal field
 
 **Planned syntax:**
 
@@ -1341,7 +1341,7 @@ println(a.is_overdrawn)         # calls get is_overdrawn → false
 - [x] `[1, 2, 3]` creates a list literal
 - [x] `[1, 2, ...rest]` spreads another list
 - [x] `items[i]` indexes
-- [~] `items[i..j]` slices
+- [ ] `items[i..j]` slices — ❌ not implemented
 - [x] `items[i] = val` assigns
 - [x] `items.add(val)` appends (method)
 - [x] `items.pop()` removes and returns the last
@@ -1370,7 +1370,7 @@ alice_age = ages["alice"]
 n = ages.len()            # 3
 ```
 
-- [ ] Non-string keys — ❌ not supported (planned)
+- [x] Non-string keys — ✅ working
 
 ## 8.3 Tuples
 
@@ -1390,7 +1390,7 @@ x = t.0                  # 1
 - [x] `(params) =>\n  body` is a block-bodied closure
 - [x] Captures variables by reference
 - [x] First-class: can be passed, returned, stored
-- [~] Type annotations on parameters: `(x: i32) => x * 2` — 🔶 partial
+- [x] Type annotations on parameters: `(x: i32) => x * 2` — ✅ working
 
 ```kl
 double = (x: i32) => x * 2
@@ -1413,7 +1413,7 @@ Kyle supports two forms of async:
 | Form | Description | Status |
 |---|---|---|
 | `async expr` | Spawns an expression as a concurrent task | ✅ Current (thread-based) |
-| `async fn name():` | Declares an async function (state machine) | ❌ Planned (work-stealing scheduler) |
+| `async fn name():` | Declares an async function (thread pool V2) | ✅ Implemented |
 
 ## 10.1 Expression Form (Current)
 
@@ -1428,7 +1428,7 @@ result = await task
 
 ## 10.2 Async Functions (Planned)
 
-- [ ] `async fn name():` declares an async function — ❌ not implemented
+- [x] `async fn name():` declares an async function (thread pool V2) — ✅ implemented
 - [ ] Uses a work-stealing scheduler (like Tokio) instead of OS threads
 - [ ] The function body is compiled as a state machine
 - [ ] `await` inside an `async fn` yields control to the scheduler
@@ -1516,7 +1516,7 @@ age = user?.age          # i32 or None
 - [x] `import x` — imports the `x` module
 - [x] `import path.to.module` — nested module path (maps to `path/to/module.kl`)
 - [x] `from x import y` — imports `y` from module `x`
-- [ ] `from x import y as z` — imports `y` as `z`
+- [x] `from x import y as z` — imports `y` as `z`
 - [x] `import ~x` — relative import from current file
 
 ```kl
@@ -1667,16 +1667,16 @@ which is translated to runtime function calls by the compiler.
 | `.get(i)` | `(i64) T` | Get element at index (panics if out of bounds) | 🔶 Planned |
 | `.set(i, v)` | `(i64, T) void` | Set element at index | 🔶 Planned |
 | `.clone()` | `() [T]` | Deep copy of the list | ✅ |
-| `.insert(i, v)` | `(i64, T) void` | Insert at index, shifting elements right | 🔶 Planned |
+| `.insert(i, v)` | `(i64, T) void` | Insert at index, shifting elements right | ✅ working |
 | `.remove(v)` | `(T) void` | Remove first occurrence of value | 🔶 Planned |
-| `.remove_at(i)` | `(i64) T` | Remove and return element at index | 🔶 Planned |
-| `.clear()` | `() void` | Remove all elements | 🔶 Planned |
-| `.contains(v)` | `(T) bool` | Check if value exists in list | 🔶 Planned |
+| `.remove_at(i)` | `(i64) T` | Remove and return element at index | ✅ working |
+| `.clear()` | `() void` | Remove all elements | ✅ working |
+| `.contains(v)` | `(T) bool` | Check if value exists in list | ✅ working |
 | `.find(v)` | `(T) i64?` | Find index of first occurrence (returns `None` if not found) | 🔶 Planned |
 | `.sort()` | `() void` | Sort in-place | 🔶 Planned |
-| `.reverse()` | `() void` | Reverse in-place | 🔶 Planned |
-| `.pop_first()` | `() T` | Remove and return first element | 🔶 Planned |
-| `.extend(other)` | `([T]) void` | Append all elements from another list | 🔶 Planned |
+| `.reverse()` | `() void` | Reverse in-place | ✅ working |
+| `.pop_first()` | `() T` | Remove and return first element | ✅ working |
+| `.extend(other)` | `([T]) void` | Append all elements from another list | ✅ working |
 
 Examples:
 ```kyle
@@ -1695,9 +1695,9 @@ copied = items.clone()       # deep copy
 | :--- | :--- | :--- | :--- |
 | `.len()` | `() i64` | Number of key-value entries | ✅ |
 | `.clone()` | `() {K:V}` | Deep copy of the dict | ✅ |
-| `.get(k)` | `(str) V?` | Look up key (returns `None` if missing) | 🔶 Planned |
-| `.set(k, v)` | `(str, V) void` | Set key-value pair | 🔶 Planned |
-| `.contains(k)` | `(str) bool` | Check if key exists | 🔶 Planned |
+| `.get(k)` | `(str) V?` | Look up key (returns `None` if missing) | ✅ working |
+| `.set(k, v)` | `(str, V) void` | Set key-value pair | ✅ working |
+| `.contains(k)` | `(str) bool` | Check if key exists | ✅ working |
 | `.keys()` | `() [str]` | Return list of all keys | 🔶 Planned |
 | `.values()` | `() [V]` | Return list of all values | 🔶 Planned |
 | `.clear()` | `() void` | Remove all entries | 🔶 Planned |

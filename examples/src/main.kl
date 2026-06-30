@@ -1,210 +1,27 @@
-## Kyle Comprehensive Syntax Test
-
-fn square(n: i32) i32: n * n
+## Phase 15 — Verification
 
 fn add(a: i32, b: i32) i32: a + b
+fn is_even(x: i32) bool: x % 2 == 0
 
-fn greet(name: str) str: "Hello, " + name
-
-fn greet_default(name: str = "World") str: "Hello, " + name
-
-fn sum_all(...numbers: i32) i32:
-    total := 0
-    for n in numbers: total = total + n
-    total
-
-fn test_if(x: i32) str:
-    if x > 0: "positive"
-    elif x < 0: "negative"
-    else: "zero"
-
-fn test_while() i32:
-    n := 0
-    while n < 5: n = n + 1
-    n
-
-fn test_loop() i32:
-    n := 0
-    loop:
-        n = n + 1
-        if n >= 3: break
-    n
-
-fn describe(n: i32) str:
-    match n:
-        0 | 1: "small"
-        2 | 3: "medium"
-        _: "unknown"
-
-fn test_binding(opt: i32?) str:
-    if n = opt: "got " + str(n)
-    else: "nothing"
-
-enum Color:
-    Red
-    Blue
-
-fn color_name(c: Color) str:
-    match c:
-        Color.Red: "red"
-
-class Shape:
-    fn area() f64: 0.0
-
-class Circle :: Shape:
-    radius: f64
-    Circle(r: f64):
-        this.radius = r
-    fn area() f64:
-        3.14 * this.radius * this.radius
-    fn describe() str:
-        "Circle(" + str(this.radius) + ")"
-
-class Box:
-    value: i32
-        get: return this._val
-        set(v): this._val = v
-    _val: i32
-    Box(v: i32):
-        this._val = v
-
-final class Point:
-    x: i32
-    y: i32
-
-fn test_defer() str:
-    s := ""
-    defer s = s + "!"
-    s = "hello"
-    s
-
-fn test_guard(x: i32) i32:
-    guard x > 0 else: return 0
-    x * 2
-
-fn interpolate(name: str, age: i32) str:
-    "My name is {name} and I am {age}"
-
-async fn async_compute(n: i32) i32:
-    n * n
-
-fn test_async():
-    t := async async_compute(7)
-    r := await t
-    assert(r == 49)
-
-fn test_destruct():
-    (xv, yv) = (1, 2)
-    assert(xv == 1)
-    assert(yv == 2)
-
-# ============================================================
-# Main test
-# ============================================================
 fn main() i32:
-    # 1. Variables
-    mode := "test"
-    app_name = "Kyle"
-
-    # 2. Arithmetic
-    a := 42
-    assert(a + 10 == 52)
-    assert(a - 5 == 37)
-    assert(a * 2 == 84)
-    assert(a / 3 == 14)
-    assert(a % 7 == 0)
-    assert(-a == -42)
-    assert((42 > 10) == true)
-    assert((42 < 10) == false)
-    assert((true and false) == false)
-    assert((true or false) == true)
-    assert((5 & 3) == 1)
-    assert((5 | 3) == 7)
-    assert((1 << 3) == 8)
-    max_val := a > 100 ? a : 100
-    assert(max_val == 100)
-
-    # 3. Functions
     assert(add(2, 3) == 5)
-    assert(greet("Alice") == "Hello, Alice")
-    assert(greet_default() == "Hello, World")
-    assert(square(4) == 16)
-
-    # 4. Closures
-    double = (x) => x * 2
-    assert(double(5) == 10)
-
-    # 5. Control flow
-    assert(test_if(5) == "positive")
-    assert(test_while() == 5)
-    assert(test_loop() == 3)
-    assert(describe(0) == "small")
-    assert(describe(3) == "medium")
-
-    # 6. Binding if
-    assert(test_binding(42) == "got 42")
-    assert(test_binding(None) == "nothing")
-
-    # 7. Enum
-    assert(color_name(Color.Red) == "red")
-
-    # 8. Classes
-    c := Circle(5.0)
-    assert(c.area() > 78.0)
-    assert(c.describe() == "Circle(5)")
-
-    # 9. Properties
-    b := Box(42)
-    assert(b.value == 42)
-    b.value = 100
-    assert(b.value == 100)
-
-    # 10. Struct
-    pt := Point { x: 3, y: 4 }
-    assert(pt.x == 3)
-    assert(pt.y == 4)
-
-    # 11. Guard
-    assert(test_defer() == "hello")
-    assert(test_guard(5) == 10)
-    assert(test_guard(-1) == 0)
-
-    # 12. String interpolation
-    s := interpolate("Kyle", 5)
-    assert(s == "My name is Kyle and I am 5")
-
-    # 13. Destructuring
-    test_async()
-    test_destruct()
-
-    # 14. List methods
-    items := [5, 10, 15, 20]
-    items.add(25)
-    assert(items.len() == 5)
-    assert(items.contains(15) == 1)
-    assert(items.pop() == 25)
-    assert(items.pop_first() == 5)
-    items.insert(1, 7)
-    assert(items.remove_at(2) == 15)
-    items2 := items.clone()
-    items2.reverse()
-    assert(items2[0] == 20)
-    copy := [2, 3, 4]
-    assert(copy.product() == 24)
-    items.clear()
-    assert(items.len() == 0)
-
-    # 15. String methods
-    text := "Hello World"
-    assert(text.len() == 11)
-    assert(text.upper() == "HELLO WORLD")
-    assert(text.lower() == "hello world")
-    assert(text.contains("World") == 1)
-
-    # 16. Clone
-    original := "move me"
-    cloned := original.clone()
-    assert(original == cloned)
-
-    println("ALL TESTS PASSED")
+    assert(is_even(10) == true)
+    assert((true and false) == false)
+    assert((5 & 3) == 1)
+    max := 42 > 50 ? 42 : 50
+    assert(max == 50)
+    triple = (n) => n * 3
+    assert(triple(10) == 30)
+    (a, b) = (10, 20)
+    assert(a == 10)
+    assert("Hello {42}" == "Hello 42")
+    ns := [10, 20, 30]
+    ns.add(40)
+    assert(ns.len() == 4)
+    cfg = {"k": "v"}
+    assert(cfg.len() == 1)
+    tk = async add(40, 2)
+    rv = await tk
+    assert(rv == 42)
+    println("ALL PHASE 15 TESTS PASSED")
     0

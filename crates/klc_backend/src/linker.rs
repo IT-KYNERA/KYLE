@@ -23,7 +23,7 @@ impl Linker {
         }
     }
 
-    pub fn link(&self, object_files: &[&Path], output: &Path, runtime_lib: Option<&Path>) -> Result<(), String> {
+    pub fn link(&self, object_files: &[&Path], output: &Path, runtime_lib: Option<&Path>, release: bool) -> Result<(), String> {
         if object_files.is_empty() {
             return Err("No object files to link".to_string());
         }
@@ -31,12 +31,21 @@ impl Linker {
         let mut cmd = Self::linker_cmd();
         cmd.arg("-o").arg(output);
 
+        if release {
+            cmd.arg("-O3");
+            cmd.arg("-flto");  // GCC Link-Time Optimization
+        }
+
         for obj in object_files {
             cmd.arg(obj);
         }
 
         if let Some(runtime) = runtime_lib {
             cmd.arg(runtime);
+        }
+
+        if release {
+            cmd.arg("-lm");
         }
 
         let status = cmd.status().map_err(|e| format!("Linker failed: {}", e))?;

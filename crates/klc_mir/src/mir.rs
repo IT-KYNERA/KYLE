@@ -43,7 +43,7 @@ pub enum MirType {
 }
 
 /// Binary operators in MIR.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MirBinaryOp {
     Add, Sub, Mul, Div, Rem,
     And, Or, Xor,
@@ -52,7 +52,7 @@ pub enum MirBinaryOp {
 }
 
 /// Unary operators in MIR.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MirUnaryOp {
     Neg, Not, BitNot,
 }

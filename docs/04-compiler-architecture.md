@@ -12,11 +12,17 @@
    │  Source  │ →  │ Lexer │ →  │ Parser │ →  │  HIR   │ →  │ Semantic │ →  │  MIR   │
    │  .kl     │    │       │    │        │    │ Build  │    │  + Types │    │Lowering│
    └──────────┘    └───────┘    └────────┘    └────────┘    └──────────┘    └────┬───┘
-                                                                                  │
+                                                                                   │
    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-   │  Binary  │ ←  │  Linker  │ ←  │ Codegen  │ ←  │  Move    │ ←  │ Optimize │ ←─┘
-   │   .kl    │    │          │    │(LLVM 18) │    │ Analysis │    │          │
-   └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
+   │  Binary  │ ←  │  Linker  │ ←  │  SSA     │ ←  │  Move    │ ←  │ Optimize │ ←─┘
+   │   .kl    │    │          │    │  Codegen │    │ Analysis │    │          │
+   └──────────┘    └──────────┘    └─────┬─────┘    └──────────┘    └──────────┘
+                                         │
+                                    ┌────▼────┐
+                                    │   SSA   │
+                                    │  Form   │
+                                    │  Pass   │
+                                    └─────────┘
 ```
 
 Each stage is implemented as a separate Rust crate and is independently
@@ -49,7 +55,7 @@ kl/
 | `klc_hir` | HIR building + validation | `Program` (AST) | `HirModule` (HIR) |
 | `klc_semantic` | Name resolution + type checking | `HirModule` | `HirModule` (typed) + `SymbolTable` |
 | `klc_mir` | Mid-level IR + passes | `HirModule` | `MirModule` (functions, types, control flow) |
-| `klc_backend` | LLVM codegen + linking | `MirModule` | Native executable |
+| `klc_backend` | SSA Form + LLVM codegen + linking | `MirModule` | Native executable |
 | `klc_driver` | Pipeline orchestrator | (none) | `klc::run(source, options) -> Result` |
 | `klc_cli` | Command-line tool | argv | Compiled binary, stdout/stderr |
 | `klc_runtime` | C-ABI runtime library | (linked at compile time) | Provides memory, I/O, string ops to compiled Kyle code |
@@ -186,18 +192,20 @@ specifically for Kyle's semantics. The backend translates MIR → LLVM IR.
 
 ## 8. Stage 6: MIR Optimization (`klc_mir::optimize`)
 
-Constant-folding and dead-code elimination passes on the MIR.
+Constant-folding, dead-code elimination, and inlining passes on the MIR.
 
 **Currently implemented:**
 
 - Constant folding: `2 + 3` → `5` at MIR level
 - Unreachable-code elimination after unconditional `return` / `break`
+- **Function inlining** (Phase 15): inline small/single-call functions
+- **Mem2Reg** (Phase 15): promote non-escaping allocas to SSA values
 
-**Planned (Phase 10):**
+**Planned:**
 
 - Loop-invariant code motion
 - Strength reduction
-- Function inlining
+- GVN (Global Value Numbering) on SSA
 
 ---
 
@@ -228,24 +236,66 @@ used after it has been moved. Eliminates the need for refcounting.
 
 ---
 
-## 10. Stage 8: LLVM Codegen (`klc_backend`)
+## 10. Stage 8: SSA Form Transformation (`klc_mir::ssa`) — NUEVO (Phase 15)
 
-Translates MIR to LLVM IR using `inkwell` (Rust bindings for LLVM 18), then
-invokes the LLVM toolchain to compile to an object file, and links the
-runtime library to produce the final executable.
+Converts the lowered MIR (`MirFunction` with load/store) into **Static Single
+Assignment** form (`SsaFunction` with phi nodes). This is the most impactful
+optimization in the compiler — it eliminates the allocas and load/store pairs
+that prevent LLVM from optimizing aggressively.
 
-**Output:** A native binary in `target/<debug|release>/<name>`.
+**Output:** `SsaModule { functions: Vec<SsaFunction> }`
 
-**Optimization level:** Currently `Default` (LLVM's default). The `--release`
-flag is accepted but does not yet switch to `O2`/`O3` — this is planned for
-Phase 9.
+**Key passes:**
 
-**Linker:** Uses the system linker (`cc`) for the final link step. The
-runtime library `libklc_runtime.a` is linked statically.
+1. **Mem2Reg** — Identify non-escaping allocas (no `field_ptr`/`PtrOffset` to them).
+   Replace each `load %X` with the value of the last `store %X` reaching that point.
+   Insert phi nodes at join points where multiple definitions converge.
+
+2. **Phi placement** — Use the dominance-frontier algorithm to place minimal phi nodes.
+
+3. **Renaming** — Walk the dominator tree, renaming variables so each assignment
+   gets a unique SSA version.
+
+**SSA vs non-SSA:** Functions that use heap-allocated types (strings, lists, dicts,
+class instances) or have `field_ptr`/`Memcpy` instructions remain in non-SSA form,
+since those allocas escape and cannot be promoted.
+
+**Optimizations that require SSA:**
+- GVN (Global Value Numbering)
+- Constant propagation across blocks
+- Dead store elimination
 
 ---
 
-## 11. The Runtime (`klc_runtime`)
+## 11. Stage 9: LLVM Codegen (`klc_backend`)
+
+Translates **SsaFunction** (or `MirFunction` for non-SSA functions) to LLVM IR
+using `inkwell` (Rust bindings for LLVM 18), then invokes the LLVM toolchain to
+compile to an object file, and links the runtime library to produce the final
+executable.
+
+**SSA codegen:** For SSA functions, the codegen emits LLVM values directly
+(phi nodes, arithmetic, calls) without allocating stack slots or emitting
+load/store pairs. This lets LLVM apply its full optimization pipeline
+(constant propagation, loop optimization, vectorization).
+
+**Non-SSA codegen:** Functions with escaping allocas fall back to the original
+alloca+load+store codegen path.
+
+**Output:** A native binary in `target/<debug|release>/<name>`.
+
+**Optimization levels:**
+| Mode | LLVM flags | Codegen |
+|------|-----------|---------|
+| Debug | `-O0` | Non-SSA (alloca) |
+| Release | `-O2 -flto=thin` | SSA + Alias Analysis |
+
+**Linker:** Uses the system linker (`cc`) with `-flto=thin` for release builds.
+The runtime library `libklc_runtime.a` is linked statically.
+
+---
+
+## 12. The Runtime (`klc_runtime`)
 
 A static C-ABI library linked into every compiled Kyle program. It
 provides the primitive operations that the compiler lowers calls to.
@@ -272,7 +322,7 @@ The runtime is written in **pure Rust** with `#[unsafe(no_mangle)]` and
 
 ---
 
-## 12. The Standard Library (`std/`)
+## 13. The Standard Library (`std/`)
 
 Eight `.kl` modules, all written in Kyle itself. The public syntax for
 optional types is `T?` (internally represented as `Option<T>`).
@@ -290,7 +340,7 @@ optional types is `T?` (internally represented as `Option<T>`).
 
 ---
 
-## 13. Compilation Modes
+## 14. Compilation Modes
 
 | Mode | Trigger | Optimization | Output |
 |---|---|---|---|
@@ -302,7 +352,7 @@ optimization level passed to LLVM.
 
 ---
 
-## 14. Development Commands
+## 15. Development Commands
 
 ```bash
 # Build all crates

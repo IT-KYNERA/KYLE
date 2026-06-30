@@ -17,3 +17,4 @@ pub mod source_map;
 pub mod symbol;
 pub mod diagnostic;
 pub mod types;
+pub mod semver;

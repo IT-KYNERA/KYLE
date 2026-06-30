@@ -159,7 +159,7 @@ fn cmd_new(args: &[String]) {
 
     // kl.toml — project manifest
     let manifest = format!(
-        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"1\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle programming language project\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
+        "name = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle programming language project\"\nmain = \"src/main.kl\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
         project_name
     );
     fs::write(project_dir.join("kl.toml"), &manifest).unwrap_or_else(|e| {
@@ -363,7 +363,12 @@ fn cmd_build(args: &[String]) {
                         println!("Build complete: {}", output.display());
                         let lock_path = project_root.join("kl.lock");
                         let manifest = klc_tools::package::Manifest::find_in_directory(&project_root).ok();
-                        if let Some(m) = manifest {
+                        if let Some(ref m) = manifest {
+                            if let Err(errors) = m.validate() {
+                                for err in &errors {
+                                    eprintln!("Warning: kl.toml: {}", err);
+                                }
+                            }
                             let mut lock = klc_tools::package::LockFile::read(&lock_path).unwrap_or_default();
                             for (name, version) in &m.dependencies {
                                 lock.add_package(name, version, "registry");

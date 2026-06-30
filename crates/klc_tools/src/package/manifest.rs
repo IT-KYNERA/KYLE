@@ -1,3 +1,4 @@
+use klc_core::semver::{parse_version, SemanticVersion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -7,11 +8,16 @@ use std::path::Path;
 pub struct Manifest {
     pub name: String,
     pub version: String,
+    #[serde(default)]
     pub edition: String,
+    #[serde(default)]
     pub authors: Vec<String>,
+    #[serde(default)]
     pub license: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default)]
+    pub main: String,
     #[serde(default)]
     pub compiler: CompilerConfig,
     #[serde(default)]
@@ -80,5 +86,53 @@ impl Manifest {
 
     pub fn save_to_dir(&self, dir: &Path) -> Result<(), String> {
         self.write(&dir.join("kl.toml"))
+    }
+
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors: Vec<String> = Vec::new();
+
+        if self.name.is_empty() {
+            errors.push("project name is required".into());
+        } else if !self.name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+            errors.push(format!("invalid project name '{}': only letters, numbers, _, - allowed", self.name));
+        }
+
+        if self.version.is_empty() {
+            errors.push("project version is required".into());
+        } else if let Err(e) = parse_version(&self.version) {
+            errors.push(format!("invalid project version '{}': {}", self.version, e));
+        }
+
+        if !self.edition.is_empty() && self.edition != "2024" {
+            errors.push(format!("unsupported edition '{}' (supported: 2024)", self.edition));
+        }
+
+        for (dep_name, dep_ver) in &self.dependencies {
+            if dep_name.is_empty() {
+                errors.push("dependency name cannot be empty".into());
+            }
+            if let Err(e) = klc_core::semver::parse_requirement(dep_ver) {
+                errors.push(format!("invalid version requirement for '{}': {} ({})", dep_name, e, dep_ver));
+            }
+        }
+
+        for (dep_name, dep_ver) in &self.dev_dependencies {
+            if dep_name.is_empty() {
+                errors.push("dev-dependency name cannot be empty".into());
+            }
+            if let Err(e) = klc_core::semver::parse_requirement(dep_ver) {
+                errors.push(format!("invalid version requirement for dev-dep '{}': {} ({})", dep_name, e, dep_ver));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub fn parsed_version(&self) -> Result<SemanticVersion, String> {
+        parse_version(&self.version)
     }
 }

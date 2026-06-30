@@ -460,7 +460,13 @@ impl TypeChecker {
     fn infer_expr(&mut self, expr: &Expr) -> Type {
         match expr {
             Expr::Literal { value, .. } => match value {
-                Literal::Integer(_) => Type::I32,
+                Literal::Integer(n) => {
+                    if *n > i32::MAX as i64 || *n < i32::MIN as i64 {
+                        Type::I64
+                    } else {
+                        Type::I32
+                    }
+                }
                 Literal::Float(_) => Type::F64,
                 Literal::String(_) => Type::Str,
                 Literal::Boolean(_) => Type::Bool,

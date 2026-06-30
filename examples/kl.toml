@@ -1,7 +1,7 @@
-name = "kyle-syntax-test"
+name = "kyle-full-test"
 version = "0.1.0"
 edition = "1"
-description = "Comprehensive syntax test for Kyle"
+description = "Comprehensive test of all Kyle syntax"
 
 [compiler]
 optimization = "O2"

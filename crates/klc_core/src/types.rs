@@ -85,7 +85,13 @@ impl Type {
 
     pub fn default_for_literal(lit: &crate::ast::Literal) -> Self {
         match lit {
-            crate::ast::Literal::Integer(_) => Type::I32,
+            crate::ast::Literal::Integer(n) => {
+                if *n > i32::MAX as i64 || *n < i32::MIN as i64 {
+                    Type::I64
+                } else {
+                    Type::I32
+                }
+            }
             crate::ast::Literal::Float(_) => Type::F64,
             crate::ast::Literal::String(_) => Type::Str,
             crate::ast::Literal::Boolean(_) => Type::Bool,

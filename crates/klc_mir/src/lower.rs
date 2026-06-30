@@ -688,12 +688,100 @@ impl Lowerer {
         None
     }
 
+    /// Lower an `async fn` declaration. Generates two MIR functions:
+    ///   1. `_async_body_{name}` — the actual body (with i64 dummy param, returns i64)
+    ///   2. `{name}` — the wrapper that spawns the body on the thread pool via kl_spawn_task
+    fn lower_async_fn(&self, f: &FunctionDecl, body: &Block) -> Option<MirFunction> {
+        let struct_defs = self.struct_defs.borrow().clone();
+        let body_fn_name = format!("_async_body_{}", f.name);
+
+        // === 1. Generate the async body function ===
+        let mut body_func = MirFunction::new(&body_fn_name);
+        body_func.params = vec![MirType::I64];
+        body_func.return_type = MirType::I64;
+
+        let mut cctx = LowerCtx::new();
+        cctx.struct_defs = struct_defs.clone();
+
+        // Allocate dummy param (unused for now)
+        let dummy = cctx.alloc_local("_dummy", MirType::I64);
+        cctx.current_block.insts.push(MirInst::Store {
+            dest: dummy,
+            value: MirValue::Param(0),
+        });
+
+        // Lower the body statements (same logic as lower_function)
+        let last_is_tail = matches!(body.statements.last(), Some(Stmt::Expression(_)));
+        let stmt_count = body.statements.len();
+        for (i, stmt) in body.statements.iter().enumerate() {
+            if i + 1 == stmt_count {
+                if let Stmt::If(_) = stmt {
+                    cctx.tail_if_as_return = true;
+                }
+            }
+            cctx = self.lower_stmt(cctx, stmt);
+        }
+
+        // Emit return — widen tail value to i64
+        if cctx.current_block.terminator == MirTerminator::Unreachable {
+            let tail_local = if last_is_tail {
+                cctx.next_local.checked_sub(1)
+            } else { None };
+            if let Some(val_local) = tail_local {
+                let val_type = cctx.local_types.get(&val_local).cloned().unwrap_or(MirType::I32);
+                if val_type != MirType::I64 {
+                    let widened = cctx.alloc_local("_aw", MirType::I64);
+                    cctx.current_block.insts.push(MirInst::Cast {
+                        dest: widened,
+                        value: MirValue::Local(val_local),
+                        to_type: MirType::I64,
+                    });
+                    cctx.emit_return(MirValue::Local(widened));
+                } else {
+                    cctx.emit_return(MirValue::Local(val_local));
+                }
+            } else {
+                cctx.emit_return(MirValue::Constant(MirConstant::I64(0)));
+            }
+        }
+        body_func.local_count = cctx.next_local;
+        body_func.basic_blocks = cctx.blocks;
+        self.async_functions.borrow_mut().push(body_func);
+
+        // === 2. Generate the wrapper function (returns i64 task handle) ===
+        let mut wrapper = MirFunction::new(&f.name);
+        wrapper.return_type = MirType::I64;
+
+        let mut ctx = LowerCtx::new();
+        ctx.struct_defs = struct_defs;
+
+        let dest = ctx.alloc_local("_async_h", MirType::I64);
+        ctx.current_block.insts.push(MirInst::AsyncSpawn {
+            dest,
+            function_name: body_fn_name,
+            arg: MirValue::Constant(MirConstant::I64(0)),
+        });
+        ctx.emit_return(MirValue::Local(dest));
+        wrapper.local_count = ctx.next_local;
+        wrapper.basic_blocks = ctx.blocks;
+
+        Some(wrapper)
+    }
+
     fn lower_function(&self, f: &FunctionDecl) -> Option<MirFunction> {
         let body = f.body.as_ref()?;
+        // Handle async fn: generate body + wrapper that spawns on thread pool
+        if f.is_async {
+            return self.lower_async_fn(f, body);
+        }
         let struct_defs = self.struct_defs.borrow().clone();
         let mut mir_func = MirFunction::new(&f.name);
         mir_func.params = f.params.iter()
-            .map(|p| ast_type_to_mir(&p.type_, Some(&struct_defs)))
+            .map(|p| if p.variadic {
+                MirType::List(Box::new(ast_type_to_mir(&p.type_, Some(&struct_defs))))
+            } else {
+                ast_type_to_mir(&p.type_, Some(&struct_defs))
+            })
             .collect();
         mir_func.return_type = f.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
@@ -708,7 +796,12 @@ impl Lowerer {
 
         // Allocate and store params
         for (i, param) in f.params.iter().enumerate() {
-            let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+            let ptype = if param.variadic {
+                MirType::List(Box::new(ast_type_to_mir(&param.type_, Some(&ctx.struct_defs))))
+            } else {
+                ast_type_to_mir(&param.type_, Some(&ctx.struct_defs))
+            };
+            let local = ctx.alloc_local(&param.name, ptype);
             ctx.current_block.insts.push(MirInst::Store {
                 dest: local,
                 value: MirValue::Param(i),
@@ -2971,6 +3064,123 @@ impl Lowerer {
                             });
                             return ctx;
                         }
+                        // === LAZY ITERATOR ===
+                        if is_list && property == "iter" && arguments.is_empty() {
+                            let list_i64 = ctx.alloc_local("_li64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: list_i64, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                            });
+                            let result = ctx.alloc_local("_iter", MirType::Ptr(Box::new(MirType::I8)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_iter_new".to_string(),
+                                args: vec![MirValue::Local(list_i64)],
+                            });
+                            return ctx;
+                        }
+                        // === HIGHER-ORDER METHODS (map, filter, fold, reduce) ===
+                        if is_list && property == "map" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_mapres", MirType::List(Box::new(MirType::I64)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_list_map".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                        if is_list && property == "filter" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_filres", MirType::List(Box::new(MirType::I64)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_list_filter".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                        if is_list && property == "fold" && arguments.len() == 2 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let init_val = ctx.next_local - 1;
+                            let init_i64 = ctx.alloc_local("_fldi", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: init_i64, value: MirValue::Local(init_val), to_type: MirType::I64,
+                            });
+                            ctx = self.lower_expr(ctx, &arguments[1]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_fldres", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_list_fold".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(init_i64), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                        if is_list && property == "reduce" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_rdcres", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_list_reduce".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                    }
+
+                    // === ITERATOR METHODS (lazy iteration API) ===
+                    let is_iter = obj_type.as_ref().map(|t| matches!(t, MirType::Ptr(_))).unwrap_or(false);
+                    if is_iter {
+                        if property == "next" && arguments.is_empty() {
+                            let iter_i64 = ctx.alloc_local("_it64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: iter_i64, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                            });
+                            let result = ctx.alloc_local("_next", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_iter_next".to_string(),
+                                args: vec![MirValue::Local(iter_i64)],
+                            });
+                            return ctx;
+                        }
+                        if property == "map" && arguments.len() == 1 {
+                            let iter_i64 = ctx.alloc_local("_im64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: iter_i64, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                            });
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_itermap", MirType::Ptr(Box::new(MirType::I8)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_iter_map".to_string(),
+                                args: vec![MirValue::Local(iter_i64), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                        if property == "filter" && arguments.len() == 1 {
+                            let iter_i64 = ctx.alloc_local("_if64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: iter_i64, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                            });
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let fn_ptr = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_iterfil", MirType::Ptr(Box::new(MirType::I8)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_iter_filter".to_string(),
+                                args: vec![MirValue::Local(iter_i64), MirValue::Local(fn_ptr)],
+                            });
+                            return ctx;
+                        }
+                        if property == "collect" && arguments.is_empty() {
+                            let iter_i64 = ctx.alloc_local("_ic64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: iter_i64, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                            });
+                            let result = ctx.alloc_local("_icol", MirType::List(Box::new(MirType::I64)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "kl_iter_collect".to_string(),
+                                args: vec![MirValue::Local(iter_i64)],
+                            });
+                            return ctx;
+                        }
                     }
 
                     // Dict method shortcuts (len, set, get)
@@ -3239,7 +3449,39 @@ impl Lowerer {
                 if let Some(decl) = decl_opt {
                     let supplied = arguments.len();
                     for (i, param) in decl.params.iter().enumerate() {
-                        if i < supplied {
+                        if param.variadic {
+                            // Pack remaining arguments into a list
+                            let elem_type = ast_type_to_mir(&param.type_, Some(&ctx.struct_defs));
+                            let list_type = MirType::List(Box::new(elem_type.clone()));
+                            let list_handle = ctx.alloc_local("_varargs", list_type.clone());
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(list_handle),
+                                name: "kl_list_new".to_string(),
+                                args: vec![],
+                            });
+                            for j in i..supplied {
+                                let arg = &arguments[j];
+                                ctx = self.lower_expr(ctx, arg);
+                                let val = ctx.next_local - 1;
+                                let val_i64 = ctx.alloc_local("_vvi", MirType::I64);
+                                ctx.current_block.insts.push(MirInst::Cast {
+                                    dest: val_i64,
+                                    value: MirValue::Local(val),
+                                    to_type: MirType::I64,
+                                });
+                                ctx.current_block.insts.push(MirInst::Call {
+                                    dest: None,
+                                    name: "kl_list_push".to_string(),
+                                    args: vec![MirValue::Local(list_handle), MirValue::Local(val_i64)],
+                                });
+                            }
+                            let result = ctx.alloc_local("_vr", list_type);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: result,
+                                value: MirValue::Local(list_handle),
+                            });
+                            args.push(MirValue::Local(result));
+                        } else if i < supplied {
                             let arg = &arguments[i];
                             // Struct-typed identifiers: pass original local by reference
                             if let Expr::Identifier { name, .. } = arg {

@@ -442,3 +442,123 @@ pub extern "C" fn kl_list_reverse(list: *mut KlList) {
         }
     }
 }
+
+// ============================================================
+// Lazy Iterator API (Phase 10)
+// ============================================================
+
+/// Opaque iterator state stored as a heap-allocated i64 array:
+///   [0] = source list ptr (i64)
+///   [1] = current index
+///   [2] = map fn ptr (0 = none)
+///   [3] = filter fn ptr (0 = none)
+#[repr(C)]
+pub struct KlIter {
+    pub source: i64,
+    pub index: i64,
+    pub map_fn: i64,
+    pub filter_fn: i64,
+}
+
+/// Create a lazy iterator from a list.
+/// Returns an opaque pointer to a KlIter (stored as i64 in Kyle).
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_new(list_ptr: i64) -> i64 {
+    let boxed = Box::new(KlIter {
+        source: list_ptr,
+        index: 0,
+        map_fn: 0,
+        filter_fn: 0,
+    });
+    Box::into_raw(boxed) as i64
+}
+
+/// Get the next value from an iterator.
+/// Returns the value, or i64::MIN when exhausted.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_next(iter_ptr: i64) -> i64 {
+    if iter_ptr == 0 { return i64::MIN; }
+    let iter = unsafe { &mut *(iter_ptr as *mut KlIter) };
+    let list_ptr = iter.source as *const KlList;
+    if list_ptr.is_null() { return i64::MIN; }
+    unsafe {
+        let list = &*list_ptr;
+        loop {
+            if iter.index >= list.len as i64 {
+                return i64::MIN;
+            }
+            let raw_val = std::ptr::read(list.data.add(iter.index as usize));
+            iter.index += 1;
+            let mut val = raw_val;
+
+            // Apply map FIRST (transform the raw value)
+            if iter.map_fn != 0 {
+                let map: FnI64 = std::mem::transmute(iter.map_fn);
+                val = map(val);
+            }
+
+            // Apply filter AFTER map (filter on transformed value)
+            if iter.filter_fn != 0 {
+                let filter: FnI64 = std::mem::transmute(iter.filter_fn);
+                if filter(val) == 0 {
+                    continue; // skip, index already advanced past this element
+                }
+            }
+
+            return val;
+        }
+    }
+}
+
+/// Create a mapped iterator (lazy, no allocation).
+/// Returns a new KlIter that wraps the source with a map function.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_map(source_ptr: i64, fn_ptr: i64) -> i64 {
+    if source_ptr == 0 { return 0; }
+    let source = unsafe { &*(source_ptr as *const KlIter) };
+    let boxed = Box::new(KlIter {
+        source: source.source,
+        index: source.index,
+        map_fn: fn_ptr,
+        filter_fn: source.filter_fn,
+    });
+    Box::into_raw(boxed) as i64
+}
+
+/// Create a filtered iterator (lazy, no allocation).
+/// Returns a new KlIter that wraps the source with a filter function.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_filter(source_ptr: i64, fn_ptr: i64) -> i64 {
+    if source_ptr == 0 { return 0; }
+    let source = unsafe { &*(source_ptr as *const KlIter) };
+    let boxed = Box::new(KlIter {
+        source: source.source,
+        index: source.index,
+        map_fn: source.map_fn,
+        filter_fn: fn_ptr,
+    });
+    Box::into_raw(boxed) as i64
+}
+
+/// Collect an iterator into a new list.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_collect(iter_ptr: i64) -> *mut KlList {
+    if iter_ptr == 0 { return std::ptr::null_mut(); }
+    let result = kl_list_new();
+    if result.is_null() { return result; }
+    loop {
+        let val = kl_iter_next(iter_ptr);
+        if val == i64::MIN { break; }
+        kl_list_push(result, val);
+    }
+    result
+}
+
+/// Free an iterator.
+#[unsafe(no_mangle)]
+pub extern "C" fn kl_iter_free(iter_ptr: i64) {
+    if iter_ptr == 0 { return; }
+    unsafe {
+        drop(Box::from_raw(iter_ptr as *mut KlIter));
+    }
+}

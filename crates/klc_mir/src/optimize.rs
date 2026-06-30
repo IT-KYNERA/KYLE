@@ -13,8 +13,14 @@ impl Optimizer {
     pub fn optimize(&self, module: &mut MirModule) {
         // First, evaluate const fn calls (replaces them with constants)
         self.const_eval(module);
+        // TODO: Inlining pass disabled — causes segfault, needs fixing
+        // self.inline_small_functions(module);
         for func in &mut module.functions {
             self.constant_fold(func);
+            // Phase 15: GVN requires SSA Form (dest must be assigned once).
+            // On non-SSA MIR, a dest can be overwritten, making GVN incorrect.
+            // Enable only when SSA codegen is active.
+            // self.local_value_numbering(func);
             // Compute move_locals: locals with Move-type allocas
             let move_locals: HashSet<usize> = func.basic_blocks.iter()
                 .flat_map(|b| b.insts.iter())
@@ -26,6 +32,237 @@ impl Optimizer {
                 .collect();
             self.dead_code_elim(func, &move_locals);
             self.remove_unreachable_blocks(func);
+        }
+    }
+
+
+
+    /// Inline small functions (single basic block, ≤ 10 insts) at call sites.
+    fn inline_small_functions(&self, module: &mut MirModule) {
+        let funcs = module.functions.clone();
+        for func_idx in 0..module.functions.len() {
+            let caller_name = module.functions[func_idx].name.clone();
+            let mut new_blocks: Vec<MirBasicBlock> = Vec::new();
+            let mut block_map: HashMap<String, String> = HashMap::new();
+            let mut local_offset: usize = 0;
+
+            // First pass: find all call sites to inline candidates
+            let mut inlines: Vec<(usize, usize, String)> = Vec::new(); // (block_idx, inst_idx, callee_name)
+            for (bi, block) in module.functions[func_idx].basic_blocks.iter().enumerate() {
+                for (ii, inst) in block.insts.iter().enumerate() {
+                    if let MirInst::Call { name, .. } = inst {
+                        // Check if callee is a candidate for inlining
+                        if let Some(callee_idx) = funcs.iter().position(|f| f.name == *name) {
+                            let callee = &funcs[callee_idx];
+                            let is_small = callee.basic_blocks.len() == 1
+                                && callee.basic_blocks[0].insts.iter()
+                                    .filter(|inst| !matches!(inst, MirInst::Alloca { .. }))
+                                    .count() <= 10
+                                && callee.name != caller_name; // no recursion
+                            if is_small {
+                                inlines.push((bi, ii, name.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+
+            if inlines.is_empty() {
+                continue;
+            }
+
+            // Clone the function's blocks to modify them
+            let mut func_blocks = module.functions[func_idx].basic_blocks.clone();
+            // Process inlines in reverse order (so indices don't shift)
+            for (bi, ii, callee_name) in inlines.into_iter().rev() {
+                let callee_idx = funcs.iter().position(|f| f.name == callee_name).unwrap();
+                let callee = &funcs[callee_idx];
+                let dest_local = match &func_blocks[bi].insts[ii] {
+                    MirInst::Call { dest: Some(d), .. } => Some(*d),
+                    _ => None,
+                };
+                let call_args: Vec<MirValue> = match &func_blocks[bi].insts[ii] {
+                    MirInst::Call { args, .. } => args.clone(),
+                    _ => vec![],
+                };
+
+                // Compute local offset for inlined blocks
+                let max_local = func_blocks.iter()
+                    .flat_map(|b| b.insts.iter())
+                    .filter_map(|inst| {
+                        match inst {
+                            MirInst::Alloca { dest, .. } => Some(*dest),
+                            MirInst::Store { dest, .. } => Some(*dest),
+                            MirInst::Load { dest, .. } => Some(*dest),
+                            MirInst::BinaryOp { dest, .. } => Some(*dest),
+                            MirInst::UnaryOp { dest, .. } => Some(*dest),
+                            MirInst::Cast { dest, .. } => Some(*dest),
+                            MirInst::Call { dest, .. } => *dest,
+                            MirInst::PtrOffset { dest, .. } => Some(*dest),
+                            MirInst::FieldPtr { dest, .. } => Some(*dest),
+                            _ => None,
+                        }
+                    })
+                    .max()
+                    .unwrap_or(0) + 1;
+
+                // Check that inlining only happens in blocks with simple terminators
+                let term_is_br = matches!(&func_blocks[bi].terminator, MirTerminator::Br(_));
+                if !term_is_br {
+                    continue; // skip complex terminators for now
+                }
+
+                // Remove the Call instruction
+                func_blocks[bi].insts.remove(ii);
+
+                // Clone the callee's single block with remapped locals
+                let callee_block = &callee.basic_blocks[0];
+                let param_count = callee.params.len();
+                let mut local_map: HashMap<usize, usize> = HashMap::new();
+
+                // Map callee allocas to new locals
+                for inst in &callee_block.insts {
+                    if let MirInst::Alloca { dest, .. } = inst {
+                        let new_local = max_local + local_map.len();
+                        local_map.insert(*dest, new_local);
+                        // Copy the alloca instruction
+                        let mut new_alloca = inst.clone();
+                        if let MirInst::Alloca { dest, .. } = &mut new_alloca {
+                            *dest = new_local;
+                        }
+                        func_blocks[bi].insts.push(new_alloca);
+                        // Store param values into param allocas
+                        if *dest < param_count {
+                            if let Some(arg) = call_args.get(*dest) {
+                                func_blocks[bi].insts.push(MirInst::Store {
+                                    dest: new_local,
+                                    value: arg.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Map and copy non-alloca instructions
+                for inst in &callee_block.insts {
+                    if matches!(inst, MirInst::Alloca { .. }) {
+                        continue;
+                    }
+                    let mut new_inst = inst.clone();
+                    Self::remap_inst_locals(&mut new_inst, &local_map);
+                    func_blocks[bi].insts.push(new_inst);
+                }
+                // Handle return terminator: store result then continue to next block
+                if let MirTerminator::Return(val) = &callee_block.terminator {
+                    let mapped_val = Self::map_value(val, &local_map);
+                    if let Some(dest) = dest_local {
+                        func_blocks[bi].insts.push(MirInst::Store {
+                            dest,
+                            value: mapped_val,
+                        });
+                    }
+                }
+            }
+
+            module.functions[func_idx].basic_blocks = func_blocks;
+        }
+    }
+
+    fn map_value(val: &MirValue, map: &HashMap<usize, usize>) -> MirValue {
+        match val {
+            MirValue::Local(id) => {
+                if let Some(new_id) = map.get(id) {
+                    MirValue::Local(*new_id)
+                } else {
+                    val.clone()
+                }
+            }
+            _ => val.clone(),
+        }
+    }
+
+    fn remap_inst_locals(inst: &mut MirInst, map: &HashMap<usize, usize>) {
+        match inst {
+            MirInst::Store { dest, value } => {
+                if let Some(new_dest) = map.get(dest) {
+                    *dest = *new_dest;
+                }
+                *value = Self::map_value(value, map);
+            }
+            MirInst::Load { dest, src } => {
+                if let Some(new_dest) = map.get(dest) {
+                    *dest = *new_dest;
+                }
+                if let Some(new_src) = map.get(src) {
+                    *src = *new_src;
+                }
+            }
+            MirInst::BinaryOp { dest, left, right, .. } => {
+                if let Some(new_dest) = map.get(dest) {
+                    *dest = *new_dest;
+                }
+                *left = Self::map_value(left, map);
+                *right = Self::map_value(right, map);
+            }
+            MirInst::UnaryOp { dest, operand, .. } => {
+                if let Some(new_dest) = map.get(dest) {
+                    *dest = *new_dest;
+                }
+                *operand = Self::map_value(operand, map);
+            }
+            MirInst::Call { dest, args, .. } => {
+                if let Some(d) = dest {
+                    if let Some(new_dest) = map.get(d) {
+                        *dest = Some(*new_dest);
+                    }
+                }
+                for arg in args.iter_mut() {
+                    *arg = Self::map_value(arg, map);
+                }
+            }
+            MirInst::Cast { dest, value, .. } => {
+                if let Some(new_dest) = map.get(dest) {
+                    *dest = *new_dest;
+                }
+                *value = Self::map_value(value, map);
+            }
+            MirInst::PtrOffset { dest, ptr, index } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                if let Some(new_ptr) = map.get(ptr) { *ptr = *new_ptr; }
+                *index = Self::map_value(index, map);
+            }
+            MirInst::FieldPtr { dest, ptr, .. } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                if let Some(new_ptr) = map.get(ptr) { *ptr = *new_ptr; }
+            }
+            MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
+                if let Some(new_d) = map.get(dest_ptr_local) { *dest_ptr_local = *new_d; }
+                if let Some(new_s) = map.get(src_alloca_local) { *src_alloca_local = *new_s; }
+            }
+            MirInst::FnAddr { dest, .. } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+            }
+            MirInst::CallIndirect { dest, fn_ptr, args, .. } => {
+                if let Some(d) = dest {
+                    if let Some(new_dest) = map.get(d) { *dest = Some(*new_dest); }
+                }
+                if let Some(new_fp) = map.get(fn_ptr) { *fn_ptr = *new_fp; }
+                for arg in args.iter_mut() {
+                    *arg = Self::map_value(arg, map);
+                }
+            }
+            MirInst::AsyncSpawn { dest, arg, .. } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                *arg = Self::map_value(arg, map);
+            }
+            MirInst::AsyncAwait { dest, handle } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                if let Some(new_h) = map.get(handle) { *handle = *new_h; }
+            }
+            MirInst::Alloca { dest, .. } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+            }
+            _ => {}
         }
     }
 
@@ -510,6 +747,23 @@ fn eval_const_binary_op(op: &MirBinaryOp, left: &MirConstant, right: &MirConstan
             }
         }
         _ => MirConstant::Void,
+    }
+}
+
+/// Extract the destination local from an instruction (for GVN).
+fn dest_of(inst: &MirInst) -> Option<usize> {
+    match inst {
+        MirInst::Store { dest, .. } => Some(*dest),
+        MirInst::BinaryOp { dest, .. } => Some(*dest),
+        MirInst::UnaryOp { dest, .. } => Some(*dest),
+        MirInst::Cast { dest, .. } => Some(*dest),
+        MirInst::Call { dest, .. } => *dest,
+        MirInst::PtrOffset { dest, .. } => Some(*dest),
+        MirInst::FieldPtr { dest, .. } => Some(*dest),
+        MirInst::FnAddr { dest, .. } => Some(*dest),
+        MirInst::AsyncSpawn { dest, .. } => Some(*dest),
+        MirInst::AsyncAwait { dest, .. } => Some(*dest),
+        _ => None,
     }
 }
 

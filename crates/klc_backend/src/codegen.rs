@@ -1,3 +1,4 @@
+use inkwell::attributes::{Attribute, AttributeLoc};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -5,11 +6,13 @@ use inkwell::types::BasicType;
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::BasicValue;
 use inkwell::values::BasicValueEnum;
+use inkwell::values::FunctionValue;
 use inkwell::values::PointerValue;
 use inkwell::IntPredicate;
 use std::collections::HashMap;
 
 use klc_mir::mir::*;
+use klc_mir::ssa::{SsaFunction, SsaInst, SsaValueId};
 
 pub struct Codegen<'ctx> {
     context: &'ctx Context,
@@ -99,6 +102,491 @@ impl<'ctx> Codegen<'ctx> {
         Ok(())
     }
 
+    // ===================================================================
+    // SSA Codegen (Phase 15 — experimental)
+    // ===================================================================
+
+    pub fn compile_with_ssa(&mut self, mir_module: &MirModule) -> Result<(), String> {
+        let result = klc_mir::ssa::convert_module(mir_module);
+        let ssa_fns = result.ssa_functions;
+        let non_ssa_fns = result.non_ssa_functions;
+
+        self.declare_runtime_externs();
+
+        for ssa_fn in &ssa_fns {
+            self.declare_ssa_function(ssa_fn)?;
+        }
+        for func in &non_ssa_fns {
+            self.declare_function(func)?;
+        }
+        for ssa_fn in &ssa_fns {
+            self.compile_ssa_function(ssa_fn)?;
+        }
+        for func in &non_ssa_fns {
+            self.compile_function(func)?;
+        }
+        if self.needs_main_wrapper {
+            self.generate_main_wrapper()?;
+        }
+        if let Err(e) = self.module.verify() {
+            return Err(format!("SSA verify: {}", e));
+        }
+        Ok(())
+    }
+
+    fn declare_ssa_function(&mut self, func: &SsaFunction) -> Result<(), String> {
+        let ret_type = self.llvm_type(&func.return_type);
+        let ptr_ty = self.context.ptr_type(Default::default());
+        let param_types: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = func.params
+            .iter()
+            .map(|p| if matches!(p, MirType::Struct(_, _)) { ptr_ty.into() }
+                 else { self.llvm_type(p).into() })
+            .collect();
+
+        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+            self.needs_main_wrapper = true; "kyle_main"
+        } else { &func.name };
+        let fn_type = ret_type.fn_type(&param_types, false);
+        let fn_value = self.module.add_function(fn_name, fn_type, None);
+        self.fn_value_map.insert(fn_name.to_string(), fn_value);
+        Ok(())
+    }
+
+    /// Compile an SSA function, generating pure SSA LLVM IR (no allocas for promoted vars).
+    ///
+    /// Key design:
+    /// - `block_vals[bi]` maps SsaValueId → LLVM value for each block
+    /// - Each instruction reads operands directly from `block_vals[bi]` (no stale snapshot)
+    /// - `alloca_current` (global) tracks the current LLVM value for each promoted alloca
+    /// - Phi nodes in LLVM carry cross-block values; `alloca_current` seeds per-block start
+    fn compile_ssa_function(&mut self, func: &SsaFunction) -> Result<(), String> {
+        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+            "kyle_main"
+        } else { &func.name };
+        let fn_value = *self.fn_value_map.get(fn_name)
+            .ok_or_else(|| format!("SSA fn '{}' not declared", fn_name))?;
+        let ptr_ty = self.context.ptr_type(Default::default());
+
+        // Pre-scan non-promotable allocas (escaping: field_ptr, heap types)
+        self.alloca_types.clear();
+        self.ref_param_struct_types.clear();
+        self.field_ptr_allocas.clear();
+        self.field_ptr_types.clear();
+        for block in &func.blocks {
+            for inst in &block.insts {
+                if let SsaInst::Alloca { dest, type_, .. } = inst {
+                    let llvm_ty = self.llvm_type(type_);
+                    let actual = if let MirType::Ptr(_) = type_ { ptr_ty.as_basic_type_enum() } else { llvm_ty };
+                    self.alloca_types.entry(*dest).or_insert(actual);
+                }
+            }
+        }
+
+        // Create LLVM basic blocks and phi nodes
+        let mut block_map: HashMap<String, inkwell::basic_block::BasicBlock<'ctx>> = HashMap::new();
+        let mut phi_map: Vec<(usize, inkwell::values::PhiValue<'ctx>)> = Vec::new();
+        for block in &func.blocks {
+            let llvm_bb = self.context.append_basic_block(fn_value, &block.label);
+            block_map.insert(block.label.clone(), llvm_bb);
+        }
+
+        // Entry block: allocate non-promotable stack slots + params
+        self.alloca_map.clear();
+        if let Some(entry) = func.blocks.first() {
+            if let Some(&entry_bb) = block_map.get(&entry.label) {
+                self.builder.position_at_end(entry_bb);
+                for (&dest, &ty) in &self.alloca_types {
+                    while self.alloca_map.len() <= dest { self.alloca_map.push(None); }
+                    let ptr = self.builder.build_alloca(ty, "")
+                        .map_err(|e| format!("ssa alloca {}: {}", dest, e))?;
+                    self.alloca_map[dest] = Some(ptr);
+                }
+                for block in &func.blocks {
+                    for inst in &block.insts {
+                        if let SsaInst::FieldPtr { dest, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *dest { self.field_ptr_allocas.push(None); }
+                            if self.field_ptr_allocas[*dest].is_none() {
+                                self.field_ptr_allocas[*dest] = Some(
+                                    self.builder.build_alloca(ptr_ty, "_fgep")
+                                        .map_err(|e| format!("ssa fgep: {}", e))?
+                                );
+                            }
+                        }
+                    }
+                }
+                for (i, p) in fn_value.get_param_iter().enumerate() {
+                    self.param_values.insert(i, p);
+                }
+            }
+        }
+
+        // Pass 1: create phi nodes at block starts
+        for block in &func.blocks {
+            if let Some(&llvm_bb) = block_map.get(&block.label) {
+                self.builder.position_at_end(llvm_bb);
+                for phi in &block.phis {
+                    let phi_type = self.llvm_type(&phi.type_);
+                    if let Ok(llvm_phi) = self.builder.build_phi(phi_type, "_phi") {
+                        phi_map.push((phi.dest, llvm_phi));
+                    }
+                }
+            }
+        }
+
+        // Pass 2: compile instructions — main SSA codegen
+        // GLOBAL alloca_current: tracks current LLVM value for each promoted alloca.
+        // This persists across ALL blocks so values flow through loops correctly.
+        let mut alloca_current: HashMap<usize, BasicValueEnum<'ctx>> = HashMap::new();
+        let mut block_vals: Vec<HashMap<usize, BasicValueEnum<'ctx>>> = vec![HashMap::new(); func.blocks.len()];
+
+        for (bi, block) in func.blocks.iter().enumerate() {
+            if let Some(&llvm_bb) = block_map.get(&block.label) {
+                self.builder.position_at_end(llvm_bb);
+
+                // Seed block_vals with phi values for THIS block
+                // AND update alloca_current with phi values (for succeeding blocks)
+                for &(phi_id, ref phi_val) in &phi_map {
+                    let bv = phi_val.as_basic_value();
+                    if let Some(phi) = block.phis.iter().find(|p| p.dest == phi_id) {
+                        block_vals[bi].insert(phi_id, bv);
+                        alloca_current.insert(phi.alloca_id, bv);
+                    }
+                }
+
+                // Compile instructions.
+                let insts = block.insts.clone();
+
+                // Inline helper: read SsaValueId from block_vals, alloca_current, const_values
+                macro_rules! ssa_read {
+                    ($id:expr) => {{
+                        let id: SsaValueId = $id;
+                        // 1. Current block's computed values
+                        if let Some(&v) = block_vals[bi].get(&id) { v }
+                        // 2. alloca_current (cross-block vars via promoted stores/phis)
+                        else if let Some(&v) = alloca_current.get(&id) { v }
+                        // 3. Constant values from const_values
+                        else if let Some(c) = func.const_values.get(&id) { self.constant_to_llvm(c) }
+                        // 4. Default zero
+                        else { self.context.i32_type().const_zero().as_basic_value_enum() }
+                    }};
+                }
+
+                // Helper: resolve MirValue to LLVM value using block_local_map
+                macro_rules! resolve_mir {
+                    ($val:expr) => {{
+                        let val: &MirValue = $val;
+                        match val {
+                            MirValue::Constant(c) => self.constant_to_llvm(c),
+                            MirValue::Local(mir_id) => {
+                                // Map MIR local → SsaValueId using block_local_map
+                                if let Some(ssa_id) = func.block_local_map.get(bi).and_then(|m| m.get(mir_id)).copied() {
+                                    ssa_read!(ssa_id)
+                                } else {
+                                    // Fallback: try alloca_current directly
+                                    alloca_current.get(mir_id).copied()
+                                        .unwrap_or_else(|| self.context.i32_type().const_zero().as_basic_value_enum())
+                                }
+                            }
+                            MirValue::Param(id) => self.param_values.get(id).copied()
+                                .unwrap_or_else(|| self.context.i32_type().const_zero().as_basic_value_enum()),
+                        }
+                    }};
+                }
+
+                for inst in &insts {
+                    match inst {
+                        SsaInst::Alloca { .. } => {}
+                        SsaInst::Store { dest, value } => {
+                            let val = ssa_read!(*value);
+                            if *dest < self.field_ptr_allocas.len() && self.field_ptr_allocas[*dest].is_some() {
+                                if let Some(fpa) = self.field_ptr_allocas[*dest] {
+                                    let gep = self.builder.build_load(ptr_ty, fpa, "_fgepl")
+                                        .map_err(|e| format!("sfst: {}", e))?;
+                                    self.builder.build_store(gep.into_pointer_value(), val)
+                                        .map_err(|e| format!("sfst2: {}", e))?;
+                                }
+                            } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(ptr, val)
+                                    .map_err(|e| format!("ssast: {}", e))?;
+                            } else {
+                                // Promoted alloca: track in global map AND block_vals
+                                alloca_current.insert(*dest, val);
+                                // KEY FIX: Also insert into block_vals so phi incomings can find it
+                                block_vals[bi].insert(*value, val);
+                            }
+                        }
+                        SsaInst::Load { dest, src } => {
+                            let loaded = if *src < self.field_ptr_allocas.len() && self.field_ptr_allocas[*src].is_some() {
+                                if let Some(fpa) = self.field_ptr_allocas[*src] {
+                                    let gep = self.builder.build_load(ptr_ty, fpa, "_fgepl")
+                                        .map_err(|e| format!("sfld: {}", e))?;
+                                    let lt = self.field_ptr_types.get(src)
+                                        .or_else(|| self.alloca_types.get(src))
+                                        .copied().unwrap_or(self.context.i64_type().as_basic_type_enum());
+                                    Some(self.builder.build_load(lt, gep.into_pointer_value(), "")
+                                        .map_err(|e| format!("sfld2: {}", e))?)
+                                } else { None }
+                            } else if let Some(ptr) = self.alloca_map.get(*src).and_then(|p| *p) {
+                                if let Some(lt) = self.alloca_types.get(src) {
+                                    Some(self.builder.build_load(*lt, ptr, "")
+                                        .map_err(|e| format!("ssald: {}", e))?)
+                                } else { None }
+                            } else {
+                                // Promoted alloca: read from global map (no LLVM load)
+                                alloca_current.get(src).copied()
+                            };
+                            if let Some(v) = loaded {
+                                block_vals[bi].insert(*dest, v);
+                            }
+                        }
+                        SsaInst::BinaryOp { dest, op, left, right } => {
+                            let l = ssa_read!(*left);
+                            let r = ssa_read!(*right);
+                            let result = self.ssa_binop(*op, l, r)?;
+                            block_vals[bi].insert(*dest, result);
+                        }
+                        SsaInst::UnaryOp { dest, op, operand } => {
+                            let val = ssa_read!(*operand);
+                            let result = match *op {
+                                MirUnaryOp::Neg => self.builder.build_int_neg(self.to_int_value(val), ""),
+                                MirUnaryOp::Not | MirUnaryOp::BitNot => self.builder.build_not(self.to_int_value(val), ""),
+                            }.map_err(|e| format!("ssaun: {}", e))?.as_basic_value_enum();
+                            block_vals[bi].insert(*dest, result);
+                        }
+                        SsaInst::Call { dest, name, args } => {
+                            let runtime_name = match name.as_str() {
+                                "print" => "kl_print", "println" => "kl_println",
+                                "contains" => "kl_str_contains", "to_upper" => "kl_str_to_upper",
+                                "to_lower" => "kl_str_to_lower", "trim" => "kl_str_trim",
+                                "replace" => "kl_str_replace", "input" => "kl_input",
+                                "open" => "kl_open", "read_str" => "kl_read_str",
+                                "write_str" => "kl_write_str", "close" => "kl_close",
+                                "sleep" => "kl_sleep", "now" => "kl_now",
+                                "char_at" => "kl_char_at", "is_digit" => "kl_is_digit",
+                                "is_alpha" => "kl_is_alpha", "is_alnum" => "kl_is_alnum",
+                                "is_whitespace" => "kl_is_whitespace", "is_upper" => "kl_is_upper",
+                                "is_lower" => "kl_is_lower", "ord" => "kl_ord",
+                                "substr" => "kl_substr",
+                                "json_parse" => "kl_json_parse", "json_stringify" => "kl_json_stringify",
+                                _ => name,
+                            };
+                            if let Some(callee) = self.module.get_function(runtime_name) {
+                                let fn_ty = callee.get_type();
+                                let param_tys = fn_ty.get_param_types();
+                                let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum<'ctx>> = args.iter()
+                                    .enumerate().map(|(i, a)| {
+                                        let v = ssa_read!(*a);
+                                        // Auto-cast i64 → ptr when callee expects ptr
+                                        if i < param_tys.len() {
+                                            if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_tys[i] {
+                                                if let BasicValueEnum::IntValue(iv) = v {
+                                                    let ptr_ty = self.context.ptr_type(Default::default());
+                                                    if let Ok(pv) = self.builder.build_int_to_ptr(iv, ptr_ty, "_aptr") {
+                                                        return pv.into();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        v.into()
+                                    }).collect();
+                                let call_res = self.builder.build_call(callee, &llvm_args, "")
+                                    .map_err(|e| format!("ssacl {}: {}", name, e))?;
+                                if let Some(d) = dest {
+                                    if let inkwell::values::ValueKind::Basic(rv) = call_res.try_as_basic_value() {
+                                        block_vals[bi].insert(*d, rv);
+                                    }
+                                }
+                            }
+                        }
+                        SsaInst::Cast { dest, value, to_type } => {
+                            let val = ssa_read!(*value);
+                            let target = self.llvm_type(to_type);
+                            let result = self.ssa_cast(val, &target)?;
+                            block_vals[bi].insert(*dest, result);
+                        }
+                        SsaInst::FnAddr { dest, name } => {
+                            if let Some(fv) = self.fn_value_map.get(name) {
+                                block_vals[bi].insert(*dest, fv.as_global_value().as_basic_value_enum());
+                            }
+                        }
+                        SsaInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
+                            let ptr_val = ssa_read!(*fn_ptr);
+                            let llvm_ret = self.llvm_type(ret_type);
+                            let llvm_params: Vec<inkwell::types::BasicMetadataTypeEnum> = param_types.iter()
+                                .map(|p| self.llvm_type(p).into()).collect();
+                            let fn_ty = llvm_ret.fn_type(&llvm_params, false);
+                            let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum> = args.iter()
+                                .map(|a| { let v = ssa_read!(*a); v.into() }).collect();
+                            let call_res = unsafe {
+                                self.builder.build_indirect_call(fn_ty, ptr_val.into_pointer_value(), &llvm_args, "_sicl")
+                                    .map_err(|e| format!("ssaic: {}", e))?
+                            };
+                            if let Some(d) = dest {
+                                if let inkwell::values::ValueKind::Basic(rv) = call_res.try_as_basic_value() {
+                                    block_vals[bi].insert(*d, rv);
+                                }
+                            }
+                        }
+                        SsaInst::AsyncSpawn { dest, function_name, arg } => {
+                            let arg_val = ssa_read!(*arg);
+                            let spawn_fn = self.module.get_function("kl_spawn_task")
+                                .ok_or_else(|| "no kl_spawn_task".to_string())?;
+                            let fn_val = self.fn_value_map.get(function_name)
+                                .ok_or_else(|| format!("async '{}' not found", function_name))?;
+                            let args_m: Vec<inkwell::values::BasicMetadataValueEnum> = vec![
+                                fn_val.as_global_value().as_pointer_value().into(),
+                                arg_val.into(),
+                            ];
+                            let call_res = self.builder.build_call(spawn_fn, &args_m, "_ssasp")
+                                .map_err(|e| format!("ssasp: {}", e))?;
+                            if let inkwell::values::ValueKind::Basic(rv) = call_res.try_as_basic_value() {
+                                block_vals[bi].insert(*dest, rv);
+                            }
+                        }
+                        SsaInst::AsyncAwait { dest, handle } => {
+                            let handle_val = ssa_read!(*handle);
+                            let join_fn = self.module.get_function("kl_await_task")
+                                .ok_or_else(|| "no kl_await_task".to_string())?;
+                            let args_m: Vec<inkwell::values::BasicMetadataValueEnum> = vec![handle_val.into()];
+                            let call_res = self.builder.build_call(join_fn, &args_m, "_ssaaw")
+                                .map_err(|e| format!("ssaaw: {}", e))?;
+                            if let inkwell::values::ValueKind::Basic(rv) = call_res.try_as_basic_value() {
+                                block_vals[bi].insert(*dest, rv);
+                            }
+                        }
+                        SsaInst::PtrOffset { dest, ptr, index } => {
+                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                                let idx = ssa_read!(*index);
+                                let gep = unsafe {
+                                    self.builder.build_gep(self.context.i8_type(), base, &[self.to_int_value(idx)], "_ssgep")
+                                        .map_err(|e| format!("ssgep: {}", e))?
+                                };
+                                block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                            }
+                        }
+                        SsaInst::FieldPtr { dest, ptr, field_index, struct_type } => {
+                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                                if let Some(fpa) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                    let st = self.llvm_type(struct_type);
+                                    if let BasicTypeEnum::StructType(s) = st {
+                                        let fts = s.get_field_types();
+                                        if *field_index < fts.len() {
+                                            self.field_ptr_types.insert(*dest, fts[*field_index]);
+                                        }
+                                    }
+                                    let zero = self.context.i32_type().const_zero();
+                                    let idx_v = self.context.i32_type().const_int(*field_index as u64, false);
+                                    let gep = unsafe {
+                                        self.builder.build_gep(st, base, &[zero, idx_v], "_ssfptr")
+                                            .map_err(|e| format!("ssfptr: {}", e))?
+                                    };
+                                    self.builder.build_store(fpa, gep)
+                                        .map_err(|e| format!("ssfptr2: {}", e))?;
+                                }
+                            }
+                        }
+                        SsaInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
+                            if let Some(dp) = self.alloca_map.get(*dest_ptr_local).and_then(|p| *p) {
+                                if let Some(sp) = self.alloca_map.get(*src_alloca_local).and_then(|p| *p) {
+                                    let st = self.llvm_type(struct_type);
+                                    let src_val = self.builder.build_load(st, sp, "_ssmc")
+                                        .map_err(|e| format!("ssmcld: {}", e))?;
+                                    let dst_gep = self.builder.build_load(ptr_ty, dp, "_ssmd")
+                                        .map_err(|e| format!("ssmcds: {}", e))?;
+                                    self.builder.build_store(dst_gep.into_pointer_value(), src_val)
+                                        .map_err(|e| format!("ssmcst: {}", e))?;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Terminator
+                match &block.terminator {
+                    MirTerminator::Return(val) => {
+                        let ret = resolve_mir!(val);
+                        self.builder.build_return(Some(&ret))
+                            .map_err(|e| format!("ssaret: {}", e))?;
+                    }
+                    MirTerminator::Br(label) => {
+                        if let Some(&tb) = block_map.get(label) {
+                            self.builder.build_unconditional_branch(tb)
+                                .map_err(|e| format!("ssabr: {}", e))?;
+                        }
+                    }
+                    MirTerminator::CondBr { cond, true_block, false_block } => {
+                        let cond_val = resolve_mir!(cond);
+                        let cond_int = self.to_int_value(cond_val);
+                        let i1_cond = if cond_int.get_type().get_bit_width() > 1 {
+                            let i1_ty = self.context.bool_type();
+                            self.builder.build_int_truncate(cond_int, i1_ty, "")
+                                .map_err(|e| format!("cond trunc: {}", e))?
+                        } else {
+                            cond_int
+                        };
+                        if let (Some(&tb), Some(&fb)) = (block_map.get(true_block), block_map.get(false_block)) {
+                            self.builder.build_conditional_branch(i1_cond, tb, fb)
+                                .map_err(|e| format!("ssacbr: {}", e))?;
+                        }
+                    }
+                    MirTerminator::Unreachable => {}
+                }
+            }
+        }
+
+        // Pass 3: phi incomings — fill from block_vals + alloca_current
+        for (bi, block) in func.blocks.iter().enumerate() {
+            for phi in &block.phis {
+                if let Some(phi_entry) = phi_map.iter().find(|(id, _)| *id == phi.dest) {
+                    let incomings: Vec<(BasicValueEnum<'ctx>, inkwell::basic_block::BasicBlock<'ctx>)> = phi.incomings.iter()
+                        .filter_map(|(val_id, pred_label)| {
+                            let pred_bb = block_map.get(pred_label).copied()?;
+                            // Find predecessor index in function block list
+                            let pred_bi = func.blocks.iter().position(|b| &b.label == pred_label)?;
+                            // Search predecessor's block_vals only (avoids dominance violations)
+                            let val = block_vals[pred_bi].get(val_id).copied()
+                                .or_else(|| {
+                                    // Check const_values for constants
+                                    func.const_values.get(val_id)
+                                        .map(|c| self.constant_to_llvm(c))
+                                });
+                            val.map(|v| (v, pred_bb))
+                        })
+                        .collect();
+                    if !incomings.is_empty() {
+                        let refs: Vec<(&dyn BasicValue<'ctx>, inkwell::basic_block::BasicBlock<'ctx>)> =
+                            incomings.iter().map(|(v, b)| {
+                                let bv: &dyn BasicValue = v;
+                                (bv, *b)
+                            }).collect();
+                        phi_entry.1.add_incoming(&refs);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // ===================================================================
+    // SSA Helper Functions (free functions to avoid borrow issues)
+    // ===================================================================
+
+    /// Helper: declare an extern runtime function with optional LLVM string attributes.
+    fn add_runtime_extern(
+        &self,
+        name: &str,
+        ft: inkwell::types::FunctionType<'ctx>,
+        kv_attrs: &[(&str, &str)],
+    ) -> FunctionValue<'ctx> {
+        let func = self.module.add_function(name, ft, None);
+        for &(key, val) in kv_attrs {
+            let attr = self.context.create_string_attribute(key, val);
+            func.add_attribute(AttributeLoc::Function, attr);
+        }
+        func
+    }
+
     /// Declare external runtime functions that generated code can call.
     fn declare_runtime_externs(&mut self) {
         let void_ty = self.context.void_type();
@@ -143,11 +631,11 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_f64_to_str", ft, None);
         }
-        // i32 kl_strlen(ptr)
+        // i32 kl_strlen(ptr) — readonly
         {
             let params = [ptr_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
-            self.module.add_function("kl_strlen", ft, None);
+            self.add_runtime_extern("kl_strlen", ft, &[("memory", "read")]);
         }
         // ptr kl_concat(ptr, i32, ptr, i32)
         {
@@ -166,11 +654,11 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_input_with_prompt", ft, None);
         }
-        // i32 kl_str_contains(ptr, ptr)
+        // i32 kl_str_contains(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
-            self.module.add_function("kl_str_contains", ft, None);
+            self.add_runtime_extern("kl_str_contains", ft, &[("memory", "read")]);
         }
         // ptr kl_str_to_upper(ptr)
         {
@@ -231,12 +719,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&[], false);
             self.module.add_function("kl_now", ft, None);
         }
-        // i8 kl_char_at(ptr, i32)
+        // i8 kl_char_at(ptr, i32) — readonly
         {
             let i8_ty = self.context.i8_type();
             let params = [ptr_ty.into(), i32_ty.into()];
             let ft = i8_ty.fn_type(&params, false);
-            self.module.add_function("kl_char_at", ft, None);
+            self.add_runtime_extern("kl_char_at", ft, &[("memory", "read")]);
         }
         // ptr kl_list_new()
         {
@@ -267,11 +755,11 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("kl_list_pop", ft, None);
         }
-        // i64 kl_list_get(ptr, i64)
+        // i64 kl_list_get(ptr, i64) — readonly
         {
             let params = [ptr_ty.into(), i64_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_list_get", ft, None);
+            self.add_runtime_extern("kl_list_get", ft, &[("memory", "read")]);
         }
         // void kl_list_set(ptr, i64, i64)
         {
@@ -279,17 +767,17 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_list_set", ft, None);
         }
-        // i64 kl_list_len(ptr)
+        // i64 kl_list_len(ptr) — readonly
         {
             let params = [ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_list_len", ft, None);
+            self.add_runtime_extern("kl_list_len", ft, &[("memory", "read")]);
         }
-        // i64 kl_list_sum(ptr), kl_list_product(ptr), kl_list_max(ptr), kl_list_min(ptr)
+        // i64 kl_list_sum(ptr), kl_list_product(ptr), kl_list_max(ptr), kl_list_min(ptr) — readonly
         for name in &["kl_list_sum", "kl_list_product", "kl_list_max", "kl_list_min"] {
             let params = [ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function(name, ft, None);
+            self.add_runtime_extern(name, ft, &[("memory", "read")]);
         }
         // void kl_list_reverse(ptr)
         {
@@ -320,17 +808,17 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_dict_set", ft, None);
         }
-        // i64 kl_dict_get(ptr, ptr)
+        // i64 kl_dict_get(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_dict_get", ft, None);
+            self.add_runtime_extern("kl_dict_get", ft, &[("memory", "read")]);
         }
-        // i64 kl_dict_len(ptr)
+        // i64 kl_dict_len(ptr) — readonly
         {
             let params = [ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_dict_len", ft, None);
+            self.add_runtime_extern("kl_dict_len", ft, &[("memory", "read")]);
         }
         // void kl_dict_free(ptr)
         {
@@ -344,7 +832,7 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_substr", ft, None);
         }
-        // i32 kl_is_digit(i8), kl_is_alpha(i8), etc.
+        // i32 kl_is_digit(i8), kl_is_alpha(i8), etc. — all readnone (pure)
         {
             let i8_ty = self.context.i8_type();
             let params = [i8_ty.into()];
@@ -352,14 +840,14 @@ impl<'ctx> Codegen<'ctx> {
             for name in &["kl_is_digit", "kl_is_alpha", "kl_is_alnum",
                           "kl_is_whitespace", "kl_is_upper", "kl_is_lower",
                           "kl_ord"] {
-                self.module.add_function(name, ft, None);
+                self.add_runtime_extern(name, ft, &[("memory", "none")]);
             }
         }
-        // i32 kl_eq_str(ptr, ptr)
+        // i32 kl_eq_str(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
-            self.module.add_function("kl_eq_str", ft, None);
+            self.add_runtime_extern("kl_eq_str", ft, &[("memory", "read")]);
         }
         // ptr kl_init_args(i32, ptr)  — convert C argv to Kyle list
         {
@@ -395,11 +883,11 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_dict_free", ft, None);
         }
-        // i64 kl_dict_get(ptr, ptr)  — get value by key (key is C string ptr)
+        // i64 kl_dict_get(ptr, ptr)  — get value by key (key is C string ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_dict_get", ft, None);
+            self.add_runtime_extern("kl_dict_get", ft, &[("memory", "read")]);
         }
         // void kl_dict_set(ptr, ptr, i64)  — set key=value
         {
@@ -407,17 +895,17 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("kl_dict_set", ft, None);
         }
-        // i64 kl_dict_len(ptr)
+        // i64 kl_dict_len(ptr) — readonly
         {
             let params = [ptr_ty.into()];
             let ft = i64_ty.fn_type(&params, false);
-            self.module.add_function("kl_dict_len", ft, None);
+            self.add_runtime_extern("kl_dict_len", ft, &[("memory", "read")]);
         }
-        // i32 kl_dict_contains(ptr, ptr)
+        // i32 kl_dict_contains(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
-            self.module.add_function("kl_dict_contains", ft, None);
+            self.add_runtime_extern("kl_dict_contains", ft, &[("memory", "read")]);
         }
         // void kl_dict_remove(ptr, ptr)
         {
@@ -1350,6 +1838,103 @@ impl<'ctx> Codegen<'ctx> {
                 }))
             }
             MirValue::Constant(c) => Ok(self.constant_to_llvm(c)),
+        }
+    }
+
+    // SSA Helper: binary operation
+    fn ssa_binop(&self, op: MirBinaryOp, l: BasicValueEnum<'ctx>, r: BasicValueEnum<'ctx>) -> Result<BasicValueEnum<'ctx>, String> {
+        let to_float = |v: BasicValueEnum<'ctx>| -> inkwell::values::FloatValue<'ctx> {
+            if let BasicValueEnum::FloatValue(f) = v { f }
+            else { self.builder.build_signed_int_to_float(self.to_int_value(v), self.context.f64_type(), "").unwrap() }
+        };
+        let to_int = |v: BasicValueEnum<'ctx>| -> inkwell::values::IntValue<'ctx> {
+            if let BasicValueEnum::IntValue(i) = v { i }
+            else { self.context.i32_type().const_zero() }
+        };
+        let l_is_float = matches!(l, BasicValueEnum::FloatValue(_));
+        let r_is_float = matches!(r, BasicValueEnum::FloatValue(_));
+        if l_is_float || r_is_float {
+            let lf = to_float(l); let rf = to_float(r);
+            Ok(match op {
+                MirBinaryOp::Add => self.builder.build_float_add(lf, rf, "").map_err(|e| format!("fadd: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Sub => self.builder.build_float_sub(lf, rf, "").map_err(|e| format!("fsub: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Mul => self.builder.build_float_mul(lf, rf, "").map_err(|e| format!("fmul: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Div => self.builder.build_float_div(lf, rf, "").map_err(|e| format!("fdiv: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Eq => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::OEQ, lf, rf, "").map_err(|e| format!("feq: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("feqe: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Neq => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::ONE, lf, rf, "").map_err(|e| format!("fne: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("fnee: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Lt => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::OLT, lf, rf, "").map_err(|e| format!("flt: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("flte: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Gt => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::OGT, lf, rf, "").map_err(|e| format!("fgt: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("fgte: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Le => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::OLE, lf, rf, "").map_err(|e| format!("fle: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("flee: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Ge => { let c = self.builder.build_float_compare(inkwell::FloatPredicate::OGE, lf, rf, "").map_err(|e| format!("fge: {}", e))?;
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("fgee: {}", e))?.as_basic_value_enum() }
+                _ => return Err("ssa: unsupported float op".into()),
+            })
+        } else {
+            let li = to_int(l); let ri = to_int(r);
+            Ok(match op {
+                MirBinaryOp::Add => self.builder.build_int_add(li, ri, "").map_err(|e| format!("iadd: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Sub => self.builder.build_int_sub(li, ri, "").map_err(|e| format!("isub: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Mul => self.builder.build_int_mul(li, ri, "").map_err(|e| format!("imul: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Div => self.builder.build_int_signed_div(li, ri, "").map_err(|e| format!("idiv: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Rem => self.builder.build_int_signed_rem(li, ri, "").map_err(|e| format!("irem: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::And => self.builder.build_and(li, ri, "").map_err(|e| format!("iand: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Or => self.builder.build_or(li, ri, "").map_err(|e| format!("ior: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Xor => self.builder.build_xor(li, ri, "").map_err(|e| format!("ixor: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "").map_err(|e| format!("ishl: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "").map_err(|e| format!("ishr: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Eq => self.builder.build_int_compare(inkwell::IntPredicate::EQ, li, ri, "").map_err(|e| format!("ieq: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Neq => self.builder.build_int_compare(inkwell::IntPredicate::NE, li, ri, "").map_err(|e| format!("ine: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Lt => self.builder.build_int_compare(inkwell::IntPredicate::SLT, li, ri, "").map_err(|e| format!("ilt: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Gt => self.builder.build_int_compare(inkwell::IntPredicate::SGT, li, ri, "").map_err(|e| format!("igt: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Le => self.builder.build_int_compare(inkwell::IntPredicate::SLE, li, ri, "").map_err(|e| format!("ile: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Ge => self.builder.build_int_compare(inkwell::IntPredicate::SGE, li, ri, "").map_err(|e| format!("ige: {}", e))?.as_basic_value_enum(),
+            })
+        }
+    }
+
+    // SSA Helper: type cast
+    fn ssa_cast(&self, val: BasicValueEnum<'ctx>, target: &BasicTypeEnum<'ctx>) -> Result<BasicValueEnum<'ctx>, String> {
+        Ok(match (&val, target) {
+            (BasicValueEnum::FloatValue(_), BasicTypeEnum::FloatType(t)) =>
+                self.builder.build_float_cast(self.to_float_value(val), *t, "").map_err(|e| format!("fcs: {}", e))?.as_basic_value_enum(),
+            (BasicValueEnum::IntValue(_), BasicTypeEnum::IntType(t)) => {
+                let vi = self.to_int_value(val);
+                let sw = vi.get_type().get_bit_width();
+                let dw = t.get_bit_width();
+                (if sw < dw { self.builder.build_int_z_extend(vi, *t, "") }
+                 else if sw > dw { self.builder.build_int_truncate(vi, *t, "") }
+                 else { self.builder.build_int_cast(vi, *t, "") })
+                    .map_err(|e| format!("ics: {}", e))?.as_basic_value_enum()
+            }
+            (BasicValueEnum::IntValue(_), BasicTypeEnum::FloatType(t)) =>
+                self.builder.build_signed_int_to_float(self.to_int_value(val), *t, "").map_err(|e| format!("itof: {}", e))?.as_basic_value_enum(),
+            (BasicValueEnum::FloatValue(_), BasicTypeEnum::IntType(t)) =>
+                self.builder.build_float_to_signed_int(self.to_float_value(val), *t, "").map_err(|e| format!("ftoi: {}", e))?.as_basic_value_enum(),
+            (BasicValueEnum::PointerValue(_), BasicTypeEnum::IntType(t)) =>
+                self.builder.build_ptr_to_int(val.into_pointer_value(), *t, "").map_err(|e| format!("ptoi: {}", e))?.as_basic_value_enum(),
+            (BasicValueEnum::IntValue(_), BasicTypeEnum::PointerType(t)) =>
+                self.builder.build_int_to_ptr(self.to_int_value(val), *t, "").map_err(|e| format!("itop: {}", e))?.as_basic_value_enum(),
+            _ => val,
+        })
+    }
+
+    // SSA Helper: convert MirValue to LLVM value using block_vals
+    fn ssa_mir_val(&self, val: &MirValue, bv: &[HashMap<usize, BasicValueEnum<'ctx>>], bi: usize, _func: &SsaFunction) -> Result<BasicValueEnum<'ctx>, String> {
+        match val {
+            MirValue::Constant(c) => Ok(self.constant_to_llvm(c)),
+            MirValue::Local(id) => {
+                for m in bv.iter().take(bi + 1).rev() {
+                    if let Some(&v) = m.get(id) { return Ok(v); }
+                }
+                Ok(self.context.i32_type().const_zero().as_basic_value_enum())
+            }
+            MirValue::Param(id) => self.param_values.get(id).copied()
+                .ok_or_else(|| "ssa: param not found".to_string()),
         }
     }
 

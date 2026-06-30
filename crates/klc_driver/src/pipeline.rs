@@ -10,6 +10,7 @@ use klc_mir::mir::MirModule;
 use klc_mir::lower::Lowerer;
 use klc_mir::optimize::Optimizer;
 use klc_mir::move_analysis::MoveAnalysis;
+
 use klc_backend::codegen::Codegen;
 use klc_backend::linker::Linker;
 use klc_tools::package::find_project_root;
@@ -17,6 +18,7 @@ use inkwell::context::Context;
 use inkwell::targets::{FileType, InitializationConfig, Target, TargetMachine};
 use inkwell::OptimizationLevel;
 use std::io::Write;
+use std::time::Instant;
 
 #[derive(Default)]
 pub struct Pipeline;
@@ -281,7 +283,17 @@ impl Pipeline {
 
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "kl_module");
-        codegen.compile(&mir.module)?;
+        if optimization == OptimizationLevel::Aggressive {
+            match codegen.compile_with_ssa(&mir.module) {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("SSA codegen error (falling back): {}", e);
+                    codegen.compile(&mir.module)?;
+                }
+            }
+        } else {
+            codegen.compile(&mir.module)?;
+        }
 
         // Ensure artifact directory exists
         std::fs::create_dir_all(artifact_dir)
@@ -302,10 +314,11 @@ impl Pipeline {
         let obj_path = artifact_dir.join(format!("{}.o", stem));
         emit_object(codegen.module(), &obj_path, optimization)?;
 
-        // Link
+        // Link (ThinLTO in release mode)
+        let is_release = optimization == OptimizationLevel::Aggressive;
         let linker = Linker::new();
         let runtime_lib = Linker::find_runtime_lib();
-        linker.link(&[&obj_path], output_path, runtime_lib.as_deref())
+        linker.link(&[&obj_path], output_path, runtime_lib.as_deref(), is_release)
             .map_err(|e| format!("Link error: {}", e))?;
 
         Ok(())
