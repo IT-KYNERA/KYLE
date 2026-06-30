@@ -2291,7 +2291,7 @@ impl Lowerer {
                                     .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
                                 if let Some(field_idx) = field_idx {
                                     let field_type = fields[field_idx].1.clone();
-                                    let ft = ctx.alloc_local("_fptr", field_type.clone());
+                                    let ft = ctx.alloc_local("_fptr", MirType::I64);
                                     ctx.current_block.insts.push(MirInst::FieldPtr {
                                         dest: ft,
                                         ptr: obj_ptr,
@@ -3591,8 +3591,7 @@ impl Lowerer {
                             let field_idx = fields.iter().position(|(fname, _)| fname == property)
                                 .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
                             if let Some(field_idx) = field_idx {
-                                let field_type = fields[field_idx].1.clone();
-                                let field_ptr = ctx.alloc_local("_fieldptr", field_type.clone());
+                                let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
                                 ctx.current_block.insts.push(MirInst::FieldPtr {
                                     dest: field_ptr,
                                     ptr: obj_ptr,
@@ -3746,7 +3745,7 @@ impl Lowerer {
                             .or_else(|| resolved_fields.iter().position(|(fname, _)| fname == &backing));
                         if let Some(field_idx) = field_idx {
                             let field_type = resolved_fields[field_idx].1.clone();
-                            let field_ptr = ctx.alloc_local("_fieldptr", field_type.clone());
+                            let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: field_ptr,
                                 ptr: obj_ptr,
