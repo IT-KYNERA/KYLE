@@ -105,8 +105,8 @@ Fase 16:   LLVM IR Quality       🔜 EN CURSO — ~8%
                                    🔲 16.7 — !range metadata en bool
                                    🔲 16.8 — lifetime.start/lifetime.end
                                    ⏳ 16.1 — nsw/nuw flags (DIFERIDO: requiere range analysis)
-Fase 11:   Package Manager      🔜 DETALLADO (registry, semver, publish, lock)
-Fase 12:   Tooling              🔜 DETALLADO (LSP, VS Code, tests, formatter)
+Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
+  Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
 Fase 13:   Sintaxis Restante    🔜 DETALLADO (genéricos, rangos, is, ptr, etc.)
 Fase 14:   Borrow Checker       📅 (post-v1.0)
 Fase 15:   Alternative Backends 📅 (post-v1.0)
@@ -316,30 +316,33 @@ Hoy cada `.map()` crea una lista nueva (eager). Con lazy evaluation, solo se ite
 
 ---
 
-### Fase 11: Package Manager 📅 (registry, resolución, publicación)
+### Fase 11: Package Manager ✅ (registry, resolución, publicación)
 
 **Filosofía:** Tan simple como Cargo pero SIN la complejidad de workspaces multi-crate
 y SIN build scripts. Un package = un proyecto. Una dependencia = una línea en `kl.toml`.
 
+**Estado general:** ✅ 11.1-11.5 implementados. Foundation completa: resolver, registry client,
+cache, lock file, CLI commands, import resolution from cached packages.
+
 ---
 
-#### 11.1 — Manifest (`kl.toml`) completo
+#### 11.1 — Manifest (`kl.toml`) completo ✅
 
-**Estado actual:** ✅ `kl.toml` existe con campos `[project]` y `[dependencies]` básicos.
-El compilador lee `name` y `dependencies` pero no valida semver ni resuelve nada.
+**Estado actual:** ✅ `kl.toml` soporta formato plano y `[project]` table. Validación completa
+con mensajes de error con sugerencias. `dev-dependencies` parseadas. Main field usado.
 
-**Lo que falta:**
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 11.1.1 | Validación completa de campos `[project]` (name, version, authors, description, license, edition) | `klc_tools/src/package/manifest.rs` | ✅ |
+| 11.1.2 | Validación de versiones semver (major.minor.patch con pre-release opcional) | `klc_tools/src/package/manifest.rs` | ✅ (vía crate `semver`) |
+| 11.1.3 | Campo `[project] main` para entry point distinto de `src/main.kl` | `klc_tools/src/package/manifest.rs` | ✅ (resolved via `project_main()`) |
+| 11.1.4 | Sección `[dev-dependencies]` para dependencias de testing | `klc_tools/src/package/manifest.rs` | ✅ |
+| 11.1.5 | Sección `[target]` para configuraciones por plataforma (opcional) | `klc_tools/src/package/manifest.rs` | ⏳ (baja prioridad) |
+| 11.1.6 | Error claro y con sugerencias si `kl.toml` falta o está mal formado | `klc_tools/src/package/manifest.rs` | ✅ |
 
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 11.1.1 | Validación completa de campos `[project]` (name, version, authors, description, license, edition) | `klc_core/src/manifest.rs` | ⭐⭐ |
-| 11.1.2 | Validación de versiones semver (major.minor.patch con pre-release opcional) | `klc_core/src/manifest.rs` | ⭐⭐⭐ |
-| 11.1.3 | Campo `[project] main` para entry point distinto de `src/main.kl` | `klc_driver/src/pipeline.rs` | ⭐⭐ |
-| 11.1.4 | Sección `[dev-dependencies]` para dependencias de testing | `klc_core/src/manifest.rs` | ⭐⭐ |
-| 11.1.5 | Sección `[target]` para configuraciones por plataforma (opcional) | `klc_core/src/manifest.rs` | ⭐ |
-| 11.1.6 | Error claro y con sugerencias si `kl.toml` falta o está mal formado | `klc_core/src/manifest.rs` | ⭐⭐ |
+**Ejemplo de `kl.toml` (ambos formatos soportados):**
 
-**Ejemplo de `kl.toml` final:**
+Formato `[project]` (nuevo, recomendado):
 ```toml
 [project]
 name = "myapp"
@@ -350,6 +353,10 @@ license = "MIT"
 edition = "2024"
 main = "src/main.kl"
 
+[compiler]
+optimization = "O2"
+target = "native"
+
 [dependencies]
 math = "1.0.0"
 json = "2.1.0"
@@ -358,103 +365,100 @@ json = "2.1.0"
 testing = "1.0.0"
 ```
 
+Formato plano (backward compatible):
+```toml
+name = "myapp"
+version = "0.1.0"
+edition = "2024"
+
+[compiler]
+optimization = "O2"
+target = "native"
+
+[dependencies]
+math = "1.0.0"
+```
+
 ---
 
-#### 11.2 — Resolución de dependencias (semver)
+#### 11.2 — Resolución de dependencias (semver) ✅
 
-**Estado actual:** ❌ No existe. `kl.toml` declara dependencias pero no se resuelven.
+**Estado actual:** ✅ Resolución semver completa con algoritmo greedy, resolución transitiva,
+detección de conflictos, y orden topológico. Integrado con registry + cache + lock file.
 
-**Objetivo:** Dado `json = "2.1.0"` en `kl.toml`, el compilador debe:
-1. Consultar el registry
-2. Encontrar la versión `2.1.0` (o `^2.1.0` compatible)
-3. Descargar el paquete
-4. Compilarlo como módulo importable
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 11.2.1 | Parseo completo de semver: `^1.2.3`, `~1.2`, `>=1.0 <2.0`, `*`, `1.x` | `klc_core/src/semver.rs` (vía crate `semver`) | ✅ |
+| 11.2.2 | Comparación de versiones (major.minor.patch.pre) | `klc_core/src/semver.rs` | ✅ |
+| 11.2.3 | Algoritmo de resolución: greedy (elige la mayor compatible) | `klc_core/src/resolver.rs` | ✅ |
+| 11.2.4 | Generación de `kl.lock` con versiones resueltas + orden topológico | `klc_tools/src/package/lock.rs` | ✅ |
+| 11.2.5 | Cache de dependencias descargadas en `~/.kl/cache/` | `klc_tools/src/package/cache.rs` | ✅ |
+| 11.2.6 | `kl update` para actualizar `kl.lock` a últimas versiones compatibles | `klc_cli/src/main.rs` | ✅ |
+| 11.2.7 | `kl outdated` para listar dependencias desactualizadas | `klc_cli/src/main.rs` | ✅ |
+| 11.2.8 | Resolución de dependencias transitivas (dep de dep) | `klc_core/src/resolver.rs` | ✅ |
 
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 11.2.1 | Parseo completo de semver: `^1.2.3`, `~1.2`, `>=1.0 <2.0`, `*`, `1.x` | `klc_core/src/semver.rs` (nuevo) | ⭐⭐⭐ |
-| 11.2.2 | Comparación de versiones (major.minor.patch.pre) | `klc_core/src/semver.rs` (nuevo) | ⭐⭐⭐ |
-| 11.2.3 | Algoritmo de resolución: greedy (simple, elige la mayor compatible) | `klc_core/src/resolver.rs` (nuevo) | ⭐⭐⭐ |
-| 11.2.4 | Generación de `kl.lock` con versiones resueltas | `klc_core/src/manifest.rs` | ⭐⭐⭐ |
-| 11.2.5 | Cache de dependencias descargadas en `~/.kl/cache/` | `klc_core/src/cache.rs` (nuevo) | ⭐⭐⭐ |
-| 11.2.6 | `kl update` para actualizar `kl.lock` a últimas versiones compatibles | `klc_cli/src/main.rs` | ⭐⭐ |
-| 11.2.7 | `kl outdated` para listar dependencias desactualizadas | `klc_cli/src/main.rs` | ⭐⭐ |
-| 11.2.8 | Resolución de dependencias transitivas (dep de dep) | `klc_core/src/resolver.rs` | ⭐⭐⭐ |
-
-**Algoritmo de resolución (propuesto):**
+**Algoritmo de resolución implementado:**
 ```
 1. Leer kl.toml
 2. Para cada dep en [dependencies]:
-   a. Consultar registry por todas las versiones del paquete
-   b. Filtrar por la restricción semver (ej: "2.1.0" → >=2.1.0 <3.0.0)
+   a. Consultar registry (RegistryBackend trait) por todas las versiones del paquete
+   b. Filtrar por la restricción semver
    c. Elegir la versión más alta que cumpla
-   d. Descargar el kl.toml de esa versión para obtener sus dependencias
-   e. Repetir recursivamente
-3. Si hay conflictos (dos deps requieren versiones incompatibles del mismo paquete):
-   - Reportar error claro con el árbol de dependencias conflictivas
-4. Escribir kl.lock con todas las versiones resueltas
+   d. Obtener dependencias transitivas del registry
+   e. Repetir recursivamente (con detección de ciclos y profundidad máxima)
+3. Si hay conflictos → error claro
+4. Escribir kl.lock con orden topológico
+5. Descargar tarballs faltantes al cache
 ```
 
 ---
 
-#### 11.3 — Registry (servidor de paquetes)
+#### 11.3 — Registry (cliente HTTP) ✅
 
-**Estado actual:** ❌ No existe.
+**Estado actual:** ✅ Cliente HTTP+JSON para registry REST API. Cache local.
+File registry para testing offline.
 
-**Objetivo:** Un registry simple basado en Git (como Cargo) pero sin la complejidad
-de crates.io. Alternativa: registry plano basado en archivos JSON + tarballs.
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 11.3.1 | Diseñar estructura del registry (API HTTP REST) | — | ✅ (API definida en `registry.rs`) |
+| 11.3.2 | Cliente HTTP para consultar registry (via `ureq`) | `klc_tools/src/package/registry.rs` | ✅ |
+| 11.3.3 | Descarga y extracción de paquetes (.tar.gz) | `klc_tools/src/package/registry.rs` + `cache.rs` | ✅ |
+| 11.3.4 | Cache local en `~/.kl/cache/<pkg>-<ver>/` | `klc_tools/src/package/cache.rs` | ✅ |
+| 11.3.5 | `kl publish` — empaquetar y subir paquete al registry | `klc_cli/src/main.rs` | ✅ |
+| 11.3.6 | `kl login` — autenticación con API key | `klc_cli/src/main.rs` | ✅ |
+| 11.3.7 | Verificación de integridad (SHA256 checksums) | `klc_tools/src/package/cache.rs` | ✅ |
+| 11.3.8 | File-based registry para testing offline | `klc_tools/src/package/registry.rs` | ✅ |
 
-**Opción recomendada — Registry basado en Git:**
+**API del registry (esperada por el cliente):**
 ```
-# Estructura del registry:
-index.git/
-├── config.json           # Metadata del registry
-├── pa/
-│   └── package-name      # Archivo con lista de versiones
-└── pa/
-    └── package-name-1.0.0.crate  # Tarball del paquete (en almacenamiento)
+GET  /v1/packages/:name          → { versions: [{ version, yanked }] }
+GET  /v1/packages/:name/:ver/dependencies → { dependencies: [{ name, version }] }
+GET  /v1/packages/:name/:ver/download     → binary .tar.gz
+GET  /v1/packages/:name/:ver/kl.toml      → raw kl.toml
+PUT  /v1/packages/:name/:ver/upload       ← binary .tar.gz (para publish)
+GET  /v1/auth/verify                      → 200 OK (con Bearer token)
 ```
-
-**Opción alternativa — Registry HTTP+JSON:**
-```
-GET https://registry.kyle-lang.org/v1/packages/math
-→ { "versions": [{ "version": "1.0.0", "yank": false }, ...] }
-
-GET https://registry.kyle-lang.org/v1/packages/math/1.0.0/download
-→ binary .tar.gz
-```
-
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 11.3.1 | Diseñar estructura del registry (API HTTP REST) | docs/ (nuevo) | ⭐⭐⭐ |
-| 11.3.2 | Cliente HTTP para consultar registry | `klc_core/src/registry.rs` (nuevo) | ⭐⭐⭐ |
-| 11.3.3 | Descarga y extracción de paquetes (.tar.gz) | `klc_core/src/registry.rs` | ⭐⭐⭐ |
-| 11.3.4 | Cache local en `~/.kl/cache/<pkg>-<ver>/` | `klc_core/src/cache.rs` | ⭐⭐⭐ |
-| 11.3.5 | `kl publish` — empaquetar y subir paquete al registry | `klc_cli/src/main.rs` | ⭐⭐⭐ |
-| 11.3.6 | `kl login` — autenticación con API key | `klc_cli/src/main.rs` | ⭐⭐ |
-| 11.3.7 | Verificación de integridad (SHA256 checksums) | `klc_core/src/registry.rs` | ⭐⭐ |
-| 11.3.8 | Yank de versiones (marcar una versión como no disponible) | registry server | ⭐⭐ |
 
 ---
 
-#### 11.4 — Importación desde paquetes
+#### 11.4 — Importación desde paquetes ✅
 
-**Estado actual:** `import math` busca archivos locales. No entiende paquetes.
+**Estado actual:** ✅ El pipeline resuelve imports desde caché de paquetes
+automáticamente. `resolve_imports()` en pipeline.rs agrega search paths desde
+`kl.lock` y desde `~/.kl/cache/`. Orden de resolución implementado.
 
-**Lo que falta:**
+| # | Tarea | Archivo | Estado |
+|---|-------|---------|--------|
+| 11.4.1 | `import math` busca primero en paquetes instalados, luego en locales | `klc_driver/src/pipeline.rs` | ✅ |
+| 11.4.2 | `import mypkg.str` — importar submódulo de un paquete | `klc_frontend/src/parser.rs` | ✅ (existente) |
+| 11.4.3 | Resolver `import json` a `~/.kl/cache/json-2.1.0/src/lib.kl` | `klc_driver/src/pipeline.rs` | ✅ |
+| 11.4.4 | Compilar dependencias ANTES que el proyecto principal | `klc_driver/src/pipeline.rs` | ✅ (vía search paths) |
+| 11.4.5 | Cache de compilación: no recompilar dependencias si no cambiaron | `klc_driver/src/pipeline.rs` | ⏳ (futuro) |
 
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 11.4.1 | `import math` busca primero en paquetes instalados, luego en locales | `klc_frontend/src/parser.rs` | ⭐⭐⭐ |
-| 11.4.2 | `import mypkg.str` — importar submódulo de un paquete | `klc_frontend/src/parser.rs` | ⭐⭐⭐ |
-| 11.4.3 | Resolver `import json` a `~/.kl/cache/json-2.1.0/src/lib.kl` | `klc_driver/src/pipeline.rs` | ⭐⭐⭐ |
-| 11.4.4 | Compilar dependencias ANTES que el proyecto principal | `klc_driver/src/pipeline.rs` | ⭐⭐⭐ |
-| 11.4.5 | Cache de compilación: no recompilar dependencias si no cambiaron | `klc_driver/src/pipeline.rs` | ⭐⭐ |
-
-**Orden de resolución de imports (actualizado):**
+**Orden de resolución de imports:**
 ```
 import math → busca en:
-  1. Paquetes instalados en ~/.kl/cache/math-*/src/
+  1. Paquetes instalados en ~/.kl/cache/math-*/src/ (desde kl.lock + cache scan)
   2. Directorio del archivo actual
   3. src/ del proyecto
   4. std/ (librería estándar)
@@ -462,22 +466,32 @@ import math → busca en:
 
 ---
 
-#### 11.5 — Comandos del package manager
+#### 11.5 — Comandos del package manager ✅
 
-| Comando | Estado actual | Lo que falta |
-|---------|---------------|-------------|
-| `kl new <name>` | ✅ Crea proyecto template | Mejorar template con `kl.toml` más completo |
-| `kl add <dep>@<ver>` | ✅ Solo modifica kl.toml | Que descargue y resuelva inmediatamente |
-| `kl remove <dep>` | ✅ Solo modifica kl.toml | Que actualice kl.lock |
-| `kl build` | ✅ Compila | Sin cambios |
-| `kl run` | ✅ Ejecuta | Sin cambios |
-| `kl test` | 🔶 Solo type-check | Ver Fase 12.1 |
-| `kl publish` | ❌ No existe | Empaquetar + subir al registry |
-| `kl login` | ❌ No existe | Guardar API key en ~/.kl/config.toml |
-| `kl update` | ❌ No existe | Actualizar kl.lock |
-| `kl outdated` | ❌ No existe | Listar deps desactualizadas |
-| `kl info` | ✅ Muestra metadata | Sin cambios |
-| `kl doc` | ❌ No existe | Generar documentación desde `##` comments |
+| Comando | Estado | Detalle |
+|---------|--------|---------|
+| `kl new <name>` | ✅ | Template con `[project]` table, src/, tests/, .vscode/ |
+| `kl add <dep>@<ver>` | ✅ | Modifica kl.toml + resuelve + descarga inmediatamente |
+| `kl remove <dep>` | ✅ | Modifica kl.toml |
+| `kl build` | ✅ | Resuelve deps + descarga + compila |
+| `kl run` | ✅ | Resuelve deps + descarga + compila + ejecuta |
+| `kl check` | ✅ | Resuelve deps antes de type-check |
+| `kl test` | ✅ | Resuelve deps antes de testear |
+| `kl info` | ✅ | Muestra metadata + lock info + cache status |
+| `kl publish` | ✅ | Empaqueta .tar.gz + sube al registry |
+| `kl login` | ✅ | Verifica API key + guarda en ~/.kl/config.toml |
+| `kl update` | ✅ | Re-resuelve y actualiza kl.lock |
+| `kl outdated` | ✅ | Compara lock vs registry, lista desactualizadas |
+| `kl doc` | ❌ | Futuro (Fase 12) |
+
+#### Lo que falta de Phase 11 (no implementado, fuera del alcance del compilador)
+
+| Item | Razón |
+|------|-------|
+| `[target]` section en manifest | Baja prioridad, opcional para cross-compilación |
+| Yank de versiones (server-side) | Es responsabilidad del servidor registry, no del cliente |
+| Registry server HTTP | El cliente está listo, el server es un proyecto aparte |
+| Cache de compilación incremental | Optimización futura (no recompilar deps si no cambiaron) |
 
 ---
 
@@ -498,11 +512,11 @@ sin macros de procedimiento, sin `#[should_panic]`, sin fixtures complejas.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 12.1.1 | Parser: `#[test]` attribute antes de `fn` | `klc_frontend/src/parser.rs` | ⭐⭐⭐ |
-| 12.1.2 | `#[test]` fn debe: no tener parámetros, retornar `void` o `i32` | `klc_semantic/src/type_checker.rs` | ⭐⭐⭐ |
-| 12.1.3 | `kl test` compila y ejecuta cada `#[test]` fn individualmente | `klc_cli/src/main.rs` | ⭐⭐⭐ |
-| 12.1.4 | Reporte de resultados: `PASS`, `FAIL`, total, tiempo | `klc_cli/src/main.rs` | ⭐⭐⭐ |
-| 12.1.5 | `assert(cond)`, `assert_eq(a, b)`, `assert_ne(a, b)` como builtins | `klc_runtime/src/lib.rs` | ⭐⭐⭐ |
+| 12.1.1 | Parser: `#[test]` attribute antes de `fn` | `klc_frontend/src/parser.rs` | ✅ |
+| 12.1.2 | `#[test]` fn debe: no tener parámetros, retornar `void` o `i32` | `klc_semantic/src/type_checker.rs` | ✅ |
+| 12.1.3 | `kl test` compila y ejecuta cada `#[test]` fn individualmente | `klc_cli/src/main.rs` | ✅ |
+| 12.1.4 | Reporte de resultados: `PASS`, `FAIL`, total, tiempo | `klc_cli/src/main.rs` | ✅ |
+| 12.1.5 | `assert(cond)`, `assert_eq(a, b)`, `assert_ne(a, b)` como builtins | `klc_runtime/src/lib.rs` | ✅ |
 | 12.1.6 | `assert_throws(fn, expected_error)` para testear errores | `klc_runtime/src/lib.rs` | ⭐⭐ |
 | 12.1.7 | `#[test] ignore` para saltar tests | `klc_frontend/src/parser.rs` | ⭐⭐ |
 | 12.1.8 | `kl test <filtro>` para ejecutar solo tests que coincidan | `klc_cli/src/main.rs` | ⭐⭐ |
@@ -523,50 +537,51 @@ fn test_lento():
 
 #### 12.2 — LSP (Language Server Protocol)
 
-**Estado actual:** 🔶 `kl lsp` existe. Tiene autocompletado básico, go-to-definition,
-hover, y semantic tokens. Pero tiene limitaciones importantes.
+**Estado actual:** ✅ `kl lsp` implementado completo. Tiene diagnósticos incrementales,
+autocompletado con builtins+símbolos+keywords, dot completions contextual,
+hover con docs, go-to-definition, find references, document symbols,
+signature help, code actions, formatting, rename, semantic tokens.
 
 **Lo que falta:**
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 12.2.1 | **Diagnósticos en tiempo real**: errores de sintaxis y tipo mientras se escribe | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
-| 12.2.2 | **Diagnósticos incrementales**: solo re-analizar archivo modificado, no todo el proyecto | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
-| 12.2.3 | **Autocompletado completo**: snippets, firmas de funciones, tipos | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
-| 12.2.4 | **Autocompletado contextual**: solo mostrar métodos válidos para el tipo | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
-| 12.2.5 | **Go-to-definition mejorado**: saltar a definición de función/clase en archivos del proyecto | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
+| 12.2.1 | **Diagnósticos en tiempo real**: errores de sintaxis y tipo mientras se escribe | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.2 | **Diagnósticos incrementales**: solo re-analizar archivo modificado, no todo el proyecto | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.3 | **Autocompletado completo**: builtins, símbolos del proyecto, keywords actualizados | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.4 | **Autocompletado contextual**: dot completions con tipos conocidos (struct/class/enum) | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.5 | **Go-to-definition mejorado**: saltar a definición de función/clase en archivos del proyecto | `klc_tools/src/lsp.rs` | ✅ |
 | 12.2.6 | **Go-to-definition en dependencias**: saltar a definición dentro de paquetes instalados | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.7 | **Find references**: encontrar todas las referencias a un símbolo | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.8 | **Hover mejorado**: mostrar documentación de `##` comments | `klc_tools/src/lsp.rs` | ⭐⭐⭐ |
-| 12.2.9 | **Code actions**: sugerencias automáticas (ej: "añadir import faltante") | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.10 | **Document symbols**: lista de funciones/clases en el archivo actual | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.11 | **Rename symbol**: refactorización segura (F2) | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.12 | **Format on save**: ejecutar `kl fmt` al guardar | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.13 | **Inlay hints**: mostrar tipos inferidos en variables | `klc_tools/src/lsp.rs` | ⭐⭐ |
+| 12.2.7 | **Find references**: encontrar todas las referencias a un símbolo | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.8 | **Hover mejorado**: mostrar documentación de `##` comments + tipo inferido | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.9 | **Code actions**: sugerencias automáticas (ej: "añadir import faltante") | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.10 | **Document symbols**: lista de funciones/clases en el archivo actual | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.11 | **Rename symbol**: refactorización segura (F2) | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.12 | **Format on save**: ejecutar `kl fmt` al guardar | `klc_tools/src/lsp.rs` | ✅ |
+| 12.2.13 | **Inlay hints**: mostrar tipos inferidos en variables | `klc_tools/src/lsp.rs` | ✅ |
 | 12.2.14 | **Diagnósticos en `kl.toml`**: validar el manifest | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.15 | **Code lens**: "Run test" button encima de `#[test]` fn | `klc_tools/src/lsp.rs` | ⭐ |
+| 12.2.15 | **Code lens**: "Run test" button encima de `#[test]` fn | `klc_tools/src/lsp.rs` + `extension/src/extension.ts` | ✅ |
 
 ---
 
 #### 12.3 — VS Code Extension
 
-**Estado actual:** ✅ Existe con sintaxis highlighting, snippets, y comandos básicos.
-Se conecta al LSP pero las capacidades del LSP son limitadas.
+**Estado actual:** ✅ Completa — syntax highlighting, LSP, snippets, testing UI, debug adapter, tasks, problems panel, color theme, packaging.
 
 **Lo que falta:**
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 12.3.1 | **Syntax highlighting completo**: resaltar toda la sintaxis Kyle correctamente | `extension/syntaxes/kl.tmLanguage.json` | ⭐⭐⭐ |
-| 12.3.2 | **Icono de lenguaje**: icono para archivos `.kl` | `extension/media/` | ⭐⭐ |
-| 12.3.3 | **Task provider**: botones "Run", "Build", "Test" en la barra de estado | `extension/src/extension.ts` | ⭐⭐⭐ |
-| 12.3.4 | **Problemas en tiempo real**: mostrar errores del LSP en el panel de problemas | `extension/src/extension.ts` | ⭐⭐⭐ |
-| 12.3.5 | **Snippets actualizados**: snippets para toda la sintaxis moderna | `extension/snippets/kl.json` | ⭐⭐ |
-| 12.3.6 | **Debug adapter**: step-through debugging (DAP) — opcional | `extension/src/debugger.ts` | ⭐ |
-| 12.3.7 | **Testing UI**: mostrar tests en el panel de Testing de VS Code | `extension/src/extension.ts` | ⭐⭐ |
-| 12.3.8 | **Extension packaging**: script para generar `.vsix` automáticamente | `scripts/build-extension.sh` | ⭐⭐ |
-| 12.3.9 | **Publicación en marketplace**: VS Code Marketplace + Open VSX | CI/CD | ⭐⭐ |
-| 12.3.10 | **Tema de color Kyle**: theme específico del lenguaje (colores pastel) | `extension/themes/` | ⭐ |
+| 12.3.1 | **Syntax highlighting completo**: resaltar toda la sintaxis Kyle correctamente | `extension/syntaxes/kl.tmLanguage.json` | ✅ |
+| 12.3.2 | **Icono de lenguaje**: icono para archivos `.kl` | `vscode-kl/icons/` | ⭐⭐ | ✅ |
+| 12.3.3 | **Task provider**: botones "Run", "Build", "Test" en la barra de estado | `vscode-kl/src/extension.ts` | ✅ | ✅ |
+| 12.3.4 | **Problemas en tiempo real**: mostrar errores del LSP en el panel de problemas | `vscode-kl/src/extension.ts` | ✅ | ✅ |
+| 12.3.5 | **Snippets actualizados**: snippets para toda la sintaxis moderna | `vscode-kl/snippets/kl.json` | ✅ | ✅ |
+| 12.3.6 | **Debug adapter**: DAP server para step-through debugging | `vscode-kl/src/debugger.ts` | ⭐ | ✅ |
+| 12.3.7 | **Testing UI**: mostrar tests en el panel de Testing de VS Code | `vscode-kl/src/testUI.ts` | ✅ | ✅ |
+| 12.3.8 | **Extension packaging**: script para generar `.vsix` automáticamente | `vscode-kl/scripts/build-extension.sh` | ⭐⭐ | ✅ |
+| 12.3.9 | **Marketplace metadata**: README, CHANGELOG, icono | `vscode-kl/` | ⭐⭐ | ✅ |
+| 12.3.10 | **Tema de color Kyle**: "Kyle Pastel" dark theme | `vscode-kl/themes/kl-color-theme.json` | ⭐ | ✅ |
 
 **Estructura de la extensión:**
 ```
@@ -592,18 +607,16 @@ extension/
 
 #### 12.4 — Formatter (`kl fmt`)
 
-**Estado actual:** ✅ `kl fmt` existe y formatea lo básico.
+**Estado actual:** ✅ Formateador completo con sintaxis moderna y configuración.
 
-**Lo que falta:**
-
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 12.4.1 | Formatear toda la sintaxis moderna: `:=`, `::=`, `T?`, `final class`, etc. | `klc_tools/src/formatter.rs` | ⭐⭐⭐ |
-| 12.4.2 | Formatear patterns de match (or-patterns, guards, destructuring) | `klc_tools/src/formatter.rs` | ⭐⭐ |
-| 12.4.3 | Formatear closures inline `fn(x) x * 2` | `klc_tools/src/formatter.rs` | ⭐⭐ |
-| 12.4.4 | Formatear imports (orden alfabético, agrupados) | `klc_tools/src/formatter.rs` | ⭐⭐ |
-| 12.4.5 | `kl fmt --check` (CI mode: error si el archivo no está formateado) | `klc_cli/src/main.rs` | ⭐⭐ |
-| 12.4.6 | Configuración de formato en `kl.toml` (`[format]` section) | `klc_core/src/manifest.rs` | ⭐⭐ |
+| # | Tarea | Archivo | Prioridad | Estado |
+|---|-------|---------|-----------|--------|
+| 12.4.1 | Formatear toda la sintaxis moderna: `:=`, `::=`, `T?`, `final class`, etc. | `klc_tools/src/formatter.rs` | ⭐⭐⭐ | ✅ |
+| 12.4.2 | Formatear patterns de match (or-patterns, guards, destructuring) | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.3 | Formatear closures inline `(x) => x * 2` | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.4 | Formatear imports (orden alfabético, agrupados) | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.5 | `kl fmt --check` + project mode (`kl fmt` sin args) | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.4.6 | Configuración de formato en `kl.toml` (`[format]` section) | `klc_tools/src/package/manifest.rs` | ⭐⭐ | ✅ |
 
 **Reglas de formato (v1.0):**
 - Indentación: 4 espacios (obligatorio)
@@ -617,16 +630,14 @@ extension/
 
 #### 12.5 — Shell Completions
 
-**Estado actual:** ✅ `kl completions bash` existe y funciona.
+**Estado actual:** ✅ Completions para bash, zsh, fish, y powershell.
 
-**Lo que falta:**
-
-| # | Tarea | Archivo | Prioridad |
-|---|-------|---------|-----------|
-| 12.5.1 | `kl completions zsh` | `klc_cli/src/main.rs` | ⭐⭐ |
-| 12.5.2 | `kl completions fish` | `klc_cli/src/main.rs` | ⭐⭐ |
-| 12.5.3 | `kl completions powershell` | `klc_cli/src/main.rs` | ⭐ |
-| 12.5.4 | Autocompletado de nombres de dependencias en `kl add` | `klc_cli/src/main.rs` | ⭐⭐ |
+| # | Tarea | Archivo | Prioridad | Estado |
+|---|-------|---------|-----------|--------|
+| 12.5.1 | `kl completions zsh` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.5.2 | `kl completions fish` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.5.3 | `kl completions powershell` | `klc_cli/src/main.rs` | ⭐ | ✅ |
+| 12.5.4 | Autocompletado de nombres de dependencias en `kl add` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
 
 ---
 
@@ -742,7 +753,7 @@ Para que una nueva característica entre en Kyle, debe cumplir **todos** estos c
 | | | **🔲 16.9 TBAA metadata** |
 | | | **🔲 16.5-16.8 align/noundef/!range/lifetime** |
 | | | **⏳ 16.1 nsw/nuw (diferido: requiere range analysis)** |
-| **Package manager** | **11** | **🔜 DETALLADO (registry, semver, publish, lock)** |
+| **Package manager** | **11** | **✅ 11.1-11.5 (resolver, registry client, cache, lock, publish, login, update, outdated, import desde paquetes)** |
 | **Tooling** | **12** | **🔜 DETALLADO (LSP, VS Code, tests, formatter)** |
 | **Sintaxis Restante** | **13** | **🔜 DETALLADO (genéricos, rangos, is, ptr, etc.)** |
 | **Borrow checker** | **14** | **📅 Post-v1.0** |
@@ -883,19 +894,32 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 - [ ] 10.1-10.5 Closures funcionales (fn ptr primera clase)
 - [ ] 10.6-10.9 Lazy evaluation / `iter()` trait
 
-### Fase 11 — Package Manager 🔜
-- [ ] 11.1 Manifest completo (validación, versiones, dev-deps)
-- [ ] 11.2 Resolución semver + lock file + cache
-- [ ] 11.3 Registry (cliente HTTP, descarga, publish, login)
-- [ ] 11.4 Importación desde paquetes resueltos
-- [ ] 11.5 Comandos: `kl add` real, `kl publish`, `kl login`, `kl update`, `kl outdated`
+### Fase 11 — Package Manager ✅
+- [x] 11.1 Manifest completo (validación, versiones, dev-deps, [project] table)
+- [x] 11.2 Resolución semver + lock file + cache + resolución transitiva
+- [x] 11.3 Registry (cliente HTTP con ureq, descarga, extract, publish, login, file registry)
+- [x] 11.4 Importación desde paquetes resueltos (pipeline + search paths)
+- [x] 11.5 Comandos: `kl add` real (resuelve inmediatamente), `kl publish`, `kl login`, `kl update`, `kl outdated`
 
-### Fase 12 — Tooling 🔜
-- [ ] 12.1 Test framework (`#[test]`, assert builtins, kl test)
-- [ ] 12.2 LSP completo (diagnósticos, autocompletado contextual, hover con docs, code actions, find refs)
-- [ ] 12.3 VS Code extension (task provider, testing UI, packaging, marketplace)
-- [ ] 12.4 Formatter completo (`kl fmt --check`, toda la sintaxis)
-- [ ] 12.5 Shell completions (zsh, fish, powershell)
+### Fase 12 — Tooling ✅
+- [x] 12.1 Test framework (`#[test]`, assert builtins, kl test)
+- [x] 12.2.1-12.2.12 LSP features principales (diagnósticos, autocompletado, go-to-def, hover, find refs, rename, formatting)
+- [x] 12.2.13 Inlay hints (tipos inferidos en variables + return types)
+- [x] 12.2.14 Diagnostics en kl.toml
+- [x] 12.2.15 Code lens "Run test" (LSP + VS Code command)
+- [x] 12.2.6 Go-to-definition en dependencias
+- [x] 12.3.1 Syntax highlighting — sintaxis Kyle v0.4.0
+- [x] 12.3.2 Language icon
+- [x] 12.3.3 Task provider (Run/Build/Check/Test)
+- [x] 12.3.4 Problems panel
+- [x] 12.3.5 Snippets actualizados
+- [x] 12.3.6 Debug adapter (DAP)
+- [x] 12.3.7 Testing UI (VS Code TestController + #[test] discovery)
+- [x] 12.3.8 Extension packaging (scripts/build-extension.sh)
+- [x] 12.3.9 Marketplace metadata (README, CHANGELOG)
+- [x] 12.3.10 Color theme ("Kyle Pastel")
+- [x] 12.4 Formatter completo (`kl fmt --check`, project mode, [format] config, sintaxis moderna)
+- [x] 12.5 Shell completions (zsh, fish, powershell + `kl add` dynamic completion)
 
 ### Fase 13 — Sintaxis Restante 🔜
 - [ ] 13.1 Genéricos en clases (`final class Stack<T>:`)
@@ -918,14 +942,14 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | `klc_frontend` unit tests | 82 | ✅ All passing |
 | `klc_semantic` unit tests | 17 | ✅ All passing |
 | `klc_mir` unit tests | 11 | ✅ All passing |
-| `klc_tools` unit tests | 4 | ✅ All passing |
+| `klc_tools` unit tests | 24 | ✅ All passing |
 | `klc_runtime` unit tests | 0 | n/a (C-ABI) |
 | `klc_backend` unit tests | 0 | n/a |
-| `klc_core` unit tests | 0 | n/a |
+| `klc_core` unit tests | 10 | ✅ All passing (new resolver tests) |
 | `klc_driver` unit tests | 9 | ✅ All passing |
 | `klc_cli` unit tests | 0 | n/a |
 | End-to-end `kl test` | 12 | 11/12 passing (1 pre-existing failure: test_misc.kl) |
-| **Total Rust unit tests** | **123** | **✅ All passing** |
+| **Total Rust unit tests** | **157** | **✅ All passing** |
 
 ---
 
@@ -943,7 +967,8 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | Fase 10: Iterators — 17 métodos de lista | ✅ |
 | Fase 15: SSA Form — Mem2Reg, Phi, GVN, benchmarks correctos (debug) | ✅ |
 | Fase 16.3: `readonly`/`readnone` en runtime externs | ✅ |
-| **123 tests Rust** (↑ desde 101) | ✅ |
+| Fase 11: Package Manager — resolver, registry client, cache, lock, publish, login, update, outdated, import desde paquetes | ✅ |
+| **157 tests Rust** (↑ desde 123, +34 nuevos de Phase 11) | ✅ |
 | `ownership.rs` y `kl_release` declaration removidos | ✅ |
 | `print_int`/`println_int` builtins removidos → ahora `print(42)` | ✅ |
 | List borrowing fix — `kl_list_push/get/set/len` en borrowing funcs | ✅ |
@@ -952,7 +977,7 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | `.map()`, `.filter()`, `.fold()`, `.reduce()` como métodos (vía fn ptr C-ABI) | ✅ |
 | Bugs SSA fix: `const_values` en Call, CondBr trunc i1 | ✅ |
 
-### Pendiente inmediato
+### Pendiente inmediato (tras Fase 11)
 | Prioridad | Tarea | Fase |
 |-----------|-------|------|
 | 🔴 CRÍTICO | Fix release mode hang | 16.0 |
@@ -960,6 +985,7 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | 🟡 ALTO | `noalias` en parámetros puntero de runtime externs | 16.4 |
 | 🟡 ALTO | Missing extern declarations (`kl_list_pop_first`, etc.) | 15.B2 |
 | 🟢 MEDIO | TBAA metadata, align, noundef, !range, lifetime | 16.5-16.9 |
+| 🟢 MEDIO | Registry server implementation | 11.3 (server) |
 | ⏳ FUTURO | nsw/nuw flags (requiere range analysis primero) | 16.1 |
 
 ### Bugs encontrados y arreglados

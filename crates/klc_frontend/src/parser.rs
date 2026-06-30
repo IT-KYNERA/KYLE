@@ -119,11 +119,15 @@ impl Parser {
         if self.at(TokenKind::Type) {
             return self.parse_type_alias();
         }
+        // `#[test]` attribute before function
+        if self.at(TokenKind::Hash) {
+            return self.parse_attr_function();
+        }
         if self.at(TokenKind::Fn)
             || self.at(TokenKind::Async)
             || self.at(TokenKind::Const)
         {
-            return self.parse_function().map(Decl::Function);
+            return self.parse_function(false).map(Decl::Function);
         }
         // Class: `final class X:`, `class X:`, `abstract class X:`
         if self.at(TokenKind::Final) {
@@ -249,7 +253,29 @@ impl Parser {
         Ok(Decl::TypeAlias(TypeAlias { name, type_params, type_, span: self.span_from(start) }))
     }
 
-    fn parse_function(&mut self) -> Result<FunctionDecl, String> {
+    /// Parse `#[attr]` before a function declaration.
+    /// Currently only `#[test]` is recognized.
+    fn parse_attr_function(&mut self) -> Result<Decl, String> {
+        let start = self.pos;
+        self.advance(); // consume #
+        if !self.at(TokenKind::LBracket) {
+            return Err("expected '[' after '#' for attribute".to_string());
+        }
+        self.advance(); // consume [
+        let attr_name = self.eat_identifier();
+        if !self.at(TokenKind::RBracket) {
+            return Err("expected ']' after attribute name".to_string());
+        }
+        self.advance(); // consume ]
+        if attr_name != "test" {
+            return Err(format!("unknown attribute: #[{}]", attr_name));
+        }
+        let mut func = self.parse_function(true)?;
+        func.span = self.span_from(start);
+        Ok(Decl::Function(func))
+    }
+
+    fn parse_function(&mut self, is_test: bool) -> Result<FunctionDecl, String> {
         let start = self.pos;
         let is_const = if self.at(TokenKind::Const) { self.advance(); true } else { false };
         let is_async = if self.at(TokenKind::Async) { self.advance(); true } else { false };
@@ -298,7 +324,7 @@ impl Parser {
             Some(self.parse_block()?)
         };
         Ok(FunctionDecl {
-            name, type_params, params, return_type, is_async, is_const, is_abstract, visibility, body,
+            name, type_params, params, return_type, is_async, is_const, is_abstract, is_test, visibility, body,
             span: self.span_from(start),
         })
     }
@@ -469,7 +495,7 @@ impl Parser {
             }
             // Method: `fn name(params):`
             if self.at(TokenKind::Fn) || self.at(TokenKind::Async) || self.at(TokenKind::Const) || self.at(TokenKind::Abstract) {
-                let method = self.parse_function()?;
+                let method = self.parse_function(false)?;
                 members.push(ClassMember::Method(method));
                 continue;
             }

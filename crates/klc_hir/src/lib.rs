@@ -54,6 +54,7 @@ fn desugar_function(f: &FunctionDecl) -> FunctionDecl {
         is_async: f.is_async,
         is_const: f.is_const,
         is_abstract: f.is_abstract,
+        is_test: f.is_test,
         visibility: f.visibility.clone(),
         body: f.body.as_ref().map(|b| desugar_block(b)),
         span: f.span.clone(),

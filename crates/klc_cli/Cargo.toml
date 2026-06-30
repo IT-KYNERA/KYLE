@@ -10,6 +10,10 @@ name = "kl"
 path = "src/main.rs"
 
 [dependencies]
+klc_core = { path = "../klc_core" }
 klc_driver = { path = "../klc_driver" }
 klc_tools = { path = "../klc_tools" }
-clap = "4"
+ureq = { version = "3", features = ["json"] }
+flate2 = "1"
+tar = "0.4"
+

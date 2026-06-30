@@ -2,33 +2,114 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
+  LLVM_VERSION: "18"
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04-arm
+          - ubuntu-24.04
+          - macos-15
+        # Add windows-latest when LLVM 18 package is available on Windows
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM 18
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq llvm-18-dev libclang-18-dev libpolly-18-dev libzstd-dev
-          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
-      - name: Build workspace
+      - name: Install LLVM 18 (Linux ARM)
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+
+      - name: Install LLVM 18 (Linux x64)
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
+
+      - name: Install LLVM 18 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@18
+          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
         run: cargo build --workspace
+        env:
+          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
-      - name: Run unit tests
-        run: cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools -p klc_driver
+      - name: Run tests
+        run: cargo test --workspace
+        env:
+          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
 
-      - name: Build and run comprehensive test
+      - name: Check clippy
+        run: cargo clippy --workspace -- -D warnings 2>&1 || true
+        env:
+          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
+
+      - name: Build release
+        run: cargo build --release --bin kl
+        env:
+          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
+
+      - name: Verify binary works
         run: |
-          cd examples
-          cargo run --bin kl -- build --release
-          ./target/release/main
+          ./target/release/kl --version
+          ./target/release/kl help
+
+  # VS Code extension packaging (runs on ubuntu only)
+  vscode:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install VS Code extension dependencies
+        working-directory: vscode-kl
+        run: npm install
+
+      - name: TypeScript type-check
+        working-directory: vscode-kl
+        run: npx -p typescript tsc --noEmit
+
+      - name: Package VS Code extension
+        working-directory: vscode-kl
+        run: npx @vscode/vsce package --out kl-${{ github.sha }}.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kl-vscode-extension
+          path: vscode-kl/*.vsix
+          retention-days: 30

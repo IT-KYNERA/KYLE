@@ -66,7 +66,7 @@ impl SymbolTable {
             "print", "println", "print_err", "len", "str", "input", "range",
             "json_parse", "json_stringify",
             "open", "read_str", "write_str", "close", "sleep", "now",
-            "assert", "assert_eq", "assert_str",
+            "assert", "assert_eq", "assert_ne", "assert_str",
             "contains", "to_upper", "to_lower", "trim", "replace", "substr",
             "char_at", "is_digit", "is_alpha", "is_alnum", "is_whitespace", "is_upper", "is_lower",
             "ord",
@@ -79,18 +79,19 @@ impl SymbolTable {
             if let Some(scope) = self.scopes.last_mut() {
                 scope.insert(name.to_string(), Symbol::new(
                     name.to_string(),
-                    SymKind::Function(FunctionDecl {
-                        name: name.to_string(),
-                        type_params: Vec::new(),
-                        params: Vec::new(),
-                        return_type: None,
-                        is_async: false,
-                        is_const: false,
-                        is_abstract: false,
-                        visibility: Visibility::Public,
-                        body: None,
-                        span: klc_core::span::Span::dummy(),
-                    }),
+                        SymKind::Function(FunctionDecl {
+                            name: name.to_string(),
+                            type_params: Vec::new(),
+                            params: Vec::new(),
+                            return_type: None,
+                            is_async: false,
+                            is_const: false,
+                            is_abstract: false,
+                            is_test: false,
+                            visibility: Visibility::Public,
+                            body: None,
+                            span: klc_core::span::Span::dummy(),
+                        }),
                 ));
             }
         }

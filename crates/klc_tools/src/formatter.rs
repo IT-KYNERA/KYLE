@@ -1,11 +1,14 @@
 use std::fmt::Write;
 use klc_core::ast::*;
+use crate::package::FormatConfig;
 
 /// KL code formatter — parses source to AST and pretty-prints valid KL code.
 pub struct Formatter {
     source_lines: Vec<String>,
     /// Current line index for comment tracking (1-indexed based on source lines).
     last_comment_line: usize,
+    /// Formatting configuration.
+    config: FormatConfig,
 }
 
 impl Formatter {
@@ -13,6 +16,15 @@ impl Formatter {
         Self {
             source_lines: Vec::new(),
             last_comment_line: 0,
+            config: FormatConfig::default(),
+        }
+    }
+
+    pub fn with_config(config: FormatConfig) -> Self {
+        Self {
+            source_lines: Vec::new(),
+            last_comment_line: 0,
+            config,
         }
     }
 
@@ -25,6 +37,7 @@ impl Formatter {
         let mut f = Self {
             source_lines: source.lines().map(|l| l.to_string()).collect(),
             last_comment_line: 0,
+            config: self.config.clone(),
         };
         Ok(f.format_program(&program))
     }
@@ -66,7 +79,26 @@ impl Formatter {
     fn format_program(&mut self, program: &Program) -> String {
         let mut out = String::new();
         self.last_comment_line = 0;
+
+        // Separate imports from other declarations
+        let mut imports: Vec<&Decl> = Vec::new();
+        let mut other: Vec<&Decl> = Vec::new();
         for decl in &program.declarations {
+            match decl {
+                Decl::Import(_) | Decl::FromImport(_) => imports.push(decl),
+                _ => other.push(decl),
+            }
+        }
+
+        // Sort imports: relative first, then absolute; alphabetically within each group
+        imports.sort_by(|a, b| {
+            let key_a = import_sort_key(a);
+            let key_b = import_sort_key(b);
+            key_a.cmp(&key_b)
+        });
+
+        // Write imports
+        for decl in &imports {
             let span = decl_span(decl);
             let start_line = span.start.line as usize;
             for (_indent, comment) in self.comments_before_line(start_line) {
@@ -76,16 +108,40 @@ impl Formatter {
             self.write_decl(&mut out, decl, 0);
             out.push('\n');
         }
+        if !imports.is_empty() && !other.is_empty() {
+            out.push('\n');
+        }
+
+        // Write remaining declarations
+        for decl in &other {
+            let span = decl_span(decl);
+            let start_line = span.start.line as usize;
+            for (_indent, comment) in self.comments_before_line(start_line) {
+                out.push_str(&comment);
+                out.push('\n');
+            }
+            self.write_decl(&mut out, decl, 0);
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+
         for comment in self.collect_trailing_comments() {
             out.push_str(&comment);
+            out.push('\n');
+        }
+        if self.config.trailing_newline && !out.ends_with('\n') {
             out.push('\n');
         }
         out
     }
 
     fn indent(&mut self, out: &mut String, depth: usize) {
+        let size = self.config.indent_size;
         for _ in 0..depth {
-            out.push_str("    ");
+            for _ in 0..size {
+                out.push(' ');
+            }
         }
     }
 
@@ -169,7 +225,6 @@ impl Formatter {
         if let Some(alias) = &i.alias {
             write!(out, " as {}", alias).unwrap();
         }
-        out.push('\n');
     }
 
     fn write_from_import(&mut self, out: &mut String, fi: &FromImport, depth: usize) {
@@ -183,29 +238,27 @@ impl Formatter {
         if let Some(alias) = &fi.alias {
             write!(out, " as {}", alias).unwrap();
         }
-        out.push('\n');
     }
 
     fn write_variable(&mut self, out: &mut String, v: &VariableDecl, depth: usize) {
         self.indent(out, depth);
-        if v.is_mutable {
-            write!(out, "mut ").unwrap();
-        }
         write!(out, "{}", v.name).unwrap();
         if let Some(type_) = &v.type_ {
             write!(out, ": ").unwrap();
             self.write_type(out, type_);
         }
-        write!(out, " = ").unwrap();
+        if v.is_mutable {
+            write!(out, " := ").unwrap();
+        } else {
+            write!(out, " = ").unwrap();
+        }
         self.write_expr(out, &v.value);
-        out.push('\n');
     }
 
     fn write_constant(&mut self, out: &mut String, c: &ConstantDecl, depth: usize) {
         self.indent(out, depth);
-        write!(out, "{} = ", c.name).unwrap();
+        write!(out, "{} ::= ", c.name).unwrap();
         self.write_expr(out, &c.value);
-        out.push('\n');
     }
 
     fn write_type_params(&mut self, out: &mut String, params: &[TypeParam]) {
@@ -237,9 +290,13 @@ impl Formatter {
 
     fn write_function(&mut self, out: &mut String, f: &FunctionDecl, depth: usize) {
         self.indent(out, depth);
+        if f.is_test {
+            write!(out, "#[test]\n").unwrap();
+            self.indent(out, depth);
+        }
         if f.is_const { write!(out, "const ").unwrap(); }
         if f.is_async { write!(out, "async ").unwrap(); }
-        if f.is_abstract { write!(out, "abs ").unwrap(); }
+        if f.is_abstract { write!(out, "abstract ").unwrap(); }
         write!(out, "fn {}", f.name).unwrap();
         self.write_type_params(out, &f.type_params);
         out.push('(');
@@ -258,9 +315,10 @@ impl Formatter {
     fn write_class(&mut self, out: &mut String, c: &ClassDecl, depth: usize, is_abstract: bool) {
         self.indent(out, depth);
         if is_abstract {
-            write!(out, "abs ").unwrap();
+            write!(out, "abstract class {}", c.name).unwrap();
+        } else {
+            write!(out, "final class {}", c.name).unwrap();
         }
-        write!(out, "class {}", c.name).unwrap();
         self.write_type_params(out, &c.type_params);
         if let Some(parent) = &c.parent {
             write!(out, " < {}", parent).unwrap();
@@ -361,7 +419,6 @@ impl Formatter {
         self.write_type_params(out, &t.type_params);
         write!(out, " = ").unwrap();
         self.write_type(out, &t.type_);
-        out.push('\n');
     }
 
     fn write_block(&mut self, out: &mut String, block: &Block, depth: usize) {
@@ -498,9 +555,24 @@ impl Formatter {
             Pattern::Identifier { name, .. } => out.push_str(name),
             Pattern::Literal { value, .. } => self.write_literal(out, value),
             Pattern::Wildcard { .. } => out.push('_'),
-            Pattern::Tuple { .. } => out.push_str("()"),
-            Pattern::EnumVariant { enum_name, variant, .. } => {
+            Pattern::Tuple { elements, .. } => {
+                out.push('(');
+                for (i, e) in elements.iter().enumerate() {
+                    if i > 0 { out.push_str(", "); }
+                    self.write_pattern(out, e);
+                }
+                out.push(')');
+            }
+            Pattern::EnumVariant { enum_name, variant, args, .. } => {
                 write!(out, "{}.{}", enum_name, variant).unwrap();
+                if !args.is_empty() {
+                    out.push('(');
+                    for (i, a) in args.iter().enumerate() {
+                        if i > 0 { out.push_str(", "); }
+                        self.write_pattern(out, a);
+                    }
+                    out.push(')');
+                }
             }
             Pattern::IsType { type_, .. } => {
                 write!(out, "is ").unwrap();
@@ -653,12 +725,12 @@ impl Formatter {
                 out.push(')');
             }
             Expr::Closure { params, body, .. } => {
-                out.push('|');
+                out.push('(');
                 for (i, p) in params.iter().enumerate() {
                     if i > 0 { out.push_str(", "); }
                     out.push_str(p);
                 }
-                out.push_str("| ");
+                out.push_str(") => ");
                 self.write_expr(out, body);
             }
             Expr::Await { expression, .. } => {
@@ -751,6 +823,16 @@ impl Formatter {
             BinaryOp::ShrAssign => ">>=",
             BinaryOp::Range => "..",
         }
+    }
+}
+
+/// Sort key: `(is_relative, module_name)`. Relative imports (with `~`)
+/// sort before absolute imports; within each group, alphabetical by module name.
+fn import_sort_key(decl: &Decl) -> (u8, &str) {
+    match decl {
+        Decl::Import(i) => (if i.relative { 0 } else { 1 }, i.module_name.as_str()),
+        Decl::FromImport(fi) => (if fi.relative { 0 } else { 1 }, fi.module_name.as_str()),
+        _ => (2, ""),
     }
 }
 

@@ -368,6 +368,8 @@ impl<'ctx> Codegen<'ctx> {
                                 "is_lower" => "kl_is_lower", "ord" => "kl_ord",
                                 "substr" => "kl_substr",
                                 "json_parse" => "kl_json_parse", "json_stringify" => "kl_json_stringify",
+                                "assert" => "kl_assert", "assert_eq" => "kl_assert_eq",
+                                "assert_ne" => "kl_assert_ne", "assert_str" => "kl_assert_eq",
                                 _ => name,
                             };
                             if let Some(callee) = self.module.get_function(runtime_name) {
@@ -943,6 +945,24 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("kl_clone_dict", ft, None);
         }
+        // void kl_assert(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_assert", ft, None);
+        }
+        // void kl_assert_eq(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_assert_eq", ft, None);
+        }
+        // void kl_assert_ne(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("kl_assert_ne", ft, None);
+        }
     }
 
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
@@ -1390,6 +1410,10 @@ impl<'ctx> Codegen<'ctx> {
                                 "list_len" => "kl_list_len",
                                 "json_parse" => "kl_json_parse",
                                 "json_stringify" => "kl_json_stringify",
+                                "assert" => "kl_assert",
+                                "assert_eq" => "kl_assert_eq",
+                                "assert_ne" => "kl_assert_ne",
+                                "assert_str" => "kl_assert_eq",
                                 _ => name,
                             };
                             let callee = self.module.get_function(runtime_name);

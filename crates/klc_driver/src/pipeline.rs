@@ -13,12 +13,11 @@ use klc_mir::move_analysis::MoveAnalysis;
 
 use klc_backend::codegen::Codegen;
 use klc_backend::linker::Linker;
-use klc_tools::package::find_project_root;
+use klc_tools::package::{find_project_root, LockFile, cache::package_src_dir};
 use inkwell::context::Context;
 use inkwell::targets::{FileType, InitializationConfig, Target, TargetMachine};
 use inkwell::OptimizationLevel;
 use std::io::Write;
-use std::time::Instant;
 
 #[derive(Default)]
 pub struct Pipeline;
@@ -58,6 +57,28 @@ impl Pipeline {
         let local_std = base_dir.join("std");
         if local_std.exists() {
             resolver.add_search_path(local_std);
+        }
+
+        // Add package cache search paths from lock file and cache
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let lock_path = project_root.join("kl.lock");
+            if let Ok(lock) = LockFile::read(&lock_path) {
+                for entry in &lock.packages {
+                    let src_dir = package_src_dir(&entry.name, &entry.version);
+                    if src_dir.exists() {
+                        resolver.add_search_path(src_dir);
+                    }
+                }
+            }
+            // Also scan the cache for any matching package dirs
+            if let Ok(entries) = std::fs::read_dir(klc_tools::package::cache::cache_root()) {
+                for entry in entries.flatten() {
+                    let src_dir = entry.path().join("src");
+                    if src_dir.exists() {
+                        resolver.add_search_path(src_dir);
+                    }
+                }
+            }
         }
 
         let mut import_decls: Vec<(usize, Vec<klc_core::ast::Decl>)> = Vec::new();

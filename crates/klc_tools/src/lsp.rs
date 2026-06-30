@@ -51,7 +51,7 @@ impl LanguageServer {
 
     fn server_capabilities(&self) -> ServerCapabilities {
         ServerCapabilities {
-            text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+            text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)),
             completion_provider: Some(CompletionOptions {
                 trigger_characters: Some(vec![".".to_string(), ":".to_string()]),
                 ..Default::default()
@@ -71,6 +71,10 @@ impl LanguageServer {
                 prepare_provider: Some(true),
                 work_done_progress_options: Default::default(),
             })),
+            code_lens_provider: Some(CodeLensOptions { resolve_provider: Some(false) }),
+            inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
+                InlayHintOptions { resolve_provider: Some(false), work_done_progress_options: Default::default() }
+            ))),
             semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
                 SemanticTokensOptions {
                     legend: SemanticTokensLegend {
@@ -113,6 +117,8 @@ impl LanguageServer {
             "textDocument/formatting" => self.handle_formatting(req),
             "textDocument/rename" => self.handle_rename(req),
             "textDocument/prepareRename" => self.handle_prepare_rename(req),
+            "textDocument/codeLens" => self.handle_code_lens(req),
+            "textDocument/inlayHint" => self.handle_inlay_hint(req),
             "textDocument/semanticTokens/full" => self.handle_semantic_tokens_full(req),
             _ => {
                 let resp = Response::new_err(
@@ -130,6 +136,7 @@ impl LanguageServer {
             "textDocument/didOpen" => self.handle_did_open(not),
             "textDocument/didChange" => self.handle_did_change(not),
             "textDocument/didSave" => self.handle_did_save(not),
+            "textDocument/didClose" => self.handle_did_close(not),
             _ => {}
         }
     }
@@ -145,9 +152,24 @@ impl LanguageServer {
         let params: DidChangeTextDocumentParams = serde_json::from_value(not.params).unwrap();
         let uri = params.text_document.uri.to_string();
         if let Some(change) = params.content_changes.into_iter().last() {
-            self.sources.insert(uri.clone(), change.text);
+            if let Some(range) = change.range {
+                // Incremental: apply range-based change
+                if let Some(source) = self.sources.get(&uri) {
+                    let new_source = apply_range_change(source, &range, &change.text);
+                    self.sources.insert(uri.clone(), new_source);
+                }
+            } else {
+                // Full replacement (first open or sync failure fallback)
+                self.sources.insert(uri.clone(), change.text);
+            }
         }
         self.publish_diagnostics(&uri);
+    }
+
+    fn handle_did_close(&mut self, not: Notification) {
+        let params: DidCloseTextDocumentParams = serde_json::from_value(not.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        self.sources.remove(&uri);
     }
 
     fn handle_did_save(&mut self, not: Notification) {
@@ -194,6 +216,11 @@ impl LanguageServer {
             Some(s) => s.clone(),
             None => return,
         };
+
+        if uri.ends_with("kl.toml") {
+            self.publish_manifest_diagnostics(uri, &source);
+            return;
+        }
 
         let mut lexer = klc_frontend::lexer::Lexer::new(&source);
         let tokens = lexer.tokenize();
@@ -256,6 +283,196 @@ impl LanguageServer {
             serde_json::to_value(params).unwrap(),
         );
         let _ = self.connection.sender.send(Message::Notification(not));
+    }
+
+    fn publish_manifest_diagnostics(&self, uri: &str, source: &str) {
+        let mut lsp_diags = Vec::new();
+
+        // Try parsing as TOML manifest
+        match crate::package::Manifest::from_str(source) {
+            Ok(manifest) => {
+                // Parse OK — run validation
+                if let Err(errors) = manifest.validate() {
+                    for msg in errors {
+                        lsp_diags.push(Diagnostic {
+                            range: Range {
+                                start: Position { line: 0, character: 0 },
+                                end: Position { line: 0, character: 0 },
+                            },
+                            severity: Some(DiagnosticSeverity::WARNING),
+                            source: Some("kl".to_string()),
+                            message: format!("[manifest] {}", msg),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+            Err(toml_err) => {
+                // TOML parse error — extract position from byte span
+                let msg = format!("TOML parse error: {}", toml_err);
+                let range = toml_err.span()
+                    .and_then(|span| byte_span_to_range(source, &span))
+                    .unwrap_or(Range {
+                        start: Position { line: 0, character: 0 },
+                        end: Position { line: 0, character: 0 },
+                    });
+                lsp_diags.push(Diagnostic {
+                    range,
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    source: Some("kl".to_string()),
+                    message: format!("[manifest] {}", msg),
+                    ..Default::default()
+                });
+            }
+        }
+
+        let params = PublishDiagnosticsParams {
+            uri: lsp_types::Url::parse(uri).unwrap(),
+            diagnostics: lsp_diags,
+            version: None,
+        };
+        let not = Notification::new(
+            "textDocument/publishDiagnostics".to_string(),
+            serde_json::to_value(params).unwrap(),
+        );
+        let _ = self.connection.sender.send(Message::Notification(not));
+    }
+
+    fn handle_inlay_hint(&mut self, req: Request) {
+        let params: InlayHintParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = match self.sources.get(&uri) {
+            Some(s) => s.clone(),
+            None => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<InlayHint>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+        let file_name = uri.trim_start_matches("file://");
+
+        let mut lexer = klc_frontend::lexer::Lexer::new(&source);
+        let tokens = lexer.tokenize();
+        let mut parser = klc_frontend::parser::Parser::new(tokens);
+        let program = match parser.parse() {
+            Ok(p) => p,
+            Err(_) => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<InlayHint>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+
+        let mut source_map = klc_core::source_map::SourceMap::new();
+        let _file_id = source_map.add(file_name.to_string(), source.clone());
+        let mut analyzer = klc_semantic::analyzer::SemanticAnalyzer::new()
+            .with_source(source_map, file_name.to_string());
+        analyzer.analyze(&program);
+
+        let symbols = analyzer.type_checker.symbols();
+        let fn_return_types = &analyzer.type_checker.fn_return_types;
+        let mut hints: Vec<InlayHint> = Vec::new();
+
+        for decl in &program.declarations {
+            match decl {
+                Decl::Variable(v) => {
+                    if v.type_.is_none() {
+                        if let Some(sym) = symbols.lookup(&v.name) {
+                            if let SymKind::Variable { type_: Some(t), .. } = &sym.kind {
+                                hints.push(InlayHint {
+                                    position: Position {
+                                        line: v.span.start.line.saturating_sub(1) as u32,
+                                        character: v.span.start.column.saturating_sub(1) as u32 + v.name.len() as u32,
+                                    },
+                                    label: InlayHintLabel::String(format!(": {}", t)),
+                                    kind: Some(InlayHintKind::TYPE),
+                                    padding_left: Some(true),
+                                    padding_right: Some(false),
+                                    text_edits: None,
+                                    tooltip: None,
+                                    data: None,
+                                });
+                            }
+                        }
+                    }
+                }
+                Decl::Function(f) => {
+                    if f.return_type.is_none() {
+                        if let Some(rt) = fn_return_types.get(&f.name) {
+                            let _params_end_col = f.span.start.column.saturating_sub(1)
+                                + f.name.len()
+                                + (if f.type_params.is_empty() { 1 } else { 0 });
+                            hints.push(InlayHint {
+                                position: Position {
+                                    line: f.span.start.line.saturating_sub(1) as u32,
+                                    character: f.span.start.column.saturating_sub(1) as u32 + f.name.len() as u32 + 3,
+                                },
+                                label: InlayHintLabel::String(format!(" -> {}", rt)),
+                                kind: Some(InlayHintKind::TYPE),
+                                padding_left: Some(true),
+                                padding_right: Some(false),
+                                text_edits: None,
+                                tooltip: None,
+                                data: None,
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let resp = Response::new_ok(req.id, serde_json::to_value(hints).unwrap());
+        let _ = self.connection.sender.send(Message::Response(resp));
+    }
+
+    fn handle_code_lens(&mut self, req: Request) {
+        let params: CodeLensParams = serde_json::from_value(req.params).unwrap();
+        let uri = params.text_document.uri.to_string();
+        let source = match self.sources.get(&uri) {
+            Some(s) => s.clone(),
+            None => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<CodeLens>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+
+        let mut lexer = klc_frontend::lexer::Lexer::new(&source);
+        let tokens = lexer.tokenize();
+        let mut parser = klc_frontend::parser::Parser::new(tokens);
+        let program = match parser.parse() {
+            Ok(p) => p,
+            Err(_) => {
+                let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<CodeLens>>(vec![]).unwrap());
+                let _ = self.connection.sender.send(Message::Response(resp));
+                return;
+            }
+        };
+
+        let mut lenses: Vec<CodeLens> = Vec::new();
+        for decl in &program.declarations {
+            if let Decl::Function(f) = decl {
+                if f.is_test {
+                    let range = span_to_range(&f.span);
+                    lenses.push(CodeLens {
+                        range,
+                        command: Some(Command {
+                            title: "▶ Run Test".to_string(),
+                            command: "kl.runTest".to_string(),
+                            arguments: Some(vec![
+                                serde_json::json!(uri),
+                                serde_json::json!(f.name),
+                            ]),
+                        }),
+                        data: None,
+                    });
+                }
+            }
+        }
+
+        let resp = Response::new_ok(req.id, serde_json::to_value(lenses).unwrap());
+        let _ = self.connection.sender.send(Message::Response(resp));
     }
 
     fn handle_completion(&mut self, req: Request) {
@@ -388,32 +605,38 @@ impl LanguageServer {
             ("in", "in"),
             ("match", "match value:"),
             ("return", "return value"),
+            ("pass", "pass — no-op placeholder"),
             ("fn", "fn name(params):"),
-            ("mut", "mut variable"),
-            ("class", "class Name:"),
-            ("struct", "struct Name:"),
+            ("final", "final class — lightweight class"),
+            ("abstract", "abstract class/fn — abstract declaration"),
+            ("class", "class Name :: Parent:"),
             ("enum", "enum Name:"),
             ("contract", "contract Name:"),
+            ("impl", "Class :: Contract: — implement contract"),
+            ("override", "override — override method from parent"),
+            ("static", "static — static method"),
             ("import", "import module"),
             ("from", "from module import name"),
-            ("as", "as alias"),
-            ("type", "type Alias = Type"),
-            ("const", "const NAME = value"),
-            ("abs", "abstract — abs class/fn"),
-            ("async", "async expression"),
-            ("await", "await expression"),
-            ("defer", "defer expression"),
-            ("guard", "guard condition"),
-            ("loop", "loop:"),
-            ("unsafe", "unsafe:"),
-            ("break", "break"),
-            ("true", "true"),
-            ("false", "false"),
-            ("None", "None"),
-            ("ok", "ok(value)"),
-            ("error", "error(message)"),
-            ("this", "this.field"),
-            ("next", "next (loop iteration)"),
+            ("as", "as alias | as Type — type cast"),
+            ("type", "type Alias = Type — type alias"),
+            ("is", "is — type test (value is Type)"),
+            ("async", "async — async expression"),
+            ("await", "await — await async task"),
+            ("defer", "defer — defer function call"),
+            ("guard", "guard condition else:"),
+            ("loop", "loop: — infinite loop"),
+            ("unsafe", "unsafe: — unsafe block"),
+            ("break", "break — exit loop"),
+            ("continue", "continue — next iteration"),
+            ("true", "true — boolean literal"),
+            ("false", "false — boolean literal"),
+            ("None", "None — absent value"),
+            ("ok", "ok(value) — success result"),
+            ("error", "error(message) — error result"),
+            ("this", "this — current instance"),
+            ("super", "super — parent class"),
+            (":=", "walrus — mutable variable"),
+            ("::=", "triple walrus — compile-time constant"),
         ];
         for (kw, detail) in &keywords {
             if prefix.is_empty() || kw.starts_with(&prefix) {
@@ -1199,36 +1422,99 @@ impl LanguageServer {
         let result: Option<GotoDefinitionResponse> = if word.is_empty() {
             None
         } else {
-            self.find_definition(&source, &word)
-                .map(|span| {
+            // First try current file
+            let local_result = self.find_definition_in_source(&source, &word)
+                .map(|(span, _)| {
                     let loc = Location {
                         uri: lsp_types::Url::parse(&uri).unwrap(),
                         range: span_to_range(&span),
                     };
                     GotoDefinitionResponse::Scalar(loc)
-                })
+                });
+
+            if local_result.is_some() {
+                local_result
+            } else {
+                // Try dependency packages
+                let file_path = uri.trim_start_matches("file://");
+                let project_root = crate::package::find_project_root(
+                    &std::path::Path::new(file_path)
+                );
+                if let Some(root) = project_root {
+                    self.find_definition_in_dependencies(&root, &word)
+                        .map(|(path, span)| {
+                            let dep_uri = format!("file://{}", path.display());
+                            let loc = Location {
+                                uri: lsp_types::Url::parse(&dep_uri).unwrap(),
+                                range: span_to_range(&span),
+                            };
+                            GotoDefinitionResponse::Scalar(loc)
+                        })
+                } else {
+                    None
+                }
+            }
         };
 
         let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
         let _ = self.connection.sender.send(Message::Response(resp));
     }
 
-    fn find_definition(&self, source: &str, name: &str) -> Option<Span> {
+    fn find_definition_in_source(&self, source: &str, name: &str) -> Option<(Span, String)> {
         let mut lexer = klc_frontend::lexer::Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = klc_frontend::parser::Parser::new(tokens);
         if let Ok(prog) = parser.parse() {
             for decl in &prog.declarations {
-                match decl {
-                    Decl::Function(f) if f.name == name => return Some(f.span),
-                    Decl::Variable(v) if v.name == name => return Some(v.span),
-                    Decl::Constant(c) if c.name == name => return Some(c.span),
-                    Decl::Class(c) if c.name == name => return Some(c.span),
-                    Decl::Struct(s) if s.name == name => return Some(s.span),
-                    Decl::Enum(e) if e.name == name => return Some(e.span),
-                    Decl::Contract(c) if c.name == name => return Some(c.span),
-                    Decl::TypeAlias(t) if t.name == name => return Some(t.span),
-                    _ => {}
+                let result = match decl {
+                    Decl::Function(f) if f.name == name => Some((f.span, f.name.clone())),
+                    Decl::Variable(v) if v.name == name => Some((v.span, v.name.clone())),
+                    Decl::Constant(c) if c.name == name => Some((c.span, c.name.clone())),
+                    Decl::Class(c) if c.name == name => Some((c.span, c.name.clone())),
+                    Decl::Struct(s) if s.name == name => Some((s.span, s.name.clone())),
+                    Decl::Enum(e) if e.name == name => Some((e.span, e.name.clone())),
+                    Decl::Contract(c) if c.name == name => Some((c.span, c.name.clone())),
+                    Decl::TypeAlias(t) if t.name == name => Some((t.span, t.name.clone())),
+                    _ => None,
+                };
+                if result.is_some() {
+                    return result;
+                }
+            }
+        }
+        None
+    }
+
+    /// Search for a symbol definition across all cached dependency packages.
+    fn find_definition_in_dependencies(&self, project_root: &std::path::Path, name: &str) -> Option<(std::path::PathBuf, Span)> {
+        use std::fs;
+
+        let lock_path = project_root.join("kl.lock");
+        if !lock_path.exists() {
+            return None;
+        }
+
+        let lock_content = fs::read_to_string(&lock_path).ok()?;
+        let lock: crate::package::LockFile = toml::from_str(&lock_content).ok()?;
+
+        for entry in &lock.packages {
+            let src_dir = crate::package::cache::package_src_dir(&entry.name, &entry.version);
+            if !src_dir.exists() {
+                continue;
+            }
+
+            let dep_files = match fs::read_dir(&src_dir) {
+                Ok(entries) => entries.flatten().map(|e| e.path()).filter(|p| p.extension().map_or(false, |ext| ext == "kl")).collect::<Vec<_>>(),
+                Err(_) => continue,
+            };
+
+            for dep_file in dep_files {
+                let dep_source = match fs::read_to_string(&dep_file) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                if let Some((span, _)) = self.find_definition_in_source(&dep_source, name) {
+                    return Some((dep_file, span));
                 }
             }
         }
@@ -1428,6 +1714,12 @@ impl LanguageServer {
     fn handle_formatting(&mut self, req: Request) {
         let params: DocumentFormattingParams = serde_json::from_value(req.params).unwrap();
         let uri = params.text_document.uri.to_string();
+        // Skip formatting for kl.toml
+        if uri.ends_with("kl.toml") {
+            let resp = Response::new_ok(req.id, serde_json::to_value::<Vec<TextEdit>>(vec![]).unwrap());
+            let _ = self.connection.sender.send(Message::Response(resp));
+            return;
+        }
         let source = match self.sources.get(&uri) {
             Some(s) => s.clone(),
             None => {
@@ -1982,4 +2274,62 @@ fn span_to_range(span: &Span) -> Range {
             character: span.end.column.saturating_sub(1) as u32,
         },
     }
+}
+
+/// Apply an LSP range-based text change to a source string.
+/// Range is 0-indexed line/character.
+fn apply_range_change(source: &str, range: &Range, new_text: &str) -> String {
+    let start_offset = offset_from_position(source, range.start.line as usize, range.start.character as usize);
+    let end_offset = offset_from_position(source, range.end.line as usize, range.end.character as usize);
+    let mut result = String::with_capacity(source.len() + new_text.len());
+    result.push_str(&source[..start_offset]);
+    result.push_str(new_text);
+    result.push_str(&source[end_offset..]);
+    result
+}
+
+/// Convert a 0-indexed line/character position to a byte offset in the source.
+fn offset_from_position(source: &str, line: usize, character: usize) -> usize {
+    let mut current_line = 0usize;
+    let mut offset = 0usize;
+    let bytes = source.as_bytes();
+    while current_line < line && offset < bytes.len() {
+        if bytes[offset] == b'\n' {
+            current_line += 1;
+        }
+        offset += 1;
+    }
+    // Now at start of target line; advance by `character` bytes
+    let line_start = offset;
+    let end = bytes.len().min(line_start + character);
+    // Don't go past end of line
+    let mut col_offset = line_start;
+    while col_offset < end && col_offset < bytes.len() && bytes[col_offset] != b'\n' {
+        col_offset += 1;
+    }
+    col_offset
+}
+
+/// Convert a byte span (`Range<usize>`) from TOML errors to an LSP range.
+/// Returns `None` if the span is out of bounds.
+fn byte_span_to_range(source: &str, span: &std::ops::Range<usize>) -> Option<Range> {
+    let bytes = source.as_bytes();
+    if span.start >= bytes.len() {
+        return None;
+    }
+    let start_line = bytes[..span.start].iter().filter(|&&b| b == b'\n').count() as u32;
+    let start_col = bytes[..span.start].iter().rev()
+        .take_while(|&&b| b != b'\n')
+        .count() as u32;
+
+    let end = span.end.min(bytes.len());
+    let end_line = bytes[..end].iter().filter(|&&b| b == b'\n').count() as u32;
+    let end_col = bytes[..end].iter().rev()
+        .take_while(|&&b| b != b'\n')
+        .count() as u32;
+
+    Some(Range {
+        start: Position { line: start_line, character: start_col },
+        end: Position { line: end_line, character: end_col },
+    })
 }

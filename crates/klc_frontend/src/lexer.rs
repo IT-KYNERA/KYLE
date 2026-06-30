@@ -220,6 +220,11 @@ impl Lexer {
             '{' => { self.advance(); Some(TokenKind::LBrace) }
             '}' => { self.advance(); Some(TokenKind::RBrace) }
             '@' => { self.advance(); Some(TokenKind::At) }
+            '#' => {
+                // `skip_whitespace_and_comments` leaves `#[` alone for attribute syntax
+                self.advance();
+                Some(TokenKind::Hash)
+            }
             _ => None,
         } {
             return Some(self.make_token(kind, &start_pos));
@@ -492,6 +497,10 @@ impl Lexer {
                     let is_doc = self.pos + 1 < self.chars.len() && self.chars[self.pos + 1] == '#';
                     if is_doc {
                         self.advance(); // skip first #
+                    }
+                    // Check for attribute start `#[` (not a comment)
+                    if !is_doc && self.pos + 1 < self.chars.len() && self.chars[self.pos + 1] == '[' {
+                        break; // leave `#` for the main tokenizer
                     }
                     // Line comment: skip to newline.
                     while self.pos < self.chars.len() && self.chars[self.pos] != '\n' {

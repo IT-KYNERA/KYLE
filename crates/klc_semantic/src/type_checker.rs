@@ -645,7 +645,7 @@ impl TypeChecker {
                         if let Some(name) = Self::target_name(target) {
                             match name {
                                 "print" | "println" | "print_err"
-                                | "sleep" | "assert" | "assert_eq" | "assert_str" => Type::Void,
+                                | "sleep" | "assert" | "assert_eq" | "assert_ne" | "assert_str" => Type::Void,
                                 "len" => Type::I32,
                                 "str" => Type::Str,
                                 "int" => Type::I32,

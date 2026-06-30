@@ -7,19 +7,26 @@
     { "include": "#strings" },
     { "include": "#char_literals" },
     { "include": "#numbers" },
-    { "include": "#keywords" },
-    { "include": "#types" },
+    { "include": "#keywords_control" },
+    { "include": "#keywords_declaration" },
+    { "include": "#keywords_operator" },
+    { "include": "#keywords_other" },
+    { "include": "#types_primitive" },
+    { "include": "#types_special" },
     { "include": "#builtins" },
     { "include": "#constants" },
     { "include": "#operators" },
-    { "include": "#functions" },
+    { "include": "#function_def" },
+    { "include": "#import_path" },
+    { "include": "#attributes" },
     { "include": "#properties" },
-    { "include": "#variables" }
+    { "include": "#mutable_var" }
   ],
   "repository": {
     "comments": {
       "patterns": [
-        { "name": "comment.line.number-sign.kl", "match": "#.*$" }
+        { "name": "comment.line.double-number-sign.kl", "match": "##.*$" },
+        { "name": "comment.line.number-sign.kl", "match": "#[^#].*$|#$" }
       ]
     },
     "strings": {
@@ -29,7 +36,24 @@
       "patterns": [
         { "name": "constant.character.escape.kl", "match": "\\\\[nrt0\"'\\\\]" },
         { "name": "constant.character.escape.kl", "match": "\\\\x[0-9a-fA-F]{2}" },
-        { "name": "constant.character.escape.kl", "match": "\\\\u[0-9a-fA-F]{4}" }
+        { "name": "constant.character.escape.kl", "match": "\\\\u[0-9a-fA-F]{4}" },
+        { "include": "#interpolation" }
+      ]
+    },
+    "interpolation": {
+      "name": "string.interpolated.kl",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [{ "include": "#expression" }]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#keywords_control" },
+        { "include": "#keywords_operator" },
+        { "include": "#types_primitive" },
+        { "include": "#operators" }
       ]
     },
     "char_literals": {
@@ -38,29 +62,43 @@
       "end": "'",
       "patterns": [
         { "name": "constant.character.escape.kl", "match": "\\\\[nrt0\"'\\\\]" },
-        { "name": "constant.character.escape.kl", "match": "\\\\x[0-9a-fA-F]{2}" },
-        { "name": "constant.character.escape.kl", "match": "\\\\u[0-9a-fA-F]{4}" }
+        { "name": "constant.character.escape.kl", "match": "\\\\x[0-9a-fA-F]{2}" }
       ]
     },
     "numbers": {
       "name": "constant.numeric.kl",
-      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|\\d[\\d_]*(\\.\\d[\\d_]*)?)\\b"
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|\\d[\\d_]*(\\.\\d[\\d_]*)?([eE][+-]?\\d+)?)\\b"
     },
-    "keywords": {
-      "patterns": [
-        { "name": "keyword.control.kl", "match": "\\b(if|elif|else|while|for|in|match|return|break|continue|loop|defer|guard|unsafe|async|await)\\b" },
-        { "name": "keyword.declaration.kl", "match": "\\b(fn|mut|class|struct|enum|contract|import|from|as|type|abs|const|pub|override|static|abstract|impl)\\b" },
-        { "name": "keyword.operator.kl", "match": "\\b(and|or|not|is)\\b" },
-        { "name": "keyword.other.kl", "match": "\\b(true|false|None|ok|error|this|next)\\b" }
-      ]
+    "keywords_control": {
+      "name": "keyword.control.kl",
+      "match": "\\b(if|elif|else|while|for|in|match|return|break|continue|loop|defer|guard|unsafe|async|await|pass)\\b"
     },
-    "types": {
+    "keywords_declaration": {
+      "name": "keyword.declaration.kl",
+      "match": "\\b(fn|class|final|abstract|struct|enum|contract|import|from|as|type|override|static|impl)\\b"
+    },
+    "keywords_operator": {
+      "name": "keyword.operator.kl",
+      "match": "\\b(and|or|not|is)\\b"
+    },
+    "keywords_other": {
+      "name": "keyword.other.kl",
+      "match": "\\b(true|false|None|null|this|super)\\b"
+    },
+    "types_primitive": {
       "name": "storage.type.kl",
-      "match": "\\b(i32|i64|f32|f64|bool|str|char|void|Option|Result|any|list|Map|Set)\\b"
+      "match": "\\b(i32|i64|f32|f64|bool|str|char|void|any|ptr)\\b"
+    },
+    "types_special": {
+      "patterns": [
+        { "name": "storage.type.optional.kl", "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\?\\b" },
+        { "name": "storage.type.error.kl", "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\!\\b" },
+        { "name": "storage.type.kl", "match": "\\b(list|dict|Set|Map)\\b" }
+      ]
     },
     "builtins": {
       "name": "support.function.kl",
-      "match": "\\b(print|println|print_int|println_int|print_err|str|len|int|float|bool|input|open|read_str|write_str|close|sleep|now|contains|to_upper|to_lower|trim|replace|substr|char_at|ord|is_digit|is_alpha|is_alnum|is_whitespace|is_upper|is_lower|assert|assert_eq|assert_str|assert_ne|range|json_parse|json_stringify|list_push|list_pop|list_len|ceil|floor|round)\\b"
+      "match": "\\b(print|println|print_err|str|len|int|float|bool|input|open|read_str|write_str|close|sleep|now|contains|to_upper|to_lower|trim|replace|substr|char_at|ord|chr|is_digit|is_alpha|is_alnum|is_whitespace|is_upper|is_lower|assert|assert_eq|assert_ne|range|json_parse|json_stringify|ceil|floor|round|clone)\\b"
     },
     "constants": {
       "name": "variable.other.constant.kl",
@@ -68,11 +106,38 @@
     },
     "operators": {
       "name": "keyword.operator.kl",
-      "match": "(==|!=|<=|>=|&&|\\|\\||\\+\\+|--|->|=>|\\?|\\.\\.\\.|\\.\\.|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=|<<|>>|\\+|-|\\*|/|%|&|\\||\\^|~|=|<|>|!)"
-    },
-    "functions": {
       "patterns": [
-        { "name": "entity.name.function.kl", "match": "(?<=\\bfn\\s+)([a-zA-Z_][a-zA-Z0-9_]*)" }
+        { "match": "::=" },
+        { "match": ":=" },
+        { "match": "(\\.\\.<|\\.\\.=|\\.\\.\\.|\\.\\.)" },
+        { "match": "(==|!=|<=|>=|&&|\\|\\||->|=>|\\?|\\.)" },
+        { "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)" },
+        { "match": "(<<|>>)" },
+        { "match": "(\\+|-|\\*|/|%|&|\\||\\^|~|=|<|>|!)" }
+      ]
+    },
+    "function_def": {
+      "patterns": [
+        {
+          "name": "meta.function.kl",
+          "begin": "\\bfn\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "beginCaptures": { "1": { "name": "entity.name.function.kl" } },
+          "end": "(?=\\n|:)",
+          "patterns": [
+            { "include": "#types_primitive" },
+            { "include": "#types_special" }
+          ]
+        }
+      ]
+    },
+    "import_path": {
+      "patterns": [
+        { "name": "string.unquoted.import-path.kl", "match": "(?<=\\b(?:import|from)\\s+)([a-zA-Z_][a-zA-Z0-9_.]*)" }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        { "name": "meta.annotation.kl", "begin": "#\\[", "end": "\\]", "patterns": [{ "include": "#keywords_other" }] }
       ]
     },
     "properties": {
@@ -80,9 +145,10 @@
         { "name": "variable.other.property.kl", "match": "(?<=\\.)([a-zA-Z_][a-zA-Z0-9_]*)" }
       ]
     },
-    "variables": {
+    "mutable_var": {
       "patterns": [
-        { "name": "variable.other.kl", "match": "(?<=\\b(?:mut|let|var)\\s+)([a-z_][a-zA-Z0-9_]*)" }
+        { "name": "variable.other.mutable.kl", "match": "([a-z_][a-zA-Z0-9_]*)(?=\\s*::=)" },
+        { "name": "variable.other.mutable.kl", "match": "([a-z_][a-zA-Z0-9_]*)(?=\\s*:=)" }
       ]
     }
   }

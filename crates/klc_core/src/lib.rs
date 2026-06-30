@@ -18,3 +18,4 @@ pub mod symbol;
 pub mod diagnostic;
 pub mod types;
 pub mod semver;
+pub mod resolver;

@@ -6,6 +6,7 @@ pub mod string;
 pub mod list;
 pub mod dict;
 pub mod async_;
+pub mod assert;
 pub mod error;
 pub mod panic;
 

@@ -81,6 +81,7 @@ pub enum TokenKind {
 
     // Attributes
     At,         // @
+    Hash,       // # (for `#[attr]`)
 
     // Logical
     And,        // &&

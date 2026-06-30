@@ -111,6 +111,7 @@ pub struct FunctionDecl {
     pub is_async: bool,
     pub is_const: bool,
     pub is_abstract: bool,
+    pub is_test: bool,
     pub visibility: Visibility,
     pub body: Option<Block>,
     pub span: Span,
