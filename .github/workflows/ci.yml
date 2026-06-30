@@ -48,7 +48,7 @@ jobs:
           llvm-config --version || llvm-config-18 --version || echo "No llvm-config found"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v3
+        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build --workspace
@@ -85,7 +85,7 @@ jobs:
         run: llvm-config-18 --version || echo "No llvm-config found"
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v3
+        uses: Swatinem/rust-cache@v2
 
       - name: Build
         run: cargo build --workspace
