@@ -69,13 +69,10 @@ if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
   fi
 fi
 
-# Source config so ky works in new terminals; for THIS shell just export
+# Make ky available immediately (works for direct run, for pipe: source ~/.zshrc)
 export PATH="$INSTALL_DIR:$PATH"
-# Also source the shell config to pick up any other settings
-if [ -n "${SHELL_CONFIG:-}" ] && [ -f "$SHELL_CONFIG" ]; then
-  source "$SHELL_CONFIG" 2>/dev/null || true
-fi
 
 echo ""
 echo "Kyle $VERSION installed."
-echo "Run:  ky -v"
+echo "To use now:  source ~/.zshrc"
+echo "Or open a new terminal, then:  ky -v"
