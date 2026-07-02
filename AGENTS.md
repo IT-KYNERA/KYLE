@@ -142,4 +142,4 @@ LLVM 18.1 required.
 
 ---
 
-*Version: v0.5.0 · Last updated: 2026-07-01*
+*Version: v0.5.0 · Last updated: 2026-07-02*
