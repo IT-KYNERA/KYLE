@@ -111,38 +111,14 @@ Kyle compiles to native code via **LLVM 18** with full SSA-form optimizations.
 All benchmarks measured in **user time (CPU seconds)** — lower is better.
 *Results verified identical across all languages.*
 
-### Arithmetic (500M iterations)
-
-| Language | Time | vs Rust |
-| :------- | :-: | :-----: |
-| **Kyle (SSA+O3)** | **0.00s** 🏆 | 1.0× |
-| C (-O3) | 0.00s 🏆 | 1.0× |
-| Rust (-O) | 0.00s 🏆 | 1.0× |
-| Java 26 | 0.14s | — |
-| C# .NET 10 | 0.25s | — |
-| Python 3 | 24.54s | ~∞ |
-
-### Primes (up to 3,000,000)
-
-| Language | Time | vs Rust |
-| :------- | :-: | :-----: |
-| **Kyle (SSA+O3)** | **0.19s** 🏆 | 1.0× |
-| C (-O3) | 0.19s 🏆 | 1.0× |
-| Rust (-O) | 0.19s 🏆 | 1.0× |
-| C# .NET 10 | 0.20s | 1.1× |
-| Java 26 | 0.22s | 1.2× |
-| Python 3 | 8.70s | 46× |
-
-### Mandelbrot (390×390, 100 max iter)
-
-| Language | Time | vs Rust |
-| :------- | :-: | :-----: |
-| **Kyle (SSA+O3)** | **0.01s** 🏆 | 1.0× |
-| C (-O3) | 0.01s 🏆 | 1.0× |
-| Rust (-O) | 0.01s 🏆 | 1.0× |
-| C# .NET 10 | 0.03s | 3.0× |
-| Java 26 | 0.03s | 3.0× |
-| Python 3 | 0.41s | 41× |
+| Language | Arithmetic 500M | Primes 3M | Mandelbrot |
+| :------- | :-: | :-: | :-: |
+| **Kyle (SSA+O3)** 🏆 | **0.00s** | **0.19s** | **0.01s** |
+| C (-O3) | 0.00s | 0.19s | 0.01s |
+| Rust (-O) | 0.00s | 0.19s | 0.01s |
+| C# .NET 10 | 0.25s | 0.20s | 0.03s |
+| Java 26 | 0.14s | 0.22s | 0.03s |
+| Python 3 | 24.54s | 8.70s | 0.41s |
 
 > **Kyle matches C and Rust** in CPU-bound benchmarks, outperforms C# and Java
 > by 1.5–3×, and is **25–50× faster than Python 3.**
