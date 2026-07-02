@@ -85,7 +85,8 @@ impl ScopeResolver {
         self.symbols.push_scope();
         for param in &f.params {
             let ty = self.resolve_ast_type(&param.type_);
-            let sym = Symbol::new_var(param.name.clone(), Some(ty), false);
+            let is_mutable = matches!(param.mode, ParamMode::MutableBorrow | ParamMode::Move);
+            let sym = Symbol::new_var(param.name.clone(), Some(ty), is_mutable);
             let _ = self.symbols.insert(param.name.clone(), sym);
         }
         if let Some(body) = &f.body {
@@ -118,8 +119,9 @@ impl ScopeResolver {
                     self.symbols.push_scope();
                     for param in &con.params {
                         let ty = self.resolve_ast_type(&param.type_);
+                        let is_mutable = matches!(param.mode, ParamMode::MutableBorrow | ParamMode::Move);
                         let _ = self.symbols.insert(param.name.clone(),
-                            Symbol::new_var(param.name.clone(), Some(ty), false));
+                            Symbol::new_var(param.name.clone(), Some(ty), is_mutable));
                     }
                     self.resolve_block(&con.body);
                     self.symbols.pop_scope();

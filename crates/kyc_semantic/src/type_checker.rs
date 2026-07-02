@@ -665,6 +665,31 @@ impl TypeChecker {
                                 }
                             }
                         }
+                        // Check call-site coercion: ^ required for move params
+                        if let Some(name) = Self::target_name(target) {
+                            if let Some(sym) = self.symbols.lookup(name) {
+                                if let SymKind::Function(fdecl) = &sym.kind {
+                                    for (i, (arg, param)) in arguments.iter().zip(fdecl.params.iter()).enumerate() {
+                                        let has_move = matches!(arg, Expr::MoveExpr { .. });
+                                        match param.mode {
+                                            ParamMode::Move if !has_move => {
+                                                self.reporter.report(
+                                                    Diagnostic::error(ErrorCode::E0001,
+                                                        format!("argument {} to '{}' requires '^' (ownership transfer), got plain value", i + 1, name))
+                                                );
+                                            }
+                                            ParamMode::Borrow if has_move => {
+                                                self.reporter.report(
+                                                    Diagnostic::error(ErrorCode::E0001,
+                                                        format!("argument {} to '{}' uses '^' but parameter is not a move parameter", i + 1, name))
+                                                );
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         // Override return type for builtins
                         if let Some(name) = Self::target_name(target) {
                             match name {
