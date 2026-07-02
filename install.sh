@@ -69,10 +69,10 @@ if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
   fi
 fi
 
-# Make ky available immediately (works for direct run, for pipe: source ~/.zshrc)
 export PATH="$INSTALL_DIR:$PATH"
 
 echo ""
-echo "Kyle $VERSION installed."
-echo "To use now:  source ~/.zshrc"
-echo "Or open a new terminal, then:  ky -v"
+echo "✅ Kyle $VERSION installed. PATH added to $SHELL_CONFIG"
+echo ""
+echo "  Use now:     source ~/.zshrc && ky -v"
+echo "  Or (faster): export PATH=\"$INSTALL_DIR:\$PATH\" && ky -v"
