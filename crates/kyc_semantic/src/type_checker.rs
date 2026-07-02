@@ -539,7 +539,30 @@ impl TypeChecker {
                     BinaryOp::Assign | BinaryOp::AddAssign | BinaryOp::SubAssign
                     | BinaryOp::MulAssign | BinaryOp::DivAssign | BinaryOp::RemAssign
                     | BinaryOp::BitAndAssign | BinaryOp::BitOrAssign | BinaryOp::BitXorAssign
-                    | BinaryOp::ShlAssign | BinaryOp::ShrAssign => { self.infer_expr(right); rt }
+                    | BinaryOp::ShlAssign | BinaryOp::ShrAssign => {
+                        self.infer_expr(right);
+                        if let Expr::PropertyAccess { object, property, .. } = left.as_ref() {
+                            let obj_ty = self.infer_expr(object);
+                            if let Type::Named(class_name) = &obj_ty {
+                                if let Some(sym) = self.symbols.lookup(class_name.as_str()) {
+                                    if let SymKind::Class(class_decl) = &sym.kind {
+                                        let is_mutable = class_decl.members.iter().any(|m| {
+                                            if let ClassMember::Field(f) = m {
+                                                f.name == *property && f.is_mutable
+                                            } else { false }
+                                        });
+                                        if !is_mutable {
+                                            self.reporter.report(
+                                                Diagnostic::error(ErrorCode::E0001,
+                                                    format!("cannot assign to immutable field '{}' in class '{}'", property, class_name))
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        rt
+                    }
                     BinaryOp::Range | BinaryOp::RangeInclusive | BinaryOp::RangeExclusive => Type::Void,
                 }
             }
@@ -665,6 +688,25 @@ impl TypeChecker {
                         } else {
                             *ft.return_
                         }
+                    }
+                    Type::Named(ref class_name) => {
+                        // Constructor call: Class(args) returns Class type
+                        if let Some(sym) = self.symbols.lookup(class_name.as_str()) {
+                            if let SymKind::Class(c) = &sym.kind {
+                                if let Some(ctor) = c.members.iter().find_map(|m| {
+                                    if let ClassMember::Constructor(f) = m { Some(f) } else { None }
+                                }) {
+                                    let expected = ctor.params.len();
+                                    if arg_count != expected {
+                                        self.reporter.report(
+                                            Diagnostic::error(ErrorCode::E0001,
+                                                format!("'{}' expects {} argument(s), got {}", class_name, expected, arg_count))
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        fn_type.clone()
                     }
                     _ => {
                         if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
