@@ -1095,43 +1095,48 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 **Prueba 1: Primos** — `is_prime()` hasta 3,000,000
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| **Kyle** | **0.19s** | **0.9×** 🏆 | **47×** |
-| Rust | 0.21s | 1× | 43× |
-| C (gcc -O3) | 0.19s | 0.9× | 47× |
-| Java 21 | 0.21s | 1.0× | 42× |
-| Python 3 | 8.91s | 42× más lento | 1× |
+| **Kyle (SSA+O3)** | **0.19s** | **1.0×** 🏆 | **46×** |
+| C (gcc -O3) | 0.19s | 1.0× | 46× |
+| Rust (rustc -O) | 0.19s | 1.0× | 46× |
+| C# .NET 10 | 0.20s | 1.1× | 44× |
+| Java 26 | 0.22s | 1.2× | 40× |
+| Python 3 | 8.70s | 46× | 1× |
 
 **Prueba 2: Aritmética** — `total = total + i * 2 - 1` (500M iteraciones, i32 wrap)
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| **Kyle** | **0.00s*** | **1×** 🏆 | **∞** |
-| Rust | 0.00s* | 1× | ∞ |
+| **Kyle (SSA+O3)** | **0.00s*** | **1×** 🏆 | **∞** |
 | C (gcc -O3) | 0.00s* | 1× | ∞ |
-| Java 21 | 0.14s | — | 188× |
-| Python 3 | 26.27s | — | 1× |
+| Rust (rustc -O) | 0.00s* | 1× | ∞ |
+| Java 26 | 0.14s | — | 175× |
+| C# .NET 10 | 0.25s | — | 98× |
+| Python 3 | 24.54s | — | 1× |
 
 \* Loop optimizado completamente por LLVM/GCC (const-folding)
 
 **Prueba 3: Mandelbrot** — 390×390 grid, 100 max iter (punto flotante)
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| **Kyle** | **0.01s** | **1×** 🏆 | **42×** |
-| Rust | 0.01s | 1× | 42× |
-| C (gcc -O3) | 0.01s | 1× | 42× |
-| Java 21 | 0.02s | 2× más lento | 20× |
-| Python 3 | 0.42s | 42× más lento | 1× |
+| **Kyle (SSA+O3)** | **0.01s** | **1×** 🏆 | **41×** |
+| C (gcc -O3) | 0.01s | 1× | 41× |
+| Rust (rustc -O) | 0.01s | 1× | 41× |
+| C# .NET 10 | 0.03s | 3× | 14× |
+| Java 26 | 0.03s | 3× | 14× |
+| Python 3 | 0.41s | 41× | 1× |
 
 **Resumen — User Time:**
-| Benchmark | **Kyle (SSA+O3)** | **C (-O3)** | Rust | Java | Python |
-|-----------|:-----------------:|:----------:|:----:|:----:|:------:|
-| Primes | **0.19s** | 0.19s | 0.21s | 0.21s | 8.91s |
-| Arithmetic 500M | **0.00s*** | 0.00s* | 0.00s* | 0.14s | 26.27s |
-| Mandelbrot | **0.01s** | 0.01s | 0.01s | 0.02s | 0.42s |
+| Benchmark | **Kyle** | **C** | **Rust** | **C# .NET 10** | **Java 26** | **Python** |
+|-----------|:-------:|:----:|:--------:|:--------------:|:----------:|:----------:|
+| Primes 3M | **0.19s** | 0.19s | 0.19s | 0.20s | 0.22s | 8.70s |
+| Arithmetic 500M | **0.00s*** | 0.00s* | 0.00s* | 0.25s | 0.14s | 24.54s |
+| Mandelbrot | **0.01s** | 0.01s | 0.01s | 0.03s | 0.03s | 0.41s |
 
 **Conclusión:**
-- **Kyle = C = Rust** en user time para todos los benchmarks.
-- La diferencia en wall time (0.44s Kyle vs 0.19s C en primes) es startup
-  overhead del runtime dinámico, no del cómputo.
+- **Kyle = C = Rust** en user time para todos los benchmarks computacionales.
+- C# .NET 10 y Java 26 quedan ~1.5–3× detrás de Kyle/C/Rust.
+- Python es 25–50× más lento que Kyle.
+- La diferencia en wall time (startup overhead del runtime dinámico) no afecta
+  el rendimiento CPU real.
 - **Pipeline completo:** SSA elimina allocas → LLVM -O3 optimiza →
   rendimiento nativo a la par con C/Rust.
   de PHI nodes que impiden su uso en producción.
