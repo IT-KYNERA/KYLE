@@ -540,7 +540,7 @@ fn cmd_new(args: &[String]) {
     });
 
     let vscode_settings = format!(
-        r#"{{"ky.kycPath":"{}","files.associations":{{"*.ky":"kl"}}}}"#,
+        r#"{{"ky.kycPath":"{}","files.associations":{{"*.ky":"ky"}}}}"#,
         bin_name()
     );
     let vscode_dir = project_dir.join(".vscode");
@@ -595,7 +595,7 @@ fn cmd_completions(args: &[String]) {
 }
 
 /// Hidden command `kl _complete <cmd> <prefix>` — outputs completion candidates
-/// for dynamic completion (e.g., package names for `kl add`).
+/// for dynamic completion (e.g., package names for `ky add`).
 fn cmd_complete(args: &[String]) {
     let sub = args.get(2).map(|s| s.as_str()).unwrap_or("");
     let prefix = args.get(3).map(|s| s.as_str()).unwrap_or("");
@@ -665,7 +665,7 @@ cmds=(
 )
 _describe -t commands '{name}' cmds && ret=0
 
-# Dynamic completion for `kl add` — suggest cached packages
+# Dynamic completion for `ky add` — suggest cached packages
 _{{name}}_add() {{
   local -a packages
   packages=(${{(f)\"$({name} _complete add \\\"$words[CURRENT]\\\" 2>/dev/null)\"}})
@@ -695,7 +695,7 @@ complete -c {name} -f -a outdated -d \"List outdated dependencies\"
 complete -c {name} -f -a lsp -d \"Start LSP server\"
 complete -c {name} -f -a completions -d \"Generate shell completions\"
 complete -c {name} -f -a help -d \"Show help\"
-# Dynamic completion for `kl add` — suggest cached packages
+# Dynamic completion for `ky add` — suggest cached packages
 complete -c {name} -f -n \"__fish_seen_subcommand_from add\" -a \"({name} _complete add (commandline -ct) 2>/dev/null)\" -d \"Cached package\"
 "
     )
@@ -918,7 +918,7 @@ fn cmd_add(args: &[String]) {
             if let Some(project_root) = find_project_root(&cwd) {
                 if let Err(e) = resolve_project_dependencies(&project_root, &manifest) {
                     eprintln!("Warning: could not resolve dependencies: {}", e);
-                    eprintln!("Run 'kl update' to resolve later");
+                    eprintln!("Run 'ky update' to resolve later");
                 }
             }
         }
@@ -1223,15 +1223,15 @@ fn cmd_outdated(_args: &[String]) {
         println!("All dependencies are up to date.");
     } else {
         println!();
-        println!("Run 'kl update' to update the lock file.");
+        println!("Run 'ky update' to update the lock file.");
     }
 }
 
 fn cmd_uninstall() {
     let home = std::env::var("HOME").unwrap_or_default();
     let targets = [
-        "/usr/local/bin/kl",
-        "/usr/local/lib/kl/libkyc_runtime.a",
+        "/usr/local/bin/ky",
+        "/usr/local/lib/ky/libkyc_runtime.a",
         &format!("{}/.ky/bin/kl", home),
         &format!("{}/.ky/lib/kl/libkyc_runtime.a", home),
         &format!("{}/.ky/lib/libkyc_runtime.a", home),
@@ -1245,9 +1245,9 @@ fn cmd_uninstall() {
         }
     }
     if uninstalled {
-        println!("kl uninstalled.");
+        println!("ky uninstalled.");
     } else {
-        println!("kl is not installed.");
+        println!("ky is not installed.");
     }
 }
 

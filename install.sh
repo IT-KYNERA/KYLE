@@ -20,21 +20,16 @@ if [ "${1:-}" = "uninstall" ]; then
   exit 0
 fi
 
-# --- Install mode ---
-
-# Detect OS and architecture
+# --- Detect OS ---
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
 
 case "$OS-$ARCH" in
-  linux-aarch64|linux-arm64)
-    ASSET="ky-$VERSION-linux-arm64.tar.gz"
+  linux-aarch64|linux-arm64|darwin-arm64|darwin-aarch64)
+    ASSET="ky-$VERSION"
     ;;
   linux-x86_64|linux-amd64)
-    ASSET="ky-$VERSION-linux-x64.tar.gz"
-    ;;
-  darwin-arm64|darwin-aarch64)
-    ASSET="ky-$VERSION-macos-arm64.tar.gz"
+    ASSET="ky-$VERSION"
     ;;
   *)
     echo "Unsupported platform: $OS-$ARCH"
@@ -48,25 +43,15 @@ URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET"
 # Download
 echo "Downloading Kyle $VERSION..."
 curl -fsSL "$URL" -o "/tmp/$ASSET"
+chmod +x "/tmp/$ASSET"
 
-# Extract
-tar -xzf "/tmp/$ASSET" -C /tmp
-
-# Install binary
-BIN="/tmp/ky/ky"
-chmod +x "$BIN"
-
+# Install
 if [ -w /usr/local/bin ]; then
-  mkdir -p /usr/local/lib/ky
-  mv "$BIN" /usr/local/bin/ky
-  mv /tmp/ky/lib/libkyc_runtime.a /usr/local/lib/ky/
+  mv "/tmp/$ASSET" /usr/local/bin/ky
 else
-  mkdir -p "$HOME/.ky/bin" "$HOME/.ky/lib/ky"
-  mv "$BIN" "$HOME/.ky/bin/ky"
-  mv /tmp/ky/lib/libkyc_runtime.a "$HOME/.ky/lib/ky/"
+  mkdir -p "$HOME/.ky/bin"
+  mv "/tmp/$ASSET" "$HOME/.ky/bin/ky"
 fi
-
-rm -rf "/tmp/$ASSET" "/tmp/ky"
 
 echo ""
 echo "Kyle $VERSION installed."
