@@ -1232,9 +1232,12 @@ fn cmd_uninstall() {
     let targets = [
         "/usr/local/bin/ky",
         "/usr/local/lib/ky/libkyc_runtime.a",
-        &format!("{}/.ky/bin/kl", home),
-        &format!("{}/.ky/lib/kl/libkyc_runtime.a", home),
+        &format!("{}/.ky/bin/ky", home),
+        &format!("{}/.ky/lib/ky/libkyc_runtime.a", home),
         &format!("{}/.ky/lib/libkyc_runtime.a", home),
+        &format!("{}/.kl/bin/ky", home),
+        &format!("{}/.kl/lib/ky/libkyc_runtime.a", home),
+        &format!("{}/.kl/lib/libkyc_runtime.a", home),
     ];
     let mut uninstalled = false;
     for target in &targets {
