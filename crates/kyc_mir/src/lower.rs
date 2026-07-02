@@ -297,8 +297,15 @@ impl Lowerer {
                 }
                 if let Decl::Class(c) = decl {
                     if !c.type_params.is_empty() {
-                        // Store generic classes as templates too (as struct-like types)
-                        struct_defs.insert(c.name.clone(), vec![]);
+                        // Generic class — store as struct template
+                        generic_templates.insert(c.name.clone(), StructDecl {
+                            name: c.name.clone(),
+                            type_params: c.type_params.clone(),
+                            fields: c.members.iter().filter_map(|m| {
+                                if let ClassMember::Field(f) = m { Some(f.clone()) } else { None }
+                            }).collect(),
+                            span: c.span.clone(),
+                        });
                     } else {
                         struct_defs.insert(c.name.clone(), vec![]);
                     }
@@ -319,6 +326,9 @@ impl Lowerer {
                     struct_defs.insert(s.name.clone(), fields);
                 }
                 if let Decl::Class(c) = decl {
+                    if !c.type_params.is_empty() {
+                        continue; // Generic class — monomorphized on use
+                    }
                     let fields = Self::collect_class_fields(c, &program, &struct_defs);
                     struct_defs.insert(c.name.clone(), fields);
                 }
@@ -399,6 +409,15 @@ impl Lowerer {
                 }
                 if let Decl::Class(c) = decl {
                     class_parent_map.insert(c.name.clone(), c.parent.clone());
+                    if !c.type_params.is_empty() {
+                        // Generic class — store methods as templates for lazy monomorphization
+                        for member in &c.members {
+                            if let ClassMember::Method(m) = member {
+                                let template_name = format!("{}::{}", c.name, m.name);
+                                generic_fn_templates.insert(template_name, m.clone());
+                            }
+                        }
+                    }
                     if c.members.iter().any(|m| matches!(m, ClassMember::Constructor(_))) {
                         cc_map.insert(c.name.clone(), format!("{}::new", c.name));
                         for member in &c.members {

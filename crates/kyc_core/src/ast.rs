@@ -413,6 +413,7 @@ pub enum Expr {
     FunctionCall {
         target: Box<Expr>,
         arguments: Vec<Expr>,
+        type_args: Vec<AstType>,
         span: Span,
     },
     PropertyAccess {

@@ -180,9 +180,10 @@ fn desugar_expr(expr: &Expr) -> Expr {
             value: Box::new(desugar_expr(value)),
             span: span.clone(),
         },
-        Expr::FunctionCall { target, arguments, span } => Expr::FunctionCall {
+        Expr::FunctionCall { target, arguments, type_args, span } => Expr::FunctionCall {
             target: Box::new(desugar_expr(target)),
             arguments: arguments.iter().map(desugar_expr).collect(),
+            type_args: type_args.clone(),
             span: span.clone(),
         },
         Expr::PropertyAccess { object, property, span } => Expr::PropertyAccess {
