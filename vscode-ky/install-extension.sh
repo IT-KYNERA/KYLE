@@ -64,7 +64,7 @@ if [ "$NODE_VERSION" -ge 20 ] 2>/dev/null && command -v npm &>/dev/null; then
   }
 else
   echo "==> Downloading pre-built VSIX (Node.js $NODE_VERSION < 20)..."
-  VSIX_URL="https://github.com/$REPO/releases/download/$TAG/kl-0.2.2.vsix"
+  VSIX_URL="https://github.com/$REPO/releases/download/$TAG/ky-extension.vsix"
   VSIX_FILE="ky-extension.vsix"
   curl -fsSL "$VSIX_URL" -o "$VSIX_FILE"
 fi
