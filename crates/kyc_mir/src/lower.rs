@@ -554,6 +554,7 @@ impl Lowerer {
                                 mir_func.params = ctor.params.iter()
                                     .map(|p| ast_type_to_mir(&p.type_, Some(&defs)))
                                     .collect();
+                                mir_func.param_modes = ctor.params.iter().map(|p| p.mode).collect();
                                 mir_func.return_type = if let Some(fields) = defs.get(&c.name) {
                                     MirType::Struct(c.name.clone(), fields.clone())
                                 } else {
@@ -812,6 +813,7 @@ impl Lowerer {
                 ast_type_to_mir(&p.type_, Some(&struct_defs))
             })
             .collect();
+        mir_func.param_modes = f.params.iter().map(|p| p.mode).collect();
         mir_func.return_type = f.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
             .unwrap_or(MirType::Void);
@@ -926,6 +928,10 @@ impl Lowerer {
             params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
         }
         mir_func.params = params;
+        // Param modes: `this` is always Borrow, then explicit params
+        let mut param_modes = vec![ParamMode::Borrow];
+        param_modes.extend(m.params.iter().enumerate().filter(|(i, p)| !(*i == 0 && (p.name == "this" || p.name == "self"))).map(|(_, p)| p.mode));
+        mir_func.param_modes = param_modes;
         mir_func.return_type = m.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
             .unwrap_or(MirType::Void);

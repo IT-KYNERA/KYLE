@@ -1,4 +1,5 @@
 use std::fmt;
+use kyc_core::ast::ParamMode;
 
 /// A value in MIR — represents SSA-like values, locals, and constants.
 #[derive(Clone, Debug, PartialEq)]
@@ -126,6 +127,7 @@ impl MirBasicBlock {
 pub struct MirFunction {
     pub name: String,
     pub params: Vec<MirType>,
+    pub param_modes: Vec<ParamMode>,
     pub return_type: MirType,
     pub is_fallible: bool,
     pub is_const: bool,
@@ -138,6 +140,7 @@ impl MirFunction {
         Self {
             name: name.into(),
             params: Vec::new(),
+            param_modes: Vec::new(),
             return_type: MirType::Void,
             is_fallible: false,
             is_const: false,

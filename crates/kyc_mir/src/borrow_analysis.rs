@@ -1,3 +1,4 @@
+use kyc_core::ast::ParamMode;
 /// Borrow/ownership analysis pass.
 ///
 /// Tracks move/borrow state for each value:
@@ -181,7 +182,7 @@ impl BorrowAnalysis {
                 MirInst::Call { dest, name, args } => {
                     // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
                     // (only `^` params on user-defined functions would consume)
-                    let moves_arg = is_move_func(name);
+                    let moves_arg = is_move_func(name, &[] as &[crate::mir::MirFunction]);
                     for arg in args {
                         if let MirValue::Local(l) = arg {
                             if moves_arg {
@@ -367,7 +368,7 @@ impl BorrowAnalysis {
             }
             MirInst::Call { dest, name, args } => {
                 // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
-                let moves_arg = is_move_func(name);
+                let moves_arg = is_move_func(name, &[] as &[crate::mir::MirFunction]);
                 for arg in args {
                     if let MirValue::Local(l) = arg {
                         if moves_arg {
@@ -474,10 +475,13 @@ fn check_alive(
 /// Returns true if this function CONSUMES its arguments (ownership transfer).
 /// By default (borrow-by-default), ALL functions BORROW their arguments.
 /// Only explicit `^` params on user-defined functions consume.
-/// Currently no built-in runtime functions consume their args.
-fn is_move_func(name: &str) -> bool {
-    let _ = name; // unused — all functions borrow by default
-    false
+/// Checks the function's param_modes for any ParamMode::Move.
+fn is_move_func(name: &str, _funcs: &[crate::mir::MirFunction]) -> bool {
+    if let Some(func) = _funcs.iter().find(|f| f.name == name) {
+        func.param_modes.iter().any(|m| *m == ParamMode::Move)
+    } else {
+        false
+    }
 }
 
 /// Returns true if this runtime function creates a heap-allocated value.
@@ -569,6 +573,7 @@ mod tests {
                 terminator: MirTerminator::Return(MirValue::Local(1)),
             }],
             local_count: 2,
+            param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
         let original_len = func.basic_blocks[0].insts.len();
@@ -603,6 +608,7 @@ mod tests {
                 terminator: MirTerminator::Return(MirValue::Local(1)),
             }],
             local_count: 2,
+            param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
         let mut module = MirModule { functions: vec![func], globals: vec![] };
@@ -635,6 +641,7 @@ mod tests {
                 terminator: MirTerminator::Return(MirValue::Local(2)),
             }],
             local_count: 3,
+            param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
         let mut module = MirModule { functions: vec![func], globals: vec![] };
@@ -667,6 +674,7 @@ mod tests {
                 terminator: MirTerminator::Return(MirValue::Local(0)),
             }],
             local_count: 1,
+            param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
         let mut module = MirModule { functions: vec![func], globals: vec![] };
