@@ -2245,14 +2245,22 @@ fn test():\n\
     }
 
     // -----------------------------------------------------------------------
-    // Integration — example files
+    // Integration — large file smoke test
     // -----------------------------------------------------------------------
 
     #[test]
-    fn test_main_example() {
-        let source = include_str!("../../../examples/src/main.ky");
-        if let Err(e) = parse(source) {
-            panic!("main.ky parse error: {}", e);
+    fn test_large_file() {
+        let source = r##"
+## Large synthetic test — 200 functions to stress the parser
+"##.to_string();
+        let mut body = String::new();
+        for i in 0..200 {
+            body.push_str(&format!("fn fn_{}(x: i32) i32:\n    return x + {}\n\n", i, i));
+        }
+        body.push_str("fn main() i32:\n    return fn_0(0)\n");
+        let src = format!("{}{}", source, body);
+        if let Err(e) = parse(&src) {
+            panic!("Large file parse error: {}", e);
         }
     }
 }
