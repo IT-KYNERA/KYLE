@@ -1,0 +1,7 @@
+fn inc(x: &i32):
+    x = x + 1
+
+fn main() i32:
+    n: &i32 = 0
+    inc(n)
+    0

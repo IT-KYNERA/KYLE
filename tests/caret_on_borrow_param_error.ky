@@ -1,0 +1,7 @@
+fn print_len(s: str):
+    println(str(len(s)))
+
+fn main() i32:
+    s = "hello"
+    print_len(^s)
+    0
