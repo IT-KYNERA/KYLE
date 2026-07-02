@@ -1121,34 +1121,64 @@ impl Parser {
                 } else {
                     expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
                 }
+            } else if self.at(TokenKind::Less) {
+                // Generic struct literal: Identifier<T> { field: value, ... }
+                // Only handle if < is followed by type > { (not type > ( which is a function call)
+                let start = self.pos;
+                let is_struct_lit = if let Expr::Identifier { .. } = &expr {
+                    let saved = self.pos;
+                    self.advance(); // '<'
+                    let type_ok = self.parse_type().is_ok();
+                    self.pos = saved;
+                    if !type_ok { false }
+                    else {
+                        // Scan ahead: skip type args to check for > {
+                        let mut scan_pos = saved + 1; // past '<'
+                        let mut depth = 1;
+                        while scan_pos < self.tokens.len() && depth > 0 {
+                            if self.tokens[scan_pos].is(&TokenKind::Less) { depth += 1; }
+                            else if self.tokens[scan_pos].is(&TokenKind::Greater) { depth -= 1; }
+                            scan_pos += 1;
+                        }
+                        // After >, next token should be { for a struct literal
+                        scan_pos < self.tokens.len() && self.tokens[scan_pos].is(&TokenKind::LBrace)
+                    }
+                } else { false };
+                if is_struct_lit {
+                    if let Expr::Identifier { name: struct_name, .. } = &expr {
+                        let sname = struct_name.clone();
+                        self.advance(); // '<'
+                        let mut type_args = vec![];
+                        if let Ok(first) = self.parse_type() {
+                            type_args.push(first);
+                            while self.at(TokenKind::Comma) {
+                                self.advance();
+                                if let Ok(t) = self.parse_type() { type_args.push(t); } else { break; }
+                            }
+                        }
+                        self.expect(TokenKind::Greater)?;
+                        self.expect(TokenKind::LBrace)?;
+                        let mut fields = Vec::new();
+                        while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                            let key = self.eat_identifier();
+                            self.expect(TokenKind::Colon)?;
+                            let value = self.parse_expr()?;
+                            fields.push((key, value));
+                            if self.at(TokenKind::Comma) { self.advance(); }
+                        }
+                        self.expect(TokenKind::RBrace)?;
+                        expr = Expr::StructLiteral { struct_name: sname, type_args, fields, span: self.span_from(start) };
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
             } else if self.at(TokenKind::LBrace) {
-                // Struct literal: Identifier<T> { field: value, ... }
+                // Struct literal (no generics): Identifier { field: value, ... }
                 let start = self.pos;
                 if let Expr::Identifier { name: struct_name, .. } = &expr {
                     let sname = struct_name.clone();
-                    // Check for generic type args: Name<T, U> { ... }
-                    let mut type_args = vec![];
-                    if self.tokens.get(self.pos).map_or(false, |t| t.is(&TokenKind::Less)) {
-                        let saved = self.pos;
-                        self.advance(); // '<'
-                        if let Ok(first) = self.parse_type() {
-                            let mut args = vec![first];
-                            while self.at(TokenKind::Comma) {
-                                self.advance();
-                                if let Ok(t) = self.parse_type() {
-                                    args.push(t);
-                                } else { break; }
-                            }
-                            if self.at(TokenKind::Greater) {
-                                self.advance();
-                                type_args = args;
-                            } else {
-                                self.pos = saved;
-                            }
-                        } else {
-                            self.pos = saved;
-                        }
-                    }
                     self.advance(); // consume '{'
                     let mut fields = Vec::new();
                     while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
@@ -1159,7 +1189,7 @@ impl Parser {
                         if self.at(TokenKind::Comma) { self.advance(); }
                     }
                     self.expect(TokenKind::RBrace)?;
-                    expr = Expr::StructLiteral { struct_name: sname, type_args, fields, span: self.span_from(start) };
+                    expr = Expr::StructLiteral { struct_name: sname, type_args: vec![], fields, span: self.span_from(start) };
                 } else {
                     break;
                 }
