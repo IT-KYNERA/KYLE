@@ -2,7 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-BRANCH="main"
+TAG="v0.5.0"
 TMP_DIR="/tmp/kl-extension-$$"
 
 # --- Uninstall mode ---
@@ -40,57 +40,19 @@ if [ -z "$CODE_CLI" ]; then
   exit 1
 fi
 
-# --- Check prerequisites ---
-if ! command -v node &>/dev/null; then
-  echo "ERROR: Node.js required. Install from https://nodejs.org/"
-  exit 1
-fi
-if ! command -v npm &>/dev/null; then
-  echo "ERROR: npm required."
-  exit 1
-fi
-
-# --- Clone the repo (shallow, single branch, just vscode-ky) ---
-echo "==> Downloading extension source..."
+# --- Download pre-built VSIX from GitHub Releases ---
+echo "==> Downloading pre-built VSIX (no Node.js needed)..."
 mkdir -p "$TMP_DIR"
 cd "$TMP_DIR"
 
-# GitHub allows downloading a single directory via its SVN interface
-# Fallback: download the whole repo ZIP and extract only vscode-ky
-if command -v svn &>/dev/null; then
-  # Fast path: svn export (GitHub serves SVN-compatible checkouts)
-  svn export "https://github.com/$REPO/$BRANCH/vscode-ky" vscode-ky --quiet 2>/dev/null || true
-fi
-
-if [ ! -d "vscode-ky" ]; then
-  # Fallback: download ZIP and extract
-  echo "  (using ZIP download — install svn for faster download)"
-  ZIP_URL="https://github.com/$REPO/archive/$BRANCH.zip"
-  curl -fsSL "$ZIP_URL" -o repo.zip
-  unzip -q repo.zip -d extracted
-  mv extracted/KYLE-"$BRANCH"/vscode-ky ./vscode-ky 2>/dev/null || \
-    mv extracted/KYLE-main/vscode-ky ./vscode-ky 2>/dev/null
-  rm -rf repo.zip extracted
-fi
-
-cd vscode-ky
-
-echo "==> Installing npm dependencies..."
-npm install
-
-echo "==> Packaging VSIX..."
+VSIX_URL="https://github.com/$REPO/releases/download/$TAG/kl-0.2.2.vsix"
 VSIX_FILE="ky-extension.vsix"
-npx @vscode/vsce package --out "$VSIX_FILE" 2>/dev/null || {
-  echo "  vsce not found, installing..."
-  npm install -g @vscode/vsce 2>/dev/null || true
-  npx @vscode/vsce package --out "$VSIX_FILE"
-}
 
-if [ ! -f "$VSIX_FILE" ]; then
-  echo "ERROR: failed to build VSIX."
-  echo "Try: npm install -g @vscode/vsce && vsce package"
+curl -fsSL "$VSIX_URL" -o "$VSIX_FILE" || {
+  echo "ERROR: failed to download VSIX from $VSIX_URL"
+  echo "Check the latest release at: https://github.com/$REPO/releases"
   exit 1
-fi
+}
 
 echo "==> Installing in VS Code..."
 "$CODE_CLI" --install-extension "$VSIX_FILE" --force
