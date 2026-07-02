@@ -42,6 +42,7 @@ jobs:
         run: |
           brew update
           brew install llvm@18
+          brew link --overwrite llvm@18
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
           echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
 
