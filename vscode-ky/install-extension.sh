@@ -2,6 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
+BRANCH="main"
 TAG="v0.5.0"
 TMP_DIR="/tmp/kl-extension-$$"
 
@@ -40,19 +41,40 @@ if [ -z "$CODE_CLI" ]; then
   exit 1
 fi
 
-# --- Download pre-built VSIX from GitHub Releases ---
-echo "==> Downloading pre-built VSIX (no Node.js needed)..."
 mkdir -p "$TMP_DIR"
 cd "$TMP_DIR"
 
-VSIX_URL="https://github.com/$REPO/releases/download/$TAG/kl-0.2.2.vsix"
-VSIX_FILE="ky-extension.vsix"
+# --- Node.js check: build from source if >=20, otherwise download pre-built ---
+NODE_VERSION=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1 || echo "0")
+if [ "$NODE_VERSION" -ge 20 ] 2>/dev/null && command -v npm &>/dev/null; then
+  echo "==> Building from source (Node.js $NODE_VERSION detected)..."
+  ZIP_URL="https://github.com/$REPO/archive/$BRANCH.zip"
+  curl -fsSL "$ZIP_URL" -o repo.zip
+  unzip -q repo.zip -d extracted
+  mv extracted/KYLE-"$BRANCH"/vscode-ky ./vscode-ky 2>/dev/null || \
+    mv extracted/KYLE-main/vscode-ky ./vscode-ky 2>/dev/null
+  rm -rf repo.zip extracted
 
-curl -fsSL "$VSIX_URL" -o "$VSIX_FILE" || {
-  echo "ERROR: failed to download VSIX from $VSIX_URL"
-  echo "Check the latest release at: https://github.com/$REPO/releases"
+  cd vscode-ky
+  npm install --silent 2>/dev/null
+  VSIX_FILE="ky-extension.vsix"
+  npx @vscode/vsce package --out "$VSIX_FILE" 2>/dev/null || {
+    npm install -g @vscode/vsce 2>/dev/null || true
+    npx @vscode/vsce package --out "$VSIX_FILE"
+  }
+else
+  echo "==> Downloading pre-built VSIX (Node.js $NODE_VERSION < 20)..."
+  VSIX_URL="https://github.com/$REPO/releases/download/$TAG/kl-0.2.2.vsix"
+  VSIX_FILE="ky-extension.vsix"
+  curl -fsSL "$VSIX_URL" -o "$VSIX_FILE"
+fi
+
+if [ ! -f "$VSIX_FILE" ]; then
+  echo "ERROR: failed to get VSIX."
+  echo "Install Node.js 20+ and try again, or download from:"
+  echo "  https://github.com/$REPO/releases"
   exit 1
-}
+fi
 
 echo "==> Installing in VS Code..."
 "$CODE_CLI" --install-extension "$VSIX_FILE" --force
