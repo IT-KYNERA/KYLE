@@ -55,20 +55,24 @@ else
   INSTALL_DIR="$HOME/.ky/bin"
 fi
 
-# --- Add to PATH if not already ---
-if ! command -v ky &>/dev/null; then
-  SHELL_CONFIG=""
-  if [ -n "${ZSH_VERSION:-}" ]; then SHELL_CONFIG="$HOME/.zshrc"
-  elif [ -n "${BASH_VERSION:-}" ]; then SHELL_CONFIG="$HOME/.bashrc"
-  fi
-  if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
+# --- Add to PATH automatically ---
+SHELL_NAME=$(basename "${SHELL:-}")
+case "$SHELL_NAME" in
+  zsh) SHELL_CONFIG="$HOME/.zshrc" ;;
+  bash) SHELL_CONFIG="$HOME/.bashrc" ;;
+  *) SHELL_CONFIG="" ;;
+esac
+if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
+  if ! grep -q "$INSTALL_DIR" "$SHELL_CONFIG" 2>/dev/null; then
     echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_CONFIG"
     echo "  Added $INSTALL_DIR to PATH in $SHELL_CONFIG"
   fi
 fi
 
+# Source the config so ky is available immediately
+export PATH="$INSTALL_DIR:$PATH"
+
 echo ""
 echo "Kyle $VERSION installed."
-echo "Restart your terminal or run:  export PATH=\"$INSTALL_DIR:\$PATH\""
-echo "Create a project:              ky new myapp"
-echo "Run it:                        ky run myapp/src/main.ky"
+echo "Create a project:  ky new myapp"
+echo "Run it:            ky run myapp/src/main.ky"
