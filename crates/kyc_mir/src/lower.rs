@@ -333,13 +333,23 @@ impl Lowerer {
             }
         }
 
-        // Pre-scan module-level constants
+        // Pre-scan module-level constants and immutable variables
         {
             let mut cv = self.const_values.borrow_mut();
             cv.clear();
             for decl in &program.declarations {
-                if let Decl::Constant(c) = decl {
-                    cv.insert(c.name.clone(), *c.value.clone());
+                match decl {
+                    Decl::Constant(c) => {
+                        cv.insert(c.name.clone(), *c.value.clone());
+                    }
+                    Decl::Variable(v) => {
+                        // Immutable module-level variables are inlined like
+                        // constants — their value never changes at runtime
+                        if !v.is_mutable {
+                            cv.insert(v.name.clone(), *v.value.clone());
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
