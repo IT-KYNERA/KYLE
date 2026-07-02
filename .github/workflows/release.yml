@@ -18,7 +18,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
-            --title "kl ${{ github.ref_name }}" \
+            --title "ky ${{ github.ref_name }}" \
             --notes "See commit history for changes." \
             --repo ${{ github.repository }} 2>/dev/null || true
 
@@ -34,25 +34,25 @@ jobs:
           sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
-      - name: Build kl (release)
-        run: cargo build --bin kl --release
+      - name: Build ky (release)
+        run: cargo build --bin ky --release
 
       - name: Build runtime library
         run: cargo build -p kyc_runtime --release
 
       - name: Package tarball
         run: |
-          mkdir -p dist/kl/lib
-          cp target/release/kl dist/kl/kl
-          chmod +x dist/kl/kl
-          cp target/release/libkyc_runtime.a dist/kl/lib/
-          cd dist && tar czf kl-${{ github.ref_name }}-linux-arm64.tar.gz kl
+          mkdir -p dist/ky/lib
+          cp target/release/ky dist/ky/ky
+          chmod +x dist/ky/ky
+          cp target/release/libkyc_runtime.a dist/ky/lib/
+          cd dist && tar czf ky-${{ github.ref_name }}-linux-arm64.tar.gz ky
 
       - name: Upload Release Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
 
   build-linux-x64:
     needs: create-release
@@ -66,25 +66,25 @@ jobs:
           sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
 
-      - name: Build kl (release)
-        run: cargo build --bin kl --release
+      - name: Build ky (release)
+        run: cargo build --bin ky --release
 
       - name: Build runtime library
         run: cargo build -p kyc_runtime --release
 
       - name: Package tarball
         run: |
-          mkdir -p dist/kl/lib
-          cp target/release/kl dist/kl/kl
-          chmod +x dist/kl/kl
-          cp target/release/libkyc_runtime.a dist/kl/lib/
-          cd dist && tar czf kl-${{ github.ref_name }}-linux-x64.tar.gz kl
+          mkdir -p dist/ky/lib
+          cp target/release/ky dist/ky/ky
+          chmod +x dist/ky/ky
+          cp target/release/libkyc_runtime.a dist/ky/lib/
+          cd dist && tar czf ky-${{ github.ref_name }}-linux-x64.tar.gz ky
 
       - name: Upload Release Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
 
   build-macos-arm64:
     needs: create-release
@@ -95,27 +95,29 @@ jobs:
       - name: Install LLVM 18
         run: |
           brew install llvm@18
+          brew link --overwrite llvm@18
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
 
-      - name: Build kl (release)
-        run: cargo build --bin kl --release
+      - name: Build ky (release)
+        run: cargo build --bin ky --release
 
       - name: Build runtime library
         run: cargo build -p kyc_runtime --release
 
       - name: Package tarball
         run: |
-          mkdir -p dist/kl/lib
-          cp target/release/kl dist/kl/kl
-          chmod +x dist/kl/kl
-          cp target/release/libkyc_runtime.a dist/kl/lib/
-          cd dist && tar czf kl-${{ github.ref_name }}-macos-arm64.tar.gz kl
+          mkdir -p dist/ky/lib
+          cp target/release/ky dist/ky/ky
+          chmod +x dist/ky/ky
+          cp target/release/libkyc_runtime.a dist/ky/lib/
+          cd dist && tar czf ky-${{ github.ref_name }}-macos-arm64.tar.gz ky
 
       - name: Upload Release Asset
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/kl-*.tar.gz --clobber
+          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
 
   # Windows: disabled — runner has LLVM 20 pre-installed, but inkwell requires LLVM 18.
   # To fix: either update inkwell to support LLVM 20, or downgrade runner's LLVM.
