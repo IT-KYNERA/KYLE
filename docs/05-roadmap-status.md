@@ -1058,13 +1058,17 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 ### Pendiente inmediato (tras Fase 11)
 | Prioridad | Tarea | Fase |
 |-----------|-------|------|
-| 🔴 CRÍTICO | Fix release mode hang | 16.0 |
-| 🔴 CRÍTICO | `inbounds` en GEPs (podría arreglar release hang) | 16.2 |
-| 🟡 ALTO | `noalias` en parámetros puntero de runtime externs | 16.4 |
-| 🟡 ALTO | Missing extern declarations (`ky_list_pop_first`, etc.) | 15.B2 |
-| 🟢 MEDIO | TBAA metadata, align, noundef, !range, lifetime | 16.5-16.9 |
-| 🟢 MEDIO | Registry server implementation | 11.3 (server) |
-| ✅ IMPLEMENTADO | nsw/nuw flags (overflow = UB como C) | 16.1 |
+| 🔴 CRÍTICO | **SSA release hang FIXED** — cross-block value lookup en ssa_read! | 16.0 ✅ |
+| 🔴 CRÍTICO | LLVM optimization passes (run_passes("default<O3>")) | 17.4 ✅ |
+| 🟡 ALTO | Missing extern declarations (`ky_list_pop_first`, `ky_list_clear`, `ky_list_contains`, `ky_list_filter`, `ky_list_fold`, `ky_list_insert`, `ky_list_map`, `ky_list_reduce`, `ky_list_remove_at`) | 15.B2 |
+| 🟡 ALTO | Duplicate extern declarations (`ky_dict_new/get/set/len/free` declaradas 2 veces) | 15.B3 |
+| 🟢 MEDIO | Registry server implementation (servidor HTTP para paquetes) | 11.3 (server) |
+| 🟢 MEDIO | `nsw`/`nuw` flags — build_int_nsw_add usado pero flags no aparecen en IR | 16.1 |
+| 🟢 MEDIO | `packages/` directory + path dependencies en ky.toml | 11.6 |
+| ✅ IMPLEMENTADO | Release mode fix — SSA cross-block phi values (ssa_read! busca en todos los block_vals) | ✅ |
+| ✅ IMPLEMENTADO | Return type coercion en SSA path | ✅ |
+| ✅ IMPLEMENTADO | LLVM -O3 passes vía new pass manager (run_passes) | ✅ |
+| ✅ IMPLEMENTADO | param_values.clear() entre funciones SSA | ✅ |
 
 ### Bugs encontrados y arreglados
 
@@ -1078,56 +1082,58 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 
 | Issue | Síntoma | Causa raíz | Estado |
 |-------|---------|------------|--------|
-| Release mode hang (15.B1) | `ky build --release` produce binarios que cuelgan | SSA + LLVM aggressive optimization sin atributos | 🔴 Sin fix |
-| Missing extern decls (15.B2) | Funciones `ky_list_*` existen en lower.rs/runtime pero no en LLVM | `declare_runtime_externs()` incompleto | 🟡 Sin fix |
-| Duplicate externs (15.B3) | `ky_dict_new/get/set/len/free` declaradas 2 veces | Refactor incompleto | 🟢 Cosmético |
+| Missing extern decls (15.B2) | 9 funciones `ky_list_*` existen en runtime pero no declaradas en LLVM | `declare_runtime_externs()` incompleto | 🟡 Fix pendiente |
+| Duplicate externs (15.B3) | `ky_dict_new/get/set/len/free` declaradas 2 veces en codegen | Refactor incompleto | 🟢 Cosmético |
+| `nsw`/`nuw` flags (16.1) | `build_int_nsw_add` usado pero flags no aparecen en IR generado | Posible bug en inkwell o conversión de tipo | 🟡 Diagnosticar |
 
-### Resultados de benchmark (2026-07-02) — time user, release mode, Apple Silicon
+### Resultados de benchmark (2026-07-02) — FINAL, SSA + LLVM -O3
 
-Benchmarks actualizados con tamaños grandes para hacer medibles las diferencias.
-Todos los resultados son correctos (mismos valores en todos los lenguajes).
+> **Fix aplicado:** SSA cross-block value lookup (ssa_read! busca en todos los block_vals)
+> + LLVM `run_passes("default<O3>")` vía new pass manager.
+> Todos los resultados correctos, Kyle iguala a C/Rust en user time.
 
 **Prueba 1: Primos** — `is_prime()` hasta 3,000,000
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | 0.18s | 1× | 47× |
-| Java 21 | 0.21s | 1.2× más lento | 40× |
-| **Kyle** | **0.46s** | **2.6× más lento** | **18×** |
-| Python 3 | 8.48s | 47× más lento | 1× |
+| **Kyle** | **0.19s** | **0.9×** 🏆 | **47×** |
+| Rust | 0.21s | 1× | 43× |
+| C (gcc -O3) | 0.19s | 0.9× | 47× |
+| Java 21 | 0.21s | 1.0× | 42× |
+| Python 3 | 8.91s | 42× más lento | 1× |
 
 **Prueba 2: Aritmética** — `total = total + i * 2 - 1` (500M iteraciones, i32 wrap)
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | < 0.01s* | 1× | — |
-| Java 21 | 0.13s | — | 192× |
-| **Kyle** | **0.95s** | **—** | **26×** |
-| Python 3 | 25.06s | — | 1× |
+| **Kyle** | **0.00s*** | **1×** 🏆 | **∞** |
+| Rust | 0.00s* | 1× | ∞ |
+| C (gcc -O3) | 0.00s* | 1× | ∞ |
+| Java 21 | 0.14s | — | 188× |
+| Python 3 | 26.27s | — | 1× |
 
-\* Rust pre-computó el loop aritmético en compile-time (const-folding)
+\* Loop optimizado completamente por LLVM/GCC (const-folding)
 
 **Prueba 3: Mandelbrot** — 390×390 grid, 100 max iter (punto flotante)
 | Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | 0.01s | 1× | 39× |
+| **Kyle** | **0.01s** | **1×** 🏆 | **42×** |
+| Rust | 0.01s | 1× | 42× |
+| C (gcc -O3) | 0.01s | 1× | 42× |
 | Java 21 | 0.02s | 2× más lento | 20× |
-| **Kyle** | **0.04s** | **4× más lento** | **10×** |
-| Python 3 | 0.39s | 39× más lento | 1× |
+| Python 3 | 0.42s | 42× más lento | 1× |
 
-**Resumen vs Rust (release mode):**
-| Benchmark | Rust | **Kyle** | Java | Python |
-|-----------|------|----------|------|--------|
-| Primes | 0.18s | **0.46s** (2.6×) | 0.21s (1.2×) | 8.48s (47×) |
-| Arithmetic | 0.00s* | **0.95s** (~∞) | 0.13s (~∞) | 25.06s (~∞) |
-| Mandelbrot | 0.01s | **0.04s** (4×) | 0.02s (2×) | 0.39s (39×) |
+**Resumen — User Time:**
+| Benchmark | **Kyle (SSA+O3)** | **C (-O3)** | Rust | Java | Python |
+|-----------|:-----------------:|:----------:|:----:|:----:|:------:|
+| Primes | **0.19s** | 0.19s | 0.21s | 0.21s | 8.91s |
+| Arithmetic 500M | **0.00s*** | 0.00s* | 0.00s* | 0.14s | 26.27s |
+| Mandelbrot | **0.01s** | 0.01s | 0.01s | 0.02s | 0.42s |
 
 **Conclusión:**
-- Kyle es **2.6-4× más lento que Rust** en lógica real (primes, mandelbrot).
-- En arithmetic puro, la brecha es enorme (~∞ en Rust const-folded vs 0.95s Kyle).
-  **Esto NO es por falta de atributos LLVM** — es porque el backend genera
-  22+ allocas por función y cada operación pasa por memoria RAM.
-- **El cuello de botella real**: el backend no-SSA genera código con
-  `load`/`store` para CADA operación. Rust (con SSA + mem2reg) mantiene
-  todo en registros. La Fase 15 (SSA) debería resolver esto, pero tiene bugs
+- **Kyle = C = Rust** en user time para todos los benchmarks.
+- La diferencia en wall time (0.44s Kyle vs 0.19s C en primes) es startup
+  overhead del runtime dinámico, no del cómputo.
+- **Pipeline completo:** SSA elimina allocas → LLVM -O3 optimiza →
+  rendimiento nativo a la par con C/Rust.
   de PHI nodes que impiden su uso en producción.
 - **Fase 17 (Optimization Pipeline)** debe ejecutar pases LLVM como `mem2reg`,
   `gvn`, `licm` para cerrar el gap, además de arreglar el SSA.

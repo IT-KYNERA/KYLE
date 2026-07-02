@@ -199,6 +199,170 @@ resolution is planned for Phase 13.
 Dependency **resolution** and **fetching** are not yet implemented. The
 package manager currently only manages the manifest.
 
+### 3.4 Package Ecosystem Plan (Post-v1.0)
+
+> **TL;DR:** Monorepo para desarrollo, GitHub Releases como registry inicial,
+> separar a repos independientes cuando haya 20+ paquetes estables.
+
+#### 3.4.1 Architecture — 3 Components
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Kyle Compiler (github.com/IT-KYNERA/kyle)                   │
+│     El binario `ky` incluye: compilador + runtime + std +       │
+│     package manager (kyc_tools). Todo en un mismo repo.         │
+│                                                                 │
+│     Cuando el usuario escribe `ky add json`:                    │
+│       1. Resuelve semver desde ky.toml                          │
+│       2. HTTP GET → registry/v1/packages/json                   │
+│       3. Descarga .tar.gz, extrae a ~/.ky/cache/json-1.0.0/    │
+│       4. import json busca en ~/.ky/cache/                      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  2. Registry Server (github.com/IT-KYNERA/ky-registry)          │
+│     Servidor HTTP independiente (Rust, axum). Sirve .tar.gz     │
+│     de paquetes. Hosteado en VPS o como GitHub Releases.        │
+│                                                                 │
+│     GET /v1/packages/:name           → lista versiones          │
+│     GET /v1/packages/:name/:ver/download → .tar.gz              │
+│     PUT /v1/packages/:name/:ver/upload ← publish (auth)         │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  3. Official Packages (github.com/IT-KYNERA/ky-packages)        │
+│     Código fuente de paquetes oficiales. Cada uno es un         │
+│     proyecto Kyle independiente con su propio ky.toml.          │
+│                                                                 │
+│     packages/                                                   │
+│     ├── json/        ky.toml + src/lib.ky                       │
+│     ├── http/        ky.toml + src/lib.ky                       │
+│     ├── postgresql/  ky.toml + src/lib.ky                       │
+│     ├── sqlite/      ky.toml + src/lib.ky                       │
+│     ├── crypto/      ky.toml + src/lib.ky                       │
+│     └── registry.json  ← índice generado automáticamente        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 3.4.2 Monorepo Development (Current/Fase Actual)
+
+Durante el desarrollo del lenguaje, **todo vive en el mismo repo:**
+
+```
+kyle/
+├── crates/           (compiler: 9 crates)
+├── kyc_runtime/      (runtime Rust)
+├── std/              (stdlib: core.ky, io.ky, math.ky...)
+├── packages/         ← NUEVO — paquetes oficiales en desarrollo
+│   ├── json/
+│   │   ├── ky.toml
+│   │   └── src/lib.ky
+│   ├── http/
+│   └── postgresql/
+├── docs/
+└── ky.toml           (root manifest)
+```
+
+**Path dependencies** — un proyecto de prueba declara:
+
+```toml
+[dependencies]
+json = { path = "../kyle/packages/json" }
+```
+
+El compilador resuelve la ruta local, compila el paquete como un módulo más,
+sin descargar nada de Internet. Esto permite iterar a velocidad de luz.
+
+#### 3.4.3 GitHub Releases as Registry (Fase Intermedia)
+
+Cuando los paquetes estén estables, se publican como GitHub Releases:
+
+```bash
+# publish.sh — script interno
+cd packages/json
+git tag v1.0.0
+git push origin v1.0.0
+# GitHub Action crea Release con .tar.gz
+```
+
+El `registry.json` estático se sirve via GitHub Pages:
+
+```json
+{
+  "json": {
+    "1.0.0": {
+      "url": "https://github.com/IT-KYNERA/ky-packages/releases/download/json-1.0.0.tar.gz",
+      "checksum": "sha256:a1b2c3..."
+    }
+  }
+}
+```
+
+#### 3.4.4 Package Format
+
+Cada paquete es un `.tar.gz` con:
+
+```
+json-1.0.0/
+├── ky.toml           ← name, version, dependencies
+├── src/
+│   └── lib.ky        ← entry point (pub fn exports)
+├── tests/
+├── README.md
+└── LICENSE
+```
+
+Convenciones:
+- Entry point: `src/lib.ky`
+- `pub fn` = API pública
+- `_fn` = protected (mismo paquete)
+- `__fn` = private
+
+#### 3.4.5 Path Dependencies Implementation
+
+El compilador debe soportar `{ path = "..." }` en `ky.toml`:
+
+| Archivo | Cambio |
+|---------|--------|
+| `kyc_tools/src/package/manifest.rs` | Parsear `Dependency::Path(String)` |
+| `kyc_driver/src/pipeline.rs` | Resolver imports desde `packages/` + cache paths |
+| `kyc_frontend/src/parser.rs` | Search paths para módulos de paquetes |
+
+**Module resolution order (actualizado):**
+```
+import json → busca en:
+  1. Paquetes instalados en ~/.ky/cache/json-*/src/ (desde ky.lock)
+  2. packages/json/ (desarrollo local)
+  3. Directorio del archivo actual
+  4. src/ del proyecto
+  5. std/ (librería estándar)
+```
+
+#### 3.4.6 Future: Independent Repositories
+
+Cuando haya 20+ paquetes estables y contribuidores externos:
+
+```
+github.com/IT-KYNERA/
+├── kyle/           ← compiler + runtime + std + tools
+├── ky-registry/    ← registry server (Rust, axum)
+└── KylePackages/   ← organización de paquetes oficiales
+    ├── json/
+    ├── http/
+    ├── postgresql/
+    ├── sqlite/
+    ├── websocket/
+    ├── crypto/
+    ├── image/
+    ├── xml/
+    ├── yaml/
+    └── jwt/
+```
+
+El usuario escribe exactamente lo mismo: `ky add postgres`.
+La única diferencia es que el cliente descarga desde `packages.kylelang.org`
+en lugar de GitHub Releases.
+
 ---
 
 ## 4. Build System
@@ -343,4 +507,4 @@ highlighting and snippets only.
 
 ---
 
-*Version: v0.3.0 · Last updated: 2026-06-28*
+*Version: v0.5.0 · Last updated: 2026-07-02*
