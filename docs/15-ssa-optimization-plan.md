@@ -193,7 +193,7 @@ sin store, sin load subsecuente.
 
 ### 5.1 i64 por defecto para literales grandes
 
-**Archivo:** `crates/klc_semantic/src/type_checker.rs`
+**Archivo:** `crates/kyc_semantic/src/type_checker.rs`
 
 **Cambio:** Los literales enteros > 2^31 (2147483648) se infieren como i64
 en lugar de i32. Esto elimina los casts constantes `i32 → i64` que el
@@ -213,7 +213,7 @@ fn infer_int_literal_type(val: i64) -> MirType {
 
 ### 5.2 ThinLTO
 
-**Archivo:** `crates/klc_backend/src/linker.rs`
+**Archivo:** `crates/kyc_backend/src/linker.rs`
 
 **Cambio:** Al compilar con `--release`, pasar `-flto=thin -O3` al linker.
 
@@ -226,20 +226,20 @@ if is_release {
 
 ### 5.3 Alias Analysis
 
-**Archivo:** `crates/klc_backend/src/codegen.rs`
+**Archivo:** `crates/kyc_backend/src/codegen.rs`
 
 **Cambio:** Marcar parámetros de funciones runtime como `noalias` y/o
 `readonly` para que LLVM pueda reordenar operaciones.
 
 ```rust
-// Para parámetros que son solo lectura (p.ej. kl_strlen, kl_list_len):
+// Para parámetros que son solo lectura (p.ej. ky_strlen, ky_list_len):
 let param_attr = llvm_ctx.create_enum_attribute(Attribute::get_named_enum_kind_id("readonly"), 0);
 fn_value.add_attribute(AttributeLoc::Param(0), param_attr);
 ```
 
 ### 5.4 Inlining
 
-**Archivo:** `crates/klc_mir/src/optimize.rs`
+**Archivo:** `crates/kyc_mir/src/optimize.rs`
 
 **Cambio:** Inline de funciones con < 10 instrucciones o llamadas una sola vez.
 
@@ -271,9 +271,9 @@ Antes y después de cada paso, ejecutar:
 cargo build --release
 
 # Compilar y ejecutar pruebas de rendimiento
-kl run --release examples/bench/primes.kl
-kl run --release examples/bench/mandelbrot.kl
-kl run --release examples/bench/arithmetic.kl
+kl run --release examples/bench/primes.ky
+kl run --release examples/bench/mandelbrot.ky
+kl run --release examples/bench/arithmetic.ky
 
 # Comparar con Rust
 rustc -O examples/bench/primes.rs && ./primes

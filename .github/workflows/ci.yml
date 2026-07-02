@@ -62,12 +62,12 @@ jobs:
         run: cargo clippy --workspace -- -D warnings 2>&1 || true
 
       - name: Build release
-        run: cargo build --release --bin kl
+        run: cargo build --release --bin ky
 
       - name: Smoke test
         run: |
-          ./target/release/kl --version
-          ./target/release/kl help
+          ./target/release/ky --version
+          ./target/release/ky help
 
   test-arm:
     runs-on: ubuntu-24.04-arm
@@ -98,7 +98,7 @@ jobs:
         run: cargo test --workspace
 
       - name: Build release
-        run: cargo build --release --bin kl
+        run: cargo build --release --bin ky
 
   vscode:
     runs-on: ubuntu-24.04
@@ -113,20 +113,20 @@ jobs:
           node-version: "22"
 
       - name: Install deps
-        working-directory: vscode-kl
+        working-directory: vscode-ky
         run: npm install
 
       - name: TypeScript check
-        working-directory: vscode-kl
+        working-directory: vscode-ky
         run: npx -p typescript tsc --noEmit
 
       - name: Package VSIX
-        working-directory: vscode-kl
-        run: npx @vscode/vsce package --out kl-${{ github.sha }}.vsix
+        working-directory: vscode-ky
+        run: npx @vscode/vsce package --out ky-${{ github.sha }}.vsix
 
       - name: Upload VSIX
         uses: actions/upload-artifact@v4
         with:
-          name: kl-vscode-extension
-          path: vscode-kl/*.vsix
+          name: ky-vscode-extension
+          path: vscode-ky/*.vsix
           retention-days: 30

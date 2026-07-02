@@ -1,22 +1,31 @@
-# RFC 0001: Move Semantics
+# RFC 0001: Borrow Semantics (prev: Move Semantics)
 
-- **Status:** Implemented (Phase 7, v0.4.0)
-- **Date:** 2026-06-01
+- **Status:** Refactored (Phase 7 + Phase 14, v0.5.0)
+- **Date:** 2026-06-01 (originally) / 2026-07-01 (refactored)
 - **Author:** Kyle Compiler Team
-- **PR:** [Move semantics implementation](#)
 
 ---
 
-## Summary
+## Summary (Refactored)
 
-Kyle uses **move semantics by default** for heap-allocated types (`str`,
-`[T]`, `{K:V}`, classes). Copy types (integers, floats, bools, chars) are
-implicitly duplicated on assignment. This design eliminates the need for a
-garbage collector while keeping the language safe from use-after-free bugs.
+Kyle originally used **move-by-default** (v0.4.0). This RFC was updated to
+reflect the **borrow-by-default** decision (v0.5.0+):
+
+| Original (v0.4.0) | Current (v0.5.0+) |
+|---|---|
+| `fn f(s: str)` = move ownership | `fn f(s: str)` = borrow immutably |
+| `fn f(s: &str)` = borrow (read-only) | `fn f(s: &str)` = borrow mutably |
+| Hardcoded borrowing function list | Full borrow checker via `&T` / `^T` |
+| `name := value` = mutable variable | `name: &T = value` = mutable variable |
+| `name ::= value` = constant | `name := value` = constant |
+
+The original content is preserved below for historical reference.
 
 ---
 
-## Motivation
+## Original: Move Semantics (v0.4.0)
+
+### Motivation
 
 Without move semantics:
 - Every assignment of a string would copy the underlying buffer (slow)
@@ -56,6 +65,43 @@ Move semantics gives us:
 
 ---
 
+## Borrow-Assignment Distinction (v0.5.0+)
+
+The original move-vs-copy classification still applies for **assignment**:
+
+```kl
+# Copy types: always implicit copy
+x: i32 = 42
+y = x              # x and y are independent
+
+# Move types: ownership transfers on ASSIGNMENT
+a = "hello"
+b = a              # a is moved → use-after-move if read
+```
+
+But for **function parameters**, the default is now **borrow**:
+
+```kl
+fn read(s: str):       # BORROW: s is not moved
+    println(s)
+# s released at end, caller still owns
+
+fn consume(^s: str):   # MOVE: ownership transfers
+    # s destroyed at end, caller loses access
+```
+
+| Operation | Copy type | Move type |
+|-----------|-----------|-----------|
+| Assignment `y = x` | Bitwise copy | Ownership transfer (move) |
+| Function param `s: T` | Bitwise copy | Borrow (no move) |
+| Function param `^s: T` | Ownership transfer | Ownership transfer |
+| Function param `s: &T` | Mutable borrow | Mutable borrow |
+| Return value | Bitwise copy | Ownership transferred to caller |
+| `.clone()` | N/A | Deep copy, both valid |
+| Scope exit | Nothing | Release if owned |
+
+---
+
 ## Dataflow Analysis Approach
 
 The analysis is a **forward dataflow pass** over MIR basic blocks:
@@ -70,20 +116,32 @@ The analysis is a **forward dataflow pass** over MIR basic blocks:
    compile-time error.
 5. **Clone:** `.clone()` copies the value without moving the source.
 
+### Borrowing (v0.5.0+)
+
+The analysis also tracks borrowing state:
+
+- `s: T` param → `s` is borrowed, caller keeps ownership
+- `s: &T` param → `s` is borrowed mutably, caller keeps ownership
+- `^s: T` param → ownership transferred, source invalidated
+
 ---
 
-## Borrowing Functions Concept
+## Syntax Summary (v0.5.0+)
 
-Not all functions take ownership. Functions like `print()`, `println()`,
-`len()`, and list mutators (`list_push`, `list_get`, `list_set`) are
-designated as **borrowing functions** — they read or mutate the value
-without consuming it.
-
-The move analysis has a hardcoded list of borrowing function names. When
-a value is passed to a borrowing function, the source remains `Live`.
-
-This is an interim solution. A full borrow checker (references `&T`/`&mut T`)
-is planned post-v1.0.
+| Concept | Syntax |
+|---------|--------|
+| Immutable variable | `name = value` |
+| Mutable variable | `name: &T = value` or `name = &value` |
+| Constant | `NAME := value` |
+| Immutable borrow param | `fn f(s: T)` |
+| Mutable borrow param | `fn f(s: &T)` |
+| Move param | `fn f(^s: T)` |
+| Call: immutable borrow | `f(x)` |
+| Call: mutable borrow | `f(&x)` |
+| Call: move | `f(^x)` |
+| Immutable field | `name: T` |
+| Mutable field | `name: &T` |
+| Mutable field with default | `name: &T = expr` |
 
 ---
 
@@ -110,8 +168,8 @@ else:
 ### Return After Move
 
 ```kl
-fn get_length(s: str) i32:
-    len = s.len()     # s is borrowed, not moved
+fn get_length(s: str) i32:   # borrow (not move)
+    len = s.len()
     return len
 # s is still Live → OK
 ```
@@ -125,13 +183,27 @@ println(s)      # OK: s is still Live
 println(t)      # OK: t is Live
 ```
 
+### Borrow at Call Site
+
+```kl
+fn append(s: &str):
+    s = s + "!"
+
+name: &str = "Kyle"
+append(name)            # ✅ &str → &str (mutable, direct)
+
+nick = "Ana"            # immutable
+append(&nick)           # ✅ str → &str with & coercion
+append(nick)            # ❌ missing & → compile error
+```
+
 ---
 
 ## Implementation Details
 
-- **File:** `klc_mir/src/move_analysis.rs`
+- **File:** `kyc_mir/src/borrow_analysis.rs` (formerly `move_analysis.rs`)
 - **Pass location:** Between MIR lowering and codegen
 - **Pipeline integration:** Build fails on use-after-move errors
-- **Testing:** 9 end-to-end tests in `klc_driver` covering copy types,
-  clone, borrowing functions, params, if/else branches, use-after-move,
-  and return after move
+- **Parameter rules:** Tracked via MIR parameter annotations (Borrow, MutableBorrow, Move)
+- **Testing:** 9+ end-to-end tests in `kyc_driver` covering copy types,
+  clone, borrowing, params, if/else branches, use-after-move, return after move

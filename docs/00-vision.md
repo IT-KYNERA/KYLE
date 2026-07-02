@@ -77,7 +77,7 @@ These are the four north-stars. Every design decision is checked against them.
 - **Classes with inheritance, polymorphism, and visibility** — `_` protected,
   `__` private, no prefix public
 - **Structs by reference** — passed by `ptr` to LLVM, no copy overhead
-- **RAII memory** — `kl_alloc` / `kl_retain` / `kl_release` at scope exit
+- **RAII memory** — `ky_alloc` / `ky_retain` / `ky_release` at scope exit
 - **C-compatible ABI** — every type is `#[repr(C)]`, ready for FFI
 
 ---
@@ -154,8 +154,8 @@ Kyle is for:
 
 - **Backend engineers** writing HTTP services, CLI tools, and daemons who want
   Python's ergonomics with C's performance
-- **Systems programmers** who want Rust's safety without the borrow-checker
-  learning curve
+- **Systems programmers** who want Rust's safety with a simpler borrow system
+  (no lifetimes, no `&mut T`, borrow-by-default)
 - **Educators and students** who need a small, clear, well-typed language to
   teach the fundamentals of compilation and type systems
 - **Tool authors** who need a fast, statically-linked, single-file binary for

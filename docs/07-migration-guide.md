@@ -14,7 +14,7 @@ no semicolons, and value readability. But Kyle is compiled and statically typed.
 
 | Python | Kyle | Reason |
 | :--- | :--- | :--- |
-| `x = 5` | `x = 5` (immutable) or `x := 5` (mutable) | Mutability is explicit |
+| `x = 5` | `x = 5` (immutable) or `x: &i32 = 5` (mutable) | Mutability is explicit |
 | `x: int = 5` | `x: i32 = 5` | Strong typing, explicit sizes |
 | `def f(x):` | `fn f(x):` | `fn` is shorter, more common in compiled langs |
 | `None` | `None` | Same (but typed as `T?`) |
@@ -35,8 +35,8 @@ no semicolons, and value readability. But Kyle is compiled and statically typed.
 1. **No `let`/`const`/`var`** — the operator itself declares the binding.
    `x = 5` is a declaration (immutable), not reassignment.
 
-2. **Mutable by choice** — `x := 5` declares a mutable variable. You must
-   opt into mutability with `:=`.
+2. **Mutable by choice** — `x: &T = 5` or `x = &5` declares a mutable
+   variable. Constants use `X := 5` at module scope.
 
 3. **No exceptions** — every error is a value. Use `fn f() T!` and `?` to
    propagate. No `try`/`catch`/`finally`.
@@ -55,16 +55,21 @@ no semicolons, and value readability. But Kyle is compiled and statically typed.
 ## 2. From Rust
 
 Kyle takes Rust's type safety but drastically simplifies the syntax. No
-lifetime annotations, no borrow checker (at v1.0), no macros.
+lifetime annotations, no `impl` blocks, no macros.
 
 ### Syntax Differences
 
 | Rust | Kyle | Reason |
 | :--- | :--- | :--- |
 | `let x = 5;` | `x = 5` | No `let`, no `;` |
-| `let mut x = 5;` | `x := 5` | Walrus operator is cleaner |
-| `const X: i32 = 5;` | `X ::= 5` | `::=` is visually distinct |
+| `let mut x = 5;` | `x: &i32 = 5` or `x = &5` | `&T` marks mutability |
+| `const X: i32 = 5;` | `X := 5` | `:=` for constants |
 | `fn f(x: i32) i32 { }` | `fn f(x: i32) i32:` | Indentation, no `;` |
+| `fn f(x: &i32)` | `fn f(x: i32)` | Borrow-by-default (no `&` needed) |
+| `fn f(x: &mut i32)` | `fn f(x: &i32)` | `&` in type = mutable borrow |
+| `fn f(x: i32)` (copy) | `^x: i32` | `^` = ownership transfer |
+| `f(&x)` | `f(x)` | Immutable borrow, no `&` needed |
+| `f(&mut x)` | `f(&x)` | `&` at call site = permit mutation |
 | `Option<T>` | `T?` | Postfix `?` everywhere |
 | `Result<T, E>` | `T!` | Only error type (no custom error types yet) |
 | `x.ok_or("err")?` | `x?` | Implicit error propagation |
@@ -79,11 +84,16 @@ lifetime annotations, no borrow checker (at v1.0), no macros.
 
 ### What to Watch Out For
 
-1. **No borrow checker** (yet) — Kyle v1.0 uses move semantics with a dataflow
-   analysis instead of a full borrow checker. References `&T`/`&mut T` are
-   planned post-v1.0.
+1. **Borrow-by-default** — Kyle parameters are borrowed (not moved) by default.
+   Use `^x: T` for explicit ownership transfer (move).
 
-2. **No lifetime annotations** — Kyle's dataflow analysis tracks moves
+2. **No `&mut T`** — Kyle uses `&T` for both mutable and immutable borrows.
+   The distinction is tracked internally; `&T` in a type = mutable.
+
+3. **No `&` required for immutable borrows** — just pass the value:
+   `read(x)` not `read(&x)`. Only mutation needs `&`: `append(&x)`.
+
+4. **No lifetime annotations** — Kyle's dataflow analysis tracks moves
    intraprocedurally. No `'a`, no `'static`.
 
 3. **No `impl` blocks** — methods are defined inside the class body directly.
@@ -113,8 +123,8 @@ Kyle has a richer type system and different syntax.
 | Go | Kyle | Reason |
 | :--- | :--- | :--- |
 | `var x int = 5` | `x: i32 = 5` or `x = 5` | Type inference, no `var` |
-| `x := 5` | `x := 5` | Same walrus, but also means mutable |
-| `const X = 5` | `X ::= 5` | Different syntax |
+| `x := 5` | `x: &i32 = 5` or `x = &5` | `&T` marks mutability, `:=` is for constants |
+| `const X = 5` | `X := 5` | `:=` for constants replaces `::=` |
 | `func f(x int) int { }` | `fn f(x: i32) i32:` | `fn`, colon, indentation |
 | `x, err := f()` | `x = f()?` | No tuple errors, `?` propagates |
 | `if err != nil { return }` | `guard ok else: return` | Guard pattern, fail-fast |

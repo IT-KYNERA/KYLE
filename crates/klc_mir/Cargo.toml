@@ -1,9 +1,0 @@
-[package]
-name = "klc_mir"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-
-[dependencies]
-klc_core = { path = "../klc_core" }

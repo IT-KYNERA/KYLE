@@ -1,16 +1,16 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/klc_core",
-    "crates/klc_frontend",
-    "crates/klc_hir",
-    "crates/klc_semantic",
-    "crates/klc_mir",
-    "crates/klc_backend",
-    "crates/klc_driver",
-    "crates/klc_cli",
-    "crates/klc_runtime",
-    "crates/klc_tools",
+    "crates/kyc_core",
+    "crates/kyc_frontend",
+    "crates/kyc_hir",
+    "crates/kyc_semantic",
+    "crates/kyc_mir",
+    "crates/kyc_backend",
+    "crates/kyc_driver",
+    "crates/kyc_cli",
+    "crates/kyc_runtime",
+    "crates/kyc_tools",
 ]
 
 [workspace.package]

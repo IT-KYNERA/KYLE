@@ -6,20 +6,20 @@
 
 ---
 
-## 1. Compiler CLI (`kl`)
+## 1. Compiler CLI (`ky`)
 
 ### 1.1 Build & Run
-- [ ] `kl build src/main.kl` — compiles to native binary
-- [ ] `kl run src/main.kl` — compiles and executes
-- [ ] `kl run hello.kl` (no `main()`) — runs as script
-- [ ] `kl build --release` — produces optimized binary
-- [ ] `kl check file.kl` — type-check only (no binary)
-- [ ] `kl parse file.kl` — dumps AST
-- [ ] `kl mir file.kl` — dumps MIR
+- [ ] `kl build src/main.ky` — compiles to native binary
+- [ ] `kl run src/main.ky` — compiles and executes
+- [ ] `kl run hello.ky` (no `main()`) — runs as script
+- [ ] `ky build --release` — produces optimized binary
+- [ ] `kl check file.ky` — type-check only (no binary)
+- [ ] `kl parse file.ky` — dumps AST
+- [ ] `kl mir file.ky` — dumps MIR
 
 ### 1.2 Test Framework
-- [ ] `kl test` (in project dir) — runs all `#[test]` functions
-- [ ] `kl test file.kl` — runs tests in single file
+- [ ] `ky test` (in project dir) — runs all `#[test]` functions
+- [ ] `ky test file.ky` — runs tests in single file
 - [ ] Test PASS prints correctly
 - [ ] Test FAIL prints error + location
 - [ ] `#[test] fn test_name():` — test function is ignored during normal build
@@ -27,14 +27,14 @@
 - [ ] `assert_eq(a, b)` — panics if a != b
 - [ ] `assert_ne(a, b)` — panics if a == b
 
-### 1.3 Formatter (`kl fmt`)
-- [ ] `kl fmt file.kl` — formats file in-place
-- [ ] `kl fmt --check file.kl` — exits 1 if would reformat
-- [ ] `kl fmt` (no args, in project dir) — formats all `src/*.kl` and `tests/*.kl`
-- [ ] `kl fmt src/` — formats all `.kl` in directory
-- [ ] Roundtrip idempotency: `kl fmt file.kl && kl fmt --check file.kl` passes
-- [ ] `:=` syntax preserved (mutable variables)
-- [ ] `::=` syntax preserved (constants)
+### 1.3 Formatter (`ky fmt`)
+- [ ] `ky fmt file.ky` — formats file in-place
+- [ ] `ky fmt --check file.ky` — exits 1 if would reformat
+- [ ] `ky fmt` (no args, in project dir) — formats all `src/*.ky` and `tests/*.ky`
+- [ ] `ky fmt src/` — formats all `.ky` in directory
+- [ ] Roundtrip idempotency: `ky fmt file.ky && ky fmt --check file.ky` passes
+- [ ] `&T` syntax preserved (mutable variables)
+- [ ] `:=` syntax preserved (compile-time constants)
 - [ ] `final class` preserved
 - [ ] `abstract class` preserved
 - [ ] `#[test]` preserved before test functions
@@ -47,35 +47,35 @@
 - [ ] Enum variant patterns `Enum.Variant(args)` preserved
 - [ ] Or-patterns `a | b` preserved
 - [ ] Match guards `pattern if cond` preserved
-- [ ] `[format]` config in `kl.toml` is respected (`max_line_width`, `indent_size`)
+- [ ] `[format]` config in `ky.toml` is respected (`max_line_width`, `indent_size`)
 
 ### 1.4 Package Manager
-- [ ] `kl new myproject` — creates project skeleton
-- [ ] `kl add foo` — resolves and adds dependency
-- [ ] `kl add foo@1.2.3` — adds specific version
-- [ ] `kl remove foo` — removes dependency
-- [ ] `kl info` — shows project info
-- [ ] `kl update` — updates lock file
-- [ ] `kl outdated` — lists outdated dependencies
-- [ ] `kl publish` — publishes to registry
-- [ ] `kl login` — logs into registry
+- [ ] `ky new myproject` — creates project skeleton
+- [ ] `ky add foo` — resolves and adds dependency
+- [ ] `ky add foo@1.2.3` — adds specific version
+- [ ] `ky remove foo` — removes dependency
+- [ ] `ky info` — shows project info
+- [ ] `ky update` — updates lock file
+- [ ] `ky outdated` — lists outdated dependencies
+- [ ] `ky publish` — publishes to registry
+- [ ] `ky login` — logs into registry
 
 ### 1.5 Shell Completions
-- [ ] `kl completions bash` — outputs valid bash completion script
-- [ ] `kl completions zsh` — outputs valid zsh completion script
-- [ ] `kl completions fish` — outputs valid fish completion script
-- [ ] `kl completions powershell` — outputs valid PowerShell completion script
-- [ ] `kl add <TAB>` — suggests cached package names (all shells)
+- [ ] `ky completions bash` — outputs valid bash completion script
+- [ ] `ky completions zsh` — outputs valid zsh completion script
+- [ ] `ky completions fish` — outputs valid fish completion script
+- [ ] `ky completions powershell` — outputs valid PowerShell completion script
+- [ ] `ky add <TAB>` — suggests cached package names (all shells)
 
 ---
 
-## 2. LSP (`kl lsp`)
+## 2. LSP (`ky lsp`)
 
 ### 2.1 Diagnostics
-- [ ] Open a `.kl` file with syntax error → red squiggly + Problems panel entry
-- [ ] Open a `.kl` file with type error → error reported
+- [ ] Open a `.ky` file with syntax error → red squiggly + Problems panel entry
+- [ ] Open a `.ky` file with type error → error reported
 - [ ] Fix error → diagnostics clear automatically
-- [ ] `kl.toml` manifest errors shown (missing fields, invalid semver)
+- [ ] `ky.toml` manifest errors shown (missing fields, invalid semver)
 - [ ] Many quick edits → incremental sync works (no crash, no stale errors)
 
 ### 2.2 Completions
@@ -88,7 +88,7 @@
 ### 2.3 Go-to-Definition
 - [ ] Ctrl+click on function name → jumps to its definition (same file)
 - [ ] Ctrl+click on variable → jumps to its declaration
-- [ ] Ctrl+click on import → jumps to the module file (in `~/.kl/cache/` for deps)
+- [ ] Ctrl+click on import → jumps to the module file (in `~/.ky/cache/` for deps)
 
 ### 2.4 Hover
 - [ ] Hover over variable → shows inferred type
@@ -104,7 +104,7 @@
 - [ ] Click "Run test" → compiles and runs just that test
 
 ### 2.7 Format on Save
-- [ ] Save `.kl` file → file is auto-formatted
+- [ ] Save `.ky` file → file is auto-formatted
 
 ---
 
@@ -112,9 +112,9 @@
 
 ### 3.1 Installation
 - [ ] VSIX installs without errors
-- [ ] Extension activates on `.kl` files
-- [ ] Extension activates on `kl.toml` files
-- [ ] Language icon appears for `.kl` files in file explorer
+- [ ] Extension activates on `.ky` files
+- [ ] Extension activates on `ky.toml` files
+- [ ] Language icon appears for `.ky` files in file explorer
 
 ### 3.2 Commands (Ctrl+Shift+P)
 - [ ] `KL: Run current file` — compiles and runs
@@ -124,7 +124,7 @@
 - [ ] `KL: Run specific test` — runs one test
 
 ### 3.3 Tasks
-- [ ] Terminal > Run Task > `kl: run/build/check/test` — each works
+- [ ] Terminal > Run Task > `ky: run/build/check/test` — each works
 
 ### 3.4 Testing UI
 - [ ] Open Testing panel → discovers `#[test]` functions
@@ -149,7 +149,7 @@
 ### 3.7 Syntax Highlighting
 - [ ] Keywords highlighted: `fn`, `final`, `abstract`, `match`, `if`, `while`, `for`
 - [ ] Types highlighted: `i32`, `str`, `bool`, `f64`
-- [ ] `:=`, `::=` highlighted as operators
+- [ ] `:=` highlighted as constant operator
 - [ ] `T?`, `T!` highlighted
 - [ ] Comments highlighted
 - [ ] Strings and string interpolation highlighted
@@ -166,7 +166,7 @@
 ### 4.1 Variable Declarations
 - [ ] `name := value` — mutable variable (walrus)
 - [ ] `name = value` — immutable variable
-- [ ] `name ::= value` — compile-time constant
+- [ ] `name := value` — compile-time constant
 - [ ] `name: Type = value` — typed immutable
 - [ ] `name: Type := value` — typed mutable
 
@@ -261,7 +261,7 @@
 ## 6. Edge Cases & Stress Tests
 
 ### 6.1 Large Files
-- [ ] Format a 1000+ line `.kl` file — completes within 2 seconds
+- [ ] Format a 1000+ line `.ky` file — completes within 2 seconds
 - [ ] LSP handles a 5000+ line file without slowdown
 - [ ] Compiler handles 100+ source files in a project
 
@@ -273,12 +273,12 @@
 
 ### 6.3 Concurrency
 - [ ] LSP handles rapid edits without crashing
-- [ ] Multiple `kl` commands can run simultaneously
-- [ ] `kl test` runs tests in parallel (if applicable)
+- [ ] Multiple `ky` commands can run simultaneously
+- [ ] `ky test` runs tests in parallel (if applicable)
 
 ### 6.4 Package Manager
-- [ ] `kl add` with network error → graceful error message
-- [ ] `kl add` on existing dependency → updates version
+- [ ] `ky add` with network error → graceful error message
+- [ ] `ky add` on existing dependency → updates version
 - [ ] Circular dependencies → error reported
 - [ ] Lock file conflict → manual resolution message
 
@@ -289,7 +289,7 @@
 ### 7.1 macOS (Apple Silicon)
 - [ ] Full test suite passes
 - [ ] VS Code extension loads correctly
-- [ ] `kl lsp` works with VS Code on macOS
+- [ ] `ky lsp` works with VS Code on macOS
 
 ### 7.2 Linux (ARM64)
 - [ ] Full test suite passes

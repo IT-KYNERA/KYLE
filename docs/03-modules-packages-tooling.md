@@ -18,21 +18,21 @@ curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 One line for the VS Code extension:
 
 ```bash
-curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
-code --install-extension /tmp/kl.vsix
+curl -fsSL -o /tmp/ky.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
+code --install-extension /tmp/ky.vsix
 ```
 
 Verify:
 
 ```bash
-kl --version
-# kl v0.2.2
+ky --version
+# ky v0.2.2
 ```
 
 ### 1.2 Create a Project
 
 ```bash
-kl new myapp
+ky new myapp
 cd myapp
 ```
 
@@ -41,13 +41,13 @@ Generated layout:
 ```
 myapp/
 ├── src/
-│   ├── main.kl           ← entry point (fn main)
-│   └── lib.kl            ← library code (optional)
+│   ├── main.ky           ← entry point (fn main)
+│   └── lib.ky            ← library code (optional)
 ├── tests/
-│   └── test_main.kl      ← test stubs
+│   └── test_main.ky      ← test stubs
 ├── .vscode/
 │   └── settings.json     ← editor config
-├── kl.toml               ← project manifest
+├── ky.toml               ← project manifest
 ├── README.md             ← project README
 └── .gitignore
 ```
@@ -56,18 +56,18 @@ myapp/
 
 ```bash
 # Run in debug mode (fast compile, slow execution)
-kl run
+ky run
 
 # Build to native binary
-kl build
+ky build
 # → ./myapp
 
 # Build optimized release binary
-kl build --release
+ky build --release
 # → target/release/myapp
 
 # Type-check without building
-kl check src/main.kl
+ky check src/main.ky
 ```
 
 ---
@@ -78,7 +78,7 @@ kl check src/main.kl
 
 Kyle has four import forms:
 
-```kl
+```ky
 # 1. Import a whole module
 import math                # use: math.sqrt(2.0)
 
@@ -96,11 +96,11 @@ from str import capitalize as cap  # use: cap("hi")
 
 Use `~` to import relative to the current file:
 
-```kl
-# In src/widgets/button.kl
-import ~helpers    # → src/widgets/helpers.kl
-import ~~shared    # → src/shared.kl
-import ~~~../utils # → src/utils.kl
+```ky
+# In src/widgets/button.ky
+import ~helpers    # → src/widgets/helpers.ky
+import ~~shared    # → src/shared.ky
+import ~~~../utils # → src/utils.ky
 ```
 
 Each `~` goes up one directory.
@@ -114,7 +114,7 @@ When you write `import x`, the compiler searches in this order:
 3. `cwd/std/`
 4. The compiler's bundled `std/` directory
 
-The first file matching `x.kl` is loaded.
+The first file matching `x.ky` is loaded.
 
 ### 2.4 Visibility (Module-Level)
 
@@ -128,8 +128,8 @@ Module-level declarations use the same underscore convention as class members:
 
 The leading underscores are stripped from the import name.
 
-```kl
-# In str/uppercase.kl
+```ky
+# In str/uppercase.ky
 fn __internal_helper():
     # ...
 
@@ -137,7 +137,7 @@ fn uppercase(s: str) str:
     return __internal_helper() + s
 ```
 
-```kl
+```ky
 # In another file
 from str import uppercase
 # from str import __internal_helper  ← compile error: private
@@ -154,9 +154,9 @@ from str import uppercase
 
 ## 3. Package Manager
 
-### 3.1 The Manifest (`kl.toml`)
+### 3.1 The Manifest (`ky.toml`)
 
-Every project has a `kl.toml`:
+Every project has a `ky.toml`:
 
 ```toml
 [project]
@@ -178,9 +178,9 @@ testing = "1.0.0"
 The compiler reads `name`, `version`, and `dependencies` from the manifest.
 The other fields are stored but not currently used by the compiler.
 
-### 3.2 The Lock File (`kl.lock`)
+### 3.2 The Lock File (`ky.lock`)
 
-After a successful build, `kl.lock` is generated with the resolved versions
+After a successful build, `ky.lock` is generated with the resolved versions
 of all dependencies. The lock file is currently a stub — real dependency
 resolution is planned for Phase 13.
 
@@ -188,13 +188,13 @@ resolution is planned for Phase 13.
 
 | Command | Description | Status |
 |---|---|---|
-| `kl new <name>` | Create a new project from a template | ✅ |
-| `kl add <dep@version>` | Add a dependency to `kl.toml` | ✅ (manifest only) |
-| `kl remove <dep>` | Remove a dependency from `kl.toml` | ✅ (manifest only) |
-| `kl info` | Show project metadata | ✅ |
-| `kl build` | Build the project | ✅ |
-| `kl run` | Build and run | ✅ |
-| `kl test` | Run tests in `tests/` | 🔶 (type-checks only) |
+| `ky new <name>` | Create a new project from a template | ✅ |
+| `ky add <dep@version>` | Add a dependency to `ky.toml` | ✅ (manifest only) |
+| `ky remove <dep>` | Remove a dependency from `ky.toml` | ✅ (manifest only) |
+| `ky info` | Show project metadata | ✅ |
+| `ky build` | Build the project | ✅ |
+| `ky run` | Build and run | ✅ |
+| `ky test` | Run tests in `tests/` | 🔶 (type-checks only) |
 
 Dependency **resolution** and **fetching** are not yet implemented. The
 package manager currently only manages the manifest.
@@ -205,26 +205,26 @@ package manager currently only manages the manifest.
 
 ### 4.1 Project Mode
 
-When `kl` is run inside a directory with a `kl.toml`, it operates in project
-mode. The entry point is `src/main.kl` (or the file specified in `[project]
+When `ky` is run inside a directory with a `ky.toml`, it operates in project
+mode. The entry point is `src/main.ky` (or the file specified in `[project]
 main`).
 
 ```bash
 cd myapp
-kl run          # uses src/main.kl
-kl build        # produces ./myapp
-kl build --release  # optimized
+ky run          # uses src/main.ky
+ky build        # produces ./myapp
+ky build --release  # optimized
 ```
 
 ### 4.2 Single-File Mode
 
-When `kl <command> <file.kl>` is run with an explicit file, it operates in
-single-file mode. The given file is the entry point, and `kl.toml` is
+When `kl <command> <file.ky>` is run with an explicit file, it operates in
+single-file mode. The given file is the entry point, and `ky.toml` is
 ignored.
 
 ```bash
-kl run hello.kl
-kl check my_script.kl
+ky run hello.ky
+ky check my_script.ky
 ```
 
 ### 4.3 Build Artifacts
@@ -247,7 +247,7 @@ The `target/` directory is gitignored.
 | Flag | Effect |
 |---|---|
 | `--release` | Use optimized codegen (planned — currently same as debug) |
-| `--check` | Type-check only, don't generate code (alias for `kl check`) |
+| `--check` | Type-check only, don't generate code (alias for `ky check`) |
 | `--verbose` | Print compilation steps |
 | `--no-color` | Disable ANSI colors in output |
 
@@ -257,20 +257,20 @@ The `target/` directory is gitignored.
 
 ### 5.1 Project Commands
 
-Run these from the project root (where `kl.toml` lives):
+Run these from the project root (where `ky.toml` lives):
 
 | Command | Description |
 |---|---|
-| `kl new <name>` | Create a new project |
-| `kl run` | Build and execute |
-| `kl build` | Compile to native binary |
-| `kl build --release` | Compile with optimizations |
-| `kl test` | Run project tests |
-| `kl add <dep@ver>` | Add a dependency |
-| `kl remove <dep>` | Remove a dependency |
-| `kl info` | Show project info |
-| `kl fmt` | Format all `.kl` files in `src/` |
-| `kl completions <shell>` | Print shell completion script |
+| `ky new <name>` | Create a new project |
+| `ky run` | Build and execute |
+| `ky build` | Compile to native binary |
+| `ky build --release` | Compile with optimizations |
+| `ky test` | Run project tests |
+| `ky add <dep@ver>` | Add a dependency |
+| `ky remove <dep>` | Remove a dependency |
+| `ky info` | Show project info |
+| `ky fmt` | Format all `.ky` files in `src/` |
+| `ky completions <shell>` | Print shell completion script |
 
 ### 5.2 File Commands
 
@@ -278,13 +278,13 @@ Run these with an explicit file:
 
 | Command | Description |
 |---|---|
-| `kl run <file>` | Compile and execute |
-| `kl check <file>` | Type-check only (no codegen, fast) |
-| `kl build <file>` | Compile to native binary |
-| `kl parse <file>` | Print the AST as text |
-| `kl mir <file>` | Print the MIR (mid-level IR) |
-| `kl fmt <file>` | Format the file in-place |
-| `kl lsp` | Start the language server (stdio) |
+| `ky run <file>` | Compile and execute |
+| `ky check <file>` | Type-check only (no codegen, fast) |
+| `ky build <file>` | Compile to native binary |
+| `ky parse <file>` | Print the AST as text |
+| `ky mir <file>` | Print the MIR (mid-level IR) |
+| `ky fmt <file>` | Format the file in-place |
+| `ky lsp` | Start the language server (stdio) |
 
 ### 5.3 Global Flags
 
@@ -304,8 +304,8 @@ Run these with an explicit file:
 The extension `.vsix` is a single file in each release. Install it once:
 
 ```bash
-curl -fsSL -o /tmp/kl.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
-code --install-extension /tmp/kl.vsix
+curl -fsSL -o /tmp/ky.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
+code --install-extension /tmp/ky.vsix
 ```
 
 Then in VS Code, run **Developer: Reload Window** (`Cmd+Shift+P`).
@@ -328,14 +328,14 @@ Then in VS Code, run **Developer: Reload Window** (`Cmd+Shift+P`).
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `kl.klcPath` | string | `"kl"` | Path to the `kl` binary |
+| `ky.kycPath` | string | `"kl"` | Path to the `ky` binary |
 | `kl.semanticHighlighting` | bool | `true` | Enable semantic colors |
 
 ### 6.4 Extension Activation
 
 The extension activates when:
 
-- A `.kl` file is opened
+- A `.ky` file is opened
 - The user runs `KL: Run`, `KL: Build`, or `KL: Check`
 
 If the language server fails to start, the extension falls back to syntax

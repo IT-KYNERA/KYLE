@@ -31,7 +31,7 @@ resolves all types at compile time — there is no runtime type tagging, no
 | `any` | 8 bytes | `*const u8` | Top type (opaque pointer) |
 
 **String encoding:** Strings are null-terminated C strings (`*const u8`). The
-length is computed at runtime via `kl_strlen`. There is no length field stored
+length is computed at runtime via `ky_strlen`. There is no length field stored
 alongside the pointer at the value level.
 
 **Char encoding:** A `char` is a single byte. Full Unicode is not supported —
@@ -222,34 +222,50 @@ Kyle's error model does not include:
 
 ---
 
-## 3. Memory Model: Move Semantics (Planned)
+## 3. Memory Model: Borrow & Ownership (v0.5.0+)
 
-Kyle is moving from a **reference-counted** model to **move semantics by
-default** (Phase 6). This section documents the *target* memory model. The
-current implementation uses move semantics; the transition
-is underway.
+Kyle uses **borrow semantics by default** for function parameters and
+**move-on-assignment** for heap types. There is no garbage collector and
+no implicit reference counting. Memory is managed statically through:
 
-### 3.1 Core Principle: Move by Default, Copy on Intent
+- **Copy types** — stack values duplicated on assignment (no ownership)
+- **Move types** — ownership transfers on `=` assignment, but **borrowed** by
+  default in function parameters
+- **Clone** — explicit deep copy via `.clone()`
+
+### 3.1 Core Principle: Borrow by Default, Move on Intent
 
 | Category | Behavior | Examples |
 |---|---|---|
 | **Copy types** | Implicitly copied on assignment | `i8`–`i64`, `u8`–`u64`, `f32`, `f64`, `bool`, `char`, `void` |
-| **Move types** | Ownership transfers on assignment; source is invalidated | `final class`, `abstract class`, `[T]`, `{K: V}`, `str`, `T?`, `T!` |
+| **Move types** | Ownership transfers on `=` assignment; borrowed in fn params | `final class`, `abstract class`, `[T]`, `{K: V}`, `str`, `T?`, `T!` |
 | **Clone** | Explicit deep copy via `.clone()` | `b = a.clone()` |
 
 Primitives are `Copy` — they live on the stack and assignment duplicates
-the bits. Classes and collections are `Move` — they own heap resources and
-assignment transfers ownership.
+the bits. Classes and collections are `Move` — they own heap resources.
+
+**Key distinction:** Assignment (`=`) still transfers ownership for Move
+types, but **function parameters borrow by default**:
 
 ```kl
 # Copy — stack value, bits are duplicated
 x: i32 = 42
-y = x              # both x and y are valid, independent copies
+y = x              # both x and y are valid
 
-# Move — ownership transfers
+# Move — ownership transfers on ASSIGNMENT
 a = [1, 2, 3]
 b = a              # a is now invalid (move)
 # print(a)        # compile error: a was moved
+
+# Borrow — function parameters borrow by default
+fn read(s: str):   # s is BORROWED (not moved)
+    println(s)
+# s released, caller keeps ownership
+
+# Move in function params — explicit via ^
+fn consume(^s: str):   # ownership transfer
+    # s destroyed here
+    pass
 
 # Explicit clone
 c = b.clone()      # deep copy, both b and c are valid
@@ -257,12 +273,14 @@ c = b.clone()      # deep copy, both b and c are valid
 
 ### 3.2 What the Compiler Does
 
-The compiler's **move checker** (Phase 6) tracks:
+The compiler's **borrow checker** (Phase 7 + 14) tracks:
 
 1. **Live variables** — which names hold valid values at each program point
-2. **Move paths** — when a value is assigned to another name, the source is
-   marked as moved (invalidated)
-3. **Re-initialization** — moved-from variables can be re-assigned:
+2. **Move paths** — when a value is assigned to another name via `=`, the
+   source is marked as moved (invalidated)
+3. **Borrow paths** — when a value is passed as a function parameter, it is
+   borrowed unless prefixed with `^`
+4. **Re-initialization** — moved-from variables can be re-assigned:
    ```kl
    a = [1, 2, 3]
    b = a           # a is moved
@@ -274,10 +292,11 @@ The compiler's **move checker** (Phase 6) tracks:
 When a variable goes out of scope:
 
 - **Copy types:** nothing — the value is on the stack, no destructor needed
-- **Move types:** the compiler inserts a `kl_release` call to free associated
-  heap memory, but **only if** the value was not moved out (ownership was not
-  transferred). Once moved, the destructor is suppressed — the new owner
-  is responsible.
+- **Move types that were NOT moved out:** the compiler inserts a `ky_release`
+   call to free associated heap memory. Once moved, the destructor is
+   suppressed — the new owner is responsible.
+- **Borrowed values (fn params):** the caller is the owner, so the callee
+   never releases them.
 
 This is analogous to Rust's `drop` but managed by the compiler rather than
 via a trait. The compiler knows statically whether a variable is the
@@ -308,15 +327,15 @@ If you need a stack copy (for mutation without affecting the caller), use
 
 ### 3.5 List and Dict Storage
 
-Lists and dicts are **heap-allocated** via `kl_list_new` / `kl_dict_new`.
+Lists and dicts are **heap-allocated** via `ky_list_new` / `ky_dict_new`.
 With move semantics, assignment transfers ownership:
 
 ```kl
-a = [1, 2, 3]      # kl_list_new, a owns the allocation
+a = [1, 2, 3]      # ky_list_new, a owns the allocation
 b = a              # move: a is invalidated, b owns the allocation
 # ... at end of scope ...
-# kl_release(b) -> refcount=0, frees the list
-# kl_release(a) is NOT emitted — a was moved out
+# ky_release(b) -> refcount=0, frees the list
+# ky_release(a) is NOT emitted — a was moved out
 ```
 
 ### 3.6 String Literals
@@ -327,36 +346,19 @@ free them, and you don't need to.
 
 When a string literal is assigned to a variable, the compiler treats it as
 a static string reference — no allocation, no move. Concatenation results
-(e.g. `"a" + "b"`) produce owned strings via `kl_concat`.
+(e.g. `"a" + "b"`) produce owned strings via `ky_concat`.
 
-### 3.7 Refcounting: Legacy Mechanism
-
-The current compiler (pre-Phase 6) uses **reference counting** as the
-default memory management strategy. Every heap allocation starts with
-refcount = 1; `kl_retain` and `kl_release` are inserted automatically.
-
-This is being replaced by move semantics because:
-
-- **Performance:** refcounting adds atomic operations on every copy, even
-  in single-threaded code
-- **Predictability:** refcounting cannot handle cyclic references without
-  an explicit weak-reference mechanism
-- **Ergonomics:** move semantics makes ownership explicit at the syntax level
-
-After Phase 6, reference counting will remain only in the stdlib types
-`Rc<T>` and `Arc<T>` for shared ownership scenarios where single-owner
-semantics do not apply.
-
-### 3.8 Summary of Memory Operations
+### 3.7 Summary of Memory Operations
 
 | Operation | Copy types | Move types |
 |---|---|---|
 | Assignment (`=`) | Bitwise copy | Ownership transfer, source invalidated |
-| Function parameter | Bitwise copy | Reference passed (ABI) |
+| Borrow param (`s: T`) | Bitwise copy | Borrowed (caller keeps ownership) |
+| Mutable borrow param (`s: &T`) | Bitwise copy | Borrowed mutably (caller keeps ownership) |
+| Move param (`^s: T`) | Ownership transfer | Ownership transfer |
 | Return value | Bitwise copy | Ownership transferred to caller |
 | `.clone()` | N/A (free) | Deep copy, both valid |
-| Scope exit | Nothing | `kl_release` if owned |
-| Borrow (`&`) | Reference | Reference (no move) |
+| Scope exit | Nothing | `ky_release` if owned |
 
 ---
 
@@ -369,55 +371,55 @@ able to call C libraries directly from Kyle (Phase 9).
 
 | C signature | Used for |
 |---|---|
-| `void kl_print(const u8* s, i32 len)` | `print(s)` |
-| `void kl_println(const u8* s, i32 len)` | `println(s)` |
+| `void ky_print(const u8* s, i32 len)` | `print(s)` |
+| `void ky_println(const u8* s, i32 len)` | `println(s)` |
 
-| `u8* kl_i64_to_str(i64 v)` | `str(v)` |
-| `i64 kl_str_to_i64(const u8* s)` | `int(s)` (planned) |
-| `i32 kl_strlen(const u8* s)` | `len(s)` for strings |
-| `u8* kl_concat(const u8* a, i32 a_len, const u8* b, i32 b_len)` | string `+` |
-| `i32 kl_eq_str(const u8* a, i32 a_len, const u8* b, i32 b_len)` | string `==` |
-| `i32 kl_input()` | `input()` |
-| `i32 kl_input_with_prompt(const u8* prompt, i32 prompt_len)` | `input(p)` |
-| `i32 kl_open(const u8* path, const u8* mode)` | `open(path, mode)` |
-| `i32 kl_close(i32 fd)` | `close(fd)` |
-| `u8* kl_read_str(i32 fd, i32 count)` | `read_str(fd, n)` |
-| `i32 kl_write_str(i32 fd, const u8* s)` | `write_str(fd, s)` |
-| `i32 kl_sleep(i32 ms)` | `sleep(ms)` |
-| `i32 kl_now()` | `now()` |
-| `void* kl_alloc(i64 size)` | heap allocation |
-| `void kl_free(void* ptr)` | heap free |
-| `void kl_retain(void* ptr)` | refcount++ (legacy) |
-| `void kl_release(void* ptr)` | refcount-- / free (legacy) |
-| `i32 kl_str_to_upper(const u8* s, i32 len)` | `to_upper(s)` |
-| `i32 kl_str_to_lower(const u8* s, i32 len)` | `to_lower(s)` |
-| `i32 kl_str_trim(const u8* s, i32 len)` | `trim(s)` |
-| `i32 kl_str_replace(const u8* s, i32 len, const u8* old, const u8* new)` | `replace(s, o, n)` |
-| `i32 kl_char_at(const u8* s, i32 idx)` | `char_at(s, i)` |
-| `i32 kl_is_digit(char c)` | `is_digit(c)` |
-| `i32 kl_is_alpha(char c)` | `is_alpha(c)` |
-| `i32 kl_is_alnum(char c)` | `is_alnum(c)` |
-| `i32 kl_is_whitespace(char c)` | `is_whitespace(c)` |
-| `i32 kl_is_upper(char c)` | `is_upper(c)` |
-| `i32 kl_is_lower(char c)` | `is_lower(c)` |
-| `i32 kl_ord(char c)` | `ord(c)` |
-| `i32 kl_substr(const u8* s, i32 start, i32 count)` | `substr(s, st, n)` |
-| `void* kl_list_new()` | new list |
-| `void kl_list_push(void* list, i64 value)` | list append |
-| `i64 kl_list_pop(void* list)` | list pop |
-| `i64 kl_list_get(void* list, i32 idx)` | list index |
-| `void kl_list_set(void* list, i32 idx, i64 value)` | list assign |
-| `i32 kl_list_len(void* list)` | list length |
-| `void* kl_list_slice(void* list, i32 start, i32 end)` | list slice |
-| `void kl_list_extend(void* dst, void* src)` | list extend |
-| `void* kl_dict_new()` | new dict |
-| `void kl_dict_set(void* dict, const u8* key, i32 key_len, i64 value)` | dict set |
-| `i64 kl_dict_get(void* dict, const u8* key, i32 key_len)` | dict get |
-| `i32 kl_dict_len(void* dict)` | dict length |
-| `i32 kl_range(i64 start, i64 end)` | `range()` iterator |
-| `i64 kl_spawn_thread(void* fn, i64 arg)` | `async` |
-| `i64 kl_join_thread(i64 handle)` | `await` |
-| `void* kl_init_args(i32 argc, const u8** argv)` | CLI arg init |
+| `u8* ky_i64_to_str(i64 v)` | `str(v)` |
+| `i64 ky_str_to_i64(const u8* s)` | `int(s)` (planned) |
+| `i32 ky_strlen(const u8* s)` | `len(s)` for strings |
+| `u8* ky_concat(const u8* a, i32 a_len, const u8* b, i32 b_len)` | string `+` |
+| `i32 ky_eq_str(const u8* a, i32 a_len, const u8* b, i32 b_len)` | string `==` |
+| `i32 ky_input()` | `input()` |
+| `i32 ky_input_with_prompt(const u8* prompt, i32 prompt_len)` | `input(p)` |
+| `i32 ky_open(const u8* path, const u8* mode)` | `open(path, mode)` |
+| `i32 ky_close(i32 fd)` | `close(fd)` |
+| `u8* ky_read_str(i32 fd, i32 count)` | `read_str(fd, n)` |
+| `i32 ky_write_str(i32 fd, const u8* s)` | `write_str(fd, s)` |
+| `i32 ky_sleep(i32 ms)` | `sleep(ms)` |
+| `i32 ky_now()` | `now()` |
+| `void* ky_alloc(i64 size)` | heap allocation |
+| `void ky_free(void* ptr)` | heap free |
+| `void ky_retain(void* ptr)` | refcount++ (legacy) |
+| `void ky_release(void* ptr)` | refcount-- / free (legacy) |
+| `i32 ky_str_to_upper(const u8* s, i32 len)` | `to_upper(s)` |
+| `i32 ky_str_to_lower(const u8* s, i32 len)` | `to_lower(s)` |
+| `i32 ky_str_trim(const u8* s, i32 len)` | `trim(s)` |
+| `i32 ky_str_replace(const u8* s, i32 len, const u8* old, const u8* new)` | `replace(s, o, n)` |
+| `i32 ky_char_at(const u8* s, i32 idx)` | `char_at(s, i)` |
+| `i32 ky_is_digit(char c)` | `is_digit(c)` |
+| `i32 ky_is_alpha(char c)` | `is_alpha(c)` |
+| `i32 ky_is_alnum(char c)` | `is_alnum(c)` |
+| `i32 ky_is_whitespace(char c)` | `is_whitespace(c)` |
+| `i32 ky_is_upper(char c)` | `is_upper(c)` |
+| `i32 ky_is_lower(char c)` | `is_lower(c)` |
+| `i32 ky_ord(char c)` | `ord(c)` |
+| `i32 ky_substr(const u8* s, i32 start, i32 count)` | `substr(s, st, n)` |
+| `void* ky_list_new()` | new list |
+| `void ky_list_push(void* list, i64 value)` | list append |
+| `i64 ky_list_pop(void* list)` | list pop |
+| `i64 ky_list_get(void* list, i32 idx)` | list index |
+| `void ky_list_set(void* list, i32 idx, i64 value)` | list assign |
+| `i32 ky_list_len(void* list)` | list length |
+| `void* ky_list_slice(void* list, i32 start, i32 end)` | list slice |
+| `void ky_list_extend(void* dst, void* src)` | list extend |
+| `void* ky_dict_new()` | new dict |
+| `void ky_dict_set(void* dict, const u8* key, i32 key_len, i64 value)` | dict set |
+| `i64 ky_dict_get(void* dict, const u8* key, i32 key_len)` | dict get |
+| `i32 ky_dict_len(void* dict)` | dict length |
+| `i32 ky_range(i64 start, i64 end)` | `range()` iterator |
+| `i64 ky_spawn_thread(void* fn, i64 arg)` | `async` |
+| `i64 ky_join_thread(i64 handle)` | `await` |
+| `void* ky_init_args(i32 argc, const u8** argv)` | CLI arg init |
 
 ### 4.2 FFI (Planned — Phase 9)
 
@@ -447,9 +449,9 @@ result = await task                    # joins the thread
 
 Internally:
 
-1. `async <expr>` lowers to `kl_spawn_thread(<closure>, 0)`
+1. `async <expr>` lowers to `ky_spawn_thread(<closure>, 0)`
 2. Returns an `i64` thread handle
-3. `await <handle>` lowers to `kl_join_thread(<handle>)`, which blocks
+3. `await <handle>` lowers to `ky_join_thread(<handle>)`, which blocks
 
 This is simple and correct, but spawns a real OS thread per async expression.
 Work-stealing coroutines (similar to Tokio) are planned for Phase 11.
@@ -463,7 +465,7 @@ val = ch.recv()            # receive (blocks if empty)
 ch.close()                  # close the channel
 ```
 
-Channels exist in the runtime (`klc_runtime/src/channel.rs`) but are not yet
+Channels exist in the runtime (`kyc_runtime/src/channel.rs`) but are not yet
 exposed to the Kyle language. This is planned for Phase 9.
 
 ---

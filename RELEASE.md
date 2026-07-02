@@ -15,16 +15,16 @@ export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 
 ```bash
 # Desde la raíz del proyecto
-cargo build --release --bin kl
+cargo build --release --bin ky
 ```
 
-Esto genera: `target/release/kl`
+Esto genera: `target/release/ky`
 
 ## 2. Verificar que funciona
 
 ```bash
-./target/release/kl build --release examples/src/main.kl
-./target/release/kl run examples/src/main.kl
+./target/release/ky build --release examples/src/main.ky
+./target/release/ky run examples/src/main.ky
 ```
 
 ## URL del release actual
@@ -32,8 +32,8 @@ Esto genera: `target/release/kl`
 **v0.4.0:** https://github.com/IT-KYNERA/KYLE/releases/tag/v0.4.0
 
 **Descargas directas:**
-- Linux ARM64: `kl-v0.4.0-linux-arm64.tar.gz`
-- macOS ARM64: `kl-v0.4.0-macos-arm64.tar.gz`
+- Linux ARM64: `ky-v0.4.0-linux-arm64.tar.gz`
+- macOS ARM64: `ky-v0.4.0-macos-arm64.tar.gz`
 
 ## 3. Subir release a GitHub
 
@@ -51,11 +51,11 @@ git push origin v0.4.0
 
 # 3. Subir el binario comprimido
 cd target/release
-tar -czf kl-v0.4.0-linux-arm64.tar.gz kl
+tar -czf ky-v0.4.0-linux-arm64.tar.gz ky
 # Subir este archivo al release en GitHub
 
 # 4. Si estás en macOS ARM:
-tar -czf kl-v0.4.0-macos-arm64.tar.gz kl
+tar -czf ky-v0.4.0-macos-arm64.tar.gz ky
 # Subir también
 ```
 
@@ -96,12 +96,12 @@ jobs:
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
 
       - name: Build
-        run: cargo build --release --bin kl
+        run: cargo build --release --bin ky
 
       - name: Package
         run: |
           cd target/release
-          tar -czf ../../kl-${{ github.ref_name }}-${{ runner.os }}.tar.gz kl
+          tar -czf ../../ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz ky
 
       - name: Upload
         uses: actions/upload-release-asset@v1
@@ -109,8 +109,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./kl-${{ github.ref_name }}-${{ runner.os }}.tar.gz
-          asset_name: kl-${{ github.ref_name }}-${{ runner.os }}.tar.gz
+          asset_path: ./ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz
+          asset_name: ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz
           asset_content_type: application/gzip
 ```
 
@@ -118,15 +118,15 @@ jobs:
 
 ```bash
 # Descomprimir
-tar -xzf kl-v0.4.0-linux-arm64.tar.gz
+tar -xzf ky-v0.4.0-linux-arm64.tar.gz
 
 # Instalar en el sistema
-sudo cp kl /usr/local/bin/kl
+sudo cp ky /usr/local/bin/ky
 
 # Verificar
-kl --help
-kl build --release mi_proyecto/src/main.kl
-kl run mi_proyecto/src/main.kl
+ky --help
+kl build --release mi_proyecto/src/main.ky
+kl run mi_proyecto/src/main.ky
 ```
 
 ## 5. Probar el compilador instalado
@@ -134,13 +134,13 @@ kl run mi_proyecto/src/main.kl
 ```bash
 # Crear un proyecto de prueba
 mkdir -p test_project/src
-cat > test_project/src/main.kl << 'EOF'
+cat > test_project/src/main.ky << 'EOF'
 fn main() i32:
     println("Hello from Kyle!")
     0
 EOF
 
 # Compilar y ejecutar
-kl build --release test_project/src/main.kl
+kl build --release test_project/src/main.ky
 ./target/release/main
 ```

@@ -8,21 +8,21 @@ target/
 *.o
 *.ll
 *.bc
-*.klc
-.klc-build/
+*.kyc
+.kyc-build/
 klc-build/
 build/
 
-# === Examples — only .kl source files are tracked ===
+# === Examples — only .ky source files are tracked ===
 /examples/*
-!/examples/*.kl
-!/examples/**/*.kl
-!/examples/kl.toml
+!/examples/*.ky
+!/examples/**/*.ky
+!/examples/ky.toml
 
 # === VS Code extension ===
-vscode-kl/node_modules/
-vscode-kl/package-lock.json
-vscode-kl/*.vsix
+vscode-ky/node_modules/
+vscode-ky/package-lock.json
+vscode-ky/*.vsix
 *.js.map
 
 # === IDE / Editor ===

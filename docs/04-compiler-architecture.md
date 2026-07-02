@@ -10,12 +10,12 @@
 ```
    ┌──────────┐    ┌───────┐    ┌────────┐    ┌────────┐    ┌──────────┐    ┌────────┐
    │  Source  │ →  │ Lexer │ →  │ Parser │ →  │  HIR   │ →  │ Semantic │ →  │  MIR   │
-   │  .kl     │    │       │    │        │    │ Build  │    │  + Types │    │Lowering│
+   │  .ky     │    │       │    │        │    │ Build  │    │  + Types │    │Lowering│
    └──────────┘    └───────┘    └────────┘    └────────┘    └──────────┘    └────┬───┘
                                                                                    │
    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐   │
-   │  Binary  │ ←  │  Linker  │ ←  │  SSA     │ ←  │  Move    │ ←  │ Optimize │ ←─┘
-   │   .kl    │    │          │    │  Codegen │    │ Analysis │    │          │
+   │  Binary  │ ←  │  Linker  │ ←  │  SSA     │ ←  │  Borrow  │ ←  │ Optimize │ ←─┘
+   │   .ky    │    │          │    │  Codegen │    │ Analysis │    │          │
    └──────────┘    └──────────┘    └─────┬─────┘    └──────────┘    └──────────┘
                                          │
                                     ┌────▼────┐
@@ -34,36 +34,36 @@ representation that the next stage consumes.
 ## 2. The Nine Crates
 
 ```
-kl/
+ky/
 ├── crates/
-│   ├── klc_core/        ← AST, span, types, diagnostics
-│   ├── klc_frontend/    ← Lexer, parser
-│   ├── klc_hir/         ← HIR definition, builder, HIR-level validation
-│   ├── klc_semantic/    ← Symbol table, type checker, scope resolver
-│   ├── klc_mir/         ← MIR definition, lowering, optimizer, move analysis
-│   ├── klc_backend/     ← LLVM 18 codegen (inkwell), linker driver
-│   ├── klc_driver/      ← Pipeline orchestrator (klc::run)
-│   ├── klc_cli/         ← Command-line interface (the `kl` binary)
-│   ├── klc_runtime/     ← C-ABI runtime (memory, string, list, dict, io, async)
-│   └── klc_tools/       ← LSP server, formatter, package manager
+│   ├── kyc_core/        ← AST, span, types, diagnostics
+│   ├── kyc_frontend/    ← Lexer, parser
+│   ├── kyc_hir/         ← HIR definition, builder, HIR-level validation
+│   ├── kyc_semantic/    ← Symbol table, type checker, scope resolver
+│   ├── kyc_mir/         ← MIR definition, lowering, optimizer, borrow analysis
+│   ├── kyc_backend/     ← LLVM 18 codegen (inkwell), linker driver
+│   ├── kyc_driver/      ← Pipeline orchestrator (klc::run)
+│   ├── kyc_cli/         ← Command-line interface (the `kl` binary)
+│   ├── kyc_runtime/     ← C-ABI runtime (memory, string, list, dict, io, async)
+│   └── kyc_tools/       ← LSP server, formatter, package manager
 ```
 
 | Crate | Purpose | Inputs | Outputs |
 |---|---|---|---|
-| `klc_core` | Foundation types | (none) | AST nodes, type system, source maps, diagnostic reporters |
-| `klc_frontend` | Lexing + parsing | Source string | `Program` (AST) |
-| `klc_hir` | HIR building + validation | `Program` (AST) | `HirModule` (HIR) |
-| `klc_semantic` | Name resolution + type checking | `HirModule` | `HirModule` (typed) + `SymbolTable` |
-| `klc_mir` | Mid-level IR + passes | `HirModule` | `MirModule` (functions, types, control flow) |
-| `klc_backend` | SSA Form + LLVM codegen + linking | `MirModule` | Native executable |
-| `klc_driver` | Pipeline orchestrator | (none) | `klc::run(source, options) -> Result` |
-| `klc_cli` | Command-line tool | argv | Compiled binary, stdout/stderr |
-| `klc_runtime` | C-ABI runtime library | (linked at compile time) | Provides memory, I/O, string ops to compiled Kyle code |
-| `klc_tools` | Out-of-band tools (LSP, fmt) | Source string | LSP responses, formatted source |
+| `kyc_core` | Foundation types | (none) | AST nodes, type system, source maps, diagnostic reporters |
+| `kyc_frontend` | Lexing + parsing | Source string | `Program` (AST) |
+| `kyc_hir` | HIR building + validation | `Program` (AST) | `HirModule` (HIR) |
+| `kyc_semantic` | Name resolution + type checking | `HirModule` | `HirModule` (typed) + `SymbolTable` |
+| `kyc_mir` | Mid-level IR + passes | `HirModule` | `MirModule` (functions, types, control flow) |
+| `kyc_backend` | SSA Form + LLVM codegen + linking | `MirModule` | Native executable |
+| `kyc_driver` | Pipeline orchestrator | (none) | `klc::run(source, options) -> Result` |
+| `kyc_cli` | Command-line tool | argv | Compiled binary, stdout/stderr |
+| `kyc_runtime` | C-ABI runtime library | (linked at compile time) | Provides memory, I/O, string ops to compiled Kyle code |
+| `kyc_tools` | Out-of-band tools (LSP, fmt) | Source string | LSP responses, formatted source |
 
 ---
 
-## 3. Stage 1: Lexer (`klc_frontend::lexer`)
+## 3. Stage 1: Lexer (`kyc_frontend::lexer`)
 
 Converts source text into a stream of tokens.
 
@@ -75,7 +75,7 @@ Converts source text into a stream of tokens.
 - Literals: integer (decimal, hex `0x`, binary `0b`, with `_` separators), float, string (with `{...}` interpolation), char, `true`, `false`, `None`
 - Identifiers (alphanumeric + `_`, starting with letter or `_`)
 - Operators: arithmetic, comparison, logical, bitwise, range, spread, ternary, optional chain, error prop
-- Assignment operators: `=` (immutable bind), `:=` (`Walrus`, mutable bind), `::=` (`ConstDecl`, constant declaration)
+- Assignment operators: `=` (immutable bind), `:=` (`Walrus`, constant declaration), `&T` (mutable type prefix), `^T` (move type prefix)
 - Indentation: `INDENT` and `DEDENT` (the lexer implements Python-style indent/dedent based on leading whitespace)
 - Modifier keywords: `Abstract`, `Final` (class/variant modifiers)
 - Punctuation: `(`, `)`, `[`, `]`, `{`, `}`, `,`, `:` (with no space), `;` (optional)
@@ -85,7 +85,7 @@ are detected by the parser.
 
 ---
 
-## 4. Stage 2: Parser (`klc_frontend::parser`)
+## 4. Stage 2: Parser (`kyc_frontend::parser`)
 
 Builds an AST from the token stream.
 
@@ -103,8 +103,9 @@ does not attempt to recover and report multiple errors.
 
 **New syntax handled:**
 
-- `:=` (walrus) and `::=` (const-decl) are parsed as `DeclKind::Variable` with
-  mutability/constancy flags on the declaration node
+- `:=` (walrus) is parsed as `DeclKind::Variable` with constancy flag for constants
+- `&T` is parsed as mutable reference type
+- `^T` is parsed as move type (ownership transfer)
 - `abstract class` / `final class` are parsed as modifiers on the class declaration
   (the lexer emits `Abstract` / `Final` tokens before `class`/`variant`)
 - `T?` is parsed as `TypeKind::Optional(inner)` — sugar for `Option<T>` that is
@@ -112,7 +113,7 @@ does not attempt to recover and report multiple errors.
 
 ---
 
-## 5. Stage 3: HIR Build (`klc_hir`)
+## 5. Stage 3: HIR Build (`kyc_hir`)
 
 Converts the parser's AST into the High-level Intermediate Representation
 (HIR). The HIR is a desugared, simplified tree that is easier for the
@@ -123,8 +124,9 @@ semantic analyzer and subsequent passes to consume.
 **Desugarings performed:**
 
 - `T?` is normalized to `Option<T>` (the internal representation)
-- `:=` (walrus) and `::=` (const-decl) are lowered to immutable variable
-  declarations with mutability/constancy flags on the `HirBinding`
+- `:=` (walrus) is lowered to constant declaration with constancy flag on `HirBinding`
+- `&T` types are lowered to mutable reference types in HIR
+- `^T` types are lowered to move/ownership types in HIR
 - `abstract class` / `final class` modifiers are stored as flags on the
   `HirClass` node
 - String interpolation (`"hello {name}"`) is decomposed into a sequence
@@ -137,7 +139,7 @@ same scope, invalid modifier combinations).
 
 ---
 
-## 6. Stage 4: Semantic Analysis (`klc_semantic`)
+## 6. Stage 4: Semantic Analysis (`kyc_semantic`)
 
 Resolves names to symbols and checks types. Operates on the HIR rather
 than the raw AST.
@@ -166,7 +168,7 @@ not yet supported.)
 
 ---
 
-## 7. Stage 5: MIR Lowering (`klc_mir::lower`)
+## 7. Stage 5: MIR Lowering (`kyc_mir::lower`)
 
 Converts the typed HIR into Kyle's Mid-level Intermediate Representation
 (MIR). MIR is a simpler, more uniform form that is easier to analyze and
@@ -179,18 +181,18 @@ specifically for Kyle's semantics. The backend translates MIR → LLVM IR.
 
 **Special handling in the lowerer:**
 
-- Builtin functions are resolved to runtime calls (`print` → `kl_print`,
-  `len` → `kl_strlen`, etc.)
-- String interpolation is decomposed into `kl_concat` calls
-- `async <expr>` is wrapped in a `kl_spawn_thread` call
-- `await <handle>` is lowered to `kl_join_thread`
+- Builtin functions are resolved to runtime calls (`print` → `ky_print`,
+  `len` → `ky_strlen`, etc.)
+- String interpolation is decomposed into `ky_concat` calls
+- `async <expr>` is wrapped in a `ky_spawn_thread` call
+- `await <handle>` is lowered to `ky_join_thread`
 - Method dispatch on classes is resolved via the `method_table`
 - Inheritance is handled via the `class_parent_map` chain walk
 - Default constructor is synthesized if the class has none
 
 ---
 
-## 8. Stage 6: MIR Optimization (`klc_mir::optimize`)
+## 8. Stage 6: MIR Optimization (`kyc_mir::optimize`)
 
 Constant-folding, dead-code elimination, and inlining passes on the MIR.
 
@@ -209,34 +211,36 @@ Constant-folding, dead-code elimination, and inlining passes on the MIR.
 
 ---
 
-## 9. Stage 7: Move Analysis (`klc_mir::move_analysis`)
+## 9. Stage 7: Borrow Analysis (`kyc_mir::borrow_analysis`)
 
-Performs move-semantics analysis on the MIR to ensure that no value is
-used after it has been moved. Eliminates the need for refcounting.
+Performs borrow/ownership analysis on the MIR. Parameters are **borrowed
+by default** (not moved). Only `^` parameters transfer ownership.
 
 **What is tracked:**
 
-- Every variable binding has a move state (live / moved / consumed)
-- Function call arguments are consumed (moved) unless the parameter type
-  is `Copy`
+- Every variable binding has a state (live / moved / borrowed)
+- Function call arguments are **borrowed** unless the parameter is `^T`
 - Assignment to a previously bound name (`x = new_val`) moves out the
   old value
 - Return values from functions are moved to the caller
+- Parameter types: `s: T` = borrow, `s: &T` = mutable borrow, `^s: T` = move
 
 **Enforcement:**
 
 - A compile error is emitted if a moved value is referenced again
+- A compile error is emitted if `&` is missing for mutation coercion
 - The analysis handles all control-flow paths (branches, loops, early
   returns) using a data-flow framework on the MIR control-flow graph
 
-**Future (Phase 11+):**
+**Future (Fase 14+):**
 
 - Partial moves (moving one field of a class while keeping others alive)
 - Destructors (`drop`) for types with cleanup logic
+- Full borrow checker with reference types (`&T`, `^T`)
 
 ---
 
-## 10. Stage 8: SSA Form Transformation (`klc_mir::ssa`) — NUEVO (Phase 15)
+## 10. Stage 8: SSA Form Transformation (`kyc_mir::ssa`) — NUEVO (Phase 15)
 
 Converts the lowered MIR (`MirFunction` with load/store) into **Static Single
 Assignment** form (`SsaFunction` with phi nodes). This is the most impactful
@@ -267,7 +271,7 @@ since those allocas escape and cannot be promoted.
 
 ---
 
-## 11. Stage 9: LLVM Codegen (`klc_backend`)
+## 11. Stage 9: LLVM Codegen (`kyc_backend`)
 
 Translates **SsaFunction** (or `MirFunction` for non-SSA functions) to LLVM IR
 using `inkwell` (Rust bindings for LLVM 18), then invokes the LLVM toolchain to
@@ -291,25 +295,25 @@ alloca+load+store codegen path.
 | Release | `-O2 -flto=thin` | SSA + Alias Analysis |
 
 **Linker:** Uses the system linker (`cc`) with `-flto=thin` for release builds.
-The runtime library `libklc_runtime.a` is linked statically.
+The runtime library `libkyc_runtime.a` is linked statically.
 
 ---
 
-## 12. The Runtime (`klc_runtime`)
+## 12. The Runtime (`kyc_runtime`)
 
 A static C-ABI library linked into every compiled Kyle program. It
 provides the primitive operations that the compiler lowers calls to.
-The runtime uses move semantics. Refcounting functions (kl_retain/kl_release)
+The runtime uses borrow semantics. Refcounting functions (ky_retain/ky_release)
 remain available for future Rc/Arc use in the stdlib.
 
 | File | Responsibility |
 |---|---|
-| `memory.rs` | `kl_alloc`, `kl_free`, `kl_retain`, `kl_release` — heap management (reserved for future Rc/Arc) |
-| `string.rs` | `kl_concat`, `kl_strlen`, `kl_str_to_*`, `kl_i64_to_str`, `kl_str_to_i64` |
-| `list.rs` | `kl_list_new`, `kl_list_push`, `kl_list_pop`, `kl_list_get`, `kl_list_set`, `kl_list_len`, `kl_list_slice`, `kl_list_extend` |
-| `dict.rs` | `kl_dict_new`, `kl_dict_set`, `kl_dict_get`, `kl_dict_len` |
-| `io.rs` | `kl_print`, `kl_println`, `kl_input`, `kl_input_with_prompt`, `kl_open`, `kl_read_str`, `kl_write_str`, `kl_close` |
-| `async_.rs` | `kl_spawn_thread`, `kl_join_thread` — async/await runtime |
+| `memory.rs` | `ky_alloc`, `ky_free`, `ky_retain`, `ky_release` — heap management (reserved for future Rc/Arc) |
+| `string.rs` | `ky_concat`, `ky_strlen`, `ky_str_to_*`, `ky_i64_to_str`, `ky_str_to_i64` |
+| `list.rs` | `ky_list_new`, `ky_list_push`, `ky_list_pop`, `ky_list_get`, `ky_list_set`, `ky_list_len`, `ky_list_slice`, `ky_list_extend` |
+| `dict.rs` | `ky_dict_new`, `ky_dict_set`, `ky_dict_get`, `ky_dict_len` |
+| `io.rs` | `ky_print`, `ky_println`, `ky_input`, `ky_input_with_prompt`, `ky_open`, `ky_read_str`, `ky_write_str`, `ky_close` |
+| `async_.rs` | `ky_spawn_thread`, `ky_join_thread` — async/await runtime |
 | `channel.rs` | (planned) `Channel<T>` for inter-thread communication |
 | `thread.rs` | OS thread spawning primitives |
 | `panic.rs` | Panic handler for `assert` failures |
@@ -324,7 +328,7 @@ The runtime is written in **pure Rust** with `#[unsafe(no_mangle)]` and
 
 ## 13. The Standard Library (`std/`)
 
-Eight `.kl` modules, all written in Kyle itself. The public syntax for
+Eight `.ky` modules, all written in Kyle itself. The public syntax for
 optional types is `T?` (internally represented as `Option<T>`).
 
 | Module | Purpose |
@@ -347,7 +351,7 @@ optional types is `T?` (internally represented as `Option<T>`).
 | Debug | default | None (`-O0`) | `target/debug/<name>` |
 | Release | --release | Aggressive (O2/O3) | target/release/<name> |
 
-Both modes link the same `libklc_runtime.a`. The difference is in the
+Both modes link the same `libkyc_runtime.a`. The difference is in the
 optimization level passed to LLVM.
 
 ---
@@ -359,20 +363,20 @@ optimization level passed to LLVM.
 cargo build --workspace
 
 # Run all unit tests
-cargo test -p klc_core -p klc_frontend -p klc_hir -p klc_semantic \
-          -p klc_mir -p klc_runtime -p klc_tools
+cargo test -p kyc_core -p kyc_frontend -p kyc_hir -p kyc_semantic \
+          -p kyc_mir -p kyc_runtime -p kyc_tools
 
-# Build the kl binary in release mode
-cargo build --release --bin kl
+# Build the ky binary in release mode
+cargo build --release --bin ky
 
 # Type-check a file without building
-./target/release/kl check examples/hello.kl
+./target/release/kl check examples/hello.ky
 
 # Run a file
-./target/release/kl run examples/hello.kl
+./target/release/kl run examples/hello.ky
 
 # Format source
-./target/release/kl fmt src/main.kl
+./target/release/kl fmt src/main.ky
 ```
 
 ---

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="vscode-kl/icons/kl_128.png" width="128" alt="Kyle">
+<img src="vscode-ky/icons/kl_128.png" width="128" alt="Kyle">
 
 # Kyle
 
@@ -13,7 +13,7 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 [![CI](https://github.com/IT-KYNERA/KYLE/actions/workflows/ci.yml/badge.svg)](https://github.com/IT-KYNERA/KYLE/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/badge/release-v0.4.0-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Linux%20ARM%20%7C%20Linux%20x64%20%7C%20macOS%20ARM-6C3FC5?style=for-the-badge)](#download)
-[![VS Code](https://img.shields.io/badge/VS%20Code-extension-6C3FC5?style=for-the-badge)](vscode-kl/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-extension-6C3FC5?style=for-the-badge)](vscode-ky/)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=for-the-badge)](https://www.rust-lang.org)
 
 </div>
@@ -22,13 +22,13 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
 ## Download
 
-### Compiler (`kl`)
+### Compiler (`ky`)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 ```
 
-Auto-detects OS/arch, downloads binary to `/usr/local/bin/kl` (or `~/.kl/bin/kl`).
+Auto-detects OS/arch, downloads binary to `/usr/local/bin/ky` (or `~/.ky/bin/kl`).
 
 | Platform | Arch | Direct link |
 | :--- | :--- | :--- |
@@ -39,13 +39,13 @@ Auto-detects OS/arch, downloads binary to `/usr/local/bin/kl` (or `~/.kl/bin/kl`
 
 ### VS Code Extension
 
-![VS Code Extension](vscode-kl/icons/kl.png)
+![VS Code Extension](vscode-ky/icons/ky.png)
 
 **Syntax highlighting, LSP diagnostics, snippets, debugging, testing UI, and more.**
 
 **One-command install** (requires VS Code `code` CLI in PATH):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-kl/install-extension.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
 ```
 
 The script downloads the latest VSIX from GitHub Releases and installs it via `code --install-extension`.
@@ -56,9 +56,9 @@ The script downloads the latest VSIX from GitHub Releases and installs it via `c
 |--------|-------|
 | **VSIX from Releases** | Download `.vsix` from [Releases page](https://github.com/IT-KYNERA/KYLE/releases) → VS Code: `Extensions: Install from VSIX...` |
 | **VSIX from CI** | [Actions tab](https://github.com/IT-KYNERA/KYLE/actions) → latest run → artifact `kl-vscode-extension` → unzip → Install from VSIX |
-| **Build from source** | `git clone ... && cd vscode-kl && npm install && npx @vscode/vsce package` → Install from VSIX |
+| **Build from source** | `git clone ... && cd vscode-ky && npm install && npx @vscode/vsce package` → Install from VSIX |
 
-**Requirements:** VS Code ^1.85 and the `kl` binary in PATH.
+**Requirements:** VS Code ^1.85 and the `ky` binary in PATH.
 
 ---
 
@@ -66,21 +66,21 @@ The script downloads the latest VSIX from GitHub Releases and installs it via `c
 
 ```bash
 # Run a script (no main() needed — works like Python)
-cat > hello.kl << 'EOF'
+cat > hello.ky << 'EOF'
 println("Hello from Kyle!")
 EOF
-kl run hello.kl
+ky run hello.ky
 # → Hello from Kyle!
 
 # Or create a project
-kl new myapp
+ky new myapp
 cd myapp
-cat > src/main.kl << 'EOF'
+cat > src/main.ky << 'EOF'
 fn main() i32:
     println("Hello, World!")
     0
 EOF
-kl build --release
+ky build --release
 ./target/release/myapp
 # → Hello, World!
 ```
@@ -91,9 +91,9 @@ kl build --release
 
 ```kyle
 # Variables — no `let`, no `mut`, no `const`
-name := "Kyle"          # mutable (walrus operator)
+name: &str = "Kyle"     # mutable (& in type)
 version = "1.0"         # immutable
-PI ::= 3.14159          # compile-time constant
+PI := 3.14159           # compile-time constant
 
 # Types — T? is Option<T>, T! is Result<T, Error>
 age: i32 = 30
@@ -192,54 +192,54 @@ fn test_addition():
 | Pattern matching with or-patterns | Final classes & abstract classes | Properties (get/set) |
 | Contracts (interfaces) | Enums with payload | Match guards |
 | Error values with `?` propagation | `T?` optionals, `T!` error types | Async/await (thread pool) |
-| `=` immutable, `:=` mutable, `::=` constant | Labeled loops | Destructuring |
+| `=` immutable, `&T` mutable, `:=` constant | Labeled loops | Destructuring |
 | First-class closures | Function pointer types `fn(T) U` | Imports with aliases |
 | List methods (add/pop/insert/contains/etc) | String methods (upper/lower/trim/etc) | Dict literals |
 | Defer, guard, unsafe | String interpolation | Variadic functions |
 | Stdlib: core, io, math, str, time, json, collections, testing | LSP: diagnostics, completions, go-to-def, hover, inlay hints, code lens | VS Code: snippets (35+), tasks, testing UI, debug adapter, color theme |
-| `kl fmt` formatter with `--check` | `kl test` test runner | Shell completions (bash/zsh/fish/powershell) |
-| Package manager: `kl add/remove/update/outdated/publish` | Semantic version resolution with lock file | Local package cache (`~/.kl/cache/`) |
+| `ky fmt` formatter with `--check` | `ky test` test runner | Shell completions (bash/zsh/fish/powershell) |
+| Package manager: `ky add/remove/update/outdated/publish` | Semantic version resolution with lock file | Local package cache (`~/.ky/cache/`) |
 
 ---
 
 ## CLI
 
-### Project Commands (from a project directory with `kl.toml`)
+### Project Commands (from a project directory with `ky.toml`)
 
 | Command | Description |
 | :--- | :--- |
-| `kl build [--release]` | Compile project to native binary |
-| `kl run [--release]` | Compile and execute project |
-| `kl test` | Run all `#[test]` functions |
-| `kl info` | Show project info |
-| `kl add <dep>[@<ver>]` | Add dependency |
-| `kl remove <dep>` | Remove dependency |
-| `kl update` | Update lock file to latest compatible versions |
-| `kl outdated` | List outdated dependencies |
-| `kl publish` | Publish package to registry |
-| `kl login` | Login to package registry |
+| `ky build [--release]` | Compile project to native binary |
+| `ky run [--release]` | Compile and execute project |
+| `ky test` | Run all `#[test]` functions |
+| `ky info` | Show project info |
+| `ky add <dep>[@<ver>]` | Add dependency |
+| `ky remove <dep>` | Remove dependency |
+| `ky update` | Update lock file to latest compatible versions |
+| `ky outdated` | List outdated dependencies |
+| `ky publish` | Publish package to registry |
+| `ky login` | Login to package registry |
 
 ### File Commands
 
 | Command | Description |
 | :--- | :--- |
-| `kl build <file.kl>` | Compile single file |
-| `kl run <file.kl>` | Compile and run single file |
-| `kl check <file.kl>` | Type-check without codegen |
-| `kl parse <file.kl>` | Parse and dump AST |
-| `kl mir <file.kl>` | Parse and dump MIR |
-| `kl test <file.kl>` | Run tests in single file |
-| `kl fmt [file/dir]` | Format sources (project, file, or directory) |
-| `kl fmt --check [file]` | Check formatting (CI mode) |
+| `ky build <file.ky>` | Compile single file |
+| `ky run <file.ky>` | Compile and run single file |
+| `ky check <file.ky>` | Type-check without codegen |
+| `ky parse <file.ky>` | Parse and dump AST |
+| `ky mir <file.ky>` | Parse and dump MIR |
+| `ky test <file.ky>` | Run tests in single file |
+| `ky fmt [file/dir]` | Format sources (project, file, or directory) |
+| `ky fmt --check [file]` | Check formatting (CI mode) |
 
 ### Tools
 
 | Command | Description |
 | :--- | :--- |
-| `kl new <project>` | Create new KL project |
-| `kl lsp` | Start LSP server (stdio) |
-| `kl completions <shell>` | Generate shell completions (bash, zsh, fish, powershell) |
-| `kl help` | Show help |
+| `ky new <project>` | Create new KL project |
+| `ky lsp` | Start LSP server (stdio) |
+| `ky completions <shell>` | Generate shell completions (bash, zsh, fish, powershell) |
+| `ky help` | Show help |
 
 ---
 
@@ -285,8 +285,8 @@ export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 # Build
 git clone https://github.com/IT-KYNERA/KYLE.git
 cd KYLE
-cargo build --release --bin kl
-sudo cp target/release/kl /usr/local/bin/kl
+cargo build --release --bin ky
+sudo cp target/release/ky /usr/local/bin/ky
 ```
 
 ---
@@ -301,10 +301,10 @@ cargo test --workspace
 cargo build --workspace
 
 # TypeScript type-check (VS Code extension)
-cd vscode-kl && npx -p typescript tsc --noEmit
+cd vscode-ky && npx -p typescript tsc --noEmit
 
 # Package VS Code extension
-cd vscode-kl && npx @vscode/vsce package
+cd vscode-ky && npx @vscode/vsce package
 ```
 
 ---

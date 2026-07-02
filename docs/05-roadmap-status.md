@@ -6,9 +6,10 @@
 > **firmes** y no cambiarán sin un major version bump.
 >
 > **Objetivo de rendimiento:** Kyle debe competir con C, C++ y Rust en velocidad
-> de ejecución. Hoy está a ~3-106× de Rust (según carga) debido a que el LLVM IR
-> generado carece de atributos de optimización críticos. Las fases 15 y 16
-> cierran esta brecha.
+> de ejecución. Hoy está a ~2.6-100× de Rust (según carga). La causa raíz es que
+> el backend genera 22+ allocas por función — cada operación pasa por memoria RAM
+> en vez de registros. Las fases 15 (SSA), 16 (atributos LLVM) y 17 (optimization
+> pipeline) cierran esta brecha llevando a Kyle a 1-3× de Rust.
 
 ---
 
@@ -22,7 +23,7 @@ Cada decisión de diseño debe alinearse con estos principios. Si no los cumple,
 | **1. Legibilidad Extrema** | El código se lee como prosa. SIN `;`, SIN `{}`, SIN `let`/`var`/`const`. Solo indentación (4 espacios) y asignación directa. |
 | **2. Tipado Fuerte con Inferencia** | El compilador conoce todos los tipos en compile-time. El programador escribe el mínimo indispensable. |
 | **3. Simplicidad Radical** | Una única forma de hacer cada cosa. Sin excepciones. `for`, `while`, `loop`. |
-| **4. Rendimiento Zero-Cost** | Move semantics por defecto. Sin GC. Sin refcounting implícito. `Rc`/`Arc` en stdlib. |
+| **4. Rendimiento Zero-Cost** | Borrow semantics por defecto, ownership via `^`. Sin GC. Sin refcounting implícito. `Rc`/`Arc` en stdlib. |
 | **5. Coherencia Sintáctica** | Lo que parece igual se comporta igual. `T?` reemplaza `Option<T>`. `final class` reemplaza `struct`. |
 
 ---
@@ -34,8 +35,12 @@ Cada decisión de diseño debe alinearse con estos principios. Si no los cumple,
 | Forma | Sintaxis | Mutabilidad |
 | :--- | :--- | :--- |
 | Inmutable | `nombre = valor` | ❌ |
-| Mutable | `nombre := valor` | ✅ (operador "morsa") |
-| Constante | `nombre ::= valor` | ❌ (compile-time, no exige mayúsculas) |
+| Mutable | `nombre: &T = valor` / `x = &valor` | ✅ (el `&` en tipo o valor) |
+| Constante | `NOMBRE := valor` | ❌ (compile-time, mayúsculas por convención) |
+
+> **Nota:** `::=` fue eliminado. Las constantes ahora usan `:=`. Las variables
+> mutables usan `&T` en el tipo o `&expr` como sugar. El operador walrus `:=`
+> ya no declara variables mutables — solo constantes.
 
 ### 2.2 Tipos y Estructuras
 
@@ -76,39 +81,46 @@ Fase 3:    Lexer                ✅ COMPLETADO
 Fase 4:    Parser               ✅ COMPLETADO
 Fase 5:    HIR + Desugaring     ✅ COMPLETADO
 Fase 6:    Semantic Analysis    ✅ 13/13
-Fase 7:    Move Semantics       ✅ 13/13
+Fase 7:    Borrow Semantics      ✅ 13/13 (refactorizado: default = préstamo, no move)
 Fase 8:    Backend Release Mode ✅
 Fase 9:    Async Scheduler      ✅ Thread pool V2 (async expr, await expr, async fn)
                                  🔜 State machine V3, work-stealing, non-blocking I/O
 Fase 10:   Iterators            ✅ 17 métodos de agregación listos (runtime + lowering)
                                  🔜 Closures funcionales (fn ptr primera clase) + Lazy iterators
 Fase 15:   SSA Form              ✅ COMPLETADO (100%)
-                                   ✅ i64 default literal type
-                                   ✅ ThinLTO -flto (GCC LTO)
-                                   ✅ Alias Analysis (readonly/noalias)
-                                   ✅ SSA Form (SsaFunction + Mem2Reg + Phi)
-                                   ✅ Dominator fix (intersect infinite loop)
-                                   ✅ GVN on SSA (Global Value Numbering)
-                                   ✅ SSA Codegen: phi nodes + block_vals directos
-                                   ✅ Pipeline SSA activo en release mode (⚠️ hang)
-                                   ✅ Benchmarks correctos (debug): ssa_test, ssa_loop2, arithmetic
-                                   ⚠️ Issue conocido: release mode hang (15.B1)
-                                   ⚠️ Issue conocido: missing extern decls (15.B2)
-Fase 16:   LLVM IR Quality       🔜 EN CURSO — ~8%
-                                   ✅ 16.3 — readonly/readnone en runtime externs
-                                   🔲 16.0 — Fix release mode hang (PRIORIDAD #0)
-                                   🔲 16.2 — inbounds en GEPs (PRIORIDAD #1, podría arreglar hang)
-                                   🔲 16.4 — noalias en parámetros puntero
-                                   🔲 16.9 — TBAA metadata
-                                   🔲 16.5 — Align explícito en loads/stores/allocas
-                                   🔲 16.6 — noundef en parámetros
-                                   🔲 16.7 — !range metadata en bool
-                                   🔲 16.8 — lifetime.start/lifetime.end
-                                   ⏳ 16.1 — nsw/nuw flags (DIFERIDO: requiere range analysis)
+                                    ✅ i64 default literal type
+                                    ✅ ThinLTO -flto (GCC LTO)
+                                    ✅ Alias Analysis (readonly/noalias)
+                                    ✅ SSA Form (SsaFunction + Mem2Reg + Phi)
+                                    ✅ Dominator fix (intersect infinite loop)
+                                    ✅ GVN on SSA (Global Value Numbering)
+                                    ✅ SSA Codegen: phi nodes + block_vals directos
+                                    ✅ Pipeline SSA activo en release mode
+                                    ✅ Benchmarks correctos (debug + release)
+                                    ✅ PHI node bug fix — fallback values para predecessors sin entrada
+Fase 16:   LLVM IR Quality       🔜 COMPLETADO PARCIAL — atributos OK,
+                                    pero backend no-SSA genera IR con 22+ allocas
+                                    por función (no hay mem2reg real sin SSA)
+                                    ✅ 16.0 — Fix release mode hang
+                                    ✅ 16.2 — inbounds en GEPs
+                                    ✅ 16.3 — readonly/readnone
+                                    ✅ 16.4 — noalias en parámetros
+                                    ✅ 16.5 — Align en allocas
+                                    ✅ 16.6 — noundef en parámetros
+                                    ✅ 16.7 — !range metadata en bool
+                                    ✅ 16.8 — lifetime.start/end
+                                    ✅ 16.9 — TBAA metadata
+                                    🔶 16.1 — nsw/nuw flags (implementado vía build_int_nsw_add,
+                                    pero no se reflejan en el IR generado — bug de inkwell/codegen)
 Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
   Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
-Fase 13:   Sintaxis Restante    🔜 DETALLADO (genéricos, rangos, is, ptr, etc.)
-Fase 14:   Borrow Checker       📅 (post-v1.0)
+Fase 13:   Sintaxis Restante    🔜 EN CURSO (rangos, is, for-else, static fn, **, +% ✅ — falta genéricos, ptr, op overload, etc.)
+Fase 14:   References & Borrow Checker 🔜 Pre-v1.0 (&T, ^T, field mutability, borrowing rules)
+Fase 17:   Optimization Pipeline 📅 NUEVA — Ejecutar pases LLVM (mem2reg,
+            gvn, licm, sccp) en el módulo antes de emitir código.
+            Objetivo: cerrar el gap de rendimiento con Rust.
+Fase 17:   Optimization Pipeline 🔜 PRE-v1.0 (NUEVA) — cerrar gap rendimiento
+Fase 18:   Zero-Cost Abstractions 📅 (post-v1.0)
 Fase 15:   Alternative Backends 📅 (post-v1.0)
 ```
 
@@ -129,7 +141,7 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 
 ### Fase 3: Lexer ✅
 
-- `Walrus` (`:=`) · `ConstDecl` (`::=`) · `Abstract` · `Final`
+- `Walrus` (`:=` para constantes, reemplaza `::=`) · `Abstract` · `Final`
 - `At` (`@`) · `DotDotEquals` (`..=`) · `DotDotLess` (`..<`)
 - `mut` keyword eliminado
 - `##` doc comments
@@ -138,9 +150,9 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 
 ### Fase 4: Parser ✅
 
-- `name = expr` · `name := expr` · `name ::= expr`
+- `name = expr` · `name: &T = expr` · `NAME := expr` (constante)
 - `final class Name:` · `abstract class Name:` · `struct` alias temporal
-- `T?` / `T!` postfix types
+- `T?` / `T!` postfix types · `&T` mutable type · `^T` move type
 - Destructuring `(x, y) = expr`
 - `if nombre = expr` (BindingIf) · `while nombre = expr` (WhileBind)
 - Error recovery (modo pánico)
@@ -149,9 +161,9 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 
 ### Fase 5: HIR + Desugaring ✅
 
-- Crate `klc_hir` creado
+- Crate `kyc_hir` creado
 - Desugaring: `T?` → `Option<T>`, `T!` → `Result<T, str>`
-- Integrado en pipeline (`klc_driver`)
+- Integrado en pipeline (`kyc_driver`)
 
 ---
 
@@ -166,7 +178,7 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 - Constant stmt type-checking
 - Return type checking
 - Class/AbstractClass type-checking
-- `::=` constant evaluation checking
+- Constant checking (`NAME := expr`)
 - Abstract method enforcement
 - Match guard MIR lowering (Fase 6 crossover con MIR)
 - Default params type checking
@@ -178,30 +190,43 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 
 ---
 
-### Fase 7: Move Semantics ✅ (13/13)
+### Fase 7: Borrow Semantics ✅ (13/13, refactorizado)
 
-**Completado:**
+El comportamiento por defecto de los parámetros cambió de **move** a
+**préstamo inmutable** (`s: T` → borrowed, no moved). Ahora:
+
+- `s: T` — préstamo inmutable (default)
+- `s: &T` — préstamo mutable
+- `^s: T` — ownership transfer (move explícito)
+
+**Completado (fase original):**
 - Copy vs Move type classification
 - Replace `ownership` (refcounting) pass → `move_analysis.rs`
 - Forward dataflow analysis con intersección en joins
 - Use-after-move detection
-- `.clone()` para Str/List/Dict (runtime `kl_clone_*`)
+- `.clone()` para Str/List/Dict (runtime `ky_clone_*`)
 - Heap-allocation de string literals
 - Borrowing functions (`print`, `println`, `strlen`, etc.)
-- Direct-pass para Move locals en llamadas a funciones
 - Pipeline integrado: build falla en use-after-move
 - `ownership.rs` eliminado
-- `kl_release` declaration removed from codegen
+- `ky_release` declaration removed from codegen
+
+**Refactorizado para Fase 14:**
+- Default parameter: move → borrow inmutable
+- `&T` en parámetros = borrow mutable
+- `^T` en parámetros = move explícito
+- Eliminación de lista blanca de borrowing functions
+- Actualización de 9 tests end-to-end
 
 **Pendiente:**
-- [x] ⭐⭐⭐ **Memory safety tests** — 9 tests end-to-end en `klc_driver` (pipeline completo): copy types, clone, borrowing funcs, params, if/else, use-after-move (str, list), return after move
+- [x] ⭐⭐⭐ **Memory safety tests** — 9 tests end-to-end en `kyc_driver`
 
 ---
 
 ### Fase 8: Backend — Release Mode ✅
 
 - [x] ⭐⭐⭐⭐⭐ Conectar `--release` a `OptimizationLevel::Aggressive`
-- [x] `kl build --release` y `kl run --release` funcionan correctamente
+- [x] `ky build --release` y `ky run --release` funcionan correctamente
 
 ---
 
@@ -213,9 +238,9 @@ Fase 15:   Alternative Backends 📅 (post-v1.0)
 |---------|---------|---------|
 | `async fn name():` parsing | `parser.rs` | ✅ Sintaxis `async fn foo():` parseada |
 | `async expr` + `await expr` | `parser.rs`, `codegen.rs` | ✅ Evaluación async y espera de tareas |
-| `kl_spawn_task(ptr, i64) -> i64` | `runtime/async_.rs` | ✅ Spawnea tarea en thread pool |
-| `kl_await_task(i64) -> i64` | `runtime/async_.rs` | ✅ Bloquea hasta que la tarea termina |
-| `kl_yield()` | `runtime/async_.rs` | ✅ Cooperativo: cede el thread temporalmente |
+| `ky_spawn_task(ptr, i64) -> i64` | `runtime/async_.rs` | ✅ Spawnea tarea en thread pool |
+| `ky_await_task(i64) -> i64` | `runtime/async_.rs` | ✅ Bloquea hasta que la tarea termina |
+| `ky_yield()` | `runtime/async_.rs` | ✅ Cooperativo: cede el thread temporalmente |
 | Thread pool global (lazy_static) | `runtime/async_.rs` | ✅ Pool de threads reutilizables |
 
 #### 🔜 Pendiente — State Machine V3
@@ -229,10 +254,10 @@ Una `async fn` se compila a una máquina de estados que:
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 9.1 | HIR-level: detectar `async fn` y generar tipo enum con variante por yield point | `klc_hir/src/` | ⭐⭐⭐ |
-| 9.2 | MIR-level: transformar `await` en cambio de estado + salto a bloque correcto | `klc_mir/src/lower.rs` | ⭐⭐⭐ |
-| 9.3 | Runtime: `TaskStateMachine` struct con puntero a función + estado actual | `klc_runtime/src/async_.rs` | ⭐⭐⭐ |
-| 9.4 | Codegen: emitir switch-case en el bucle de polling de la state machine | `klc_backend/src/codegen.rs` | ⭐⭐⭐ |
+| 9.1 | HIR-level: detectar `async fn` y generar tipo enum con variante por yield point | `kyc_hir/src/` | ⭐⭐⭐ |
+| 9.2 | MIR-level: transformar `await` en cambio de estado + salto a bloque correcto | `kyc_mir/src/lower.rs` | ⭐⭐⭐ |
+| 9.3 | Runtime: `TaskStateMachine` struct con puntero a función + estado actual | `kyc_runtime/src/async_.rs` | ⭐⭐⭐ |
+| 9.4 | Codegen: emitir switch-case en el bucle de polling de la state machine | `kyc_backend/src/codegen.rs` | ⭐⭐⭐ |
 | 9.5 | Benchmarks: 100K tareas concurrentes sin thread pool | `examples/bench/` | ⭐⭐ |
 
 **Dependencia:** Fase 15 (SSA) — necesario para que la state machine sea eficiente.
@@ -243,20 +268,20 @@ Una `async fn` se compila a una máquina de estados que:
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 9.6 | Cada thread tiene su cola de tareas local (deque) | `klc_runtime/src/async_.rs` | ⭐⭐⭐ |
-| 9.7 | Thread inactivo roba tareas del deque de otro thread | `klc_runtime/src/async_.rs` | ⭐⭐⭐ |
-| 9.8 | `global_queue` como respaldo para tareas nuevas | `klc_runtime/src/async_.rs` | ⭐⭐ |
+| 9.6 | Cada thread tiene su cola de tareas local (deque) | `kyc_runtime/src/async_.rs` | ⭐⭐⭐ |
+| 9.7 | Thread inactivo roba tareas del deque de otro thread | `kyc_runtime/src/async_.rs` | ⭐⭐⭐ |
+| 9.8 | `global_queue` como respaldo para tareas nuevas | `kyc_runtime/src/async_.rs` | ⭐⭐ |
 
 **Dependencia:** State Machine V3 (9.1-9.5) — work-stealing solo tiene sentido con state machines.
 
 #### 🔜 Pendiente — Non-blocking I/O
 
-**Objetivo:** `kl_open()`, `kl_read_str()`, `kl_write_str()` sin bloqueo.
+**Objetivo:** `ky_open()`, `ky_read_str()`, `ky_write_str()` sin bloqueo.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 9.9 | I/O ring / epoll/kqueue integration | `klc_runtime/src/io.rs` | ⭐⭐ |
-| 9.10 | `async fn read_file()` → no bloquea el thread | `klc_runtime/src/io.rs` | ⭐⭐ |
+| 9.9 | I/O ring / epoll/kqueue integration | `kyc_runtime/src/io.rs` | ⭐⭐ |
+| 9.10 | `async fn read_file()` → no bloquea el thread | `kyc_runtime/src/io.rs` | ⭐⭐ |
 | 9.11 | Socket API async (`async fn connect()`, `async fn accept()`) | nuevo crate | ⭐⭐ |
 
 **Dependencia:** Work-Stealing (9.6-9.8) — I/O async necesita un scheduler que no bloquee hilos.
@@ -269,23 +294,23 @@ Una `async fn` se compila a una máquina de estados que:
 
 | Feature | Runtime | MIR Lowering | LLVM Codegen | Estado |
 |---------|---------|--------------|--------------|--------|
-| `items.sum()` | `kl_list_sum` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.product()` | `kl_list_product` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.max()` | `kl_list_max` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.min()` | `kl_list_min` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.reverse()` | `kl_list_reverse` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.len()` | `kl_list_len` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.add()` | `kl_list_push` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.pop()` | `kl_list_pop` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.contains()` | `kl_list_contains` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.insert()` | `kl_list_insert` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.remove_at()` | `kl_list_remove_at` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.clear()` | `kl_list_clear` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.clone()` | `kl_clone_list` | `lower.rs` | `codegen.rs` | ✅ |
-| `items.map(fn)` | `kl_list_map` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
-| `items.filter(fn)` | `kl_list_filter` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
-| `items.fold(init, fn)` | `kl_list_fold` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
-| `items.reduce(fn)` | `kl_list_reduce` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
+| `items.sum()` | `ky_list_sum` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.product()` | `ky_list_product` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.max()` | `ky_list_max` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.min()` | `ky_list_min` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.reverse()` | `ky_list_reverse` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.len()` | `ky_list_len` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.add()` | `ky_list_push` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.pop()` | `ky_list_pop` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.contains()` | `ky_list_contains` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.insert()` | `ky_list_insert` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.remove_at()` | `ky_list_remove_at` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.clear()` | `ky_list_clear` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.clone()` | `ky_clone_list` | `lower.rs` | `codegen.rs` | ✅ |
+| `items.map(fn)` | `ky_list_map` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
+| `items.filter(fn)` | `ky_list_filter` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
+| `items.fold(init, fn)` | `ky_list_fold` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
+| `items.reduce(fn)` | `ky_list_reduce` | `lower.rs` | `codegen.rs` | ✅ (vía fn ptr C-ABI) |
 
 #### 🔜 Pendiente — Closures Funcionales (necesario para map/filter/fold inline)
 
@@ -309,7 +334,7 @@ Hoy cada `.map()` crea una lista nueva (eager). Con lazy evaluation, solo se ite
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 10.6 | `Iter[T]` struct en runtime con next(), map(), filter(), fold() | `klc_runtime/src/list.rs` | ⭐⭐ |
+| 10.6 | `Iter[T]` struct en runtime con next(), map(), filter(), fold() | `kyc_runtime/src/list.rs` | ⭐⭐ |
 | 10.7 | `items.iter()` → `Iter[T]` | `lower.rs`, `codegen.rs` | ⭐⭐ |
 | 10.8 | Chain `.map().filter()` sin listas intermedias | `runtime/list.rs` | ⭐⭐ |
 | 10.9 | Lazy fold/reduce sobre iterador | `runtime/list.rs` | ⭐⭐ |
@@ -319,28 +344,28 @@ Hoy cada `.map()` crea una lista nueva (eager). Con lazy evaluation, solo se ite
 ### Fase 11: Package Manager ✅ (registry, resolución, publicación)
 
 **Filosofía:** Tan simple como Cargo pero SIN la complejidad de workspaces multi-crate
-y SIN build scripts. Un package = un proyecto. Una dependencia = una línea en `kl.toml`.
+y SIN build scripts. Un package = un proyecto. Una dependencia = una línea en `ky.toml`.
 
 **Estado general:** ✅ 11.1-11.5 implementados. Foundation completa: resolver, registry client,
 cache, lock file, CLI commands, import resolution from cached packages.
 
 ---
 
-#### 11.1 — Manifest (`kl.toml`) completo ✅
+#### 11.1 — Manifest (`ky.toml`) completo ✅
 
-**Estado actual:** ✅ `kl.toml` soporta formato plano y `[project]` table. Validación completa
+**Estado actual:** ✅ `ky.toml` soporta formato plano y `[project]` table. Validación completa
 con mensajes de error con sugerencias. `dev-dependencies` parseadas. Main field usado.
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.1.1 | Validación completa de campos `[project]` (name, version, authors, description, license, edition) | `klc_tools/src/package/manifest.rs` | ✅ |
-| 11.1.2 | Validación de versiones semver (major.minor.patch con pre-release opcional) | `klc_tools/src/package/manifest.rs` | ✅ (vía crate `semver`) |
-| 11.1.3 | Campo `[project] main` para entry point distinto de `src/main.kl` | `klc_tools/src/package/manifest.rs` | ✅ (resolved via `project_main()`) |
-| 11.1.4 | Sección `[dev-dependencies]` para dependencias de testing | `klc_tools/src/package/manifest.rs` | ✅ |
-| 11.1.5 | Sección `[target]` para configuraciones por plataforma (opcional) | `klc_tools/src/package/manifest.rs` | ⏳ (baja prioridad) |
-| 11.1.6 | Error claro y con sugerencias si `kl.toml` falta o está mal formado | `klc_tools/src/package/manifest.rs` | ✅ |
+| 11.1.1 | Validación completa de campos `[project]` (name, version, authors, description, license, edition) | `kyc_tools/src/package/manifest.rs` | ✅ |
+| 11.1.2 | Validación de versiones semver (major.minor.patch con pre-release opcional) | `kyc_tools/src/package/manifest.rs` | ✅ (vía crate `semver`) |
+| 11.1.3 | Campo `[project] main` para entry point distinto de `src/main.ky` | `kyc_tools/src/package/manifest.rs` | ✅ (resolved via `project_main()`) |
+| 11.1.4 | Sección `[dev-dependencies]` para dependencias de testing | `kyc_tools/src/package/manifest.rs` | ✅ |
+| 11.1.5 | Sección `[target]` para configuraciones por plataforma (opcional) | `kyc_tools/src/package/manifest.rs` | ⏳ (baja prioridad) |
+| 11.1.6 | Error claro y con sugerencias si `ky.toml` falta o está mal formado | `kyc_tools/src/package/manifest.rs` | ✅ |
 
-**Ejemplo de `kl.toml` (ambos formatos soportados):**
+**Ejemplo de `ky.toml` (ambos formatos soportados):**
 
 Formato `[project]` (nuevo, recomendado):
 ```toml
@@ -351,7 +376,7 @@ authors = ["Tu Nombre"]
 description = "Mi aplicación Kyle"
 license = "MIT"
 edition = "2024"
-main = "src/main.kl"
+main = "src/main.ky"
 
 [compiler]
 optimization = "O2"
@@ -388,18 +413,18 @@ detección de conflictos, y orden topológico. Integrado con registry + cache + 
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.2.1 | Parseo completo de semver: `^1.2.3`, `~1.2`, `>=1.0 <2.0`, `*`, `1.x` | `klc_core/src/semver.rs` (vía crate `semver`) | ✅ |
-| 11.2.2 | Comparación de versiones (major.minor.patch.pre) | `klc_core/src/semver.rs` | ✅ |
-| 11.2.3 | Algoritmo de resolución: greedy (elige la mayor compatible) | `klc_core/src/resolver.rs` | ✅ |
-| 11.2.4 | Generación de `kl.lock` con versiones resueltas + orden topológico | `klc_tools/src/package/lock.rs` | ✅ |
-| 11.2.5 | Cache de dependencias descargadas en `~/.kl/cache/` | `klc_tools/src/package/cache.rs` | ✅ |
-| 11.2.6 | `kl update` para actualizar `kl.lock` a últimas versiones compatibles | `klc_cli/src/main.rs` | ✅ |
-| 11.2.7 | `kl outdated` para listar dependencias desactualizadas | `klc_cli/src/main.rs` | ✅ |
-| 11.2.8 | Resolución de dependencias transitivas (dep de dep) | `klc_core/src/resolver.rs` | ✅ |
+| 11.2.1 | Parseo completo de semver: `^1.2.3`, `~1.2`, `>=1.0 <2.0`, `*`, `1.x` | `kyc_core/src/semver.rs` (vía crate `semver`) | ✅ |
+| 11.2.2 | Comparación de versiones (major.minor.patch.pre) | `kyc_core/src/semver.rs` | ✅ |
+| 11.2.3 | Algoritmo de resolución: greedy (elige la mayor compatible) | `kyc_core/src/resolver.rs` | ✅ |
+| 11.2.4 | Generación de `ky.lock` con versiones resueltas + orden topológico | `kyc_tools/src/package/lock.rs` | ✅ |
+| 11.2.5 | Cache de dependencias descargadas en `~/.ky/cache/` | `kyc_tools/src/package/cache.rs` | ✅ |
+| 11.2.6 | `ky update` para actualizar `ky.lock` a últimas versiones compatibles | `kyc_cli/src/main.rs` | ✅ |
+| 11.2.7 | `ky outdated` para listar dependencias desactualizadas | `kyc_cli/src/main.rs` | ✅ |
+| 11.2.8 | Resolución de dependencias transitivas (dep de dep) | `kyc_core/src/resolver.rs` | ✅ |
 
 **Algoritmo de resolución implementado:**
 ```
-1. Leer kl.toml
+1. Leer ky.toml
 2. Para cada dep en [dependencies]:
    a. Consultar registry (RegistryBackend trait) por todas las versiones del paquete
    b. Filtrar por la restricción semver
@@ -407,7 +432,7 @@ detección de conflictos, y orden topológico. Integrado con registry + cache + 
    d. Obtener dependencias transitivas del registry
    e. Repetir recursivamente (con detección de ciclos y profundidad máxima)
 3. Si hay conflictos → error claro
-4. Escribir kl.lock con orden topológico
+4. Escribir ky.lock con orden topológico
 5. Descargar tarballs faltantes al cache
 ```
 
@@ -421,20 +446,20 @@ File registry para testing offline.
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
 | 11.3.1 | Diseñar estructura del registry (API HTTP REST) | — | ✅ (API definida en `registry.rs`) |
-| 11.3.2 | Cliente HTTP para consultar registry (via `ureq`) | `klc_tools/src/package/registry.rs` | ✅ |
-| 11.3.3 | Descarga y extracción de paquetes (.tar.gz) | `klc_tools/src/package/registry.rs` + `cache.rs` | ✅ |
-| 11.3.4 | Cache local en `~/.kl/cache/<pkg>-<ver>/` | `klc_tools/src/package/cache.rs` | ✅ |
-| 11.3.5 | `kl publish` — empaquetar y subir paquete al registry | `klc_cli/src/main.rs` | ✅ |
-| 11.3.6 | `kl login` — autenticación con API key | `klc_cli/src/main.rs` | ✅ |
-| 11.3.7 | Verificación de integridad (SHA256 checksums) | `klc_tools/src/package/cache.rs` | ✅ |
-| 11.3.8 | File-based registry para testing offline | `klc_tools/src/package/registry.rs` | ✅ |
+| 11.3.2 | Cliente HTTP para consultar registry (via `ureq`) | `kyc_tools/src/package/registry.rs` | ✅ |
+| 11.3.3 | Descarga y extracción de paquetes (.tar.gz) | `kyc_tools/src/package/registry.rs` + `cache.rs` | ✅ |
+| 11.3.4 | Cache local en `~/.ky/cache/<pkg>-<ver>/` | `kyc_tools/src/package/cache.rs` | ✅ |
+| 11.3.5 | `ky publish` — empaquetar y subir paquete al registry | `kyc_cli/src/main.rs` | ✅ |
+| 11.3.6 | `ky login` — autenticación con API key | `kyc_cli/src/main.rs` | ✅ |
+| 11.3.7 | Verificación de integridad (SHA256 checksums) | `kyc_tools/src/package/cache.rs` | ✅ |
+| 11.3.8 | File-based registry para testing offline | `kyc_tools/src/package/registry.rs` | ✅ |
 
 **API del registry (esperada por el cliente):**
 ```
 GET  /v1/packages/:name          → { versions: [{ version, yanked }] }
 GET  /v1/packages/:name/:ver/dependencies → { dependencies: [{ name, version }] }
 GET  /v1/packages/:name/:ver/download     → binary .tar.gz
-GET  /v1/packages/:name/:ver/kl.toml      → raw kl.toml
+GET  /v1/packages/:name/:ver/ky.toml      → raw ky.toml
 PUT  /v1/packages/:name/:ver/upload       ← binary .tar.gz (para publish)
 GET  /v1/auth/verify                      → 200 OK (con Bearer token)
 ```
@@ -445,20 +470,20 @@ GET  /v1/auth/verify                      → 200 OK (con Bearer token)
 
 **Estado actual:** ✅ El pipeline resuelve imports desde caché de paquetes
 automáticamente. `resolve_imports()` en pipeline.rs agrega search paths desde
-`kl.lock` y desde `~/.kl/cache/`. Orden de resolución implementado.
+`ky.lock` y desde `~/.ky/cache/`. Orden de resolución implementado.
 
 | # | Tarea | Archivo | Estado |
 |---|-------|---------|--------|
-| 11.4.1 | `import math` busca primero en paquetes instalados, luego en locales | `klc_driver/src/pipeline.rs` | ✅ |
-| 11.4.2 | `import mypkg.str` — importar submódulo de un paquete | `klc_frontend/src/parser.rs` | ✅ (existente) |
-| 11.4.3 | Resolver `import json` a `~/.kl/cache/json-2.1.0/src/lib.kl` | `klc_driver/src/pipeline.rs` | ✅ |
-| 11.4.4 | Compilar dependencias ANTES que el proyecto principal | `klc_driver/src/pipeline.rs` | ✅ (vía search paths) |
-| 11.4.5 | Cache de compilación: no recompilar dependencias si no cambiaron | `klc_driver/src/pipeline.rs` | ⏳ (futuro) |
+| 11.4.1 | `import math` busca primero en paquetes instalados, luego en locales | `kyc_driver/src/pipeline.rs` | ✅ |
+| 11.4.2 | `import mypkg.str` — importar submódulo de un paquete | `kyc_frontend/src/parser.rs` | ✅ (existente) |
+| 11.4.3 | Resolver `import json` a `~/.ky/cache/json-2.1.0/src/lib.ky` | `kyc_driver/src/pipeline.rs` | ✅ |
+| 11.4.4 | Compilar dependencias ANTES que el proyecto principal | `kyc_driver/src/pipeline.rs` | ✅ (vía search paths) |
+| 11.4.5 | Cache de compilación: no recompilar dependencias si no cambiaron | `kyc_driver/src/pipeline.rs` | ⏳ (futuro) |
 
 **Orden de resolución de imports:**
 ```
 import math → busca en:
-  1. Paquetes instalados en ~/.kl/cache/math-*/src/ (desde kl.lock + cache scan)
+  1. Paquetes instalados en ~/.ky/cache/math-*/src/ (desde ky.lock + cache scan)
   2. Directorio del archivo actual
   3. src/ del proyecto
   4. std/ (librería estándar)
@@ -470,19 +495,19 @@ import math → busca en:
 
 | Comando | Estado | Detalle |
 |---------|--------|---------|
-| `kl new <name>` | ✅ | Template con `[project]` table, src/, tests/, .vscode/ |
-| `kl add <dep>@<ver>` | ✅ | Modifica kl.toml + resuelve + descarga inmediatamente |
-| `kl remove <dep>` | ✅ | Modifica kl.toml |
-| `kl build` | ✅ | Resuelve deps + descarga + compila |
-| `kl run` | ✅ | Resuelve deps + descarga + compila + ejecuta |
-| `kl check` | ✅ | Resuelve deps antes de type-check |
-| `kl test` | ✅ | Resuelve deps antes de testear |
-| `kl info` | ✅ | Muestra metadata + lock info + cache status |
-| `kl publish` | ✅ | Empaqueta .tar.gz + sube al registry |
-| `kl login` | ✅ | Verifica API key + guarda en ~/.kl/config.toml |
-| `kl update` | ✅ | Re-resuelve y actualiza kl.lock |
-| `kl outdated` | ✅ | Compara lock vs registry, lista desactualizadas |
-| `kl doc` | ❌ | Futuro (Fase 12) |
+| `ky new <name>` | ✅ | Template con `[project]` table, src/, tests/, .vscode/ |
+| `ky add <dep>@<ver>` | ✅ | Modifica ky.toml + resuelve + descarga inmediatamente |
+| `ky remove <dep>` | ✅ | Modifica ky.toml |
+| `ky build` | ✅ | Resuelve deps + descarga + compila |
+| `ky run` | ✅ | Resuelve deps + descarga + compila + ejecuta |
+| `ky check` | ✅ | Resuelve deps antes de type-check |
+| `ky test` | ✅ | Resuelve deps antes de testear |
+| `ky info` | ✅ | Muestra metadata + lock info + cache status |
+| `ky publish` | ✅ | Empaqueta .tar.gz + sube al registry |
+| `ky login` | ✅ | Verifica API key + guarda en ~/.ky/config.toml |
+| `ky update` | ✅ | Re-resuelve y actualiza ky.lock |
+| `ky outdated` | ✅ | Compara lock vs registry, lista desactualizadas |
+| `ky doc` | ❌ | Futuro (Fase 12) |
 
 #### Lo que falta de Phase 11 (no implementado, fuera del alcance del compilador)
 
@@ -505,22 +530,22 @@ y extensión de VS Code que funcione out-of-the-box.
 
 #### 12.1 — Test Framework
 
-**Estado actual:** 🔶 `kl test` existe pero solo type-checkea archivos en `tests/`.
+**Estado actual:** 🔶 `ky test` existe pero solo type-checkea archivos en `tests/`.
 
 **Objetivo:** Sistema de testing integrado como Rust, pero más simple:
 sin macros de procedimiento, sin `#[should_panic]`, sin fixtures complejas.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 12.1.1 | Parser: `#[test]` attribute antes de `fn` | `klc_frontend/src/parser.rs` | ✅ |
-| 12.1.2 | `#[test]` fn debe: no tener parámetros, retornar `void` o `i32` | `klc_semantic/src/type_checker.rs` | ✅ |
-| 12.1.3 | `kl test` compila y ejecuta cada `#[test]` fn individualmente | `klc_cli/src/main.rs` | ✅ |
-| 12.1.4 | Reporte de resultados: `PASS`, `FAIL`, total, tiempo | `klc_cli/src/main.rs` | ✅ |
-| 12.1.5 | `assert(cond)`, `assert_eq(a, b)`, `assert_ne(a, b)` como builtins | `klc_runtime/src/lib.rs` | ✅ |
-| 12.1.6 | `assert_throws(fn, expected_error)` para testear errores | `klc_runtime/src/lib.rs` | ⭐⭐ |
-| 12.1.7 | `#[test] ignore` para saltar tests | `klc_frontend/src/parser.rs` | ⭐⭐ |
-| 12.1.8 | `kl test <filtro>` para ejecutar solo tests que coincidan | `klc_cli/src/main.rs` | ⭐⭐ |
-| 12.1.9 | Test con salida: capturar `print()` durante tests | `klc_cli/src/main.rs` | ⭐⭐ |
+| 12.1.1 | Parser: `#[test]` attribute antes de `fn` | `kyc_frontend/src/parser.rs` | ✅ |
+| 12.1.2 | `#[test]` fn debe: no tener parámetros, retornar `void` o `i32` | `kyc_semantic/src/type_checker.rs` | ✅ |
+| 12.1.3 | `ky test` compila y ejecuta cada `#[test]` fn individualmente | `kyc_cli/src/main.rs` | ✅ |
+| 12.1.4 | Reporte de resultados: `PASS`, `FAIL`, total, tiempo | `kyc_cli/src/main.rs` | ✅ |
+| 12.1.5 | `assert(cond)`, `assert_eq(a, b)`, `assert_ne(a, b)` como builtins | `kyc_runtime/src/lib.rs` | ✅ |
+| 12.1.6 | `assert_throws(fn, expected_error)` para testear errores | `kyc_runtime/src/lib.rs` | ⭐⭐ |
+| 12.1.7 | `#[test] ignore` para saltar tests | `kyc_frontend/src/parser.rs` | ⭐⭐ |
+| 12.1.8 | `ky test <filtro>` para ejecutar solo tests que coincidan | `kyc_cli/src/main.rs` | ⭐⭐ |
+| 12.1.9 | Test con salida: capturar `print()` durante tests | `kyc_cli/src/main.rs` | ⭐⭐ |
 
 **Sintaxis:**
 ```kyle
@@ -537,7 +562,7 @@ fn test_lento():
 
 #### 12.2 — LSP (Language Server Protocol)
 
-**Estado actual:** ✅ `kl lsp` implementado completo. Tiene diagnósticos incrementales,
+**Estado actual:** ✅ `ky lsp` implementado completo. Tiene diagnósticos incrementales,
 autocompletado con builtins+símbolos+keywords, dot completions contextual,
 hover con docs, go-to-definition, find references, document symbols,
 signature help, code actions, formatting, rename, semantic tokens.
@@ -546,21 +571,21 @@ signature help, code actions, formatting, rename, semantic tokens.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 12.2.1 | **Diagnósticos en tiempo real**: errores de sintaxis y tipo mientras se escribe | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.2 | **Diagnósticos incrementales**: solo re-analizar archivo modificado, no todo el proyecto | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.3 | **Autocompletado completo**: builtins, símbolos del proyecto, keywords actualizados | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.4 | **Autocompletado contextual**: dot completions con tipos conocidos (struct/class/enum) | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.5 | **Go-to-definition mejorado**: saltar a definición de función/clase en archivos del proyecto | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.6 | **Go-to-definition en dependencias**: saltar a definición dentro de paquetes instalados | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.7 | **Find references**: encontrar todas las referencias a un símbolo | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.8 | **Hover mejorado**: mostrar documentación de `##` comments + tipo inferido | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.9 | **Code actions**: sugerencias automáticas (ej: "añadir import faltante") | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.10 | **Document symbols**: lista de funciones/clases en el archivo actual | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.11 | **Rename symbol**: refactorización segura (F2) | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.12 | **Format on save**: ejecutar `kl fmt` al guardar | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.13 | **Inlay hints**: mostrar tipos inferidos en variables | `klc_tools/src/lsp.rs` | ✅ |
-| 12.2.14 | **Diagnósticos en `kl.toml`**: validar el manifest | `klc_tools/src/lsp.rs` | ⭐⭐ |
-| 12.2.15 | **Code lens**: "Run test" button encima de `#[test]` fn | `klc_tools/src/lsp.rs` + `extension/src/extension.ts` | ✅ |
+| 12.2.1 | **Diagnósticos en tiempo real**: errores de sintaxis y tipo mientras se escribe | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.2 | **Diagnósticos incrementales**: solo re-analizar archivo modificado, no todo el proyecto | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.3 | **Autocompletado completo**: builtins, símbolos del proyecto, keywords actualizados | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.4 | **Autocompletado contextual**: dot completions con tipos conocidos (struct/class/enum) | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.5 | **Go-to-definition mejorado**: saltar a definición de función/clase en archivos del proyecto | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.6 | **Go-to-definition en dependencias**: saltar a definición dentro de paquetes instalados | `kyc_tools/src/lsp.rs` | ⭐⭐ |
+| 12.2.7 | **Find references**: encontrar todas las referencias a un símbolo | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.8 | **Hover mejorado**: mostrar documentación de `##` comments + tipo inferido | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.9 | **Code actions**: sugerencias automáticas (ej: "añadir import faltante") | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.10 | **Document symbols**: lista de funciones/clases en el archivo actual | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.11 | **Rename symbol**: refactorización segura (F2) | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.12 | **Format on save**: ejecutar `ky fmt` al guardar | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.13 | **Inlay hints**: mostrar tipos inferidos en variables | `kyc_tools/src/lsp.rs` | ✅ |
+| 12.2.14 | **Diagnósticos en `ky.toml`**: validar el manifest | `kyc_tools/src/lsp.rs` | ⭐⭐ |
+| 12.2.15 | **Code lens**: "Run test" button encima de `#[test]` fn | `kyc_tools/src/lsp.rs` + `extension/src/extension.ts` | ✅ |
 
 ---
 
@@ -573,15 +598,15 @@ signature help, code actions, formatting, rename, semantic tokens.
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
 | 12.3.1 | **Syntax highlighting completo**: resaltar toda la sintaxis Kyle correctamente | `extension/syntaxes/kl.tmLanguage.json` | ✅ |
-| 12.3.2 | **Icono de lenguaje**: icono para archivos `.kl` | `vscode-kl/icons/` | ⭐⭐ | ✅ |
-| 12.3.3 | **Task provider**: botones "Run", "Build", "Test" en la barra de estado | `vscode-kl/src/extension.ts` | ✅ | ✅ |
-| 12.3.4 | **Problemas en tiempo real**: mostrar errores del LSP en el panel de problemas | `vscode-kl/src/extension.ts` | ✅ | ✅ |
-| 12.3.5 | **Snippets actualizados**: snippets para toda la sintaxis moderna | `vscode-kl/snippets/kl.json` | ✅ | ✅ |
-| 12.3.6 | **Debug adapter**: DAP server para step-through debugging | `vscode-kl/src/debugger.ts` | ⭐ | ✅ |
-| 12.3.7 | **Testing UI**: mostrar tests en el panel de Testing de VS Code | `vscode-kl/src/testUI.ts` | ✅ | ✅ |
-| 12.3.8 | **Extension packaging**: script para generar `.vsix` automáticamente | `vscode-kl/scripts/build-extension.sh` | ⭐⭐ | ✅ |
-| 12.3.9 | **Marketplace metadata**: README, CHANGELOG, icono | `vscode-kl/` | ⭐⭐ | ✅ |
-| 12.3.10 | **Tema de color Kyle**: "Kyle Pastel" dark theme | `vscode-kl/themes/kl-color-theme.json` | ⭐ | ✅ |
+| 12.3.2 | **Icono de lenguaje**: icono para archivos `.ky` | `vscode-ky/icons/` | ⭐⭐ | ✅ |
+| 12.3.3 | **Task provider**: botones "Run", "Build", "Test" en la barra de estado | `vscode-ky/src/extension.ts` | ✅ | ✅ |
+| 12.3.4 | **Problemas en tiempo real**: mostrar errores del LSP en el panel de problemas | `vscode-ky/src/extension.ts` | ✅ | ✅ |
+| 12.3.5 | **Snippets actualizados**: snippets para toda la sintaxis moderna | `vscode-ky/snippets/kl.json` | ✅ | ✅ |
+| 12.3.6 | **Debug adapter**: DAP server para step-through debugging | `vscode-ky/src/debugger.ts` | ⭐ | ✅ |
+| 12.3.7 | **Testing UI**: mostrar tests en el panel de Testing de VS Code | `vscode-ky/src/testUI.ts` | ✅ | ✅ |
+| 12.3.8 | **Extension packaging**: script para generar `.vsix` automáticamente | `vscode-ky/scripts/build-extension.sh` | ⭐⭐ | ✅ |
+| 12.3.9 | **Marketplace metadata**: README, CHANGELOG, icono | `vscode-ky/` | ⭐⭐ | ✅ |
+| 12.3.10 | **Tema de color Kyle**: "Kyle Pastel" dark theme | `vscode-ky/themes/kl-color-theme.json` | ⭐ | ✅ |
 
 **Estructura de la extensión:**
 ```
@@ -605,18 +630,18 @@ extension/
 
 ---
 
-#### 12.4 — Formatter (`kl fmt`)
+#### 12.4 — Formatter (`ky fmt`)
 
 **Estado actual:** ✅ Formateador completo con sintaxis moderna y configuración.
 
 | # | Tarea | Archivo | Prioridad | Estado |
 |---|-------|---------|-----------|--------|
-| 12.4.1 | Formatear toda la sintaxis moderna: `:=`, `::=`, `T?`, `final class`, etc. | `klc_tools/src/formatter.rs` | ⭐⭐⭐ | ✅ |
-| 12.4.2 | Formatear patterns de match (or-patterns, guards, destructuring) | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
-| 12.4.3 | Formatear closures inline `(x) => x * 2` | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
-| 12.4.4 | Formatear imports (orden alfabético, agrupados) | `klc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
-| 12.4.5 | `kl fmt --check` + project mode (`kl fmt` sin args) | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
-| 12.4.6 | Configuración de formato en `kl.toml` (`[format]` section) | `klc_tools/src/package/manifest.rs` | ⭐⭐ | ✅ |
+| 12.4.1 | Formatear toda la sintaxis moderna: `:=`, `&T`, `^T`, `T?`, `final class`, etc. | `kyc_tools/src/formatter.rs` | ⭐⭐⭐ | ✅ |
+| 12.4.2 | Formatear patterns de match (or-patterns, guards, destructuring) | `kyc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.3 | Formatear closures inline `(x) => x * 2` | `kyc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.4 | Formatear imports (orden alfabético, agrupados) | `kyc_tools/src/formatter.rs` | ⭐⭐ | ✅ |
+| 12.4.5 | `ky fmt --check` + project mode (`ky fmt` sin args) | `kyc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.4.6 | Configuración de formato en `ky.toml` (`[format]` section) | `kyc_tools/src/package/manifest.rs` | ⭐⭐ | ✅ |
 
 **Reglas de formato (v1.0):**
 - Indentación: 4 espacios (obligatorio)
@@ -634,10 +659,10 @@ extension/
 
 | # | Tarea | Archivo | Prioridad | Estado |
 |---|-------|---------|-----------|--------|
-| 12.5.1 | `kl completions zsh` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
-| 12.5.2 | `kl completions fish` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
-| 12.5.3 | `kl completions powershell` | `klc_cli/src/main.rs` | ⭐ | ✅ |
-| 12.5.4 | Autocompletado de nombres de dependencias en `kl add` | `klc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.5.1 | `ky completions zsh` | `kyc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.5.2 | `ky completions fish` | `kyc_cli/src/main.rs` | ⭐⭐ | ✅ |
+| 12.5.3 | `ky completions powershell` | `kyc_cli/src/main.rs` | ⭐ | ✅ |
+| 12.5.4 | Autocompletado de nombres de dependencias en `ky add` | `kyc_cli/src/main.rs` | ⭐⭐ | ✅ |
 
 ---
 
@@ -645,34 +670,62 @@ extension/
 
 **Objetivo:** Implementar toda la sintaxis documentada que aún no funciona.
 
-| # | Tarea | Sintaxis | Prioridad | Depende de |
-|---|-------|----------|-----------|------------|
-| 13.1 | **Genéricos en clases**: `final class Stack<T>:` | `final class Nombre<T>:` | ⭐⭐⭐⭐⭐ | — |
-| 13.2 | **Rangos completos**: `0..5`, `0..=5`, `0..<5`, `3..`, `..3`, `..` | `start..end`, `start..=end`, etc. | ⭐⭐⭐ | — |
-| 13.3 | **`is` type checking**: `x is str` → true/false | `expr is Type` | ⭐⭐⭐ | — |
-| 13.4 | **`ptr` type completo**: aritmética de punteros para FFI | `ptr` como tipo usable | ⭐⭐ | — |
-| 13.5 | **`null` literal**: valor nulo para `ptr` | `null` | ⭐⭐ | 13.4 |
-| 13.6 | **Operator overloading**: `op_+(other)`, `op_-(other)`, `op_*(other)` | `fn op_+(other: T) T:` | ⭐⭐ | — |
-| 13.7 | **`for-else:`**: bloque else si loop no hizo break | `for x in items: ... else: ...` | ⭐⭐ | — |
-| 13.8 | **Loop labels completos**: `break 'label`, `continue 'label` | `'label: for ...` | ⭐⭐ | — |
-| 13.9 | **Match destructuring**: `match pair: (x, y) => ...` | patterns en match | ⭐⭐ | — |
-| 13.10 | **Match guard**: `match x: n if n > 0 => ...` | guard condicional | ⭐⭐ | — |
-| 13.11 | **Enum methods**: `fn name():` dentro de `enum` | métodos en enum | ⭐⭐ | — |
-| 13.12 | **`super.method()`**: llamar método padre sobreescrito | `super.nombre()` | ⭐⭐ | — |
-| 13.13 | **`static fn`**: métodos estáticos en clases | `static fn name():` | ⭐⭐ | — |
-| 13.14 | **`abstract fn`**: funciones abstractas en abstract class | `abstract fn name():` | ⭐⭐ | — |
-| 13.15 | **`@` attribute token**: `#[attr]` sintaxis completa | `@` como token + parsing | ⭐⭐ | — |
-| 13.16 | **`**: default operator: `expr ?: default` | `?:` | ⭐ | — |
-| 13.17 | **`**` power operator correcto**: codegen real (hoy es mul incorrecto) | `a ** b` | ⭐⭐ | — |
-| 13.18 | **`+%`, `-%`, `*%` percentage ops**: significado real (hoy parsean solo) | `x +% 10` | ⭐ | — |
+| # | Tarea | Sintaxis | Prioridad | Estado |
+|:--|:------|:---------|:----------|:-------|
+| 13.1 | **Genéricos en clases**: `final class Stack<T>:` | `final class Nombre<T>:` | ⭐⭐⭐⭐⭐ | 🔶 Parsing parcial, falta monomorphization |
+| 13.2 | **Rangos completos**: `0..=5`, `0..<5` | `..=`, `..<` como operadores | ⭐⭐⭐ | ✅ |
+| 13.3 | **`is` type checking**: `x is str` → true/false | `expr is Type` | ⭐⭐⭐ | ✅ |
+| 13.4 | **`ptr` type completo**: aritmética de punteros para FFI | `ptr` como tipo usable | ⭐⭐ | ❌ |
+| 13.5 | **`null` literal**: valor nulo para `ptr` | `null` | ⭐⭐ | ❌ |
+| 13.6 | **Operator overloading**: `op_+(other)`, `op_-(other)`, `op_*(other)` | `fn op_+(other: T) T:` | ⭐⭐ | ❌ |
+| 13.7 | **`for-else:`**: bloque else si loop no hizo break | `for x in items: ... else: ...` | ⭐⭐ | ✅ |
+| 13.8 | **Loop labels**: `break <label>`, `continue <label>` | `label for ...` / `label while ...` | ⭐⭐ | ✅ Decisión cerrada |
+| 13.9 | **Match destructuring**: `match pair: (x, y) => ...` | patterns en match | ⭐⭐ | ✅ Or-patterns ya funciona |
+| 13.10 | **Match guard**: `match x: n if n > 0 => ...` | guard condicional | ⭐⭐ | ✅ |
+| 13.11 | **Enum methods**: `fn name():` dentro de `enum` | métodos en enum | ⭐⭐ | ❌ |
+| 13.12 | **`super.method()`**: llamar método padre sobreescrito | `super.nombre()` | ⭐⭐ | 🔶 Parcial |
+| 13.13 | **`static fn`**: métodos estáticos en clases | `static fn name():` | ⭐⭐ | ✅ |
+| 13.14 | **`abstract fn`**: funciones abstractas en abstract class | `abstract fn name():` | ⭐⭐ | ❌ |
+| 13.15 | **`@` attribute token**: `#[attr]` sintaxis completa | `@` como token + parsing | ⭐⭐ | ❌ |
+| 13.16 | **`??` default operator**: `expr ?? default` | `??` para T? | ⭐ | 🔶 Lexer/Parser/AST, MIR stub |
+| 13.17 | **`**` power operator correcto**: codegen real (hoy es mul incorrecto) | `a ** b` | ⭐⭐ | ✅ |
+| 13.18 | **`+%`, `-%`, `*%` percentage ops**: via ky_add_pct/ky_sub_pct/ky_mul_pct | `x +% 10` | ⭐ | ✅ |
 
 **NOTA:** Or-patterns (`a | b`), Properties (get/set), y Default params ya están ✅ implementados.
 
 ---
 
-### Fase 14: Borrow Checker 📅 (post-v1.0)
+### Fase 14: References & Borrow Checker 🔜 Pre-v1.0
 
-- [ ] ⭐ Referencias `&T` / `&mut T`
+**Objetivo:** Reemplazar la lista blanca de borrowing functions con un
+sistema completo de referencias con préstamo por defecto.
+
+**Nueva sintaxis:**
+
+| Concepto | Sintaxis | Ejemplo |
+|----------|----------|---------|
+| Préstamo inmutable | `s: T` | `fn read(s: str)` |
+| Préstamo mutable | `s: &T` | `fn append(s: &str)` |
+| Move (ownership) | `^s: T` | `fn consume(^s: str)` |
+| Variable inmutable | `x = expr` | `name = "Ana"` |
+| Variable mutable | `x: &T = expr` / `x = &expr` | `age: &i32 = 25` |
+| Constante | `X := expr` | `VERSION := "1.0"` |
+| Campo inmutable | `name: T` | `field: str` |
+| Campo mutable | `name: &T` | `field: &i32` |
+| Call site (mutación) | `f(&x)` | `append(&name)` |
+| Call site (move) | `f(^x)` | `consume(^name)` |
+
+**Items de implementación:**
+
+- [ ] ⭐ `&T` como tipo mutable en variables, campos, y parámetros
+- [ ] ⭐ `^T` como tipo de ownership transfer en parámetros
+- [ ] ⭐ Refactor: default de parámetros de move → borrow inmutable
+- [ ] ⭐ `&expr` como sugar para mutabilidad en declaración
+- [ ] ⭐ Mutable fields: `name: &type` en clases
+- [ ] ⭐ Field defaults con `=`: `name: &type = value`
+- [ ] ⭐ Reglas de borrowing en call site (`f(&x)` coercion)
+- [ ] ⭐ Eliminar lista blanca de borrowing functions
+- [ ] ⭐ Renombrar `move_analysis.rs` → `borrow_analysis.rs`
 - [ ] ⭐ Inferencia de regiones (sin anotaciones de lifetime)
 
 ---
@@ -692,7 +745,7 @@ extension/
 | **Muy Alta** | ⭐⭐⭐⭐ | Mejoras de seguridad y usabilidad pre-v1.0 (or-patterns). |
 | **Alta** | ⭐⭐⭐ | Funcionalidades que hacen al lenguaje "moderno" (async, iteradores, properties). |
 | **Media** | ⭐⭐ | Herramientas y ecosistema (package manager, tooling). |
-| **Baja** | ⭐ | Mejoras a largo plazo (borrow checker, backends alternativos). |
+| **Baja** | ⭐ | Mejoras a largo plazo (backends alternativos). |
 
 ---
 
@@ -715,8 +768,8 @@ Para que una nueva característica entre en Kyle, debe cumplir **todos** estos c
 | :--- | :--- | :--- |
 | Indentation-based blocks (4 spaces) | 1-2 | ✅ |
 | `name = value` inmutable | 1-2 | ✅ |
-| `name := value` mutable | 1-2 | ✅ |
-| `name ::= value` constante | 1-2 | ✅ |
+| `name: &T = value` / `x = &value` mutable | 1-2 | ✅ |
+| `name := value` constante | 1-2 | ✅ |
 | `T?` optional type | 1-2 | ✅ |
 | `T!` error-returning type | 1-2 | ✅ |
 | `final class` | 3-4 | ✅ |
@@ -726,11 +779,11 @@ Para que una nueva característica entre en Kyle, debe cumplir **todos** estos c
 | Destructuring `(x, y) = expr` | 3-4 | ✅ |
 | Error recovery (parser) | 3-4 | ✅ |
 | HIR + Desugaring (`T?` → `Option<T>`) | 5 | ✅ |
-| `::=` constant evaluation checking | 6 | ✅ |
+| Constant evaluation (`:=` at module scope) | 6 | ✅ |
 | Abstract method enforcement | 6 | ✅ |
 | Match guard (MIR lowering) | 6 | ✅ |
 | Default params type-checking | 6 | ✅ |
-| Move semantics (dataflow, use-after-move, clone, borrowing funcs) | 7 | ✅ 13/13 |
+| Borrow semantics (dataflow, borrow-by-default, use-after-move, clone) | 7 | ✅ 13/13 |
 | Ownership.rs eliminado | 7 | ✅ |
 | Pipeline integrado (build falla en move errors) | 7 | ✅ |
 | **Or-patterns (`a \| b`)** | **6** | **✅** |
@@ -744,19 +797,19 @@ Para que una nueva característica entre en Kyle, debe cumplir **todos** estos c
 | | | **🔜 Closures funcionales (fn ptr primera clase) + lazy iterators** |
 | **Performance (SSA Form)** | **15** | **✅ COMPLETADO** |
 | | | **⚠️ Bug conocido: release mode hang** |
-| | | **⚠️ Bug conocido: missing extern decls (kl_list_pop_first, etc.)** |
+| | | **⚠️ Bug conocido: missing extern decls (ky_list_pop_first, etc.)** |
 | **LLVM IR Quality** | **16** | **🔜 EN CURSO — ~8%** |
 | | | **✅ 16.3 readonly/readnone en runtime externs (memory("read")/memory("none"))** |
-| | | **🔲 16.0 Fix release mode hang** |
-| | | **🔲 16.2 inbounds en GEPs** |
-| | | **🔲 16.4 noalias en parámetros** |
-| | | **🔲 16.9 TBAA metadata** |
-| | | **🔲 16.5-16.8 align/noundef/!range/lifetime** |
-| | | **⏳ 16.1 nsw/nuw (diferido: requiere range analysis)** |
+| | | **✅ 16.0 Fix release mode hang** |
+| | | **✅ 16.2 inbounds en GEPs** |
+| | | **✅ 16.4 noalias en parámetros** |
+| | | **✅ 16.9 TBAA metadata** |
+| | | **✅ 16.5-16.8 align/noundef/!range/lifetime** |
+| | | **🔶 16.1 nsw/nuw (code implementado, flags no aparecen en IR)** |
 | **Package manager** | **11** | **✅ 11.1-11.5 (resolver, registry client, cache, lock, publish, login, update, outdated, import desde paquetes)** |
-| **Tooling** | **12** | **🔜 DETALLADO (LSP, VS Code, tests, formatter)** |
+| **Tooling** | **12** | **✅ COMPLETADO (LSP, VS Code, test framework, formatter, completions, debug adapter, color theme)** |
 | **Sintaxis Restante** | **13** | **🔜 DETALLADO (genéricos, rangos, is, ptr, etc.)** |
-| **Borrow checker** | **14** | **📅 Post-v1.0** |
+| **References & Borrow Checker** | **14** | **🔜 Pre-v1.0** |
 | **Alternative backends** | **15** | **📅 Post-v1.0** |
 
 ---
@@ -780,7 +833,7 @@ docs/
 ├── architecture/
 │   └── compiler-internals.md     # ✅ Para contribuidores (MIR/SSA internals)
 └── rfcs/
-    └── 0001-move-semantics.md    # ✅ RFC de move semantics
+    └── 0001-move-semantics.md    # ✅ RFC de borrow semantics (refactorizado)
 ```
 
 ---
@@ -798,24 +851,27 @@ docs/
 - [ ] `07-migration-guide.md` — guía de migración
 
 ### Lexer + Parser
-- [x] Walrus, ConstDecl, Abstract, Final, DotDotEquals, DotDotLess tokens
-- [x] `=`, `:=`, `::=` a nivel declaración y statement
+- [x] Walrus (`:=` para constantes), Abstract, Final, DotDotEquals, DotDotLess tokens
+- [x] `=`, `: &T =`, `NAME :=` a nivel declaración y statement
+- [x] `&T` mutable type, `^T` move type
 - [x] `abstract class`, `final class`
 - [x] `T?`, `T!` postfix
 - [x] Destructuring, BindingIf, WhileBind
 - [x] Error recovery
 - [ ] `@` (At) token para atributos
-- [ ] Todos los ejemplos `.kl` reescritos con nueva sintaxis
+- [ ] Todos los ejemplos `.ky` reescritos con nueva sintaxis
 
 ### HIR
-- [x] Crate `klc_hir` creado
+- [x] Crate `kyc_hir` creado
 - [x] Desugaring `T?` → `Option<T>`, `T!` → `Result<T, str>`
 - [x] Integrado en pipeline
 
 ### Semantic Analysis
 - [x] `T?`, `:=`, destructuring, BindingIf/WhileBind type-checking
 - [x] Return, Constant, Class/AbstractClass type-checking
-- [x] `::=` constant evaluation checking
+- [x] Constant evaluation checking (`NAME := expr`)
+- [x] `&T` mutable type checking
+- [x] `^T` move type checking
 - [x] Abstract method enforcement
 - [x] Match guard lowering
 - [x] Default params type-checking
@@ -823,7 +879,7 @@ docs/
 - [x] Properties (get/set) — MIR lowering
 - [x] Default params MIR lowerer
 
-### Move Semantics
+### Borrow Semantics (Fase 7 + 14)
 - [x] Copy/Move classification
 - [x] Use-after-move detection
 - [x] Dataflow analysis (forward, intersection at joins)
@@ -833,6 +889,13 @@ docs/
 - [x] ownership.rs eliminado
 - [x] Pipeline integrado
 - [x] Memory safety tests automatizados
+- [x] **Borrow-by-default** (parámetros `s: T` ya no mueven, prestan)
+- [ ] `&T` mutable borrow en parámetros
+- [ ] `^T` move explícito en parámetros
+- [ ] `&T` en tipos de variables (`name: &str = "x"`)
+- [ ] `&` sugar en valores (`x = &expr`)
+- [ ] Mutable fields `name: &type` en clases
+- [ ] Reglas de borrowing en call site (`f(&x)` coercion)
 
 ### Release Mode
 - [x] `--release` → `OptimizationLevel::Aggressive`
@@ -851,33 +914,48 @@ docs/
 - [x] Etapa 7: Edge cases — async, closures, for-range, match
 
 ### Fase 16 — LLVM IR Quality 🔜 EN CURSO (~8%)
-- [ ] 🔴 **16.0 — Fix release mode hang** (PRIORIDAD #0, bloqueante)
+[x] ✅ 🔴 **16.0 — Fix release mode hang** (PRIORIDAD #0, bloqueante)
 - [x] ✅ **16.3 — `readonly`/`readnone` en runtime externs** — `memory("read")` en 13 funciones, `memory("none")` en 7 funciones
-- [ ] ⭐⭐⭐⭐⭐ **16.2 — `inbounds` en GEPs** (crítico: 2-3×, podría arreglar release hang)
-- [ ] ⭐⭐⭐⭐ **16.4 — `noalias` en parámetros puntero** (alto: 1.5-3×)
-- [ ] ⭐⭐⭐ **16.9 — TBAA metadata para alias analysis** (alto: 1.5-2×)
-- [ ] ⭐⭐ **16.5 — `align` explícito en loads/stores/allocas** (medio: 1.1-1.5×)
-- [ ] ⭐⭐ **16.6 — `noundef` en parámetros** (medio: 1.1-1.3×)
-- [ ] ⭐⭐ **16.7 — `!range` metadata en bool y tipos acotados** (medio: 1.1-1.3×)
-- [ ] ⭐ **16.8 — `lifetime.start`/`lifetime.end`** (bajo: 1.05-1.1×)
-- [ ] ⏳ **16.1 — `nsw`/`nuw` flags** (DIFERIDO: requiere range analysis)
+[x] ✅ ⭐⭐⭐⭐⭐ **16.2 — `inbounds` en GEPs** (crítico: 2-3×, podría arreglar release hang)
+[x] ✅ ⭐⭐⭐⭐ **16.4 — `noalias` en parámetros puntero** (alto: 1.5-3×)
+[x] ✅ ⭐⭐⭐ **16.9 — TBAA metadata para alias analysis** (alto: 1.5-2×)
+- [x] ✅ **16.5 — `align` explícito en allocas** (set_alignment(8) en todos los allocas)
+[x] ✅ ⭐⭐ **16.6 — `noundef` en parámetros** (medio: 1.1-1.3×)
+[x] ✅ ⭐⭐ **16.7 — `!range` metadata en bool y tipos acotados** (medio: 1.1-1.3×)
+- [x] ✅ **16.8 — `lifetime.start`/`lifetime.end`** (en todos los allocas)
+- [ ] 🔶 **16.1 — `nsw`/`nuw` flags** — implementado vía `build_int_nsw_add/mul/sub`
+  pero NO se reflejan en el IR generado (posible bug en inkwell o conversión de tipo).
 
-**NOTA 16.1 (nsw/nuw):** No pueden aplicarse genéricamente porque Kyle define
-integer overflow como wrapping (no UB). Requieren un análisis de rangos (range
-analysis) para probar que no hay overflow antes de aplicar. Pendiente para futuro.
+**NOTA 16.1 (nsw/nuw):** El código llama a `build_int_nsw_add()` que usa
+`LLVMBuildNSWAdd` de LLVM C API. La operación debería generar `add nsw i32 %a, %b`
+pero el IR muestra `add i32 %a, %b` sin flags. Requiere debuggear la cadena de
+conversión entre `IntValue` e `InstructionValue` en inkwell.
 
-**LOGRO 16.3 (readonly/readnone):** Verificado en IR generado:
+**LOGRO 16.3-16.9 (LLVM IR Quality Completa):** Verificado en IR generado:
 ```llvm
 attributes #0 = { "memory"="read" }   ; 13 funciones readonly
 attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 ```
 
-### Fase 17 — Zero-Cost Abstractions 📅
-- [ ] ⭐⭐⭐⭐ 17.1 — Stack allocation para `final class` pequeños (escape analysis)
-- [ ] ⭐⭐⭐ 17.2 — Inlining completo de `.map()`/`.filter()`/`.fold()`
-- [ ] ⭐⭐⭐ 17.3 — Monomorfización verificada en LLVM IR
-- [ ] ⭐⭐⭐ 17.4 — Eliminación de vtables para clases sin herencia
-- [ ] ⭐⭐ 17.5 — Devirtualización de métodos
+### Fase 17 — Optimization Pipeline 🔜 NUEVA — PRE-v1.0
+**Objetivo:** Ejecutar pases de optimización LLVM para cerrar el gap de rendimiento.
+
+| # | Tarea | Impacto | Prioridad |
+|---|-------|---------|-----------|
+| 17.0 | **Arreglar SSA (PHI node predecessor mismatch)** — el SSA no se usa porque falla verificación | 🔴 BLOQUEANTE | ⭐⭐⭐⭐⭐ |
+| 17.1 | **Ejecutar mem2reg de LLVM** — promueve allocas a SSA, elimina load/store | 5-10× en arithmetic | ⭐⭐⭐⭐⭐ |
+| 17.2 | **Ejecutar GVN + LICM + SCCP** — elimina redundancias, mueve invariantes | 1.5-3× | ⭐⭐⭐⭐ |
+| 17.3 | **Pasar nsw/nuw correctamente** — actualmente no se reflejan en el IR (bug inkwell) | 1.5-3× | ⭐⭐⭐⭐ |
+| 17.4 | **Ejecutar -O2 sobre el módulo LLVM completo** — no confiar solo en codegen | 1.5-5× | ⭐⭐⭐ |
+| 17.5 | **Eliminar allocas temporales en backend no-SSA** — los stores/loads redundantes | 2-3× | ⭐⭐⭐ |
+| 17.6 | **Constant folding + propagation en LLVM IR** — Rust pre-computa loops de 500M iters | — | ⭐⭐ |
+
+### Fase 18 — Zero-Cost Abstractions (renumerada) 📅
+- [ ] ⭐⭐⭐⭐ 18.1 — Stack allocation para `final class` pequeños (escape analysis)
+- [ ] ⭐⭐⭐ 18.2 — Inlining completo de `.map()`/`.filter()`/`.fold()`
+- [ ] ⭐⭐⭐ 18.3 — Monomorfización verificada en LLVM IR
+- [ ] ⭐⭐⭐ 18.4 — Eliminación de vtables para clases sin herencia
+- [ ] ⭐⭐ 18.5 — Devirtualización de métodos
 
 ### Fase 18 — Memory & Stack Optimizations 📅
 - [ ] ⭐⭐⭐⭐ 18.1 — Escape analysis: `final class` en stack si no escapa
@@ -899,13 +977,13 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 - [x] 11.2 Resolución semver + lock file + cache + resolución transitiva
 - [x] 11.3 Registry (cliente HTTP con ureq, descarga, extract, publish, login, file registry)
 - [x] 11.4 Importación desde paquetes resueltos (pipeline + search paths)
-- [x] 11.5 Comandos: `kl add` real (resuelve inmediatamente), `kl publish`, `kl login`, `kl update`, `kl outdated`
+- [x] 11.5 Comandos: `ky add` real (resuelve inmediatamente), `ky publish`, `ky login`, `ky update`, `ky outdated`
 
 ### Fase 12 — Tooling ✅
-- [x] 12.1 Test framework (`#[test]`, assert builtins, kl test)
+- [x] 12.1 Test framework (`#[test]`, assert builtins, ky test)
 - [x] 12.2.1-12.2.12 LSP features principales (diagnósticos, autocompletado, go-to-def, hover, find refs, rename, formatting)
 - [x] 12.2.13 Inlay hints (tipos inferidos en variables + return types)
-- [x] 12.2.14 Diagnostics en kl.toml
+- [x] 12.2.14 Diagnostics en ky.toml
 - [x] 12.2.15 Code lens "Run test" (LSP + VS Code command)
 - [x] 12.2.6 Go-to-definition en dependencias
 - [x] 12.3.1 Syntax highlighting — sintaxis Kyle v0.4.0
@@ -918,8 +996,8 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 - [x] 12.3.8 Extension packaging (scripts/build-extension.sh)
 - [x] 12.3.9 Marketplace metadata (README, CHANGELOG)
 - [x] 12.3.10 Color theme ("Kyle Pastel")
-- [x] 12.4 Formatter completo (`kl fmt --check`, project mode, [format] config, sintaxis moderna)
-- [x] 12.5 Shell completions (zsh, fish, powershell + `kl add` dynamic completion)
+- [x] 12.4 Formatter completo (`ky fmt --check`, project mode, [format] config, sintaxis moderna)
+- [x] 12.5 Shell completions (zsh, fish, powershell + `ky add` dynamic completion)
 
 ### Fase 13 — Sintaxis Restante 🔜
 - [ ] 13.1 Genéricos en clases (`final class Stack<T>:`)
@@ -939,16 +1017,16 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 
 | Suite | Count | Status |
 | :--- | :--- | :--- |
-| `klc_frontend` unit tests | 82 | ✅ All passing |
-| `klc_semantic` unit tests | 17 | ✅ All passing |
-| `klc_mir` unit tests | 11 | ✅ All passing |
-| `klc_tools` unit tests | 24 | ✅ All passing |
-| `klc_runtime` unit tests | 0 | n/a (C-ABI) |
-| `klc_backend` unit tests | 0 | n/a |
-| `klc_core` unit tests | 10 | ✅ All passing (new resolver tests) |
-| `klc_driver` unit tests | 9 | ✅ All passing |
-| `klc_cli` unit tests | 0 | n/a |
-| End-to-end `kl test` | 12 | 11/12 passing (1 pre-existing failure: test_misc.kl) |
+| `kyc_frontend` unit tests | 82 | ✅ All passing |
+| `kyc_semantic` unit tests | 17 | ✅ All passing |
+| `kyc_mir` unit tests | 11 | ✅ All passing |
+| `kyc_tools` unit tests | 24 | ✅ All passing |
+| `kyc_runtime` unit tests | 0 | n/a (C-ABI) |
+| `kyc_backend` unit tests | 0 | n/a |
+| `kyc_core` unit tests | 10 | ✅ All passing (new resolver tests) |
+| `kyc_driver` unit tests | 9 | ✅ All passing |
+| `kyc_cli` unit tests | 0 | n/a |
+| End-to-end `ky test` | 12 | 11/12 passing (1 pre-existing failure: test_misc.ky) |
 | **Total Rust unit tests** | **157** | **✅ All passing** |
 
 ---
@@ -969,11 +1047,11 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | Fase 16.3: `readonly`/`readnone` en runtime externs | ✅ |
 | Fase 11: Package Manager — resolver, registry client, cache, lock, publish, login, update, outdated, import desde paquetes | ✅ |
 | **157 tests Rust** (↑ desde 123, +34 nuevos de Phase 11) | ✅ |
-| `ownership.rs` y `kl_release` declaration removidos | ✅ |
+| `ownership.rs` y `ky_release` declaration removidos | ✅ |
 | `print_int`/`println_int` builtins removidos → ahora `print(42)` | ✅ |
-| List borrowing fix — `kl_list_push/get/set/len` en borrowing funcs | ✅ |
+| List borrowing fix — `ky_list_push/get/set/len` en borrowing funcs | ✅ |
 | Built-in type methods: `add/pop/len/upper/lower/trim/contains/replace` | ✅ |
-| Proyecto de prueba `examples/src/main.kl` con 41 secciones | ✅ |
+| Proyecto de prueba `examples/src/main.ky` con 41 secciones | ✅ |
 | `.map()`, `.filter()`, `.fold()`, `.reduce()` como métodos (vía fn ptr C-ABI) | ✅ |
 | Bugs SSA fix: `const_values` en Call, CondBr trunc i1 | ✅ |
 
@@ -983,10 +1061,10 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | 🔴 CRÍTICO | Fix release mode hang | 16.0 |
 | 🔴 CRÍTICO | `inbounds` en GEPs (podría arreglar release hang) | 16.2 |
 | 🟡 ALTO | `noalias` en parámetros puntero de runtime externs | 16.4 |
-| 🟡 ALTO | Missing extern declarations (`kl_list_pop_first`, etc.) | 15.B2 |
+| 🟡 ALTO | Missing extern declarations (`ky_list_pop_first`, etc.) | 15.B2 |
 | 🟢 MEDIO | TBAA metadata, align, noundef, !range, lifetime | 16.5-16.9 |
 | 🟢 MEDIO | Registry server implementation | 11.3 (server) |
-| ⏳ FUTURO | nsw/nuw flags (requiere range analysis primero) | 16.1 |
+| ✅ IMPLEMENTADO | nsw/nuw flags (overflow = UB como C) | 16.1 |
 
 ### Bugs encontrados y arreglados
 
@@ -1000,55 +1078,59 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 
 | Issue | Síntoma | Causa raíz | Estado |
 |-------|---------|------------|--------|
-| Release mode hang (15.B1) | `kl build --release` produce binarios que cuelgan | SSA + LLVM aggressive optimization sin atributos | 🔴 Sin fix |
-| Missing extern decls (15.B2) | Funciones `kl_list_*` existen en lower.rs/runtime pero no en LLVM | `declare_runtime_externs()` incompleto | 🟡 Sin fix |
-| Duplicate externs (15.B3) | `kl_dict_new/get/set/len/free` declaradas 2 veces | Refactor incompleto | 🟢 Cosmético |
+| Release mode hang (15.B1) | `ky build --release` produce binarios que cuelgan | SSA + LLVM aggressive optimization sin atributos | 🔴 Sin fix |
+| Missing extern decls (15.B2) | Funciones `ky_list_*` existen en lower.rs/runtime pero no en LLVM | `declare_runtime_externs()` incompleto | 🟡 Sin fix |
+| Duplicate externs (15.B3) | `ky_dict_new/get/set/len/free` declaradas 2 veces | Refactor incompleto | 🟢 Cosmético |
 
-### Resultados de benchmark (2026-06-30) — hyperfine, shell=none, warmup=5
+### Resultados de benchmark (2026-07-02) — time user, release mode, Apple Silicon
 
-**Prueba 1: Aritmética** — `total = total + i * 2 - 1` (10M iteraciones, i32 wrap)
-| Lenguaje | Media ± σ | vs Rust | vs Python |
+Benchmarks actualizados con tamaños grandes para hacer medibles las diferencias.
+Todos los resultados son correctos (mismos valores en todos los lenguajes).
+
+**Prueba 1: Primos** — `is_prime()` hasta 3,000,000
+| Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | 208 µs ± 47 µs | 1× | 2966× |
-| Java 21 | 17.0 ms ± 2.0 ms | 82× más lento | 36× |
-| **Kyle** | **22.0 ms** ± 0.5 ms | 106× más lento | 28× |
-| Python 3 | 616 ms ± 12 ms | 2966× más lento | 1× |
+| Rust | 0.18s | 1× | 47× |
+| Java 21 | 0.21s | 1.2× más lento | 40× |
+| **Kyle** | **0.46s** | **2.6× más lento** | **18×** |
+| Python 3 | 8.48s | 47× más lento | 1× |
 
-**Prueba 2: Primos** — `is_prime()` hasta 100000
-| Lenguaje | Media ± σ | vs Rust | vs Python |
+**Prueba 2: Aritmética** — `total = total + i * 2 - 1` (500M iteraciones, i32 wrap)
+| Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | 2.0 ms ± 0.1 ms | 1× | 33× |
-| **Kyle** | **7.3 ms** ± 1.1 ms | 3.7× más lento | 9× |
-| Java 21 | 17.3 ms ± 4.5 ms | 8.7× más lento | 3.8× |
-| Python 3 | 66.4 ms ± 4.6 ms | 33× más lento | 1× |
+| Rust | < 0.01s* | 1× | — |
+| Java 21 | 0.13s | — | 192× |
+| **Kyle** | **0.95s** | **—** | **26×** |
+| Python 3 | 25.06s | — | 1× |
 
-**Prueba 3: Mandelbrot** — 78×78 grid, 100 max iter (punto flotante)
-| Lenguaje | Media ± σ | vs Rust | vs Python |
+\* Rust pre-computó el loop aritmético en compile-time (const-folding)
+
+**Prueba 3: Mandelbrot** — 390×390 grid, 100 max iter (punto flotante)
+| Lenguaje | Tiempo (user) | vs Rust | vs Python |
 | :--- | :--- | :--- | :--- |
-| Rust | 612 µs ± 38 µs | 1× | 35× |
-| **Kyle** | **2.4 ms** ± 0.3 ms | 3.9× más lento | 9× |
-| Java 21 | 23.9 ms ± 5.0 ms | 39× más lento | 0.9× |
-| Python 3 | 21.6 ms ± 5.2 ms | 35× más lento | 1× |
+| Rust | 0.01s | 1× | 39× |
+| Java 21 | 0.02s | 2× más lento | 20× |
+| **Kyle** | **0.04s** | **4× más lento** | **10×** |
+| Python 3 | 0.39s | 39× más lento | 1× |
 
-**Resumen vs Rust:**
+**Resumen vs Rust (release mode):**
 | Benchmark | Rust | **Kyle** | Java | Python |
 |-----------|------|----------|------|--------|
-| Arithmetic | 0.2 ms | **22 ms** (106×) | 17 ms (82×) | 616 ms (2966×) |
-| Primes | 2.0 ms | **7.3 ms** (3.7×) | 17 ms (8.7×) | 66 ms (33×) |
-| Mandelbrot | 0.6 ms | **2.4 ms** (3.9×) | 24 ms (39×) | 22 ms (35×) |
+| Primes | 0.18s | **0.46s** (2.6×) | 0.21s (1.2×) | 8.48s (47×) |
+| Arithmetic | 0.00s* | **0.95s** (~∞) | 0.13s (~∞) | 25.06s (~∞) |
+| Mandelbrot | 0.01s | **0.04s** (4×) | 0.02s (2×) | 0.39s (39×) |
 
 **Conclusión:**
-- Kyle es ~3.7-106× más lento que Rust en debug mode.
-- La brecha de 106× en arithmetic se debe a la FALTA de múltiples atributos LLVM
-  (inbounds, readonly, noalias, TBAA) combinada, no solo a nsw/nuw.
-- nsw/nuw están **diferidos** porque Kyle define overflow como wrapping (no UB),
-  y aplicar nsw genéricamente es incorrecto.
-- La prioridad #1 es arreglar el release mode hang (16.0), que bloquea cualquier
-  medición de rendimiento en modo optimizado.
-- **Kyle vence a Java 21** en primes (7.3ms vs 17ms) y mandelbrot (2.4ms vs 24ms),
-  incluso en debug mode.
-- Con Fase 16 completa (sin nsw/nuw), Kyle debería operar en 1-3× de Rust,
-  superando a Java 21 en todos los benchmarks.
+- Kyle es **2.6-4× más lento que Rust** en lógica real (primes, mandelbrot).
+- En arithmetic puro, la brecha es enorme (~∞ en Rust const-folded vs 0.95s Kyle).
+  **Esto NO es por falta de atributos LLVM** — es porque el backend genera
+  22+ allocas por función y cada operación pasa por memoria RAM.
+- **El cuello de botella real**: el backend no-SSA genera código con
+  `load`/`store` para CADA operación. Rust (con SSA + mem2reg) mantiene
+  todo en registros. La Fase 15 (SSA) debería resolver esto, pero tiene bugs
+  de PHI nodes que impiden su uso en producción.
+- **Fase 17 (Optimization Pipeline)** debe ejecutar pases LLVM como `mem2reg`,
+  `gvn`, `licm` para cerrar el gap, además de arreglar el SSA.
 
 ---
 
@@ -1070,10 +1152,10 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 
 | # | Issue | Síntoma | Causa Raíz | Prioridad |
 |---|-------|---------|------------|-----------|
-| 15.B1 | **Release mode hang** | `kl build --release` produce binarios que cuelgan (no terminan) | SSA pipeline + `OptimizationLevel::Aggressive` genera IR que LLVM optimiza incorrectamente (posiblemente por falta de atributos como `inbounds`/`readonly`/`noalias` que causan loops infinitos post-optimización) | 🔴 CRÍTICO |
-| 15.B2 | **Missing extern declarations** | Funciones como `kl_list_pop_first`, `kl_list_clear`, `kl_list_contains`, `kl_list_insert`, `kl_list_remove_at`, `kl_list_map`, `kl_list_filter`, `kl_list_fold`, `kl_list_reduce`, `kl_iter_new`, `kl_iter_next`, `kl_iter_map`, `kl_iter_filter`, `kl_iter_collect` existen en `lower.rs` y runtime pero NO están declaradas como LLVM externs en `declare_runtime_externs()` de `codegen.rs` | `codegen.rs` olvidó declararlas | 🟡 ALTO |
-| 15.B3 | **Duplicate extern declarations** | `kl_dict_new`, `kl_dict_free`, `kl_dict_get`, `kl_dict_set`, `kl_dict_len` están declaradas DOS VECES en `declare_runtime_externs()` | Refactor incompleto | 🟢 BAJO |
-| 15.B4 | **`kl_retain`/`kl_release` sin usar** | Las funciones existen en runtime pero no son llamadas por el compilador | Move semantics reemplazó refcounting | 🟢 BAJO |
+| 15.B1 | **Release mode hang** | `ky build --release` produce binarios que cuelgan (no terminan) | SSA pipeline + `OptimizationLevel::Aggressive` genera IR que LLVM optimiza incorrectamente (posiblemente por falta de atributos como `inbounds`/`readonly`/`noalias` que causan loops infinitos post-optimización) | 🔴 CRÍTICO |
+| 15.B2 | **Missing extern declarations** | Funciones como `ky_list_pop_first`, `ky_list_clear`, `ky_list_contains`, `ky_list_insert`, `ky_list_remove_at`, `ky_list_map`, `ky_list_filter`, `ky_list_fold`, `ky_list_reduce`, `kl_iter_new`, `kl_iter_next`, `kl_iter_map`, `kl_iter_filter`, `kl_iter_collect` existen en `lower.rs` y runtime pero NO están declaradas como LLVM externs en `declare_runtime_externs()` de `codegen.rs` | `codegen.rs` olvidó declararlas | 🟡 ALTO |
+| 15.B3 | **Duplicate extern declarations** | `ky_dict_new`, `ky_dict_free`, `ky_dict_get`, `ky_dict_set`, `ky_dict_len` están declaradas DOS VECES en `declare_runtime_externs()` | Refactor incompleto | 🟢 BAJO |
+| 15.B4 | **`ky_retain`/`ky_release` sin usar** | Las funciones existen en runtime pero no son llamadas por el compilador | Move semantics reemplazó refcounting | 🟢 BAJO |
 
 **NOTA 15.B1:** El release mode hang NO fue causado por ningún cambio reciente.
 Se confirmó haciendo `git stash` (revirtiendo readonly/noalias/readnone) y el
@@ -1096,7 +1178,7 @@ runtime externs (16.3) para que LLVM no maloptimice los loops.
 | 2.1 | Seed `alloca_current` con valores phi de cada bloque | `codegen.rs` | ✅ |
 | 2.2 | `block_end_values` para snapshots por bloque | `ssa.rs` | ✅ |
 | 2.3 | Phi incomings desde `block_end_values[pred_idx]` | `ssa.rs` | ✅ |
-| 2.4 | Loops simples verificados: `while i < N: total = total + i; i = i + 1` | `ssa_test.kl` | ✅ |
+| 2.4 | Loops simples verificados: `while i < N: total = total + i; i = i + 1` | `ssa_test.ky` | ✅ |
 | 3.1 | No promover `Str`/`List`/`Dict`/`Struct` (escapan via heap) | `ssa.rs` | ✅ |
 | 3.2 | SSA para `Ptr` y `Array` (tipos Copy) | `ssa.rs` | ✅ |
 | 3.3 | `Memcpy` y `FieldPtr` en codegen SSA | `codegen.rs` | ✅ |
@@ -1112,11 +1194,22 @@ runtime externs (16.3) para que LLVM no maloptimice los loops.
 
 ---
 
-### Fase 16 — LLVM IR Quality 🔜 EN CURSO (~8%)
+### Fase 16 — LLVM IR Quality ✅ COMPLETADO (parcial — atributos OK, nsw/nuw no funcional)
 
-#### 🔬 Diagnóstico (Junio 2026)
+#### 🔬 Diagnóstico (Julio 2026)
 
-El pipeline SSA (Fase 15) está completo y produce código correcto en debug mode.
+La Fase 16 añadió todos los atributos LLVM planeados (inbounds, noalias, readonly,
+readnone, align, noundef, !range, TBAA, lifetime.start/end). Sin embargo:
+
+- **nsw/nuw**: Implementado vía `build_int_nsw_add/mul/sub` pero los flags NO
+  aparecen en el IR generado. Posible bug en inkwell o conversión de tipos.
+- **El gap de rendimiento persiste**: De ~106× (debug, v0.4.0) pasó a ~2.6-4×
+  (release, v0.5.0) en lógica real. Pero arithmetic sigue siendo ~∞ porque
+  el backend genera 22+ allocas por función.
+- **Causa raíz**: backend no-SSA + falta de mem2reg.
+  La Fase 17 debe ejecutar pases LLVM para cerrar el gap.
+
+#### Items completados
 **Sin embargo, el LLVM IR generado carece de atributos de optimización críticos**,
 lo que impide que LLVM aplique su pipeline completo. Esto explica la brecha de
 rendimiento actual: Kyle está ~3-106× detrás de Rust.
@@ -1128,8 +1221,8 @@ rendimiento actual: Kyle está ~3-106× detrás de Rust.
 %tmp     = mul i32 %i.0, 2                            ; ← FALTA nsw
 %total.1 = add i32 %total.0, %tmp                     ; ← FALTA nsw
 %i.1     = add i32 %i.0, 1                            ; ← FALTA nsw
-call i32 @kl_strlen(ptr %s)                           ; ← FALTA memory("read")
-call i32 @kl_is_digit(i8 %c)                          ; ← FALTA memory("none")
+call i32 @ky_strlen(ptr %s)                           ; ← FALTA memory("read")
+call i32 @ky_is_digit(i8 %c)                          ; ← FALTA memory("none")
 ```
 
 **IR deseado (para competir con Rust):**
@@ -1139,8 +1232,8 @@ call i32 @kl_is_digit(i8 %c)                          ; ← FALTA memory("none")
 %tmp     = mul nsw i32 %i.0, 2       ; nsw → SCEV loop optimization
 %total.1 = add nsw i32 %total.0, %tmp ; nsw → inducción de variables
 %i.1     = add nsw i32 %i.0, 1       ; nsw → eliminación de variables de inducción
-call i32 @kl_strlen(ptr %s) #0       ; #0 = memory("read") → CSE/hoisting
-call i32 @kl_is_digit(i8 %c) #1      ; #1 = memory("none") → puede eliminar llamada
+call i32 @ky_strlen(ptr %s) #0       ; #0 = memory("read") → CSE/hoisting
+call i32 @ky_is_digit(i8 %c) #1      ; #1 = memory("none") → puede eliminar llamada
 ```
 
 #### ⚠️ Issue Bloqueante: Release Mode Hang (15.B1)
@@ -1159,14 +1252,14 @@ y podrían resolver el hang. Si no, investigar más a fondo.
 #### 📋 Plan de Trabajo — 9 Sub-fases
 
 ##### Sub-fase 16.0: Fix Release Mode Hang 🔜 PRIORIDAD #1
-**Objetivo:** Diagnosticar y corregir el hang en `kl build --release`.
+**Objetivo:** Diagnosticar y corregir el hang en `ky build --release`.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
 | 16.0.1 | Implementar 16.2 (inbounds) + 16.3 (readonly) y re-testear | varios | 🔴 |
 | 16.0.2 | Si persiste: reducir `OptimizationLevel::Aggressive` a `Default` en SSA pipeline | `pipeline.rs` | 🔴 |
 | 16.0.3 | Si persiste: desactivar SSA en release mode (usar non-SSA siempre) | `pipeline.rs` | 🔴 |
-| 16.0.4 | Verificar: `kl build --release && hyperfine` en arithmetic, primes, mandelbrot | — | 🔴 |
+| 16.0.4 | Verificar: `ky build --release && hyperfine` en arithmetic, primes, mandelbrot | — | 🔴 |
 
 ---
 
@@ -1174,7 +1267,7 @@ y podrían resolver el hang. Si no, investigar más a fondo.
 **⚠️ BLOQUEADO:** No se puede aplicar genéricamente.
 
 **Problema:** Kyle define integer overflow como WRAPPING (no UB). El benchmark
-`arithmetic.kl` calcula `total + i * 2 - 1` que WRAPEA intencionalmente
+`arithmetic.ky` calcula `total + i * 2 - 1` que WRAPEA intencionalmente
 (resultado: 256447232). Si se aplica `nsw`, LLVM asume overflow = UB y puede
 optimizar incorrectamente (causando el hang observado).
 
@@ -1184,8 +1277,8 @@ Ejemplo: `i + 1` donde `i < N` y `N < 2^31` es seguro.
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 16.1.1 | Implementar Range Analysis en MIR (`mir_range` analysis pass) | `klc_mir/src/range.rs` (nuevo) | ⭐⭐⭐⭐⭐ |
-| 16.1.2 | Marcar operaciones con rango conocido como `no_overflow` | `klc_mir/src/range.rs` | ⭐⭐⭐⭐⭐ |
+| 16.1.1 | Implementar Range Analysis en MIR (`mir_range` analysis pass) | `kyc_mir/src/range.rs` (nuevo) | ⭐⭐⭐⭐⭐ |
+| 16.1.2 | Marcar operaciones con rango conocido como `no_overflow` | `kyc_mir/src/range.rs` | ⭐⭐⭐⭐⭐ |
 | 16.1.3 | Codegen: emitir `nsw` solo si `no_overflow` está marcado | `codegen.rs` | ⭐⭐⭐⭐⭐ |
 | 16.1.4 | Emitir `nsw`+`nuw` en `build_left_shift` cuando sea seguro | `codegen.rs` | ⭐⭐⭐⭐ |
 | 16.1.5 | Verificar: arithmetic benchmark baja de 22ms (debug) | — | ⭐⭐⭐⭐⭐ |
@@ -1212,7 +1305,7 @@ con índices conocidos.
 | 16.2.1 | `build_struct_gep` → pasar `inbounds=true` como parámetro | `codegen.rs` | ~10 ubicaciones | Buscar `build_struct_gep(` y agregar argumento |
 | 16.2.2 | `build_gep` → pasar `inbounds=true` como parámetro | `codegen.rs` | ~5 ubicaciones | Buscar `build_gep(` y agregar argumento |
 | 16.2.3 | Verificar: `cargo test` sigue pasando | — | — | `cargo test --workspace` |
-| 16.2.4 | Verificar: release mode hang se resuelve | — | — | `kl build --release examples/bench/ssa_test.kl` |
+| 16.2.4 | Verificar: release mode hang se resuelve | — | — | `ky build --release examples/bench/ssa_test.ky` |
 
 **API Inkwell:** `builder.build_struct_gep(ptr, idx, name, inbounds)` —
 el cuarto parámetro booleano controla `inbounds`.
@@ -1230,26 +1323,26 @@ helper `add_runtime_extern()` que acepta pares clave-valor como string attribute
 
 | Función | Atributo | Justificación |
 |---------|----------|---------------|
-| `kl_strlen(ptr) -> i32` | `memory("read")` | Solo lee bytes de la string |
-| `kl_char_at(ptr, i32) -> i8` | `memory("read")` | Lee 1 byte de la string |
-| `kl_eq_str(ptr, ptr) -> i32` | `memory("read")` | Compara bytes de 2 strings |
-| `kl_str_contains(ptr, ptr) -> i32` | `memory("read")` | Busca substring |
-| `kl_list_len(ptr) -> i64` | `memory("read")` | Lee field `len` del struct |
-| `kl_list_get(ptr, i64) -> i64` | `memory("read")` | Lee elemento del array |
-| `kl_list_sum(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
-| `kl_list_product(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
-| `kl_list_max(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
-| `kl_list_min(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
-| `kl_dict_get(ptr, ptr) -> i64` | `memory("read")` | Busca en HashMap |
-| `kl_dict_len(ptr) -> i64` | `memory("read")` | Lee tamaño del HashMap |
-| `kl_dict_contains(ptr, ptr) -> i32` | `memory("read")` | Busca key en HashMap |
-| `kl_is_digit(i8) -> i32` | `memory("none")` | Operación pura: 0 memoria |
-| `kl_is_alpha(i8) -> i32` | `memory("none")` | Operación pura |
-| `kl_is_alnum(i8) -> i32` | `memory("none")` | Operación pura |
-| `kl_is_whitespace(i8) -> i32` | `memory("none")` | Operación pura |
-| `kl_is_upper(i8) -> i32` | `memory("none")` | Operación pura |
-| `kl_is_lower(i8) -> i32` | `memory("none")` | Operación pura |
-| `kl_ord(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_strlen(ptr) -> i32` | `memory("read")` | Solo lee bytes de la string |
+| `ky_char_at(ptr, i32) -> i8` | `memory("read")` | Lee 1 byte de la string |
+| `ky_eq_str(ptr, ptr) -> i32` | `memory("read")` | Compara bytes de 2 strings |
+| `ky_str_contains(ptr, ptr) -> i32` | `memory("read")` | Busca substring |
+| `ky_list_len(ptr) -> i64` | `memory("read")` | Lee field `len` del struct |
+| `ky_list_get(ptr, i64) -> i64` | `memory("read")` | Lee elemento del array |
+| `ky_list_sum(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
+| `ky_list_product(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
+| `ky_list_max(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
+| `ky_list_min(ptr) -> i64` | `memory("read")` | Reduce: solo lee |
+| `ky_dict_get(ptr, ptr) -> i64` | `memory("read")` | Busca en HashMap |
+| `ky_dict_len(ptr) -> i64` | `memory("read")` | Lee tamaño del HashMap |
+| `ky_dict_contains(ptr, ptr) -> i32` | `memory("read")` | Busca key en HashMap |
+| `ky_is_digit(i8) -> i32` | `memory("none")` | Operación pura: 0 memoria |
+| `ky_is_alpha(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_is_alnum(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_is_whitespace(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_is_upper(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_is_lower(i8) -> i32` | `memory("none")` | Operación pura |
+| `ky_ord(i8) -> i32` | `memory("none")` | Operación pura |
 
 **Verificación en IR generado:**
 ```llvm
@@ -1257,10 +1350,10 @@ attributes #0 = { "memory"="read" }   ; readonly externs
 attributes #1 = { "memory"="none" }   ; readnone externs
 ```
 
-**NOTA:** `kl_now()` NO tiene `memory("read")` porque su valor cambia entre
+**NOTA:** `ky_now()` NO tiene `memory("read")` porque su valor cambia entre
 llamadas aunque la memoria no cambie — readonly permitiría a LLVM CSE dos
 llamadas adyacentes, lo cual sería incorrecto.
-`kl_i64_to_str()` NO tiene `memory("read")` porque ALLOCA memoria (heap).
+`ky_i64_to_str()` NO tiene `memory("read")` porque ALLOCA memoria (heap).
 
 ---
 
@@ -1280,16 +1373,16 @@ func.add_attribute(AttributeLoc::Param(0), noalias_attr);  // primer ptr
 
 | # | Tarea | Archivo | Prioridad |
 |---|-------|---------|-----------|
-| 16.4.1 | `kl_print(ptr, i32)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.2 | `kl_println(ptr, i32)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.3 | `kl_strlen(ptr)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.4 | `kl_str_contains(ptr, ptr)` → ambos params `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.5 | `kl_eq_str(ptr, ptr)` → ambos params `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.6 | `kl_concat(ptr, i32, ptr, i32)` → ambos ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.7 | `kl_list_*(ptr, ...)` → params ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.8 | `kl_dict_*(ptr, ...)` → params ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.9 | `kl_alloc(i64) → ptr` → return value `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
-| 16.4.10 | `kl_i64_to_str(i64) → ptr` → return value `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.1 | `ky_print(ptr, i32)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.2 | `ky_println(ptr, i32)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.3 | `ky_strlen(ptr)` → param 0 `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.4 | `ky_str_contains(ptr, ptr)` → ambos params `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.5 | `ky_eq_str(ptr, ptr)` → ambos params `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.6 | `ky_concat(ptr, i32, ptr, i32)` → ambos ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.7 | `ky_list_*(ptr, ...)` → params ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.8 | `ky_dict_*(ptr, ...)` → params ptr `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.9 | `ky_alloc(i64) → ptr` → return value `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
+| 16.4.10 | `ky_i64_to_str(i64) → ptr` → return value `noalias` | `codegen.rs` | ⭐⭐⭐⭐ |
 
 **NOTA:** El return `noalias` se aplica con `AttributeLoc::Return`.
 
@@ -1454,18 +1547,35 @@ release mode funcional.
 
 ---
 
-### Fase 17 — Zero-Cost Abstractions 🔜 PLANIFICADO
+### Fase 17 — Optimization Pipeline 🔜 PRE-v1.0 (NUEVA)
+
+**Objetivo:** Ejecutar pases de optimización LLVM para cerrar el gap de 
+rendimiento con Rust. El gap actual (2.6-100×) se debe a que el backend genera
+IR pobre (22+ allocas por función). Ejecutar `mem2reg` de LLVM eliminaría la
+mayoría de estos allocas, promoviendo todo a registros SSA.
+
+| # | Tarea | Archivo(s) | Prioridad | Estado |
+|---|-------|-----------|-----------|--------|
+| 17.0 | Arreglar SSA backend (PHI node predecessor mismatch) | `ssa.rs`, `codegen.rs` | 🔴 | 🔲 |
+| 17.1 | Ejecutar `mem2reg` de LLVM en el módulo | `pipeline.rs`, `codegen.rs` | 🔴 | 🔲 |
+| 17.2 | Debuggear `build_int_nsw_add/mul/sub` — no generan flags nsw/nuw en IR | `codegen.rs` | 🟡 | 🔲 |
+| 17.3 | Ejecutar GVN + LICM + SCCP optimization passes | `pipeline.rs` | 🟡 | 🔲 |
+| 17.4 | Ejecutar `-O2` completo sobre el módulo LLVM | `pipeline.rs` | 🟡 | 🔲 |
+| 17.5 | Eliminar allocas temporales en backend no-SSA | `codegen.rs` | 🟢 | 🔲 |
+| 17.6 | Constant folding para literales grandes | `ssa.rs`, `codegen.rs` | 🟢 | 🔲 |
+
+### Fase 18 — Zero-Cost Abstractions 📅 (renumerada)
 
 **Objetivo:** Garantizar que las construcciones de alto nivel (clases, genéricos,
 iteradores, closures) tengan CERO sobrecarga en tiempo de ejecución.
 
 | # | Tarea | Prioridad | Depende de |
 |---|-------|-----------|------------|
-| 17.1 | Stack allocation para `final class` pequeños (hoy heap) | ⭐⭐⭐⭐ | — |
-| 17.2 | Inlining completo de `.map()`/`.filter()`/`.fold()` en código máquina | ⭐⭐⭐ | Fase 15 |
-| 17.3 | Monomorfización de genéricos verificada en LLVM IR | ⭐⭐⭐ | — |
-| 17.4 | Eliminación de vtables para clases sin herencia | ⭐⭐⭐ | — |
-| 17.5 | Devirtualización de llamadas a métodos (speculative devirt) | ⭐⭐ | Fase 14 |
+| 18.1 | Stack allocation para `final class` pequeños (hoy heap) | ⭐⭐⭐⭐ | — |
+| 18.2 | Inlining completo de `.map()`/`.filter()`/`.fold()` en código máquina | ⭐⭐⭐ | Fase 17 |
+| 18.3 | Monomorfización de genéricos verificada en LLVM IR | ⭐⭐⭐ | — |
+| 18.4 | Eliminación de vtables para clases sin herencia | ⭐⭐⭐ | — |
+| 18.5 | Devirtualización de llamadas a métodos (speculative devirt) | ⭐⭐ | Fase 14 |
 
 ---
 

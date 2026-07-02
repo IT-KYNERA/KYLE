@@ -13,23 +13,23 @@ error() { printf "${RED}%s${NC}\n" "$*"; exit 1; }
 info()  { printf "${YELLOW}%s${NC}\n" "$*"; }
 ok()    { printf "${GREEN}%s${NC}\n" "$*"; }
 
-# Buscar kl en PATH
-KL_PATH="$(command -v kl 2>/dev/null || true)"
-if [ -z "$KL_PATH" ]; then
-    error "kl no está instalado en el PATH"
+# Buscar ky en PATH
+KY_PATH="$(command -v ky 2>/dev/null || true)"
+if [ -z "$KY_PATH" ]; then
+    error "ky no está instalado en el PATH"
 fi
 
 # Resolver directorio de instalación
-if [ -L "$KL_PATH" ]; then
-    KL_REAL="$(readlink -f "$KL_PATH" 2>/dev/null || readlink "$KL_PATH")"
-    KL_DIR="$(dirname "$(dirname "$KL_REAL")")"
+if [ -L "$KY_PATH" ]; then
+    KY_REAL="$(readlink -f "$KY_PATH" 2>/dev/null || readlink "$KY_PATH")"
+    KY_DIR="$(dirname "$(dirname "$KY_REAL")")"
 else
-    KL_DIR="$(dirname "$(dirname "$KL_PATH")")"
+    KY_DIR="$(dirname "$(dirname "$KY_PATH")")"
 fi
 
-echo "Se eliminará kl de:"
-echo "  Binario:  $KL_PATH"
-echo "  Directorio: $KL_DIR"
+echo "Se eliminará ky de:"
+echo "  Binario:  $KY_PATH"
+echo "  Directorio: $KY_DIR"
 echo ""
 echo -n "Continuar? [s/N] "
 read -r CONFIRM
@@ -39,27 +39,24 @@ if [ "$CONFIRM" != "s" ] && [ "$CONFIRM" != "S" ]; then
 fi
 
 # Eliminar binarios
-rm -f "$KL_DIR/bin/kl" "$KL_DIR/bin/klc"
-ok "Binarios eliminados: kl + klc (legacy)"
+rm -f "$KY_DIR/bin/ky"
+ok "Binarios eliminados: ky"
 
 # Eliminar runtime library
-if [ -d "$KL_DIR/lib/kl" ]; then
-    rm -rf "$KL_DIR/lib/kl"
-    ok "Runtime library eliminada: $KL_DIR/lib/kl"
+if [ -d "$KY_DIR/lib/ky" ]; then
+    rm -rf "$KY_DIR/lib/ky"
+    ok "Runtime library eliminada: $KY_DIR/lib/ky"
 fi
-
-# Eliminar uninstaller
-rm -f "$KL_DIR/bin/kl-uninstall"
 
 # Limpiar directorios vacíos (solo si no es /usr/local)
-if [ "$KL_DIR" != "/usr/local" ]; then
-    rmdir "$KL_DIR/bin" 2>/dev/null || true
-    rmdir "$KL_DIR/lib" 2>/dev/null || true
-    rmdir "$KL_DIR" 2>/dev/null || true
-    ok "Directorios eliminados: $KL_DIR"
+if [ "$KY_DIR" != "/usr/local" ]; then
+    rmdir "$KY_DIR/bin" 2>/dev/null || true
+    rmdir "$KY_DIR/lib" 2>/dev/null || true
+    rmdir "$KY_DIR" 2>/dev/null || true
+    ok "Directorios eliminados: $KY_DIR"
 fi
 
 echo ""
-ok "kl ha sido eliminado completamente."
+ok "ky ha sido eliminado completamente."
 echo ""
-echo "Si agregaste ~/.kl/bin al PATH, elimina esa línea de ~/.zshrc o ~/.bashrc"
+echo "Si agregaste ~/.ky/bin al PATH, elimina esa línea de ~/.zshrc o ~/.bashrc"

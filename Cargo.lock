@@ -409,91 +409,91 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
-name = "klc_backend"
+name = "kyc_backend"
 version = "0.4.0"
 dependencies = [
  "inkwell",
- "klc_core",
- "klc_mir",
+ "kyc_core",
+ "kyc_mir",
 ]
 
 [[package]]
-name = "klc_cli"
+name = "kyc_cli"
 version = "0.4.0"
 dependencies = [
  "flate2",
- "klc_core",
- "klc_driver",
- "klc_tools",
+ "kyc_core",
+ "kyc_driver",
+ "kyc_tools",
  "tar",
  "ureq",
 ]
 
 [[package]]
-name = "klc_core"
+name = "kyc_core"
 version = "0.4.0"
 dependencies = [
  "semver",
 ]
 
 [[package]]
-name = "klc_driver"
+name = "kyc_driver"
 version = "0.4.0"
 dependencies = [
  "inkwell",
- "klc_backend",
- "klc_core",
- "klc_frontend",
- "klc_hir",
- "klc_mir",
- "klc_semantic",
- "klc_tools",
+ "kyc_backend",
+ "kyc_core",
+ "kyc_frontend",
+ "kyc_hir",
+ "kyc_mir",
+ "kyc_semantic",
+ "kyc_tools",
 ]
 
 [[package]]
-name = "klc_frontend"
+name = "kyc_frontend"
 version = "0.4.0"
 dependencies = [
- "klc_core",
+ "kyc_core",
 ]
 
 [[package]]
-name = "klc_hir"
+name = "kyc_hir"
 version = "0.4.0"
 dependencies = [
- "klc_core",
+ "kyc_core",
 ]
 
 [[package]]
-name = "klc_mir"
+name = "kyc_mir"
 version = "0.4.0"
 dependencies = [
- "klc_core",
+ "kyc_core",
 ]
 
 [[package]]
-name = "klc_runtime"
+name = "kyc_runtime"
 version = "0.4.0"
 dependencies = [
  "libc",
 ]
 
 [[package]]
-name = "klc_semantic"
+name = "kyc_semantic"
 version = "0.4.0"
 dependencies = [
- "klc_core",
- "klc_frontend",
+ "kyc_core",
+ "kyc_frontend",
 ]
 
 [[package]]
-name = "klc_tools"
+name = "kyc_tools"
 version = "0.4.0"
 dependencies = [
  "flate2",
- "klc_core",
- "klc_frontend",
- "klc_semantic",
+ "kyc_core",
+ "kyc_frontend",
+ "kyc_semantic",
  "lsp-server",
  "lsp-types",
  "semver",

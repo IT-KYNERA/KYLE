@@ -5,19 +5,19 @@ RESULTS_FILE="/tmp/opencode/example_test_results.txt"
 rm -f "$RESULTS_FILE"
 touch "$RESULTS_FILE"
 
-KLC="./target/debug/klc"
+KYC="./target/debug/ky"
 EXAMPLES="examples"
 
 declare -A COMPILE_RESULT
 declare -A RUN_RESULT
 declare -A RUN_OUTPUT
 
-for f in "$EXAMPLES"/*.kl; do
-  BASENAME=$(basename "$f" .kl)
+for f in "$EXAMPLES"/*.ky; do
+  BASENAME=$(basename "$f" .ky)
   echo "=== TESTING: $f ===" | tee -a "$RESULTS_FILE"
 
   # Step 1: Compile
-  COMPILE_OUTPUT=$($KLC build "$f" 2>&1)
+  COMPILE_OUTPUT=$($KYC build "$f" 2>&1)
   COMPILE_EXIT=$?
   if [ $COMPILE_EXIT -ne 0 ]; then
     echo "  COMPILE FAILED (exit=$COMPILE_EXIT)" | tee -a "$RESULTS_FILE"
@@ -92,7 +92,7 @@ echo ""
 echo "--- COMPILE FAILURES ---"
 for key in "${!COMPILE_RESULT[@]}"; do
   if [ "${COMPILE_RESULT[$key]}" != "OK" ]; then
-    echo "  $key.kl"
+    echo "  $key.ky"
   fi
 done
 
@@ -100,7 +100,7 @@ echo ""
 echo "--- RUN FAILURES ---"
 for key in "${!RUN_RESULT[@]}"; do
   if [ "${RUN_RESULT[$key]}" = "FAIL" ]; then
-    echo "  $key.kl"
+    echo "  $key.ky"
     echo "    Output: ${RUN_OUTPUT[$key]}"
   fi
 done
@@ -109,7 +109,7 @@ echo ""
 echo "--- FILES THAT COMPILED OK ---"
 for key in "${!COMPILE_RESULT[@]}"; do
   if [ "${COMPILE_RESULT[$key]}" = "OK" ]; then
-    echo "  $key.kl"
+    echo "  $key.ky"
   fi
 done
 
@@ -117,6 +117,6 @@ echo ""
 echo "--- FILES THAT RAN OK ---"
 for key in "${!RUN_RESULT[@]}"; do
   if [ "${RUN_RESULT[$key]}" = "OK" ]; then
-    echo "  $key.kl"
+    echo "  $key.ky"
   fi
 done

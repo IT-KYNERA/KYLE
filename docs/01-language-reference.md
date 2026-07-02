@@ -13,7 +13,7 @@ how each piece behaves. Every construct includes:
 
 > **All checkboxes below are intentionally left unchecked.** They are the
 > test matrix for the language. Tick each box as the corresponding construct
-> is verified to compile, type-check, and run end-to-end through `kl run`.
+> is verified to compile, type-check, and run end-to-end through `ky run`.
 
 ---
 
@@ -32,7 +32,7 @@ how each piece behaves. Every construct includes:
 
 ## 1.1 Entry Point
 
-Every Kyle program has exactly one entry point, `main`, in `src/main.kl` for
+Every Kyle program has exactly one entry point, `main`, in `src/main.ky` for
 project mode or the top of the file for single-file mode.
 
 - [x] `fn main(args: [str]) i32:` declaration recognized as entry point
@@ -56,7 +56,7 @@ Kyle function, and returns its `i32` result to the OS.
 ## 1.2 Comments
 
 - [x] `#` starts a line comment to end of line
-- [x] `##` starts a documentation comment (doc comment), collected for `kl doc`
+- [x] `##` starts a documentation comment (doc comment), collected for `ky doc`
 - [x] No block comments (planned: `-# ... #-`)
 
 ```kl
@@ -69,23 +69,24 @@ x = 42   # trailing comment
 
 # 2. Variables & Mutability
 
-Kyle has three forms of binding: **immutable variable**, **mutable variable**,
-and **constant**. There is no `let`, `var`, `mut`, or `const` keyword. Instead,
-the **assignment operator** itself signals the mutability:
+Kyle has three binding forms: **immutable variable**, **mutable variable**,
+and **compile-time constant**. There is no `let`, `var`, `mut`, or `const`
+keyword. Instead, the **type syntax** and **operator** signal the mutability:
 
 | Form | Syntax | Mutability | Rebindable |
 |---|---|---|---|
 | Immutable | `name = value` | ❌ | ❌ |
-| Mutable | `name := value` | ✅ | ✅ |
-| Constant | `name ::= value` | ❌ | ❌ |
+| Mutable | `name: &T = value` or `x = &expr` | ✅ | ✅ |
+| Constant | `NAME := value` | ❌ | ❌ |
 
-The operator itself is the declaration — no keyword needed.
+The operator (`=`, `:=`) or type prefix (`&`) declares the binding — no
+keyword needed.
 
 ## 2.1 Immutable Variables
 
 - [x] `name = expr` declares an immutable variable
 - [x] Re-assignment is a compile error
-- [x] Type is inferred from the right-hand side
+- [x] Type is inferred from the right-hand side; inferred type is `T` (plain)
 
 ```kl
 name = "Kyle"           # str, immutable
@@ -95,50 +96,56 @@ items = [1, 2, 3]       # [i32], immutable
 
 ## 2.2 Mutable Variables
 
-`:=` (walrus operator) declares a mutable variable and assigns its initial
-value. The variable can be re-assigned later (same type only).
+A mutable variable is declared by prefixing the **type** with `&`, or by
+prefixing the **value expression** with `&` as a shorthand.
 
-- [x] `name := expr` declares a mutable variable
-- [x] Re-assignment with `name = expr` is allowed
+- [x] `name: &T = expr` declares a mutable variable of type `&T`
+- [x] `name = &expr` is syntactic sugar for `name: &T = expr`
+- [x] Re-assignment with `name = expr` is allowed (type must match)
 - [x] Type is fixed at declaration
-- [x] `name := name + 1` (read current, write new) is common
 
 ```kl
-count := 0
+count: &i32 = 0
 count = count + 1       # OK
-count = "hello"         # ❌ compile error: type changed
+
+name = &"Kyle"          # sugar: name: &str = "Kyle"
+name = "Ana"            # OK: reassign mutable
 ```
 
-**Why `:=` instead of `mut`:** The walrus operator makes mutability visually
-distinct at a glance. It is consistent with other languages (Go, Pascal) and
-eliminates a keyword from the language.
+**Why `&` for mutable types:** The same `&` operator used in function call
+sites to permit mutation (`append(&x)`) is reused in type position to mark
+a variable as mutable. No `mut` keyword needed anywhere.
 
 ## 2.3 Constants
 
-`::=` declares a compile-time constant. The value must be evaluable at compile
+`:=` declares a compile-time constant. The value must be evaluable at compile
 time (a literal, a `const fn` call, or an expression composed of these).
 
-- [x] `NAME ::= expr` declares a compile-time constant
+- [x] `NAME := expr` declares a compile-time constant (replaces old `::=`)
 - [x] Value must be compile-time evaluable
-- [x] No naming convention enforced by the compiler (UPPERCASE recommended by convention)
+- [x] UPPERCASE naming by convention
 
 ```kl
-PI ::= 3.14159
-MAX_RETRIES ::= 3
-GREETING ::= "Hello"
-secret_base_url ::= "https://api.example.com"   # valid, but convention is UPPERCASE
+PI := 3.14159
+MAX_RETRIES := 3
+GREETING := "Hello"
 ```
+
+> **Note:** `::=` is **removed**. Use `:=` for constants and `&T` for mutable
+> variables. The two forms cannot be confused: `NAME := expr` at module scope
+> is a constant; `name: &T = expr` is a mutable variable.
 
 ## 2.4 Explicit Type Annotations
 
-- [x] `name: T = expr` / `name: T := expr` / `name: T ::= expr` annotates the type explicitly
-- [x] Works for immutable, mutable, and constant forms
+- [x] `name: T = expr` annotates an immutable variable
+- [x] `name: &T = expr` annotates a mutable variable
+- [x] `NAME: T := expr` annotates a constant
 - [x] The annotation must match the inferred type, or a wider compatible one
 
 ```kl
 x: i32 = 42
-name: str := "Kyle"
-PI: f64 ::= 3.14159
+name: &str = "Kyle"     # mutable
+PI: f64 := 3.14159      # constant
 items: [i32] = [1, 2, 3]
 ```
 
@@ -194,7 +201,7 @@ in one line. No `let` keyword — the syntax is direct.
 | `ptr` | 8 bytes | `null` | Opaque pointer (raw memory address) |
 
 **Semantics:** Strings are null-terminated UTF-8 byte arrays, stored as
-`*const u8` in the LLVM IR. Length is computed by `kl_strlen` at runtime.
+`*const u8` in the LLVM IR. Length is computed by `ky_strlen` at runtime.
 
 ## 3.2 Composite Types
 
@@ -337,9 +344,9 @@ y: i32 = 3.14 as i32   # 3 (truncation)
 
 ## 3.13 Type Check `is`
 
-- [ ] `value is Type` returns `true` if the value has the given type — 🔶 partial
-- [ ] Used in match patterns: `x is str => ...`
-- [ ] Useful for `T?` types: `x is None => ...`
+- [x] `value is Type` returns `true` if the value has the given type — 🔶 partial
+- [x] Used in match patterns: `x is str => ...`
+- [x] Useful for `T?` types: `x is None => ...`
 
 ```kl
 if x is str:
@@ -350,8 +357,8 @@ if x is str:
 
 | Mode | Behavior |
 |---|---|
-| Debug (`kl run`) | Panics on overflow |
-| Release (`kl build --release`) | Wrapping arithmetic (silent) |
+| Debug (`ky run`) | Panics on overflow |
+| Release (`ky build --release`) | Wrapping arithmetic (silent) |
 
 ```kl
 x: i8 = 127
@@ -371,10 +378,10 @@ x = x + 1              # panics in debug, wraps to -128 in release
 | `*` | multiplication | `a * b` | ✅ |
 | `/` | division | `a / b` | ✅ |
 | `%` | remainder | `a % b` | ✅ |
-| `**` | power | `a ** b` | 🔶 Parsed, lowered as multiplication (incorrect) |
-| `+%` | `a + (a * b / 100)` | `x +% 10` | 🔶 Parsed, no semantic meaning |
-| `-%` | `a - (a * b / 100)` | `x -% 10` | 🔶 Parsed, no semantic meaning |
-| `*%` | `a * b / 100` | `x *% 10` | 🔶 Parsed, no semantic meaning |
+| `**` | power | `a ** b` | ✅ |
+| `+%` | `a + (a * b / 100)` | `x +% 10` | ✅ |
+| `-%` | `a - (a * b / 100)` | `x -% 10` | ✅ |
+| `*%` | `a * b / 100` | `x *% 10` | ✅ |
 
 - [x] `+` works for `i32`/`i64`/`f32`/`f64` and `str + str` (concatenation)
 - [x] `-`, `*`, `/`, `%` work for `i32`/`i64`/`f32`/`f64`
@@ -442,7 +449,7 @@ flipped = ~0             # all bits set
 ## 4.5 Assignment Operators
 
 `=` is always reassignment (to an existing mutable variable). `:=` is the
-declaration form for mutable variables (see §2.2). Compound forms:
+declaration form for compile-time constants (see §2.3). Compound forms:
 
 | Op | Meaning | Example | Status |
 |---|---|---|---|
@@ -467,8 +474,8 @@ declaration form for mutable variables (see §2.2). Compound forms:
 | Form | Meaning | Example | Status |
 |---|---|---|---|
 | `start..end` | exclusive end | `0..5` → 0,1,2,3,4 | ✅ |
-| `start..=end` | inclusive end | `0..=5` → 0,1,2,3,4,5 | ❌ |
-| `start..<end` | exclusive end (alias) | `0..<5` → 0,1,2,3,4 | ❌ |
+| `start..=end` | inclusive end | `0..=5` → 0,1,2,3,4,5 | ✅ |
+| `start..<end` | exclusive end (alias) | `0..<5` → 0,1,2,3,4 | ✅ |
 | `start..` | open-ended | `3..` → 3,4,... | ❌ |
 | `..end` | start-open | `..3` → 0,1,2 | ❌ |
 | `..` | full range | `..` → everything | ❌ |
@@ -499,7 +506,24 @@ b = [...a, 4, 5]       # [1, 2, 3, 4, 5]
 status = age >= 18 ? "adult" : "minor"
 ```
 
-## 4.9 Optional Chaining
+## 4.9 Default Operator (`??`)
+
+- [~] `expr ?? default` returns `expr` if it's not `none`, else `default` — 🔶 parsed, MIR lowering incomplete
+- [~] Only works with `T?` types (optionals)
+- [~] Right-associative for chained defaults
+
+```kl
+name: str? = maybe_name
+display = name ?? "anonymous"    # if name is none, use "anonymous"
+
+count: i32? = parse(input)
+result = count ?? 0              # if count is none, use 0
+
+# Chained:
+label = user_label ?? fallback ?? "untitled"
+```
+
+## 4.10 Optional Chaining
 
 - [x] `obj?.field` returns `None` if `obj` is `None`, else the field
 - [x] `obj?.method()` returns `None` if `obj` is `None`, else the result
@@ -644,22 +668,55 @@ fn greet(name: str):
 
 ## 5.2 Parameters
 
-- [x] `name: type` declares a typed parameter
+Kyle uses **borrow-by-default** semantics: parameters are **borrowed
+immutably** unless marked with `&` (mutable borrow) or `^` (ownership
+transfer / move).
+
+| Form | Semantics | Example |
+|------|-----------|---------|
+| `s: T` | Borrowed immutably — caller keeps ownership | `fn read(s: str)` |
+| `s: &T` | Borrowed mutably — caller keeps ownership, callee can mutate | `fn append(s: &str)` |
+| `^s: T` | Ownership transferred (move) — caller loses access | `fn consume(^s: str)` |
+
+- [x] `name: type` declares a plain (immutable borrow) typed parameter
+- [x] `name: &type` declares a mutable borrow parameter
+- [x] `^name: type` declares an ownership-transfer (move) parameter
 - [x] `name` (untyped) infers from the body
-- [x] Parameters are **immutable** by default (like all bindings)
 - [x] Default values: `name: type = default` — ✅ working
 - [x] Variadic: `...names: T` — ✅ working
 
 ```kl
-fn add(a: i32, b: i32) i32:
+fn add(a: i32, b: i32) i32:       # borrowed immutably (default)
     return a + b
+
+fn append(s: &str):               # borrowed mutably
+    s = s + "!"
+
+fn consume(^s: str):              # ownership transfer
+    println(s)
+    # s released at end of scope
 ```
 
-**Making a local mutable copy of a parameter:**
+**Call-site rules:**
+
+| Function expects | Variable is `T` | Variable is `&T` |
+|-----------------|-----------------|------------------|
+| `s: T` (immutable borrow) | `f(x)` ✅ | `f(x)` ✅ |
+| `s: &T` (mutable borrow) | `f(&x)` ✅ (coercion) | `f(x)` ✅ |
+| `^s: T` (move) | `f(^x)` ✅ | `f(&x)` ❌ (use `^x`) |
+
 ```kl
-fn process(id: i32):
-    id := id                  # local mutable copy
-    id = id + 1
+name: &str = "Kyle"        # mutable variable
+read(name)                 # ✅ &str → T (immutable borrow)
+append(name)               # ✅ &str → &T (mutable borrow, direct)
+
+nick = "Ana"               # immutable variable
+read(nick)                 # ✅ T → T (immutable borrow, direct)
+append(&nick)              # ✅ T → &T with & coercion
+append(nick)               # ❌ T → &T without & → compile error
+
+consume(^name)             # ✅ ownership transfer
+read(name)                 # ❌ use-after-move
 ```
 
 ## 5.3 Return Values
@@ -806,7 +863,7 @@ while i < 10:
 
 - [x] `for var in iterable:` iterates over a list
 - [x] `for var in start..end:` iterates a numeric range
-- [ ] `for-else:` runs the `else` block if the loop completes without `break` — ❌ not implemented
+- [x] `for-else:` runs the `else` block if the loop completes without `break` — ✅ working
 
 ```kl
 for item in items:
@@ -832,16 +889,23 @@ loop:
 
 ## 6.5 Labeled Loops
 
-- [ ] `'label:` marks a loop with a label — 🔶 partial
-- [ ] `break 'label` exits the labeled loop from nested loops
-- [ ] `continue 'label` continues the labeled loop from nested loops
+A label is a name placed before `for` or `while` to identify a loop.
+Use `break <label>` or `continue <label>` to control nested loops.
+
+- [~] `name: for ...:` / `name: while ...:` marks a loop with a label — 🔶 parsed, break/continue not resolved
+- [~] `break <label>` exits the labeled loop from nested loops
+- [~] `continue <label>` continues the labeled loop from nested loops
 
 ```kl
-'outer:
-for i in 0..10:
+outer for i in 0..10:
     for j in 0..10:
         if i * j > 50:
-            break 'outer     # exits both loops
+            break outer     # exits both loops
+
+main while true:
+    while running:
+        if done:
+            continue main   # restart outer loop
 ```
 
 ## 6.6 Break
@@ -1037,19 +1101,27 @@ simplest form of a user-defined data type.
 - [x] `final class Name:` declares a final class (replaces `struct`) — ✅ working
 - [ ] `final class Name<T>:` declares a generic final class
 - [x] Fields are `name: type` declarations
+- [x] `name: &type` declares a mutable field
+- [x] `name: type = expr` declares a field with default value
 - [x] `Name { x: 1, y: 2 }` creates an instance via literal syntax
 - [x] `.field` accesses a field
-- [x] `.field = value` assigns a field
+- [x] `.field = value` assigns a mutable field
 - [x] Passed by reference (no copy overhead)
 
 ```kl
 final class Point:
-    x: i32
-    y: i32
+    x: i32               # immutable field
+    y: &i32              # mutable field
+
+final class Person:
+    name: str            # immutable
+    age: &i32 := 0       # mutable, default 0
+    nickname: str? := none  # optional, default none
 
 p = Point { x: 10, y: 20 }
 println(p.x)            # 10
-p.y = 30
+p.y = 30                # OK: y is mutable (&i32)
+p.x = 5                 # ❌ ERROR: x is immutable (i32)
 ```
 
 **Why `final class` and not `struct`:** Kyle unifies all user-defined types
@@ -1137,23 +1209,23 @@ Multiple constructors are supported via parameter overloading.
 
 ```kyle
 class Person:
-    name: str
-    age: i32
+    name: str               # immutable field
+    age: &i32               # mutable field
 
-    Person(name: str, age: i32):
+    Person(name: str, age: &i32):
         this.name = name
         this.age = age
 
     Person(name: str):
         this.name = name
-        this.age = 0
+        this.age = 0         # &i32: mutable field can be reassigned
 ```
 
 ```kl
 class Counter:
-    count: i32
+    count: &i32 = 0          # mutable field, default 0
 
-    Counter(start: i32):
+    Counter(start: &i32):
         this.count = start
 
     fn increment() i32:
@@ -1162,6 +1234,7 @@ class Counter:
 
 c = Counter(10)
 c.increment()
+println(c.count)             # 11
 ```
 
 ## 7.5 Inheritance, Polymorphism & Super
@@ -1203,9 +1276,9 @@ d.speak()        # "Woof!"
 
 ```kl
 class Bank:
-    __balance: i32
+    __balance: &i32 := 0             # mutable, private, default 0
 
-    Bank(initial: i32):
+    Bank(initial: &i32):
         this.__balance = initial
 
     fn __recompute():
@@ -1240,10 +1313,10 @@ class Circle: Shape
 
 ## 7.8 Static Methods
 
-- [ ] `static fn name():` inside a class declares a static method — ❌ not implemented
-- [ ] Called on the class itself: `ClassName.method()`, not on instances
-- [ ] Cannot access `this` (no instance)
-- [ ] Can access other static methods and constants
+- [x] `static fn name():` inside a class declares a static method — ✅ working
+- [x] Called on the class itself: `ClassName.method()`, not on instances
+- [ ] Cannot access `this` (no instance) — 🔶 not enforced
+- [ ] Can access other static methods and constants — 🔶 not enforced
 
 ```kl
 class MathUtils:
@@ -1514,7 +1587,7 @@ age = user?.age          # i32 or None
 ## 12.1 Import Forms
 
 - [x] `import x` — imports the `x` module
-- [x] `import path.to.module` — nested module path (maps to `path/to/module.kl`)
+- [x] `import path.to.module` — nested module path (maps to `path/to/module.ky`)
 - [x] `from x import y` — imports `y` from module `x`
 - [x] `from x import y as z` — imports `y` as `z`
 - [x] `import ~x` — relative import from current file
@@ -1522,18 +1595,18 @@ age = user?.age          # i32 or None
 ```kl
 import io
 import math
-import collections.list           # nested path: collections/list.kl
+import collections.list           # nested path: collections/list.ky
 from str import capitalize as cap
 ```
 
 ## 12.2 Module Resolution
 
-- [x] Module name maps to a file `x.kl` in:
+- [x] Module name maps to a file `x.ky` in:
   1. The current file's directory
   2. The project's `src/` directory
   3. `cwd/std/`
   4. The compiler's bundled `std/`
-- [x] Nested paths (e.g. `a.b.c`) map to `a/b/c.kl` relative to a module root
+- [x] Nested paths (e.g. `a.b.c`) map to `a/b/c.ky` relative to a module root
 - [x] `~` prefix is replaced with the current file's directory
 
 ## 12.3 Visibility (Module-Level)
@@ -1597,7 +1670,7 @@ sub = substr(s, 2, 5)         # "Hello"
 |---|---|---|---|
 | `print(s)` | `(str) void` | Print to stdout | ✅ |
 | `println(s)` | `(str) void` | Print with newline | ✅ |
-| `print_err(s)` | `(str) void` | Print to stderr | 🔶 registered, no `kl_print_err` |
+| `print_err(s)` | `(str) void` | Print to stderr | 🔶 registered, no `ky_print_err` |
 | `len(x)` | `([T]) i32` or `(str) i32` | Length of list or string | ✅ |
 | `str(x)` | `(any) str` | Convert to string | ✅ (i64 only) |
 | `int(s)` | `(str) i32!` | Parse string to integer | 🔶 registered, no runtime impl |
@@ -1782,8 +1855,8 @@ contract_decl      = "contract" identifier [ "<" type_params ">" ] ":" block ;
 type_alias         = "type" identifier [ "<" type_params ">" ] "=" type ;
 
 variable_decl      = identifier [ ":" type ] "=" expression ;
-mutable_decl       = identifier [ ":" type ] ":=" expression ;
-const_decl         = identifier [ ":" type ] "::=" expression ;
+mutable_decl       = identifier [ ":" [ "&" ] type ] "=" ( "&" expression | expression ) ;
+const_decl         = identifier [ ":" type ] ":=" expression ;
 
 block              = NEWLINE INDENT { statement } DEDENT ;
 
@@ -1800,9 +1873,9 @@ if_stmt            = "if" expression ":" block
 if_let_stmt        = "if" "let" pattern "=" expression ":" block
                      [ "else" ":" block ] ;
 
-while_stmt         = "while" expression ":" block [ "else" ":" block ] ;
-while_let_stmt     = "while" "let" pattern "=" expression ":" block ;
-for_stmt           = "for" identifier "in" expression ":" block
+while_stmt         = [ label ] "while" expression ":" block [ "else" ":" block ] ;
+while_let_stmt     = [ label ] "while" "let" pattern "=" expression ":" block ;
+for_stmt           = [ label ] "for" identifier "in" expression ":" block
                      [ "else" ":" block ] ;
 
 match_stmt         = "match" expression ":" { match_arm } ;
@@ -1814,15 +1887,16 @@ continue_stmt      = "continue" [ label ] ;
 defer_stmt         = "defer" expression ;
 guard_stmt         = "guard" expression ":" block [ "else" ":" block ] ;
 unsafe_block       = "unsafe" ":" block ;
-loop_block         = label ":" "loop" ":" block ;
+loop_block         = [ label ] "loop" ":" block ;
 
-label              = "'" identifier ;
+label              = identifier ;
 
 expression         = assignment_expr ;
 assignment_expr    = ternary_expr
                    | ( identifier | member_access | index_expr ) assign_op expression ;
 
-ternary_expr       = logical_or [ "?" expression ":" ternary_expr ] ;
+ternary_expr       = null_coalesce [ "?" expression ":" ternary_expr ] ;
+null_coalesce      = logical_or [ "??" null_coalesce ] ;
 logical_or         = logical_and [ "or" logical_and ] ;
 logical_and        = bitwise_or [ "and" bitwise_or ] ;
 bitwise_or         = bitwise_xor [ "|" bitwise_xor ] ;
@@ -1845,9 +1919,15 @@ primary            = literal | identifier | list_literal | dict_literal
 literal            = integer | float | string | char | "true" | "false"
                    | "None" | "null" ;
 
+parameters         = param { "," param } ;
+param              = [ "^" ] identifier [ ":" [ "&" ] type ] [ "=" expression ] ;
+
 type               = primitive_type | user_type | generic_type
                    | optional_type | error_type | dict_type
-                   | function_type | pointer_type ;
+                   | function_type | pointer_type | mutable_type | move_type ;
+
+mutable_type       = "&" type ;
+move_type          = "^" type ;
 
 primitive_type     = "i8" | "i16" | "i32" | "i64"
                    | "u8" | "u16" | "u32" | "u64"
@@ -1873,13 +1953,13 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 # 17. Test Matrix Summary
 
 > Re-run this matrix whenever a release is cut. Tick the box for each item
-> verified to compile, type-check, and run end-to-end through `kl run`.
+> verified to compile, type-check, and run end-to-end through `ky run`.
 
 ## 17.1 Declarations
 
 - [x] Immutable variable (`=`)
-- [x] Mutable variable (`:=`)
-- [x] Constant (`::=`)
+- [x] Mutable variable (`&T` type or `&expr` sugar)
+- [x] Constant (`:=` at module scope)
 - [x] Typed annotation
 - [x] Type inference
 - [ ] Destructuring declaration — ❌ not implemented
@@ -1901,39 +1981,39 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 - [x] While
 - [ ] While-else — ❌ not implemented
 - [x] For-in-list
-- [ ] For-in-range — ❌ `0..5` syntax not lowered to runtime range
-- [ ] For-else — ❌ not implemented
+- [x] For-in-range — `0..5` syntax working
+- [x] For-else — ✅ working
 - [ ] Loop — ❌ infinite `loop {}` not implemented
-- [ ] Break / continue — ❌ not implemented
-- [ ] Match (literal patterns) — ❌ AST exists but lowering not verified
-- [ ] Match (identifier binding) — ❌
-- [ ] Match (enum variant) — ❌
-- [ ] Match (wildcard) — ❌
-- [ ] Match (or-pattern) — ❌ not implemented
-- [ ] Match (guard) — ❌
-- [ ] Match (is-type) — ❌ not implemented
-- [ ] Match as expression — ❌
-- [ ] Defer — ❌ AST exists but lowering may be incomplete
-- [ ] Guard — ❌ not implemented
-- [ ] Unsafe block — 🔶 parsed but no-op
+- [x] Break / continue — ✅ working
+- [x] Match (literal patterns) — ✅ working
+- [x] Match (identifier binding) — ✅ working
+- [ ] Match (enum variant) — ❌ not verified
+- [x] Match (wildcard) — ✅ working
+- [x] Match (or-pattern) — ✅ working
+- [x] Match (guard) — ✅ working
+- [ ] Match (is-type) — ❌ not verified
+- [ ] Match as expression — ❌ not verified
+- [x] Defer — ✅ working
+- [x] Guard — ✅ working
+- [x] Unsafe block — 🔶 parsed but no-op
 
 ## 17.4 Data Structures
 
-- [ ] Final class (replaces `struct`) — ❌ parsed but not tested
+- [x] Final class (replaces `struct`) — ✅ working
 - [ ] Generic final class — ❌
 - [~] Enum — 🔶 AST exists, lowering for constructors but full match not verified
-- [x] Class
-- [x] Class with constructor args
-- [x] Single inheritance
-- [x] Method override (polymorphism)
+- [x] Class — ✅ working
+- [x] Class with constructor args — ✅ working
+- [x] Single inheritance — ✅ working
+- [x] Method override (polymorphism) — ✅ working
 - [ ] Public / protected / private fields — ❌ convention-only, no enforcement
 - [ ] Public / protected / private methods — ❌ convention-only, no enforcement
-- [ ] Abstract class (`abstract class`) — ❌ parsed but semantic not implemented
-- [ ] Static methods — ❌ not implemented
-- [ ] Properties (get/set) — ❌ not implemented
+- [ ] Abstract class (`abstract class`) — 🔶 parsed but semantic not implemented
+- [x] Static methods — ✅ working
+- [x] Properties (get/set) — ✅ working
 - [ ] `super` keyword — ❌ not implemented
-- [x] Contract declaration
-- [x] Contract implementation
+- [x] Contract declaration — ✅ working
+- [x] Contract implementation — ✅ working
 - [ ] Generic contract — ❌ not implemented
 - [ ] Type alias — ❌ not implemented
 
@@ -1959,14 +2039,14 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 ## 17.6 Operators
 
 - [x] `+`, `-`, `*`, `/`, `%` arithmetic
-- [ ] `**` power — ❌ parsed but not verified
-- [ ] `+%`, `-%`, `*%` percent — ❌ not implemented
+- [x] `**` power — ✅ working (via ky_pow runtime)
+- [x] `+%`, `-%`, `*%` percent — ✅ working (via ky_pct runtime)
 - [x] `==`, `!=`, `<`, `>`, `<=`, `>=` comparison (int + float)
 - [x] `and`, `or`, `not` logical
 - [x] `&`, `|`, `^`, `<<`, `>>`, `~` bitwise
 - [x] `=`, `+=`, `-=`, `*=`, `/=`, `%=` assignment
-- [ ] `..` range — ❌ parsed but no runtime lowering
-- [ ] `...` spread — ❌ not verified
+- [x] `..` range — ✅ working in for loops
+- [ ] `...` spread — 🔶 parsed, not verified
 - [ ] `?:` ternary default — ❌ not implemented
 - [ ] `?` error propagation — ❌ not implemented in lowering
 - [ ] `?.` optional chain — ❌ not implemented
@@ -2020,16 +2100,16 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 
 ## 17.11 Tooling
 
-- [x] `kl run`
-- [x] `kl build`
-- [x] `kl check`
-- [ ] `kl parse`
-- [ ] `kl mir`
-- [ ] `kl fmt`
-- [ ] `kl test`
-- [ ] `kl new <name>`
-- [ ] `kl add` / `kl remove`
-- [ ] `kl lsp`
+- [x] `ky run`
+- [x] `ky build`
+- [x] `ky check`
+- [ ] `ky parse`
+- [ ] `ky mir`
+- [ ] `ky fmt`
+- [ ] `ky test`
+- [ ] `ky new <name>`
+- [ ] `ky add` / `ky remove`
+- [ ] `ky lsp`
 - [ ] LSP — completion
 - [ ] LSP — hover
 - [ ] LSP — go-to-definition
@@ -2045,7 +2125,11 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 
 | Construct | Status |
 |---|---|
-| Variables (`=`, `:=`, `::=`) | ✅ |
+| Variables (`=`, `&T`, `:=`) | ✅ |
+| Borrow-by-default parameters (`s: T`) | ✅ |
+| Mutable borrow parameters (`s: &T`) | 🔶 |
+| Move parameters (`^s: T`) | ❌ |
+| Mutable fields (`name: &type`) | 🔶 |
 | Type inference + typed annotation | ✅ |
 | Classes (inheritance, polymorphism) | ✅ |
 | Contracts | ✅ |
@@ -2055,7 +2139,7 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 | Compound assignment (`+=`, etc.) | ✅ |
 | Hex/binary literals | ✅ |
 | Float comparison (`.>, <. ==`) | ✅ (bug fixed) |
-| `kl run` / `kl build` / `kl check` | ✅ |
+| `ky run` / `ky build` / `ky check` | ✅ |
 | Dict literal + `dict.len()` | ✅ |
 | `len()`, `str()`, `to_upper`, `to_lower`, `trim`, `contains` | ✅ |
 | List `.add()`, `.pop()` | ✅ |
@@ -2084,11 +2168,11 @@ pattern            = literal | identifier | "_" | enum_variant pattern
 | Properties (get/set) | ❌ |
 | Static methods | ❌ |
 | Operator overloading | ❌ |
-| Move semantics (vs refcount) | ❌ |
+| Move semantics (borrow-by-default, ownership via `^`) | 🔶 |
 | FFI (`extern "C"`) | ❌ (parsed, no codegen) |
 | Compile-time evaluation (`const fn`) | 🔶 type-checks only |
 | `Channel<T>` | ❌ |
 
 ---
 
-*Version: v0.4.0 · Last updated: 2026-06-29*
+*Version: v0.5.0 · Last updated: 2026-07-02*

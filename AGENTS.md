@@ -24,16 +24,17 @@ Written in **Rust**, compiled via **LLVM 18**.
 
 The language is undergoing a major evolution. The complete plan is at
 [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md). Current focus is
-finishing **Phase 6** (Semantic) and **Phase 7** (Move Semantics).
+**Fase 17: Optimization Pipeline** (cerrar gap de rendimiento con Rust).
 
 | Phase | Focus | Status |
 |---|---|---|
 | **1–2** | Documentation + Spec updates | ✅ Done |
-| **3** | Lexer (`:=`, `::=`, `T?`, `final class`) | ✅ Done |
-| **4** | **Parser** (destructuring, error recovery) | ✅ Done |
+| **3** | Lexer (`:=`, `&T`, `T?`, `final class`) | ✅ Done |
+| **4** | **Parser** (destructuring, `&T`, `^T`) | ✅ Done |
 | **5** | **HIR — High-Level IR** | ✅ Done |
-| **6** | **Semantic** | **🔜 10/13** |
-| **7** | **Move Semantics** | **🔜 11/13** |
+| **6** | **Semantic** | ✅ Done |
+| **7** | **Borrow Semantics** | **🔜 Refactor** |
+| **14** | **References & Borrow Checker** | **🔜 Pre-v1.0** |
 | 8+ | Async scheduler, iterators, tooling | 📅 |
 
 See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
@@ -47,13 +48,15 @@ See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 | Form | Syntax | Description |
 |---|---|---|
 | Immutable | `name = value` | Declaration + immutable binding |
-| Mutable | `name := value` | Declaration + mutable binding (walrus) |
-| Constant | `name ::= value` | Compile-time constant |
+| Mutable | `name: &T = value` or `name = &value` | `&` in type/value = mutable |
+| Constant | `NAME := value` | Compile-time constant (replaces `::=`) |
 
 ### Types — Unification
 
 - `T?` is the only public optional syntax (sugar for `Option<T>` internally)
 - `T!` stays as error-returning type (sugar for `Result<T, Error>`)
+- `&T` is the mutable type (for mutable variables, mutable borrow params, mutable fields)
+- `^T` is the move/ownership type (for ownership-transfer parameters)
 - `ptr` is the raw pointer type (for FFI/unsafe)
 - `final class` replaces `struct` (lightweight, no inheritance)
 - `abstract class` replaces `abs class`
@@ -70,8 +73,8 @@ See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 | Error return | `T!` syntax |
 | Error propagation | `?` operator |
 | Exceptions | None — errors are values |
-| Entry point | `fn main(args: [str]) -> i32` in `src/main.kl` |
-| Memory | Move semantics (planned), Copy types + Clone |
+| Entry point | `fn main(args: [str]) -> i32` in `src/main.ky` |
+| Memory | Borrow-by-default, ownership via `^`, Copy types + Clone |
 | Compiler | Pure Rust + LLVM 18 via `inkwell` |
 
 ---
@@ -94,7 +97,7 @@ See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 
 ```bash
 # Rust unit tests (all crates)
-cargo test -p klc_core -p klc_frontend -p klc_semantic -p klc_mir -p klc_runtime -p klc_tools
+cargo test -p kyc_core -p kyc_frontend -p kyc_semantic -p kyc_mir -p kyc_runtime -p kyc_tools
 
 # End-to-end syntax tests
 kl test examples/kyle-test/
@@ -108,12 +111,12 @@ cargo build --workspace
 ## Development Commands
 
 ```bash
-kl run <file.kl>          # Compile and run
-kl build <file.kl>        # Compile to native binary
-kl check <file.kl>        # Type-check only (fast)
-kl new <project>          # Create new project
-kl test <project>         # Type-check all tests/ files
-kl fmt src/               # Format project
+ky run <file.ky>          # Compile and run
+ky build <file.ky>        # Compile to native binary
+ky check <file.ky>        # Type-check only (fast)
+ky new <project>          # Create new project
+ky test <project>         # Type-check all tests/ files
+ky fmt src/               # Format project
 ```
 
 ---
@@ -134,8 +137,9 @@ LLVM 18.1 required.
 3. **Do not reintroduce `mut`, `let`, `var`, `const` keywords** for variables.
 4. **Do not reintroduce `Option<T>` as a public syntax** — use `T?`.
 5. **Do not reintroduce `struct`** as a separate keyword (use `final class`).
-6. **Do not skip tests** — CI must pass before any merge.
+6. **Do not reintroduce `::=`** — constants use `:=`.
+7. **Do not skip tests** — CI must pass before any merge.
 
 ---
 
-*Version: v0.3.0 · Last updated: 2026-06-28*
+*Version: v0.5.0 · Last updated: 2026-07-01*
