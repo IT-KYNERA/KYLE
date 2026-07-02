@@ -69,10 +69,13 @@ if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
   fi
 fi
 
-# Source the config so ky is available immediately
+# Source config so ky works in new terminals; for THIS shell just export
 export PATH="$INSTALL_DIR:$PATH"
+# Also source the shell config to pick up any other settings
+if [ -n "${SHELL_CONFIG:-}" ] && [ -f "$SHELL_CONFIG" ]; then
+  source "$SHELL_CONFIG" 2>/dev/null || true
+fi
 
 echo ""
 echo "Kyle $VERSION installed."
-echo "Create a project:  ky new myapp"
-echo "Run it:            ky run myapp/src/main.ky"
+echo "Run:  ky -v"
