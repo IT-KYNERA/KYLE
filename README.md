@@ -312,3 +312,5 @@ cd vscode-ky && npx @vscode/vsce package
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Kynera
+## v0.5.0
+Thu Jul  2 11:43:40 -04 2026
