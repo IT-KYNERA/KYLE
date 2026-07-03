@@ -1,7 +1,8 @@
 # Pure Kyle runtime functions — Phase A
 # These replace kyc_runtime/src/*.rs implementations
+# Status: ✅ = works, 🔶 = needs ptr store, ❌ = needs more work
 
-# ── String functions ──────────────────────────────────────────
+# ── String functions (read-only ptr) ── ALL ✅ ────────────────
 
 fn ky_strlen(s: ptr) i32:
     len: &i32 = 0
@@ -41,7 +42,19 @@ fn ky_eq_str(a: ptr, b: ptr) i32:
         i = i + 1
     if a[i] as i8 == b[i] as i8: 1 else: 0
 
-# ── Numeric conversion ────────────────────────────────────────
+fn ky_str_contains(haystack: ptr, needle: ptr) i32:
+    if needle[0] as i8 == 0: return 1
+    hi: &i32 = 0
+    while haystack[hi] as i8 != 0:
+        ni: &i32 = 0
+        while needle[ni] as i8 != 0 and haystack[hi + ni] as i8 == needle[ni] as i8:
+            ni = ni + 1
+        if needle[ni] as i8 == 0:
+            return 1
+        hi = hi + 1
+    0
+
+# ── Numeric conversion ✅ ─────────────────────────────────────
 
 fn ky_str_to_i64(s: ptr) i64:
     result: &i64 = 0
@@ -57,7 +70,7 @@ fn ky_str_to_i64(s: ptr) i64:
         i = i + 1
     if neg: -result else: result
 
-# ── Pure math ─────────────────────────────────────────────────
+# ── Pure math ✅ ─────────────────────────────────────────────
 
 fn ky_pow(base: i64, exp: i64) i64:
     result: &i64 = 1
