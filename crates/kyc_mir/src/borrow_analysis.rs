@@ -400,6 +400,12 @@ impl BorrowAnalysis {
             MirInst::PtrOffset { ptr, .. } => {
                 self.check_alive(*ptr, alive, local_names, local_types, "read");
             }
+            MirInst::PtrStore { ptr, value, .. } => {
+                self.check_alive(*ptr, alive, local_names, local_types, "read");
+                if let MirValue::Local(id) = value {
+                    self.check_alive(*id, alive, local_names, local_types, "read");
+                }
+            }
             MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
                 self.check_alive(*dest_ptr_local, alive, local_names, local_types, "read");
                 self.check_alive(*src_alloca_local, alive, local_names, local_types, "read");

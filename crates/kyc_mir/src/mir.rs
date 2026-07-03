@@ -76,6 +76,8 @@ pub enum MirInst {
     Call { dest: Option<usize>, name: String, args: Vec<MirValue> },
     /// Get pointer to array element.
     PtrOffset { dest: usize, ptr: usize, index: MirValue },
+    /// Store value through computed pointer: ptr[index] = val
+    PtrStore { dest: usize, ptr: usize, index: MirValue, value: MirValue },
     /// Get pointer to a struct field by index.
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
     /// Cast between types.
@@ -301,7 +303,10 @@ impl fmt::Display for MirInst {
                 }
             }
             MirInst::PtrOffset { dest, ptr, index } => {
-                write!(f, "  %{} = ptr_offset %{}, {}", dest, ptr, index)
+                write!(f, "  {} = ptr_offset {}[{}]", dest, ptr, index)
+            }
+            MirInst::PtrStore { dest, ptr, index, value } => {
+                write!(f, "  {} = ptr_store {}[{}] <- {}", dest, ptr, index, value)
             }
             MirInst::FieldPtr { dest, ptr, field_index, .. } => {
                 write!(f, "  %{} = field_ptr %{}, field {}", dest, ptr, field_index)

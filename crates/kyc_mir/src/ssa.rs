@@ -55,6 +55,8 @@ pub enum SsaInst {
     Load { dest: SsaValueId, src: usize },
     /// Get pointer to array element (non-promotable)
     PtrOffset { dest: SsaValueId, ptr: usize, index: SsaValueId },
+    /// Store through pointer: ptr[index] = val (non-promotable)
+    PtrStore { ptr: usize, index: SsaValueId, value: SsaValueId },
     /// Get pointer to struct field (non-promotable)
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
     /// Copy struct memory (non-promotable)
@@ -426,6 +428,11 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }
+                MirInst::PtrStore { dest: _dest, ptr, index, value } => {
+                    let idx_id = resolve_value(index, &mut ssa, &stacks, &param_value_ids);
+                    let val_id = resolve_value(value, &mut ssa, &stacks, &param_value_ids);
+                    ssa_block.insts.push(SsaInst::PtrStore { ptr: *ptr, index: idx_id, value: val_id });
+                }
                 MirInst::FieldPtr { dest, ptr, field_index, struct_type } => {
                     ssa_block.insts.push(SsaInst::FieldPtr { dest: *dest, ptr: *ptr, field_index: *field_index, struct_type: struct_type.clone() });
                 }
@@ -645,6 +652,7 @@ fn gvn_replace_inst(inst: &mut SsaInst, replacements: &HashMap<SsaValueId, SsaVa
         SsaInst::CallIndirect { fn_ptr, args, .. } => { replace(fn_ptr); for a in args { replace(a); } }
         SsaInst::Store { value, .. } => { replace(value); }
         SsaInst::PtrOffset { index, .. } => { replace(index); }
+        SsaInst::PtrStore { index, value, .. } => { replace(index); replace(value); }
         SsaInst::AsyncSpawn { arg, .. } => { replace(arg); }
         SsaInst::AsyncAwait { handle, .. } => { replace(handle); }
         _ => {}
@@ -672,6 +680,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                 }
                 MirInst::FieldPtr { ptr, .. } => { escaped.insert(*ptr); }
                 MirInst::PtrOffset { ptr, .. } => { escaped.insert(*ptr); }
+                MirInst::PtrStore { ptr, .. } => { escaped.insert(*ptr); }
                 MirInst::Memcpy { .. } => {
                     // These reference heap-allocated memory, not promotable
                 }

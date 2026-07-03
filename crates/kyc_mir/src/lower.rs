@@ -2564,6 +2564,19 @@ impl Lowerer {
                             });
                             return ctx;
                         }
+                        // Ptr/Str set: ptr[idx] = val → MirInst::PtrStore
+                        if matches!(target_type, Some(MirType::Ptr(_))) || target_type == Some(MirType::Str) {
+                            ctx = self.lower_expr(ctx, right);
+                            let val_local = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_ps", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::PtrStore {
+                                dest: result,
+                                ptr: target_val,
+                                index: MirValue::Local(idx_val),
+                                value: MirValue::Local(val_local),
+                            });
+                            return ctx;
+                        }
                         // List set: list[idx] = val → kl_list_set
                         let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
                         ctx.current_block.insts.push(MirInst::Cast {

@@ -109,6 +109,10 @@ impl<'ctx> Codegen<'ctx> {
             MirInst::PtrOffset { index, .. } => {
                 if let MirValue::Local(id) = index { callback(*id); }
             }
+            MirInst::PtrStore { index, value, .. } => {
+                if let MirValue::Local(id) = index { callback(*id); }
+                if let MirValue::Local(id) = value { callback(*id); }
+            }
             MirInst::FieldPtr { .. } => {}
             MirInst::Cast { value, .. } => {
                 if let MirValue::Local(id) = value { callback(*id); }
@@ -661,6 +665,18 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("ssgep: {}", e))?
                                 };
                                 block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                            }
+                        }
+                        SsaInst::PtrStore { ptr, index, value } => {
+                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                                let idx = ssa_read!(*index);
+                                let val = ssa_read!(*value);
+                                let gep = unsafe {
+                                    self.builder.build_in_bounds_gep(self.context.i8_type(), base, &[self.to_int_value(idx)], "_ssps")
+                                        .map_err(|e| format!("ssps gep: {}", e))?
+                                };
+                                self.builder.build_store(gep, val)
+                                    .map_err(|e| format!("ssps store: {}", e))?;
                             }
                         }
                         SsaInst::FieldPtr { dest, ptr, field_index, struct_type } => {
@@ -1435,6 +1451,7 @@ impl<'ctx> Codegen<'ctx> {
                         escaping.insert(*ptr);
                         escaping.insert(*dest);
                     }
+                    MirInst::PtrStore { ptr, .. } => { escaping.insert(*ptr); }
                     MirInst::Memcpy { dest_ptr_local, .. } => { escaping.insert(*dest_ptr_local); }
                     _ => {}
                 }
@@ -1448,6 +1465,7 @@ impl<'ctx> Codegen<'ctx> {
                     MirInst::Call { dest, .. } => dest.map(|d| d),
                     MirInst::CallIndirect { dest, .. } => dest.map(|d| d),
                     MirInst::PtrOffset { dest, .. } => Some(*dest),
+                    MirInst::PtrStore { dest, .. } => Some(*dest),
                     MirInst::FieldPtr { dest, .. } => Some(*dest),
                     MirInst::FnAddr { dest, .. } => Some(*dest),
                     MirInst::AsyncSpawn { dest, .. } => Some(*dest),
@@ -2000,6 +2018,26 @@ impl<'ctx> Codegen<'ctx> {
                                 self.builder.build_store(dest_ptr, gep.as_basic_value_enum())
                                     .map_err(|e| format!("ptroff-store: {}", e))?;
                             }
+                        }
+                        MirInst::PtrStore { dest, ptr, index, value } => {
+                            let base_val = self.load_value(*ptr, &last_value_map)?;
+                            let idx = self.value_to_llvm(index, &last_value_map)?;
+                            let int_idx = idx.into_int_value();
+                            let pointee_type = self.context.i8_type().as_basic_type_enum();
+                            let gep = unsafe {
+                                let ptr_val = if let BasicValueEnum::IntValue(iv) = base_val {
+                                    self.builder.build_int_to_ptr(iv, self.context.ptr_type(Default::default()), "_psint")
+                                        .map_err(|e| format!("ps inttoptr: {}", e))?
+                                } else {
+                                    base_val.into_pointer_value()
+                                };
+                                self.builder.build_in_bounds_gep(pointee_type, ptr_val, &[int_idx], "")
+                                    .map_err(|e| format!("ps gep: {}", e))?
+                            };
+                            let val = self.value_to_llvm(value, &last_value_map)?;
+                            let siv = self.builder.build_store(gep, val)
+                                .map_err(|e| format!("ps store: {}", e))?;
+                            last_value_map.insert(*dest, val);
                         }
                         MirInst::FieldPtr { dest, ptr, field_index, struct_type } => {
                             if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {

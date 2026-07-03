@@ -99,6 +99,7 @@ impl Optimizer {
                             MirInst::Cast { dest, .. } => Some(*dest),
                             MirInst::Call { dest, .. } => *dest,
                             MirInst::PtrOffset { dest, .. } => Some(*dest),
+                            MirInst::PtrStore { dest, .. } => Some(*dest),
                             MirInst::FieldPtr { dest, .. } => Some(*dest),
                             _ => None,
                         }
@@ -230,6 +231,12 @@ impl Optimizer {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
                 if let Some(new_ptr) = map.get(ptr) { *ptr = *new_ptr; }
                 *index = Self::map_value(index, map);
+            }
+            MirInst::PtrStore { dest, ptr, index, value } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                if let Some(new_ptr) = map.get(ptr) { *ptr = *new_ptr; }
+                *index = Self::map_value(index, map);
+                *value = Self::map_value(value, map);
             }
             MirInst::FieldPtr { dest, ptr, .. } => {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
@@ -613,6 +620,12 @@ impl Optimizer {
                         used.insert(*ptr);
                         Self::collect_value_refs(index, &mut used);
                     }
+                    MirInst::PtrStore { dest, ptr, index, value } => {
+                        used.insert(*dest);
+                        used.insert(*ptr);
+                        Self::collect_value_refs(index, &mut used);
+                        Self::collect_value_refs(value, &mut used);
+                    }
                     MirInst::Cast { dest, value, .. } => {
                         used.insert(*dest);
                         Self::collect_value_refs(value, &mut used);
@@ -759,6 +772,7 @@ fn dest_of(inst: &MirInst) -> Option<usize> {
         MirInst::Cast { dest, .. } => Some(*dest),
         MirInst::Call { dest, .. } => *dest,
         MirInst::PtrOffset { dest, .. } => Some(*dest),
+        MirInst::PtrStore { dest, .. } => Some(*dest),
         MirInst::FieldPtr { dest, .. } => Some(*dest),
         MirInst::FnAddr { dest, .. } => Some(*dest),
         MirInst::AsyncSpawn { dest, .. } => Some(*dest),
