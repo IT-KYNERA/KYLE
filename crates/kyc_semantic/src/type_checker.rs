@@ -537,6 +537,13 @@ impl TypeChecker {
                         return Type::I32;
                     }
                 }
+                // `is` type test: resolve right side as type name, not value expression
+                if matches!(operator, BinaryOp::Is) {
+                    if let Expr::Identifier { name, .. } = right.as_ref() {
+                        let _right_type = self.resolve_ast_type(&AstType::User { name: name.clone(), span: *span });
+                    }
+                    return Type::Bool;
+                }
                 let rt = self.infer_expr(right);
                 match operator {
                     BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem

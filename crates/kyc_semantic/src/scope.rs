@@ -238,9 +238,13 @@ impl ScopeResolver {
                     );
                 }
             }
-            Expr::Binary { left, right, .. } => {
+            Expr::Binary { left, right, operator, .. } => {
                 self.resolve_expr(left);
-                self.resolve_expr(right);
+                // `as` and `is` right side is a type name, not a symbol reference
+                let skip = matches!(operator, BinaryOp::As | BinaryOp::Is);
+                if !skip {
+                    self.resolve_expr(right);
+                }
             }
             Expr::Unary { operand, .. } => self.resolve_expr(operand),
             Expr::Assignment { target, value, .. } => {

@@ -2623,12 +2623,33 @@ impl Lowerer {
                     return ctx;
                 }
 
-                // `is` type test — placeholder: always return true (i32 1)
+                // `is` type test — compare left expression type with right type name
                 if matches!(operator, BinaryOp::Is) {
+                    let left_local = ctx.next_local - 1;
+                    let left_type = ctx.local_types.get(&left_local);
+                    let right_mir_type = if let Expr::Identifier { name, .. } = right.as_ref() {
+                        match name.as_str() {
+                            "i8" => Some(MirType::I8),
+                            "i16" => Some(MirType::I16),
+                            "i32" => Some(MirType::I32),
+                            "i64" => Some(MirType::I64),
+                            "f32" => Some(MirType::F32),
+                            "f64" => Some(MirType::F64),
+                            "bool" => Some(MirType::Bool),
+                            "char" => Some(MirType::Char),
+                            "str" => Some(MirType::Str),
+                            _ => None,
+                        }
+                    } else { None };
+                    let matches = left_type.and_then(|lt| right_mir_type.map(|rt| *lt == rt)).unwrap_or(false);
                     let dest = ctx.alloc_local("_is", MirType::I32);
                     ctx.current_block.insts.push(MirInst::Store {
                         dest,
-                        value: MirValue::Constant(MirConstant::I32(1)),
+                        value: if matches {
+                            MirValue::Constant(MirConstant::I32(1))
+                        } else {
+                            MirValue::Constant(MirConstant::I32(0))
+                        },
                     });
                     return ctx;
                 }
