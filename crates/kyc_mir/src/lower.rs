@@ -2699,6 +2699,7 @@ impl Lowerer {
                             "bool" => MirType::Bool,
                             "char" => MirType::Char,
                             "str" => MirType::Str,
+                            "ptr" => MirType::Ptr(Box::new(MirType::Void)),
                             name => {
                                 if let Some(defs) = ctx.struct_defs.get(name) {
                                     MirType::Struct(name.to_string(), defs.clone())
@@ -4819,6 +4820,23 @@ impl Lowerer {
 
                         });
                     }
+                    return ctx;
+                }
+                // Ptr type indexing: ptr[index] → PtrOffset + Load
+                if matches!(target_type, MirType::Ptr(_)) {
+                    let ptr_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I64);
+                    let elem_type = if target_type == MirType::I64 { MirType::I8 } else { MirType::I8 };
+                    let offset = ctx.alloc_local("_ptroff", ptr_type.clone());
+                    ctx.current_block.insts.push(MirInst::PtrOffset {
+                        dest: offset,
+                        ptr: target_val,
+                        index: MirValue::Local(index_val),
+                    });
+                    let result = ctx.alloc_local("_ptrload", elem_type);
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: result,
+                        src: offset,
+                    });
                     return ctx;
                 }
                 let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);

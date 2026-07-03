@@ -1977,16 +1977,25 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         MirInst::PtrOffset { dest, ptr, index } => {
-                            if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {
-                                let idx = self.value_to_llvm(index, &last_value_map)?;
-                                let int_idx = idx.into_int_value();
-                                if let Some(pointee_type) = self.alloca_types.get(ptr) {
-                                    let gep = unsafe {
-                                        self.builder.build_in_bounds_gep(*pointee_type, base_ptr, &[int_idx], "")
-                                            .map_err(|e| format!("gep: {}", e))?
-                                    };
-                                    last_value_map.insert(*dest, gep.as_basic_value_enum());
-                                }
+                            let base_val = self.load_value(*ptr, &last_value_map)?;
+                            let idx = self.value_to_llvm(index, &last_value_map)?;
+                            let int_idx = idx.into_int_value();
+                            let pointee_type = self.context.i8_type().as_basic_type_enum();
+                            let gep = unsafe {
+                                let ptr_val = if let BasicValueEnum::IntValue(iv) = base_val {
+                                    self.builder.build_int_to_ptr(iv, self.context.ptr_type(Default::default()), "_inttoptr")
+                                        .map_err(|e| format!("ptroff inttoptr: {}", e))?
+                                } else {
+                                    base_val.into_pointer_value()
+                                };
+                                self.builder.build_in_bounds_gep(pointee_type, ptr_val, &[int_idx], "")
+                                    .map_err(|e| format!("ptroff gep: {}", e))?
+                            };
+                            // Store GEP result in BOTH last_value_map AND the dest alloca
+                            last_value_map.insert(*dest, gep.as_basic_value_enum());
+                            if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(dest_ptr, gep.as_basic_value_enum())
+                                    .map_err(|e| format!("ptroff-store: {}", e))?;
                             }
                         }
                         MirInst::FieldPtr { dest, ptr, field_index, struct_type } => {
@@ -2096,6 +2105,10 @@ impl<'ctx> Codegen<'ctx> {
                                     self.builder.build_float_to_signed_int(*float_val, *i, "_fptosi")
                                         .map_err(|e| format!("fptosi: {}", e))?
                                         .as_basic_value_enum()
+                                }
+                                // Pointer → Pointer: identity (no-op cast)
+                                (BasicValueEnum::PointerValue(ptr_val), BasicTypeEnum::PointerType(_)) => {
+                                    ptr_val.as_basic_value_enum()
                                 }
                                 _ => self.context.i32_type().const_zero().as_basic_value_enum(),
                             };
