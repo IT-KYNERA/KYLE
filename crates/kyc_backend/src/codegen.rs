@@ -1004,6 +1004,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_range", ft, None);
         }
+        // ptr kl_range_two(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_range_two", ft, None);
+        }
         // void kl_list_push(ptr, i64)
         {
             let params = [ptr_ty.into(), i64_ty.into()];

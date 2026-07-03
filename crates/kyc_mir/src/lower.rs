@@ -1529,7 +1529,13 @@ impl Lowerer {
             }
             Stmt::For(s) => {
                 // Check if iterable is a range expression (for i in 0..10)
-                if let Expr::Binary { operator: BinaryOp::Range, left, right, .. } = &*s.iterable {
+                let range_op = if let Expr::Binary { operator: op @ (BinaryOp::Range | BinaryOp::RangeInclusive | BinaryOp::RangeExclusive), .. } = &*s.iterable {
+                    Some(*op)
+                } else { None };
+                if let Some(range_op) = range_op {
+                    let (left, right) = if let Expr::Binary { left, right, .. } = &*s.iterable {
+                        (left, right)
+                    } else { unreachable!() };
                     // === RANGE-BASED FOR LOOP ===
                     let cond_label = ctx.fresh_block();
                     let body_label = ctx.fresh_block();
@@ -1586,8 +1592,12 @@ impl Lowerer {
                     ctx.current_block.insts.push(MirInst::Load { dest: end_loaded, src: end_alloca });
 
                     let cmp = ctx.alloc_local("_for_cmp", MirType::Bool);
+                    let cmp_op = match range_op {
+                        BinaryOp::RangeInclusive => MirBinaryOp::Le,
+                        _ => MirBinaryOp::Lt,
+                    };
                     ctx.current_block.insts.push(MirInst::BinaryOp {
-                        dest: cmp, op: MirBinaryOp::Lt,
+                        dest: cmp, op: cmp_op,
                         left: MirValue::Local(i_val), right: MirValue::Local(end_loaded),
                     });
 
@@ -3516,6 +3526,32 @@ impl Lowerer {
                         dest: Some(result),
                         name: "ky_range".to_string(),
                         args: vec![MirValue::Local(count_i64)],
+                    });
+                    return ctx;
+                }
+                // Special case: range(start, end) — create a list [start, start+1, ..., end-1]
+                if name == "range" && arguments.len() == 2 {
+                    ctx = self.lower_expr(ctx, &arguments[0]);
+                    let start_local = ctx.next_local - 1;
+                    ctx = self.lower_expr(ctx, &arguments[1]);
+                    let end_local = ctx.next_local - 1;
+                    let start_i64 = ctx.alloc_local("_rs64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: start_i64,
+                        value: MirValue::Local(start_local),
+                        to_type: MirType::I64,
+                    });
+                    let end_i64 = ctx.alloc_local("_re64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: end_i64,
+                        value: MirValue::Local(end_local),
+                        to_type: MirType::I64,
+                    });
+                    let result = ctx.alloc_local("_range2", MirType::List(Box::new(MirType::I64)));
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(result),
+                        name: "ky_range_two".to_string(),
+                        args: vec![MirValue::Local(start_i64), MirValue::Local(end_i64)],
                     });
                     return ctx;
                 }

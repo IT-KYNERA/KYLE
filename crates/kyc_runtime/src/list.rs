@@ -133,6 +133,21 @@ pub extern "C" fn ky_range(count: i64) -> *mut KlList {
     list
 }
 
+/// Create range [start, start+1, ..., end-1]
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_range_two(start: i64, end: i64) -> *mut KlList {
+    let list = ky_list_new();
+    if list.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe {
+        for i in start..end {
+            ky_list_push(list, i);
+        }
+    }
+    list
+}
+
 /// Convert C's argc/argv to a Kyle list<str>.
 /// Skips argv[0] (program name).
 #[unsafe(no_mangle)]

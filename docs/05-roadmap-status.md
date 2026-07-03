@@ -98,8 +98,9 @@ Fase 15:   SSA Form              ✅ COMPLETADO (100%)
                                     ✅ Pipeline SSA activo en release mode
                                     ✅ Benchmarks correctos (debug + release)
                                     ✅ PHI node bug fix — fallback values para predecessors sin entrada
-Fase 16:   LLVM IR Quality       ✅ COMPLETADO (excepto 16.1 nsw/nuw diferido)
+Fase 16:   LLVM IR Quality       ✅ COMPLETADO (100%)
                                     ✅ 16.0 — Fix release mode hang
+                                    ✅ 16.1 — nsw/nuw flags (verificado: `add nsw i32` en IR)
                                     ✅ 16.2 — inbounds en GEPs
                                     ✅ 16.3 — readonly/readnone
                                     ✅ 16.4 — noalias en parámetros
@@ -108,16 +109,11 @@ Fase 16:   LLVM IR Quality       ✅ COMPLETADO (excepto 16.1 nsw/nuw diferido)
                                     ✅ 16.7 — !range metadata en bool
                                     ✅ 16.8 — lifetime.start/end
                                     ✅ 16.9 — TBAA metadata
-                                    🔶 16.1 — nsw/nuw flags (implementado vía build_int_nsw_add,
-                                    pero no se reflejan en el IR generado — bug de inkwell/codegen)
 Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
   Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
 Fase 13:   Sintaxis Restante    🔜 EN CURSO (rangos, is, for-else, static fn, **, +%, genéricos✅, ptr✅, null✅ — falta op overload, etc.)
 Fase 14:   References & Borrow Checker ✅ COMPLETADO
-Fase 17:   Optimization Pipeline 🔜 v0.6 — Ejecutar pases LLVM (mem2reg,
-             gvn, licm, sccp) en el módulo antes de emitir código.
-             Objetivo: cerrar el gap de rendimiento con Rust.
-Fase 17:   Optimization Pipeline 🔜 v0.6 — cerrar gap rendimiento
+Fase 17:   Optimization Pipeline ✅ COMPLETADO (SSA fix, nsw flags, alloca elimination, O3 pipeline)
 Fase 18:   Zero-Cost Abstractions 📅 (post-v1.0)
 Fase 15:   Alternative Backends 📅 (post-v1.0)
 ```
