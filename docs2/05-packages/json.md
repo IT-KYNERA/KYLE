@@ -1,11 +1,11 @@
-# ky-json — JSON Parsing and Generation
+# json — JSON Parsing and Generation
 
 **Status:** Available in runtime, planned as package
 
 ## API
 
 ```ky
-from ky-json import parse, stringify
+from json import parse, stringify
 
 data = parse("{\"name\": \"Ana\", \"age\": 30}")
 println(data["name"])   # "Ana"

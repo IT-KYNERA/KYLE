@@ -1,11 +1,11 @@
-# ky-http — HTTP Client and Server
+# http — HTTP Client and Server
 
 **Status:** Planned
 
 ## Client API
 
 ```ky
-from ky-http import Client
+from http import Client
 
 client = Client.new()
 response = client.get("https://example.com")
@@ -16,7 +16,7 @@ println(response.body)      # "<html>..."
 ## Server API
 
 ```ky
-from ky-http import Server
+from http import Server
 
 server = Server.new()
 

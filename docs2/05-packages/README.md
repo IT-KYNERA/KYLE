@@ -4,7 +4,7 @@ Official Kyle packages and their specifications.
 
 | Package | Description |
 |---------|-------------|
-| [ky-http.md](ky-http.md) | HTTP client and server |
-| [ky-sqlite.md](ky-sqlite.md) | SQLite database bindings |
-| [ky-postgres.md](ky-postgres.md) | PostgreSQL database driver |
-| [ky-json.md](ky-json.md) | JSON parsing and generation |
+| [http.md](http.md) | HTTP client and server |
+| [sqlite.md](sqlite.md) | SQLite database bindings |
+| [postgres.md](postgres.md) | PostgreSQL database driver |
+| [json.md](json.md) | JSON parsing and generation |

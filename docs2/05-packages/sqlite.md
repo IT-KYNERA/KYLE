@@ -1,11 +1,11 @@
-# ky-sqlite — SQLite Database Bindings
+# sqlite — SQLite Database Bindings
 
 **Status:** Planned
 
 ## API
 
 ```ky
-from ky-sqlite import Database
+from sqlite import Database
 
 db = Database.open("data.db")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")

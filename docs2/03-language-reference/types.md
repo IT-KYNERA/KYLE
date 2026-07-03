@@ -81,8 +81,6 @@ y = point.1
 
 ### final class
 
-Lightweight struct with fields. No inheritance.
-
 ```ky
 final class Vec2:
     x: i32
@@ -91,20 +89,18 @@ final class Vec2:
 
 ### class
 
-Full class with single inheritance.
-
 ```ky
 class Animal:
     name: str
+    fn speak():
+        println("...")
 
 class Dog :: Animal:
-    fn bark(this):
+    fn speak():
         println("woof")
 ```
 
 ### enum
-
-Tagged union with optional payload.
 
 ```ky
 enum Optional:
@@ -114,16 +110,12 @@ enum Optional:
 
 ### contract
 
-Interface that a class can implement.
-
 ```ky
 contract Comparable:
-    fn compare(this, other: This) i32
+    fn compare(other: This) i32
 ```
 
 ## Type inference
-
-Kyle infers types automatically.
 
 ```ky
 x = 42          # i32

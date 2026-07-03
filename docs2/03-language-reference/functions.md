@@ -57,14 +57,14 @@ fn greet(name: str, greeting: str = "Hello") str:
 
 ## Methods
 
-Methods are defined inside a class. The first parameter is `this`.
+Methods are defined inside a class. The instance is accessed via `this` inside the body, but `this` is not declared as a parameter.
 
 ```ky
 final class Vec2:
     x: i32
     y: i32
 
-    fn len(this) f64:
+    fn len() f64:
         sqrt((this.x * this.x + this.y * this.y) as f64)
 
 a = Vec2 { x: 3, y: 4 }
@@ -85,7 +85,7 @@ MathUtils.square(5)    # 25
 
 ```ky
 final class Vec2:
-    fn op_+(this, other: Vec2) Vec2:
+    fn op_+(other: Vec2) Vec2:
         Vec2 { x: this.x + other.x, y: this.y + other.y }
 
 a = Vec2 { x: 1, y: 2 }

@@ -12,7 +12,7 @@ final class Vec2:
 
 ### Construction
 
-The default constructor assigns fields by name:
+Fields are assigned by name using struct literal syntax:
 
 ```ky
 v = Vec2 { x: 10, y: 20 }
@@ -20,13 +20,16 @@ v = Vec2 { x: 10, y: 20 }
 
 ### Explicit constructor
 
+Use `fn ClassName(...)` to define a constructor.
+
 ```ky
-final class Config:
+class Config:
     name: str
     port: i32
 
-    fn new(name: str, port: i32 = 8080) Config:
-        Config { name, port }
+    fn Config(name: str, port: i32 = 8080):
+        this.name = name
+        this.port = port
 ```
 
 ## class
@@ -37,7 +40,7 @@ Full class with single inheritance.
 class Animal:
     name: str
 
-    fn speak(this):
+    fn speak():
         println("...")
 ```
 
@@ -45,7 +48,7 @@ class Animal:
 
 ```ky
 class Dog :: Animal:
-    fn speak(this):
+    fn speak():
         println("woof")
 ```
 
@@ -55,7 +58,7 @@ Cannot be instantiated. Serves as a base for subclasses.
 
 ```ky
 abstract class Shape:
-    fn area(this) f64
+    fn area() f64
 ```
 
 ## Mutable fields
