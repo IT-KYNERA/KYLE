@@ -545,7 +545,7 @@ impl Lowerer {
                                         default: None, variadic: false, mode: ParamMode::Borrow, span: p.span,
                                     }],
                                     return_type: Some(p.type_.clone()),
-                                    is_async: false, is_const: false, is_static: false, is_abstract: false, is_test: false,
+                                    is_async: false, is_const: false, is_static: false, is_abstract: false, is_extern: false, is_test: false,
                                     visibility: Visibility::Public,
                                     body: Some(getter_body.clone()),
                                     span: p.span,
@@ -573,7 +573,7 @@ impl Lowerer {
                                         },
                                     ],
                                     return_type: Some(void_type),
-                                    is_async: false, is_const: false, is_static: false, is_abstract: false, is_test: false,
+                                    is_async: false, is_const: false, is_static: false, is_abstract: false, is_extern: false, is_test: false,
                                     visibility: Visibility::Public,
                                     body: Some(setter_body.clone()),
                                     span: p.span,
@@ -694,6 +694,7 @@ impl Lowerer {
             }
         }
 
+        module.links = program.links.clone();
         module
     }
 

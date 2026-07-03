@@ -11,6 +11,7 @@ pub fn desugar(program: &Program) -> Program {
     let declarations = program.declarations.iter().map(desugar_decl).collect();
     Program {
         declarations,
+        links: program.links.clone(),
         span: program.span.clone(),
     }
 }
@@ -28,6 +29,7 @@ fn desugar_decl(decl: &Decl) -> Decl {
         Decl::Enum(e) => Decl::Enum(e.clone()),
         Decl::Contract(c) => Decl::Contract(c.clone()),
         Decl::TypeAlias(t) => Decl::TypeAlias(t.clone()),
+        Decl::Link(name, span) => Decl::Link(name.clone(), *span),
     }
 }
 
@@ -62,6 +64,7 @@ fn desugar_function(f: &FunctionDecl) -> FunctionDecl {
         is_const: f.is_const,
         is_static: f.is_static,
         is_abstract: f.is_abstract,
+        is_extern: f.is_extern,
         is_test: f.is_test,
         visibility: f.visibility.clone(),
         body: f.body.as_ref().map(|b| desugar_block(b)),
@@ -368,6 +371,7 @@ mod tests {
     fn test_desugar_program_empty() {
         let program = Program {
             declarations: vec![],
+            links: vec![],
             span: dummy_span(),
         };
         let result = desugar(&program);

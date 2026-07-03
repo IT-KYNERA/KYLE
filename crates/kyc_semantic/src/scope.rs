@@ -55,6 +55,7 @@ impl ScopeResolver {
                 return;
             }
             Decl::Variable(_) => return,
+            Decl::Link(_, _) => return,
         };
         let sym = Symbol::new(name.clone(), kind);
         if let Err(e) = self.symbols.insert(name, sym) {
@@ -78,6 +79,7 @@ impl ScopeResolver {
             }
             Decl::Struct(_) | Decl::Enum(_) | Decl::Contract(_) | Decl::TypeAlias(_) => {}
             Decl::Import(_) | Decl::FromImport(_) => {}
+            Decl::Link(_, _) => {}
         }
     }
 

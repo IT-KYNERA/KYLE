@@ -341,7 +341,7 @@ impl Pipeline {
         let is_release = optimization == OptimizationLevel::Aggressive;
         let linker = Linker::new();
         let runtime_lib = Linker::find_runtime_lib();
-        linker.link(&[&obj_path], output_path, runtime_lib.as_deref(), is_release)
+        linker.link(&[&obj_path], output_path, runtime_lib.as_deref(), is_release, &mir.module.links)
             .map_err(|e| format!("Link error: {}", e))?;
 
         Ok(())
@@ -415,6 +415,7 @@ fn rename_decl(decl: &mut kyc_core::ast::Decl, new_name: &str) {
         Decl::Contract(c) => c.name = new_name.to_string(),
         Decl::TypeAlias(t) => t.name = new_name.to_string(),
         Decl::Import(_) | Decl::FromImport(_) => {}
+        Decl::Link(_, _) => {}
     }
 }
 

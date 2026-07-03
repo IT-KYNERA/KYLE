@@ -171,6 +171,7 @@ pub fn is_move_type(t: &MirType) -> bool {
 pub struct MirModule {
     pub functions: Vec<MirFunction>,
     pub globals: Vec<(String, MirType, MirConstant)>,
+    pub links: Vec<String>,
 }
 
 impl MirModule {
@@ -178,6 +179,7 @@ impl MirModule {
         Self {
             functions: Vec::new(),
             globals: Vec::new(),
+            links: Vec::new(),
         }
     }
 }

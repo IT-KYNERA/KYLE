@@ -142,6 +142,7 @@ impl ModuleResolver {
                     Decl::Enum(e) => &e.name,
                     Decl::Contract(c) => &c.name,
                     Decl::TypeAlias(t) => &t.name,
+                    Decl::Link(_, _) => return false,
                     Decl::Import(_) | Decl::FromImport(_) => return false,
                 };
                 Self::is_public(name)
@@ -166,6 +167,7 @@ impl ModuleResolver {
                 Decl::Enum(e) => &e.name,
                 Decl::Contract(c) => &c.name,
                 Decl::TypeAlias(t) => &t.name,
+                Decl::Link(_, _) => continue,
                 Decl::Import(_) | Decl::FromImport(_) => continue,
             };
             if decl_name == name {

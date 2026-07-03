@@ -23,7 +23,7 @@ impl Linker {
         }
     }
 
-    pub fn link(&self, object_files: &[&Path], output: &Path, runtime_lib: Option<&Path>, release: bool) -> Result<(), String> {
+    pub fn link(&self, object_files: &[&Path], output: &Path, runtime_lib: Option<&Path>, release: bool, links: &[String]) -> Result<(), String> {
         if object_files.is_empty() {
             return Err("No object files to link".to_string());
         }
@@ -42,6 +42,10 @@ impl Linker {
 
         if let Some(runtime) = runtime_lib {
             cmd.arg(runtime);
+        }
+
+        for link in links {
+            cmd.arg(format!("-l{}", link));
         }
 
         if release {

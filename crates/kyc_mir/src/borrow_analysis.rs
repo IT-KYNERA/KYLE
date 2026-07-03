@@ -572,6 +572,7 @@ mod tests {
         let mut module = MirModule {
             functions: vec![],
             globals: vec![],
+            links: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
         analysis.run(&mut module); // should not panic
@@ -600,7 +601,7 @@ mod tests {
         };
         let mut analysis = BorrowAnalysis::new();
         let original_len = func.basic_blocks[0].insts.len();
-        let mut module = MirModule { functions: vec![func], globals: vec![] };
+        let mut module = MirModule { functions: vec![func], globals: vec![], links: vec![] };
         analysis.run(&mut module);
         // No instructions should be added (no Move types)
         assert_eq!(module.functions[0].basic_blocks[0].insts.len(), original_len);
@@ -634,7 +635,7 @@ mod tests {
             param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
-        let mut module = MirModule { functions: vec![func], globals: vec![] };
+        let mut module = MirModule { functions: vec![func], globals: vec![], links: vec![] };
         analysis.run(&mut module);
         // Borrow-by-default: no errors expected
         assert!(analysis.errors().is_empty(), "Expected no errors, got: {:?}", analysis.errors());
@@ -667,7 +668,7 @@ mod tests {
             param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
-        let mut module = MirModule { functions: vec![func], globals: vec![] };
+        let mut module = MirModule { functions: vec![func], globals: vec![], links: vec![] };
         analysis.run(&mut module);
         // I32 is Copy — no use-after-move errors expected
         assert_eq!(analysis.errors().len(), 0, "Expected no errors, got: {:?}", analysis.errors());
@@ -700,7 +701,7 @@ mod tests {
             param_modes: vec![],
         };
         let mut analysis = BorrowAnalysis::new();
-        let mut module = MirModule { functions: vec![func], globals: vec![] };
+        let mut module = MirModule { functions: vec![func], globals: vec![], links: vec![] };
         analysis.run(&mut module);
         // Returning a Str transfers ownership to caller — no error
         assert_eq!(analysis.errors().len(), 0, "Expected no errors, got: {:?}", analysis.errors());

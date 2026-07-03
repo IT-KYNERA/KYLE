@@ -130,6 +130,7 @@ pub struct FunctionDecl {
     pub is_const: bool,
     pub is_abstract: bool,
     pub is_static: bool,
+    pub is_extern: bool,
     pub is_test: bool,
     pub visibility: Visibility,
     pub body: Option<Block>,
@@ -260,6 +261,7 @@ pub enum Decl {
     Enum(EnumDecl),
     Contract(ContractDecl),
     TypeAlias(TypeAlias),
+    Link(String, Span),
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +579,7 @@ pub enum UnaryOp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
     pub declarations: Vec<Decl>,
+    pub links: Vec<String>,
     pub span: Span,
 }
 
@@ -628,6 +631,10 @@ impl DisplayDepth for Decl {
             Decl::Enum(e) => e.fmt_depth(f, d),
             Decl::Contract(c) => c.fmt_depth(f, d),
             Decl::TypeAlias(t) => t.fmt_depth(f, d),
+            Decl::Link(name, _) => {
+                write_indent(f, d)?;
+                writeln!(f, "Link \"{}\"", name)
+            }
         }
     }
 }

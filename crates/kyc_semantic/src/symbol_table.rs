@@ -88,6 +88,7 @@ impl SymbolTable {
                             is_const: false,
                             is_static: false,
                             is_abstract: false,
+                            is_extern: false,
                             is_test: false,
                             visibility: Visibility::Public,
                             body: None,

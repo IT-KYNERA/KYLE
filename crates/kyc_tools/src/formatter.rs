@@ -211,6 +211,7 @@ impl Formatter {
             Decl::Enum(e) => self.write_enum(out, e, depth),
             Decl::Contract(c) => self.write_contract(out, c, depth),
             Decl::TypeAlias(t) => self.write_type_alias(out, t, depth),
+            Decl::Link(_, _) => {}
         }
     }
 
@@ -866,6 +867,7 @@ fn decl_span(decl: &Decl) -> kyc_core::span::Span {
         Decl::Enum(e) => e.span,
         Decl::Contract(c) => c.span,
         Decl::TypeAlias(t) => t.span,
+        Decl::Link(_, _) => kyc_core::span::Span::dummy(),
     }
 }
 

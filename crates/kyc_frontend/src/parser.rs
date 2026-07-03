@@ -12,11 +12,12 @@ pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     errors: Vec<String>,
+    links: Vec<String>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, pos: 0, errors: vec![] }
+        Self { tokens, pos: 0, errors: vec![], links: vec![] }
     }
 
     fn has_errors(&self) -> bool {
@@ -100,6 +101,7 @@ impl Parser {
         } else {
             Ok(Program {
                 declarations,
+                links: std::mem::take(&mut self.links),
                 span: self.span_from(start),
             })
         }
@@ -122,6 +124,56 @@ impl Parser {
         // `#[test]` attribute before function
         if self.at(TokenKind::Hash) {
             return self.parse_attr_function();
+        }
+        // extern fn — declare external C function (no body)
+        if self.at(TokenKind::Extern) {
+            let start = self.pos;
+            self.advance();
+            if !self.at(TokenKind::Fn) {
+                return Err("expected 'fn' after 'extern'".to_string());
+            }
+            self.advance();
+            let raw_name = self.eat_identifier();
+            let (name, _visibility) = if raw_name.starts_with("__") {
+                (raw_name.trim_start_matches('_').to_string(), Visibility::Private)
+            } else if raw_name.starts_with('_') {
+                (raw_name.trim_start_matches('_').to_string(), Visibility::Protected)
+            } else {
+                (raw_name.clone(), Visibility::Public)
+            };
+            self.expect(TokenKind::LParen)?;
+            let params = self.parse_params()?;
+            self.expect(TokenKind::RParen)?;
+            let return_type = if self.at(TokenKind::Colon) || self.at(TokenKind::Newline)
+                || self.at(TokenKind::Dedent) || self.at(TokenKind::Eof)
+            {
+                None
+            } else {
+                Some(self.parse_type()?)
+            };
+            return Ok(Decl::Function(FunctionDecl {
+                name, params, return_type,
+                type_params: vec![],
+                is_async: false, is_const: false, is_abstract: false,
+                is_static: false, is_test: false, is_extern: true,
+                visibility: Visibility::Public,
+                body: None,
+                span: self.span_from(start),
+            }));
+        }
+        // @link "libname" — link against a native library
+        if self.at(TokenKind::At) {
+            let start = self.pos;
+            self.advance();
+            if self.at_identifier() && self.eat_identifier() == "link" {
+                if let TokenKind::String(s) = &self.current()?.kind {
+                    let name = s.clone();
+                    self.advance();
+                    return Ok(Decl::Link(name, self.span_from(start)));
+                }
+                return Err("expected string literal after '@link'".to_string());
+            }
+            self.pos = start; // backtrack — not @link
         }
         if self.at(TokenKind::Fn)
             || self.at(TokenKind::Async)
@@ -354,7 +406,7 @@ impl Parser {
             Some(self.parse_block()?)
         };
         Ok(FunctionDecl {
-            name, type_params, params, return_type, is_async, is_const, is_static, is_abstract, is_test, visibility, body,
+            name, type_params, params, return_type, is_async, is_const, is_static, is_abstract, is_extern: false, is_test, visibility, body,
             span: self.span_from(start),
         })
     }
