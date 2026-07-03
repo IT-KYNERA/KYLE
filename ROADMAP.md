@@ -1,5 +1,60 @@
 # Roadmap
 
+## Platform Architecture
+
+Kyle is a layered platform. Each layer only knows the layer below it.
+
+```
+Applications (IDE, Desktop, KyleOS...)
+    │
+Kyle UI (widgets, navigation)
+    │
+Kyle Scene (scene graph, layout)
+    │
+Kyle Graphics (canvas, GPU)
+    │
+Kyle Windowing (windows, events)
+    │
+Kyle Platform (FS, net, threads, audio, sensors)
+    │
+Kyle Runtime (memory, strings, collections)
+    │
+Kyle Language (compiler)
+```
+
+The **compiler and runtime are complete** (Phases 1-17).  
+The **upper layers (Windowing → Applications) are future work**.  
+The **Platform layer is next** — it enables backend packages (HTTP, SQLite, etc.).
+
+### Current crate structure
+
+```
+kyc_core/          ✅ foundation
+kyc_frontend/      ✅ lexer + parser
+kyc_hir/           ✅ desugaring
+kyc_semantic/      ✅ type checker, scope
+kyc_mir/           ✅ MIR lowering, SSA
+kyc_backend/       ✅ LLVM codegen
+kyc_driver/        ✅ pipeline
+kyc_cli/           ✅ CLI binary
+kyc_runtime/       ✅ runtime (memory, strings, lists, dicts)
+kyc_tools/         ✅ LSP, formatter, package manager
+```
+
+### Planned crate additions
+
+| Crate | When | Purpose |
+|-------|------|---------|
+| `kyc_platform` | After Phase 0 | Platform API (FS, net, time, env) — Rust crate |
+| `kyc_platform_macos` | After Phase 0 | macOS platform adapter |
+| `kyc_platform_linux` | Future | Linux platform adapter |
+| Various `ky-*` | After Phase 0 | Kyle packages (HTTP, SQLite, JSON, etc.) |
+| `kyc_graphics` | Long-term | Canvas, GPU rendering |
+| `kyc_ui` | Long-term | Widget library |
+| `kyc_scene` | Long-term | Scene graph |
+
+---
+
 ## ✅ Completed — Phases 1–17
 
 | Phase | Description | Status |
@@ -35,7 +90,8 @@
 
 ## 🔜 Immediate Next — Phase 0: FFI Foundation
 
-**Estimated: 2.5 days**
+**Estimated: 2.5 days**  
+**Crate restructuring: NOT required for Phase 0** — all changes are in existing compiler crates.
 
 Goal: Enable packages written in 100% Kyle without Rust.
 
@@ -49,16 +105,28 @@ After Phase 0: packages like `ky-http`, `ky-sqlite`, `ky-json` can be written in
 
 ---
 
-## 📦 Package Implementation (after Phase 0)
+## 🏗️ Phase 1 — Platform Crate Setup (after Phase 0)
+
+**Estimated: 2-3 days**
+
+| Step | Task |
+|------|------|
+| 1.1 | Create `kyc_platform` crate with platform-independent API interfaces |
+| 1.2 | Create `kyc_platform_macos` adapter with macOS implementations |
+| 1.3 | Move file I/O, networking, time from `kyc_runtime` to `kyc_platform` |
+| 1.4 | Implement `@link` + `extern fn` workflow for platform FFI |
+| 1.5 | Create package template for `ky-*` packages with native/ FFI |
+
+## 📦 Package Implementation (after Phase 1)
 
 | Package | Description | Depends On |
 |---------|-------------|------------|
-| `ky-http` | HTTP/1.1 client + server (libcurl FFI) | Phase 0 |
-| `ky-json` | JSON parse + stringify | Phase 0 |
-| `ky-sqlite` | SQLite database bindings | Phase 0 + `ky-http` |
-| `ky-postgres` | PostgreSQL driver | Phase 0 |
-| `ky-websocket` | WebSocket client | Phase 0 + `ky-http` |
-| `ky-crypto` | Hashing, encryption (OpenSSL FFI) | Phase 0 |
+| `ky-http` | HTTP/1.1 client + server (libcurl FFI) | Phase 1 |
+| `ky-json` | JSON parse + stringify | Phase 1 |
+| `ky-sqlite` | SQLite database bindings | Phase 1 |
+| `ky-postgres` | PostgreSQL driver | Phase 1 |
+| `ky-websocket` | WebSocket client | Phase 1 |
+| `ky-crypto` | Hashing, encryption (OpenSSL FFI) | Phase 1 |
 
 ---
 
@@ -106,13 +174,15 @@ After Phase 0: packages like `ky-http`, `ky-sqlite`, `ky-json` can be written in
 ```
 NOW → Phase 0 (extern fn, @link, ptr) — 2.5 days
    ↓
-      Packages (ky-http, ky-json, ky-sqlite, etc.) — weeks
+      Phase 1 (Platform crate setup) — 2-3 days
          ↓
-            Phase 18 (Zero-Cost Abstractions) — months
+            Packages (ky-http, ky-json, ky-sqlite, etc.) — weeks
                ↓
-                  Async V3 + Iterators Advanced — months
+                  Phase 18 (Zero-Cost Abstractions) — months
                      ↓
-                        Alternative Backends — long-term
+                        Windowing + Graphics + Scene — months
+                           ↓
+                              UI + Desktop + KyleOS — long-term
 ```
 
 **Total language phases (1–17): 100% complete**  
