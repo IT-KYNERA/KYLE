@@ -1,0 +1,14 @@
+# ky-json package tests
+from packages.ky-json.src.lib import parse, stringify
+
+#[test]
+fn test_json_parse():
+    data = parse("{\"name\": \"Kyle\", \"version\": 1}")
+    assert(data["name"] == "Kyle")
+    assert(data["version"] == 1)
+
+#[test]
+fn test_json_stringify():
+    d = { "name": "Kyle", "version": 1 }
+    json_str = stringify(d)
+    assert(json_str != "")
