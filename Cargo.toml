@@ -11,6 +11,7 @@ members = [
     "crates/kyc_cli",
     "crates/kyc_runtime",
     "crates/kyc_tools",
+    "crates/kyc_platform",
 ]
 
 [workspace.package]

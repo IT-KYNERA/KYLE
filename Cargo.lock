@@ -472,6 +472,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "kyc_platform"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "kyc_runtime"
 version = "0.5.0"
 dependencies = [

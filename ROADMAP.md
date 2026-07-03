@@ -121,12 +121,12 @@ After Phase 0: packages like `ky-http`, `ky-sqlite`, `ky-json` can be written in
 
 | Package | Description | Depends On |
 |---------|-------------|------------|
-| `ky-http` | HTTP/1.1 client + server (libcurl FFI) | Phase 1 |
-| `ky-json` | JSON parse + stringify | Phase 1 |
-| `ky-sqlite` | SQLite database bindings | Phase 1 |
-| `ky-postgres` | PostgreSQL driver | Phase 1 |
-| `ky-websocket` | WebSocket client | Phase 1 |
-| `ky-crypto` | Hashing, encryption (OpenSSL FFI) | Phase 1 |
+| `http` | HTTP/1.1 client + server (libcurl FFI) | Phase 1 |
+| `json` | JSON parse + stringify | Phase 1 |
+| `sqlite` | SQLite database bindings | Phase 1 |
+| `postgres` | PostgreSQL driver | Phase 1 |
+| `websocket` | WebSocket client | Phase 1 |
+| `crypto` | Hashing, encryption (OpenSSL FFI) | Phase 1 |
 
 ---
 
