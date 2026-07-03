@@ -1,27 +1,59 @@
 # http — HTTP client for Kyle
 #
-# Wraps libcurl to provide HTTP GET functionality.
+# Uses curl via system() for HTTP requests.
+# Status code and body captured to temp files.
+#
 # Usage:
-#   @link "curl"
-#   response = http.get("https://example.com")
-#   println(response)
+#   status, body = http.get("https://api.example.com/users")
+#   println("status: {status}")
 
 @link "curl"
 
-# libcurl constants
-CURLOPT_URL := 10002
-CURLOPT_FOLLOWLOCATION := 52
+extern fn system(cmd: ptr) i32
 
-# libcurl function declarations
-extern fn curl_easy_init() ptr
-extern fn curl_easy_setopt(handle: ptr, option: i32, value: ptr) i32
-extern fn curl_easy_perform(handle: ptr) i32
-extern fn curl_easy_cleanup(handle: ptr)
+fn get(url: str) (i32, str):
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
+    system(cmd as ptr)
+    (parse_int(read_status()), read_body())
 
-fn get(url: str) i32:
-    curl = curl_easy_init()
-    curl_easy_setopt(curl, CURLOPT_URL, url)
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1 as ptr)
-    result = curl_easy_perform(curl)
-    curl_easy_cleanup(curl)
+fn post(url: str, data: str) (i32, str):
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X POST -d '" + data + "' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
+    system(cmd as ptr)
+    (parse_int(read_status()), read_body())
+
+fn put(url: str, data: str) (i32, str):
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X PUT -d '" + data + "' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
+    system(cmd as ptr)
+    (parse_int(read_status()), read_body())
+
+fn delete(url: str) (i32, str):
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X DELETE '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
+    system(cmd as ptr)
+    (parse_int(read_status()), read_body())
+
+fn parse_int(s: str) i32:
+    result: &i32 = 0
+    i: &i32 = 0
+    ZERO := 48
+    while i < len(s):
+        c = char_at(s, i)
+        if c >= ZERO and c <= 57:
+            result = result * 10 + (c - ZERO)
+        i = i + 1
     result
+
+fn read_status() str:
+    fd = open("/tmp/ky_status.txt", 0)
+    s = ""
+    if fd >= 0:
+        s = read_str(fd, 32)
+        close(fd)
+    s
+
+fn read_body() str:
+    fd = open("/tmp/ky_body.txt", 0)
+    s = ""
+    if fd >= 0:
+        s = read_str(fd, 65536)
+        close(fd)
+    s

@@ -565,6 +565,10 @@ impl<'ctx> Codegen<'ctx> {
                                 "assert_ne" => "ky_assert_ne", "assert_str" => "ky_assert_eq",
                                 _ => name,
                             };
+                             if self.module.get_function(runtime_name).is_none() {
+                                let fn_type = self.context.i64_type().fn_type(&[], false);
+                                self.module.add_function(runtime_name, fn_type, None);
+                            }
                             if let Some(callee) = self.module.get_function(runtime_name) {
                                 let fn_ty = callee.get_type();
                                 let param_tys = fn_ty.get_param_types();
@@ -867,6 +871,12 @@ impl<'ctx> Codegen<'ctx> {
             let params = [f64_ty.into()];
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_f64_to_str", ft, None);
+        }
+        // i64 kl_str_to_i64(ptr) — parse string to i64
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_to_i64", ft, None);
         }
         // i32 kl_strlen(ptr) — readonly
         {
@@ -1892,8 +1902,24 @@ impl<'ctx> Codegen<'ctx> {
                                 "assert_str" => "ky_assert_eq",
                                 _ => name,
                             };
-                            let callee = self.module.get_function(runtime_name);
-                            if let Some(callee_fn) = callee {
+                            if self.module.get_function(runtime_name).is_none() {
+                                // Auto-declare extern function on first use with inferred types
+                                let ret_type: BasicTypeEnum = if let Some(d) = dest {
+                                    self.alloca_types.get(&d).copied()
+                                        .unwrap_or(self.context.i64_type().as_basic_type_enum())
+                                } else {
+                                    self.context.i64_type().as_basic_type_enum()
+                                };
+                                let param_types: Vec<inkwell::types::BasicMetadataTypeEnum> = args.iter()
+                                    .filter_map(|a| {
+                                        if let MirValue::Local(id) = a {
+                                            self.alloca_types.get(id).copied().map(|t| t.into())
+                                        } else { None }
+                                    }).collect();
+                                let fn_type = ret_type.fn_type(&param_types, false);
+                                self.module.add_function(runtime_name, fn_type, None);
+                            }
+                            if let Some(callee_fn) = self.module.get_function(runtime_name) {
                                 let fn_ty = callee_fn.get_type();
                                 let param_types = fn_ty.get_param_types();
                                 let llvm_args: Vec<BasicValueEnum<'ctx>> = args
