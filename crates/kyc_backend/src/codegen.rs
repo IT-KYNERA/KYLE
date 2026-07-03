@@ -1431,7 +1431,10 @@ impl<'ctx> Codegen<'ctx> {
                         }
                     }
                     MirInst::FieldPtr { ptr, .. } => { escaping.insert(*ptr); }
-                    MirInst::PtrOffset { ptr, .. } => { escaping.insert(*ptr); }
+                    MirInst::PtrOffset { dest, ptr, .. } => { 
+                        escaping.insert(*ptr);
+                        escaping.insert(*dest);
+                    }
                     MirInst::Memcpy { dest_ptr_local, .. } => { escaping.insert(*dest_ptr_local); }
                     _ => {}
                 }

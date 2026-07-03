@@ -2564,22 +2564,6 @@ impl Lowerer {
                             });
                             return ctx;
                         }
-                        // Ptr set: ptr[idx] = val → PtrOffset + Store
-                        if matches!(target_type, Some(MirType::Ptr(_))) {
-                            ctx = self.lower_expr(ctx, right);
-                            let val_local = ctx.next_local - 1;
-                            let offset = ctx.alloc_local("_ptroff", MirType::Ptr(Box::new(MirType::Void)));
-                            ctx.current_block.insts.push(MirInst::PtrOffset {
-                                dest: offset,
-                                ptr: target_val,
-                                index: MirValue::Local(idx_val),
-                            });
-                            ctx.current_block.insts.push(MirInst::Store {
-                                dest: offset,
-                                value: MirValue::Local(val_local),
-                            });
-                            return ctx;
-                        }
                         // List set: list[idx] = val → kl_list_set
                         let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
                         ctx.current_block.insts.push(MirInst::Cast {
