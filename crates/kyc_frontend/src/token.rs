@@ -67,6 +67,7 @@ pub enum TokenKind {
     True,       // true
     False,      // false
     None,       // None
+    Null,       // null
     OkKw,       // ok (keyword alias to avoid conflict with Result)
     Extern,     // extern
     Import,     // import

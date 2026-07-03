@@ -18,6 +18,7 @@ pub enum MirConstant {
     Bool(bool),
     String(String),
     Void,
+    Null,
 }
 
 /// MIR types — simplified subset for codegen.
@@ -234,6 +235,7 @@ impl fmt::Display for MirConstant {
             MirConstant::Bool(b) => write!(f, "{}", b),
             MirConstant::String(s) => write!(f, "\"{}\"", s),
             MirConstant::Void => write!(f, "void"),
+            MirConstant::Null => write!(f, "null"),
         }
     }
 }

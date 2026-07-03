@@ -370,8 +370,11 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                                 MirConstant::F64(_) => MirType::F64,
                                 MirConstant::Bool(_) => MirType::Bool,
                                 MirConstant::String(_) => MirType::Str,
-                                MirConstant::Void => MirType::Void,
+                                                                MirConstant::Void => MirType::Void,
+                                MirConstant::Null => MirType::Ptr(Box::new(MirType::Void)),
                             };
+
+
                             let id = ssa.values.len();
                             ssa.values.push(SsaValue { type_: const_type, name: format!("_carg{}", id) });
                             ssa.const_values.insert(id, c.clone());
@@ -854,6 +857,7 @@ fn resolve_value(
                 MirConstant::Bool(_) => MirType::Bool,
                 MirConstant::String(_) => MirType::Str,
                 MirConstant::Void => MirType::Void,
+                MirConstant::Null => MirType::Ptr(Box::new(MirType::Void)),
             };
             let id = ssa.values.len();
             ssa.values.push(SsaValue { type_: const_type, name: format!("_k{}", id) });
@@ -879,6 +883,7 @@ fn value_type(value: &MirValue, func: &MirFunction, promotable: &HashSet<usize>,
             MirConstant::Bool(_) => MirType::Bool,
             MirConstant::String(_) => MirType::Str,
             MirConstant::Void => MirType::Void,
+            MirConstant::Null => MirType::Ptr(Box::new(MirType::Void)),
         },
         MirValue::Local(id) => {
             if promotable.contains(id) {

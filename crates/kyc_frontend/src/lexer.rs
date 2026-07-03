@@ -305,6 +305,7 @@ impl Lexer {
             "not" => TokenKind::Bang,
             "is" => TokenKind::Is,
             "super" => TokenKind::Super,
+            "null" => TokenKind::Null,
             _ => TokenKind::Identifier(word.to_string()),
         }
     }

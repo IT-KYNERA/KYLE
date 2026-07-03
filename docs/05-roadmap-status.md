@@ -112,7 +112,7 @@ Fase 16:   LLVM IR Quality       ✅ COMPLETADO (excepto 16.1 nsw/nuw diferido)
                                     pero no se reflejan en el IR generado — bug de inkwell/codegen)
 Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
   Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
-Fase 13:   Sintaxis Restante    🔜 EN CURSO (rangos, is, for-else, static fn, **, +% ✅ — falta genéricos, ptr, op overload, etc.)
+Fase 13:   Sintaxis Restante    🔜 EN CURSO (rangos, is, for-else, static fn, **, +%, genéricos✅, ptr✅, null✅ — falta op overload, etc.)
 Fase 14:   References & Borrow Checker ✅ COMPLETADO
 Fase 17:   Optimization Pipeline 🔜 v0.6 — Ejecutar pases LLVM (mem2reg,
              gvn, licm, sccp) en el módulo antes de emitir código.
@@ -664,17 +664,17 @@ extension/
 
 ---
 
-### Fase 13: Sintaxis Restante 🔜 (características del lenguaje que faltan)
+### Fase 13: Sintaxis Restante 🔜 (características del lenguaje que faltan — 13.1 ✅ COMPLETADO)
 
 **Objetivo:** Implementar toda la sintaxis documentada que aún no funciona.
 
 | # | Tarea | Sintaxis | Prioridad | Estado |
 |:--|:------|:---------|:----------|:-------|
-| 13.1 | **Genéricos en clases**: `final class Stack<T>:` | `final class Nombre<T>:` | ⭐⭐⭐⭐⭐ | 🔶 Parsing parcial, falta monomorphization |
+| 13.1 | **Genéricos en clases**: `final class Stack<T>:` | `final class Nombre<T>:` | ⭐⭐⭐⭐⭐ | ✅ COMPLETADO (struct literal monomorphization, method monomorphization on call) |
 | 13.2 | **Rangos completos**: `0..=5`, `0..<5` | `..=`, `..<` como operadores | ⭐⭐⭐ | ✅ |
 | 13.3 | **`is` type checking**: `x is str` → true/false | `expr is Type` | ⭐⭐⭐ | ✅ |
-| 13.4 | **`ptr` type completo**: aritmética de punteros para FFI | `ptr` como tipo usable | ⭐⭐ | ❌ |
-| 13.5 | **`null` literal**: valor nulo para `ptr` | `null` | ⭐⭐ | ❌ |
+| 13.4 | **`ptr` type completo**: aritmética de punteros para FFI | `ptr` como tipo usable | ⭐⭐ | ✅ Lexer+Parser+AST+MIR+Codegen |
+| 13.5 | **`null` literal**: valor nulo para `ptr` | `null` | ⭐⭐ | ✅ Lexer+Parser+AST+MIR+Codegen |
 | 13.6 | **Operator overloading**: `op_+(other)`, `op_-(other)`, `op_*(other)` | `fn op_+(other: T) T:` | ⭐⭐ | ❌ |
 | 13.7 | **`for-else:`**: bloque else si loop no hizo break | `for x in items: ... else: ...` | ⭐⭐ | ✅ |
 | 13.8 | **Loop labels**: `break <label>`, `continue <label>` | `label for ...` / `label while ...` | ⭐⭐ | ✅ Decisión cerrada |
@@ -685,7 +685,7 @@ extension/
 | 13.13 | **`static fn`**: métodos estáticos en clases | `static fn name():` | ⭐⭐ | ✅ |
 | 13.14 | **`abstract fn`**: funciones abstractas en abstract class | `abstract fn name():` | ⭐⭐ | ❌ |
 | 13.15 | **`@` attribute token**: `#[attr]` sintaxis completa | `@` como token + parsing | ⭐⭐ | ❌ |
-| 13.16 | **`??` default operator**: `expr ?? default` | `??` para T? | ⭐ | 🔶 Lexer/Parser/AST, MIR stub |
+| 13.16 | **`??` default operator**: `expr ?? default` | `??` para T? | ⭐ | ✅ COMPLETADO (scope, type-checker, MIR lowering, None init, codegen) |
 | 13.17 | **`**` power operator correcto**: codegen real (hoy es mul incorrecto) | `a ** b` | ⭐⭐ | ✅ |
 | 13.18 | **`+%`, `-%`, `*%` percentage ops**: via ky_add_pct/ky_sub_pct/ky_mul_pct | `x +% 10` | ⭐ | ✅ |
 
@@ -808,7 +808,7 @@ Para que una nueva característica entre en Kyle, debe cumplir **todos** estos c
 | | | **🔶 16.1 nsw/nuw (code implementado, flags no aparecen en IR)** |
 | **Package manager** | **11** | **✅ 11.1-11.5 (resolver, registry client, cache, lock, publish, login, update, outdated, import desde paquetes)** |
 | **Tooling** | **12** | **✅ COMPLETADO (LSP, VS Code, test framework, formatter, completions, debug adapter, color theme)** |
-| **Sintaxis Restante** | **13** | **🔜 DETALLADO (genéricos, rangos, is, ptr, etc.)** |
+| **Sintaxis Restante** | **13** | **🔜 DETALLADO (genéricos✅, rangos, is, ptr, etc.)** |
 | **References & Borrow Checker** | **14** | **✅ COMPLETADO** |
 | **Alternative backends** | **15** | **📅 Post-v1.0** |
 
@@ -996,11 +996,11 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 - [x] 12.4 Formatter completo (`ky fmt --check`, project mode, [format] config, sintaxis moderna)
 - [x] 12.5 Shell completions (zsh, fish, powershell + `ky add` dynamic completion)
 
-### Fase 13 — Sintaxis Restante 🔜
-- [ ] 13.1 Genéricos en clases (`final class Stack<T>:`)
+### Fase 13 — Sintaxis Restante 🔜 (13.1 ✅ 13.4 ✅ 13.5 ✅)
+- [x] 13.1 Genéricos en clases (`final class Stack<T>:`) ✅ COMPLETADO
 - [ ] 13.2 Rangos completos (`0..5`, `..=`, `..<`, `..`, `3..`)
 - [ ] 13.3 `is` type checking (`x is str`)
-- [ ] 13.4 `ptr` type completo + `null` literal
+- [x] 13.4 `ptr` type completo + `null` literal ✅ COMPLETADO
 - [ ] 13.5 Operator overloading (`op_+`, etc.)
 - [ ] 13.6 `for-else:` + loop labels
 - [ ] 13.7 Match patterns (destructuring, guards)

@@ -489,6 +489,7 @@ impl TypeChecker {
                 Literal::String(_) => Type::Str,
                 Literal::Boolean(_) => Type::Bool,
                 Literal::None => Type::Option(Box::new(Type::Void)),
+                Literal::Null => Type::Ptr,
             },
             Expr::Identifier { name, span } => {
                 if let Some(sym) = self.symbols.lookup(name) {
@@ -942,7 +943,34 @@ impl TypeChecker {
                 then_type
             }
             Expr::MutableRef { expression, .. } => self.infer_expr(expression),
-            Expr::NullCoalesce { left, right, .. } => self.infer_expr(left),
+            Expr::NullCoalesce { left, right, span } => {
+                let left_type = self.infer_expr(left);
+                let right_type = self.infer_expr(right);
+                let inner = match &left_type {
+                    Type::Option(inner) => Some(inner.as_ref()),
+                    Type::Generic(name, args) if name == "Option" && args.len() == 1 => {
+                        Some(&args[0])
+                    }
+                    _ => None,
+                };
+                if let Some(inner) = inner {
+                    if *inner != right_type {
+                        self.reporter.report(
+                            Diagnostic::error(ErrorCode::E0001,
+                                format!("'??' default value type mismatch: expected {:?}, got {:?}", inner, right_type))
+                                .with_span(*span)
+                        );
+                    }
+                    inner.clone()
+                } else {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001,
+                            format!("'??' requires Option type on left, got {:?}", left_type))
+                            .with_span(*span)
+                    );
+                    right_type
+                }
+            }
             Expr::MoveExpr { expression, .. } => self.infer_expr(expression),
             Expr::MatchExpr { expression, arms, span } => {
                 let scrutinee_type = self.infer_expr(expression);
@@ -1030,6 +1058,7 @@ impl TypeChecker {
             AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => {
                 self.resolve_ast_type(inner)
             }
+            AstType::Ptr { .. } => Type::Ptr,
         }
     }
 

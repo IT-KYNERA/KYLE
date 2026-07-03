@@ -18,6 +18,7 @@ pub enum Type {
     TypeParam(String),
     Generic(String, Vec<Type>),
     TypeVar(usize),
+    Ptr,
     Option(Box<Type>),
     Error(Box<Type>),
     Function(FunctionType),
@@ -58,6 +59,7 @@ impl Type {
             }
             AstType::Mutable { inner, .. } => Type::from_ast_type(inner),
             AstType::Move { inner, .. } => Type::from_ast_type(inner),
+            AstType::Ptr { .. } => Type::Ptr,
         }
     }
 
@@ -68,6 +70,7 @@ impl Type {
             "f32" => Type::F32, "f64" => Type::F64,
             "bool" => Type::Bool, "char" => Type::Char, "str" => Type::Str,
             "void" => Type::Void,
+            "ptr" => Type::Ptr,
             _ => Type::Named(name.to_string()),
         }
     }
@@ -81,6 +84,7 @@ impl Type {
             "f32" => Type::F32, "f64" => Type::F64,
             "bool" => Type::Bool, "char" => Type::Char, "str" => Type::Str,
             "void" => Type::Void,
+            "ptr" => Type::Ptr,
             _ => Type::Named(name.to_string()),
         }
     }
@@ -98,6 +102,7 @@ impl Type {
             crate::ast::Literal::String(_) => Type::Str,
             crate::ast::Literal::Boolean(_) => Type::Bool,
             crate::ast::Literal::None => Type::Option(Box::new(Type::TypeVar(0))),
+            crate::ast::Literal::Null => Type::Ptr,
         }
     }
 
@@ -154,6 +159,7 @@ impl fmt::Display for Type {
             Type::Char => write!(f, "char"),
             Type::Str => write!(f, "str"),
             Type::Void => write!(f, "void"),
+            Type::Ptr => write!(f, "ptr"),
             Type::Named(n) => write!(f, "{}", n),
             Type::TypeParam(n) => write!(f, "{}", n),
             Type::Generic(name, args) => {

@@ -2430,6 +2430,7 @@ impl<'ctx> Codegen<'ctx> {
                     .as_basic_value_enum()
             }
             MirConstant::Void => self.context.i32_type().const_zero().as_basic_value_enum(),
+            MirConstant::Null => self.context.ptr_type(Default::default()).const_null().as_basic_value_enum(),
         }
     }
 }

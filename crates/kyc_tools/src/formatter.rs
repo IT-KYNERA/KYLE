@@ -192,6 +192,9 @@ impl Formatter {
                 out.push('^');
                 self.write_type(out, inner);
             }
+            AstType::Ptr { .. } => {
+                out.push_str("ptr");
+            }
         }
     }
 
@@ -792,6 +795,7 @@ impl Formatter {
             }
             Literal::Boolean(b) => out.push_str(if *b { "true" } else { "false" }),
             Literal::None => out.push_str("None"),
+            Literal::Null => out.push_str("null"),
         }
     }
 

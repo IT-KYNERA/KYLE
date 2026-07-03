@@ -777,6 +777,10 @@ impl Parser {
             let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
             return Err(format!("expected type name, found {}", found));
         }
+        // Handle ptr as a built-in type
+        if name == "ptr" {
+            return Ok(AstType::Ptr { span: self.span_from(start) });
+        }
         let mut base = if self.at(TokenKind::Less) {
             self.advance();
             let mut args = Vec::new();
@@ -958,6 +962,10 @@ impl Parser {
             TokenKind::None => {
                 self.advance();
                 Expr::Literal { value: Literal::None, span: self.span_from(start) }
+            }
+            TokenKind::Null => {
+                self.advance();
+                Expr::Literal { value: Literal::Null, span: self.span_from(start) }
             }
             TokenKind::Char(s) => {
                 let val = s.chars().next().unwrap_or('\0') as u8 as i64;

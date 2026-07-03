@@ -17,6 +17,7 @@ pub enum Literal {
     String(String),
     Boolean(bool),
     None,
+    Null,
 }
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,8 @@ pub enum AstType {
     Mutable { inner: Box<AstType>, span: Span },
     /// `^T` — move/ownership transfer type (for params)
     Move { inner: Box<AstType>, span: Span },
+    /// `ptr` — raw pointer type (for FFI/unsafe)
+    Ptr { span: Span },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1285,6 +1288,7 @@ impl fmt::Display for Literal {
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Boolean(b) => write!(f, "{}", b),
             Literal::None => write!(f, "None"),
+            Literal::Null => write!(f, "null"),
         }
     }
 }
@@ -1315,6 +1319,7 @@ impl fmt::Display for AstType {
             }
             AstType::Mutable { inner, .. } => write!(f, "&{}", inner),
             AstType::Move { inner, .. } => write!(f, "^{}", inner),
+            AstType::Ptr { .. } => write!(f, "ptr"),
         }
     }
 }

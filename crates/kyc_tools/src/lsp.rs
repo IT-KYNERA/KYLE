@@ -1174,6 +1174,7 @@ impl LanguageServer {
             AstType::Dict { .. } => "dict".to_string(),
             AstType::FnPtr { .. } => "fn_ptr".to_string(),
             AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => Self::ast_type_name(inner),
+            AstType::Ptr { .. } => "ptr".to_string(),
         }
     }
 
@@ -1186,6 +1187,7 @@ impl LanguageServer {
                 Literal::String(_) => Some("str".to_string()),
                 Literal::Boolean(_) => Some("bool".to_string()),
                 Literal::None => None,
+                Literal::Null => Some("ptr".to_string()),
             },
             Expr::StructLiteral { struct_name, .. } => Some(struct_name.clone()),
             Expr::Identifier { name, .. } => {
@@ -1412,6 +1414,7 @@ impl LanguageServer {
             }
             AstType::Mutable { inner, .. } => format!("&{}", Self::fmt_ast_type(inner)),
             AstType::Move { inner, .. } => format!("^{}", Self::fmt_ast_type(inner)),
+            AstType::Ptr { .. } => "ptr".to_string(),
         }
     }
 
@@ -2265,6 +2268,7 @@ impl LanguageServer {
             AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => {
                 Self::walk_semantic_type(inner, tokens, symbols);
             }
+            AstType::Ptr { .. } => {}
         }
     }
 }
