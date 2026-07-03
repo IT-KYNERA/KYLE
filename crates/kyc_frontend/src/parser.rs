@@ -1539,6 +1539,18 @@ impl Parser {
             }
             return Ok(Pattern::Identifier { name, span: self.span_from(start) });
         }
+        // Tuple pattern: (p1, p2, ...)
+        if self.at(TokenKind::LParen) {
+            self.advance();
+            let mut elements = Vec::new();
+            loop {
+                elements.push(self.parse_pattern_or()?);
+                if self.at(TokenKind::Comma) { self.advance(); }
+                else { break; }
+            }
+            self.expect(TokenKind::RParen)?;
+            return Ok(Pattern::Tuple { elements, span: self.span_from(start) });
+        }
         let lit = match &self.current()?.kind {
             TokenKind::Integer(s) => {
                 let n: i64 = s.parse().unwrap_or(0);
