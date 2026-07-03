@@ -1,0 +1,7 @@
+# http package tests
+from packages.http.src.lib import get
+
+#[test]
+fn test_get_example():
+    result = get("https://example.com")
+    assert(result == 0)
