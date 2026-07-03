@@ -105,28 +105,132 @@ After Phase 0: packages like `ky-http`, `ky-sqlite`, `ky-json` can be written in
 
 ---
 
-## 🏗️ Phase 1 — Platform Crate Setup (after Phase 0)
+## Runtime Rewrite Analysis — What Kyle Can and Cannot Do
 
-**Estimated: 2-3 days**
+The runtime (`libkyc_runtime.a`) has **88 `extern "C"` functions**. Here's exactly what can be rewritten in pure Kyle (+ `extern fn` to libc) and what cannot.
 
-| Step | Task |
-|------|------|
-| 1.1 | Create `kyc_platform` crate with platform-independent API interfaces |
-| 1.2 | Create `kyc_platform_macos` adapter with macOS implementations |
-| 1.3 | Move file I/O, networking, time from `kyc_runtime` to `kyc_platform` |
-| 1.4 | Implement `@link` + `extern fn` workflow for platform FFI |
-| 1.5 | Create package template for `ky-*` packages with native/ FFI |
+### ✅ Can rewrite NOW (65 functions — 74%)
 
-## 📦 Package Implementation (after Phase 1)
+These use only arithmetic, raw pointers, and libc FFI. All doable with current Kyle features.
 
-| Package | Description | Depends On |
-|---------|-------------|------------|
-| `http` | HTTP/1.1 client + server (libcurl FFI) | Phase 1 |
-| `json` | JSON parse + stringify | Phase 1 |
-| `sqlite` | SQLite database bindings | Phase 1 |
-| `postgres` | PostgreSQL driver | Phase 1 |
-| `websocket` | WebSocket client | Phase 1 |
-| `crypto` | Hashing, encryption (OpenSSL FFI) | Phase 1 |
+| Module | Count | Examples |
+|--------|:-----:|----------|
+| `string.rs` | 20 | `ky_strlen`, `ky_concat`, `ky_str_to_i64`, `ky_str_contains`, `ky_substr`, etc. |
+| `list.rs` | 28 | `ky_list_new/push/get/set/pop/len`, `ky_list_map/filter/fold`, `ky_range`, etc. |
+| `io.rs` | 10 | `ky_print/println`, `ky_open/read/write/close`, `ky_sleep/now` |
+| `lib.rs` | 4 | `ky_pow`, `ky_add_pct`, `ky_sub_pct`, `ky_mul_pct` |
+| `assert.rs` | 1 | `ky_assert` |
+| `async_.rs` | 1 | `ky_yield` |
+
+**Total: 65 functions. Estimated: 2-3 days.**
+
+### 🔶 Needs missing Kyle feature (12 functions — 14%)
+
+| Function | What's Missing | Workaround |
+|----------|---------------|------------|
+| `ky_alloc/ky_free` | **Heap allocator** | Add `extern fn malloc(size: i64) ptr` ✅ already possible |
+| `ky_retain/ky_release` | **Atomic operations** | Needs LLVM `atomicrmw` instruction or `__sync_fetch_and_add` via extern |
+| `ky_iter_new/next/map/filter/free` (5) | **`Box::new` + function ptr transmute** | Use `extern fn malloc` for heap + manual vtable |
+| `ky_f64_to_str` | **f64 formatting** | Use `extern fn snprintf(buf, size, fmt, val)` from libc |
+| `ky_assert_eq/assert_ne` | **i64 error message formatting** | Use `ky_i64_to_str` (from ✅ group) |
+
+**Estimated: 2-3 days (after adding missing extern fn declarations).**
+
+### ❌ Cannot rewrite (12 functions — 14%)
+
+| Module | Count | Why |
+|--------|:-----:|-----|
+| `dict.rs` | 10 | **Needs hash map** — all 8 dict functions + 2 unimplemented (`ky_dict_contains`, `ky_dict_remove`). Dict is `HashMap<String, i64>` from Rust std. Kyle needs a hash table implementation (FNV-1a + open addressing, ~200 lines of Kyle). |
+| `thread.rs` | 2 | **Needs OS threads** — `ky_spawn_thread` needs `pthread_create` with a C-compatible trampoline. `ky_join_thread` needs `pthread_join`. The trampoline requires codegen support for `extern "C"` closures. |
+| `async_.rs` | 2 | **Needs async executor** — `ky_spawn_task` and `ky_await_task` depend on threads, channels, mutexes, atomics, and a global executor singleton. This is the most complex piece. |
+
+**Estimated: 2-3 weeks (hash map: 1 week, threads: 1-2 weeks, async: depends on threads).**
+
+### Summary
+
+| Status | Count | % |
+|--------|:-----:|:-:|
+| ✅ Can rewrite NOW | 65 | 74% |
+| 🔶 Needs minor feature | 12 | 14% |
+| ❌ Needs major feature | 12 | 14% |
+| **Total** | **88** | **100%** |
+
+---
+
+## Runtime Rewrite Plan
+
+### Phase A — Low-hanging fruit (2-3 days)
+Rewrite 65 functions that are pure Kyle + libc FFI:
+- All of `string.rs` (except `ky_f64_to_str`)
+- All of `list.rs` (iterator functions use `extern fn malloc`/`free`)
+- All of `io.rs` (direct `extern fn` to libc: read, write, open, close, clock_gettime, etc.)
+- `lib.rs` utilities, `ky_assert`, `ky_yield`
+
+### Phase B — Missing extern declarations (1 day)
+Add remaining `extern fn` declarations for:
+- `malloc`, `free`, `calloc`, `realloc` from libc
+- `snprintf` from libc (for `ky_f64_to_str`)
+- `__sync_fetch_and_add`, `__sync_fetch_and_sub`, `__sync_synchronize` (GCC builtins)
+
+### Phase C — Hash map in Kyle (1-2 weeks)
+Implement `final class Dict<K, V>` in pure Kyle with:
+- FNV-1a hash function
+- Open addressing with linear probing
+- Dynamic resizing
+- Wraps `extern fn malloc`/`free` for backing store
+
+### Phase D — Threading & Async (2-4 weeks)
+- `ky_spawn_thread`/`ky_join_thread` via `pthread_create` + C trampoline
+- Rebuild async executor on top of Kyle threads + channels
+
+### Phase E — Self-hosting compiler (4-8 weeks, low priority)
+- Declare ~85 LLVM C API functions as `extern fn`
+- Rewrite codegen logic (~2,400 lines) from Rust to Kyle
+- Compiler written in Kyle compiles itself
+
+---
+
+## Implementation Order
+
+```
+NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
+   ↓
+      Packages (http, json, sqlite — pure Kyle) — ✅ DONE
+         ↓
+            Runtime Phase A (65 functions) — 2-3 days 🔜
+               ↓
+                  Runtime Phase B (missing externs) — 1 day 🔜
+                     ↓
+                        Runtime Phase C (hash map) — 1-2 weeks 🔜
+                           ↓
+                              Runtime Phase D (threading) — 2-4 weeks 📅
+                                 ↓
+                                    Phase 18 (Zero-Cost) — months 📅
+                                       ↓
+                                          Self-hosting — low priority 📅
+```
+
+**Current state:** Packages work (http, json, sqlite) in 100% Kyle with FFI. Runtime is 74% rewritable now. Hash map is the #1 blocker for full self-sufficiency.
+
+## Self-Hosting — Codegen Analysis
+
+To compile Kyle with Kyle, the compiler's codegen (`kyc_backend/src/codegen.rs`, ~2,400 lines of Rust) must be rewritten in Kyle. It currently uses **inkwell** (Rust wrapper for LLVM C API).
+
+### What would be needed
+
+| Component | Lines | Difficulty |
+|-----------|:-----:|:----------:|
+| LLVM C API `extern fn` declarations | ~85 functions | 🟢 Easy (one-time typing) |
+| LLVM type wrappers (`LLVMValueRef`, etc.) | ~100 | 🟢 Easy (all `ptr`) |
+| Codegen logic (translate MIR → LLVM IR) | ~2,400 | 🔴 Hard (complex dispatch logic) |
+| SSA construction | ~920 | 🟡 Medium (already pure algorithms) |
+| Linker driver | ~150 | 🟢 Easy (`system("clang ...")` already works) |
+
+### LLVM is NOT replaced
+
+LLVM stays as the machine-code backend. The same way we call libcurl via `extern fn`, we would call LLVM via `extern fn LLVMBuildAdd(...)`. The ~85 LLVM C API functions map 1:1 to the existing inkwell calls.
+
+**Verdict:** Technically feasible. Not a priority — the Rust compiler is stable and the codegen doesn't need to be self-hosted to ship packages.
 
 ---
 
@@ -166,24 +270,3 @@ After Phase 0: packages like `ky-http`, `ky-sqlite`, `ky-json` can be written in
 |---------|---------|
 | Cranelift | Faster compilation (debug mode), no LLVM dependency |
 | WASM | Compile Kyle for browser and WebAssembly targets |
-
----
-
-## Implementation Order
-
-```
-NOW → Phase 0 (extern fn, @link, ptr) — 2.5 days
-   ↓
-      Phase 1 (Platform crate setup) — 2-3 days
-         ↓
-            Packages (ky-http, ky-json, ky-sqlite, etc.) — weeks
-               ↓
-                  Phase 18 (Zero-Cost Abstractions) — months
-                     ↓
-                        Windowing + Graphics + Scene — months
-                           ↓
-                              UI + Desktop + KyleOS — long-term
-```
-
-**Total language phases (1–17): 100% complete**  
-**Next milestone: Phase 0 (FFI foundation)** unlocks pure-Kyle packages.
