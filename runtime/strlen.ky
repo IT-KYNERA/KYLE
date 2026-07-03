@@ -1,8 +1,0 @@
-# Pure Kyle implementation of ky_strlen
-# Replaces kyc_runtime/src/string.rs:ky_strlen
-
-fn ky_strlen(s: ptr) i32:
-    len: &i32 = 0
-    while s[len] as i8 != 0:
-        len = len + 1
-    len
