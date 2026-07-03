@@ -87,6 +87,10 @@ Fase 9:    Async Scheduler      ✅ Thread pool V2 (async expr, await expr, asyn
                                  🔜 State machine V3, work-stealing, non-blocking I/O
 Fase 10:   Iterators            ✅ 17 métodos de agregación listos (runtime + lowering)
                                  🔜 Closures funcionales (fn ptr primera clase) + Lazy iterators
+Fase 11:   Package Manager      ✅ COMPLETADO
+Fase 12:   Tooling              ✅ COMPLETADO
+Fase 13:   Sintaxis Restante    ✅ COMPLETADO (100%)
+Fase 14:   References & Borrow Checker ✅ COMPLETADO
 Fase 15:   SSA Form              ✅ COMPLETADO (100%)
                                     ✅ i64 default literal type
                                     ✅ ThinLTO -flto (GCC LTO)
@@ -109,13 +113,15 @@ Fase 16:   LLVM IR Quality       ✅ COMPLETADO (100%)
                                     ✅ 16.7 — !range metadata en bool
                                     ✅ 16.8 — lifetime.start/end
                                     ✅ 16.9 — TBAA metadata
-Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
-  Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
-Fase 13:   Sintaxis Restante    ✅ COMPLETADO (100%)
-Fase 14:   References & Borrow Checker ✅ COMPLETADO
+Fase 16:   LLVM IR Quality       ✅ COMPLETADO (100%)
 Fase 17:   Optimization Pipeline ✅ COMPLETADO (SSA fix, nsw flags, alloca elimination, O3 pipeline)
-Fase 18:   Zero-Cost Abstractions 📅 (post-v1.0)
-Fase 15:   Alternative Backends 📅 (post-v1.0)
+═══════════════════════════════════════════════════
+📅 Post-v1.0 (planificado, no empezado):
+═══════════════════════════════════════════════════
+Fase 9b:   Async Scheduler V3   State machine, work-stealing, non-blocking I/O
+Fase 10b:  Iterators Avanzados  Closures funcionales, lazy iterators
+Fase 18:   Zero-Cost Abstractions Escape analysis, SSO, monomorfización, vtables
+Backends:  Alternative Targets  Cranelift (compilación rápida), WASM (web)
 ```
 
 ---
@@ -726,10 +732,12 @@ sistema completo de referencias con préstamo por defecto.
 
 ---
 
-### Fase 15: Alternative Backends 📅 (post-v1.0)
+### 📅 Alternative Backends (post-v1.0)
 
-- [ ] ⭐ Cranelift backend (compilación más rápida)
-- [ ] ⭐ WASM target (web)
+| Backend | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Cranelift** | Compilación más rápida (debug mode) · No requiere LLVM | ⭐⭐ |
+| **WASM** | Target WebAssembly — compilar Kyle para el navegador | ⭐⭐ |
 
 ---
 
@@ -943,27 +951,35 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 | 17.5 | **Eliminar allocas temporales en backend no-SSA** — stores/loads redundantes → valores directos | 2-3× | ⭐⭐⭐ | ✅ **COMPLETADO** (de 15 a 2 allocas por función) |
 | 17.6 | **Constant folding + propagation en LLVM IR** | — | ⭐⭐ | ✅ **COMPLETADO** |
 
-### Fase 18 — Zero-Cost Abstractions (renumerada) 📅
-- [ ] ⭐⭐⭐⭐ 18.1 — Stack allocation para `final class` pequeños (escape analysis)
-- [ ] ⭐⭐⭐ 18.2 — Inlining completo de `.map()`/`.filter()`/`.fold()`
-- [ ] ⭐⭐⭐ 18.3 — Monomorfización verificada en LLVM IR
-- [ ] ⭐⭐⭐ 18.4 — Eliminación de vtables para clases sin herencia
-- [ ] ⭐⭐ 18.5 — Devirtualización de métodos
+### 📅 Fase 18 — Zero-Cost Abstractions (post-v1.0)
 
-### Fase 18 — Memory & Stack Optimizations 📅
-- [ ] ⭐⭐⭐⭐ 18.1 — Escape analysis: `final class` en stack si no escapa
-- [ ] ⭐⭐⭐ 18.2 — Small string optimization (SSO): strings < 15 bytes inlineados
-- [ ] ⭐⭐⭐ 18.3 — Array optimizations: small arrays en stack
-- [ ] ⭐⭐ 18.4 — Return value optimization (RVO)
+| # | Tarea | Prioridad |
+|---|-------|-----------|
+| 18.1 | **Escape analysis** — `final class` pequeños en stack si no escapan (hoy heap) | ⭐⭐⭐⭐ |
+| 18.2 | **Small string optimization (SSO)** — strings < 15 bytes inlineados sin heap alloc | ⭐⭐⭐ |
+| 18.3 | **Inlining de `.map()`/`.filter()`/`.fold()`** — cero overhead sobre loop manual | ⭐⭐⭐ |
+| 18.4 | **Monomorfización verificada** — genéricos sin boxing en LLVM IR | ⭐⭐⭐ |
+| 18.5 | **Array optimizations** — small arrays en stack en vez de heap | ⭐⭐⭐ |
+| 18.6 | **Eliminación de vtables** — dispatch directo para clases sin herencia | ⭐⭐⭐ |
+| 18.7 | **Return value optimization (RVO)** — evitar copias en retorno de clases | ⭐⭐ |
+| 18.8 | **Devirtualización** — speculative devirt de llamadas a métodos | ⭐⭐ |
 
-### Fase 9 — Async Scheduler (continuación)
-- [ ] 9.1-9.5 State machine V3 (reemplazar thread pool)
-- [ ] 9.6-9.8 Work-stealing scheduler
-- [ ] 9.9-9.11 Non-blocking I/O
+### 📅 Fase 9b — Async Scheduler V3 (post-v1.0)
+**Estado:** Thread pool V2 funciona (async/await) · State machine V3 planificado
 
-### Fase 10 — Iterators (continuación)
-- [ ] 10.1-10.5 Closures funcionales (fn ptr primera clase)
-- [ ] 10.6-10.9 Lazy evaluation / `iter()` trait
+| # | Tarea | Prioridad |
+|---|-------|-----------|
+| 9.1-5 | State machine V3 — reemplazar thread pool con máquina de estados | ⭐⭐⭐ |
+| 9.6-8 | Work-stealing scheduler — balanceo de carga entre threads | ⭐⭐⭐ |
+| 9.9-11 | Non-blocking I/O — async read/write, timers, signals | ⭐⭐ |
+
+### 📅 Fase 10b — Iteradores Avanzados (post-v1.0)
+**Estado:** 17 métodos de lista funcionan (map, filter, fold, etc.) · Closures y lazy pendientes
+
+| # | Tarea | Prioridad |
+|---|-------|-----------|
+| 10.1-5 | Closures funcionales — fn pointer como primera clase ciudadana | ⭐⭐⭐ |
+| 10.6-9 | Lazy evaluation — `iter()` trait, evaluación perezosa | ⭐⭐ |
 
 ### Fase 11 — Package Manager ✅
 - [x] 11.1 Manifest completo (validación, versiones, dev-deps, [project] table)
@@ -1246,33 +1262,22 @@ en todos los benchmarks computacionales.
 **Resumen:** Fase 17 completada al 100%. Todos los items implementados, verificados
 en IR generado, y tests pasando en modo SSA (release) y no-SSA (debug).
 
-### Fase 18 — Zero-Cost Abstractions 📅 (renumerada)
+### 📅 Fase 18 — Zero-Cost Abstractions (post-v1.0)
 
-**Objetivo:** Garantizar que las construcciones de alto nivel (clases, genéricos,
-iteradores, closures) tengan CERO sobrecarga en tiempo de ejecución.
+**Objetivo:** Garantizar que las construcciones de alto nivel (clases, strings,
+iteradores) tengan CERO sobrecarga en tiempo de ejecución vs código escrito a mano.
 
-| # | Tarea | Prioridad | Depende de |
-|---|-------|-----------|------------|
-| 18.1 | Stack allocation para `final class` pequeños (hoy heap) | ⭐⭐⭐⭐ | — |
-| 18.2 | Inlining completo de `.map()`/`.filter()`/`.fold()` en código máquina | ⭐⭐⭐ | Fase 17 |
-| 18.3 | Monomorfización de genéricos verificada en LLVM IR | ⭐⭐⭐ | — |
-| 18.4 | Eliminación de vtables para clases sin herencia | ⭐⭐⭐ | — |
-| 18.5 | Devirtualización de llamadas a métodos (speculative devirt) | ⭐⭐ | Fase 14 |
-
----
-
-### Fase 18 — Memory & Stack Optimizations 🔜 PLANIFICADO
-
-**Objetivo:** Minimizar asignaciones en heap y maximizar uso de pila (stack) para
-tipos pequeños, siguiendo la filosofía C++ de "zero-cost abstractions".
-
-| # | Tarea | Prioridad | Depende de |
-|---|-------|-----------|------------|
-| 18.1 | Escape analysis: `final class` en stack si no escapa | ⭐⭐⭐⭐ | — |
-| 18.2 | Small string optimization (SSO): strings < 15 bytes inlineados | ⭐⭐⭐ | — |
-| 18.3 | Array optimizations: small arrays en stack | ⭐⭐⭐ | 18.1 |
-| 18.4 | Return value optimization (RVO) para clases | ⭐⭐ | 18.1 |
+| # | Tarea | Prioridad |
+|---|-------|-----------|
+| 18.1 | **Escape analysis** — `final class` pequeños en stack si no escapan | ⭐⭐⭐⭐ |
+| 18.2 | **Small string optimization (SSO)** — strings < 15 bytes inlineados | ⭐⭐⭐ |
+| 18.3 | **Inlining de .map()/.filter()/.fold()** — cero overhead contra loop manual | ⭐⭐⭐ |
+| 18.4 | **Monomorfización verificada** — genéricos sin boxing en LLVM IR | ⭐⭐⭐ |
+| 18.5 | **Array optimizations** — small arrays en stack | ⭐⭐⭐ |
+| 18.6 | **Eliminación de vtables** — dispatch directo para clases sin herencia | ⭐⭐⭐ |
+| 18.7 | **Return value optimization (RVO)** — evitar copias en retorno | ⭐⭐ |
+| 18.8 | **Devirtualización** — speculative devirt de llamadas a métodos | ⭐⭐ |
 
 ---
 
-*Versión: v1.0 · Actualizado: 2026-07-03 — Fases 1-17 COMPLETADAS (100%) · Fase 13 Sintaxis Restante ✅*
+*Versión: v1.0 · Actualizado: 2026-07-03 — Fases 1-17 ✅ COMPLETADAS · Fase 9b/10b/18 📅 post-v1.0*
