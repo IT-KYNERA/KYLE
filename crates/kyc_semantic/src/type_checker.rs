@@ -162,6 +162,23 @@ impl TypeChecker {
                 self.check_function(f);
             }
         }
+        // Type-check field defaults against declared field types
+        for member in &c.members {
+            if let ClassMember::Field(f) = member {
+                if let Some(ref default_expr) = f.default {
+                    let default_ty = self.infer_expr(default_expr);
+                    let field_ty = self.resolve_ast_type(&f.type_);
+                    if !self.types_match(&default_ty, &field_ty) {
+                        self.reporter.report(
+                            Diagnostic::error(ErrorCode::E0001,
+                                format!("default value type '{}' does not match field '{}' type '{}'",
+                                    default_ty, f.name, field_ty))
+                        );
+                    }
+                }
+            }
+        }
+
         // If this class has a parent, enforce that all abstract methods are implemented
         if let Some(parent_name) = &c.parent {
             if let Some(parent_sym) = self.symbols.lookup(parent_name) {
@@ -665,12 +682,22 @@ impl TypeChecker {
                                 }
                             }
                         }
-                        // Check call-site coercion: ^ required for move params
+                        // Check call-site coercion: ^ required for move params, & required for mutable borrow params
                         if let Some(name) = Self::target_name(target) {
                             if let Some(sym) = self.symbols.lookup(name) {
                                 if let SymKind::Function(fdecl) = &sym.kind {
                                     for (i, (arg, param)) in arguments.iter().zip(fdecl.params.iter()).enumerate() {
                                         let has_move = matches!(arg, Expr::MoveExpr { .. });
+                                        let has_ref = matches!(arg, Expr::MutableRef { .. });
+                                        // Check if argument is an identifier that resolves to a mutable variable
+                                        let var_is_mutable = match arg {
+                                            Expr::Identifier { name, .. } => {
+                                                self.symbols.lookup(name).map_or(false, |s| {
+                                                    matches!(s.kind, SymKind::Variable { is_mutable: true, .. })
+                                                })
+                                            }
+                                            _ => false,
+                                        };
                                         match param.mode {
                                             ParamMode::Move if !has_move => {
                                                 self.reporter.report(
@@ -682,6 +709,18 @@ impl TypeChecker {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
                                                         format!("argument {} to '{}' uses '^' but parameter is not a move parameter", i + 1, name))
+                                                );
+                                            }
+                                            ParamMode::MutableBorrow if !has_ref && !var_is_mutable => {
+                                                self.reporter.report(
+                                                    Diagnostic::error(ErrorCode::E0001,
+                                                        format!("argument {} to '{}' requires '&' (mutable reference), got plain value", i + 1, name))
+                                                );
+                                            }
+                                            ParamMode::Borrow if has_ref => {
+                                                self.reporter.report(
+                                                    Diagnostic::error(ErrorCode::E0001,
+                                                        format!("argument {} to '{}' uses '&' but parameter is not a mutable borrow parameter", i + 1, name))
                                                 );
                                             }
                                             _ => {}

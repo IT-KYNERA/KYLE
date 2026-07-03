@@ -88,6 +88,8 @@ pub struct SsaFunction {
     pub const_values: HashMap<SsaValueId, MirConstant>,
     /// Per-block mapping: MIR local ID → SsaValueId at block end (for terminator resolution)
     pub block_local_map: Vec<HashMap<usize, SsaValueId>>,
+    /// SsaValueId for each parameter (index = param index)
+    pub param_value_ids: Vec<SsaValueId>,
 }
 
 /// Module containing SSA functions.
@@ -181,6 +183,7 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
         local_count: func.local_count,
         const_values: HashMap::new(),
         block_local_map: Vec::new(),
+        param_value_ids: Vec::new(),
     };
 
     // Create SSA values for params
@@ -217,8 +220,29 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
         stacks.entry(alloca).or_default().push(vid);
     }
 
-    // Build SSA blocks in order
+    // Build SSA blocks in order. Since blocks are processed linearly (not in
+    // dominator-tree order), we must restore stacks/alloca_current to the state
+    // at the end of the immediate dominator before each block (except bb0).
+    // Otherwise values from a prior processed block leak into non-dominated
+    // successor blocks (e.g. loop body value leaks into exit block).
+    // Save stack/alloca state per block for proper restoration at dominator boundaries.
+    let mut saved_stacks: HashMap<usize, HashMap<usize, Vec<SsaValueId>>> = HashMap::new();
+    let mut saved_alloca: HashMap<usize, HashMap<usize, SsaValueId>> = HashMap::new();
     for (block_idx, block) in func.basic_blocks.iter().enumerate() {
+        // Restore stacks + alloca_current to the state at the end of the immediate
+        // dominator. This prevents values from a non-dominating prior-processed block
+        // (e.g. loop body) from leaking into a successor (e.g. exit block).
+        if block_idx > 0 {
+            let idom = doms[block_idx];
+            if idom != usize::MAX {
+                if let Some(saved) = saved_stacks.get(&idom) {
+                    stacks = saved.clone();
+                }
+                if let Some(saved) = saved_alloca.get(&idom) {
+                    alloca_current = saved.clone();
+                }
+            }
+        }
         let mut ssa_block = SsaBlock {
             label: block.label.clone(),
             phis: Vec::new(),
@@ -447,6 +471,9 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
 
         // Save per-block state for terminator resolution (MirValue::Local → SsaValueId)
         ssa.block_local_map.push(alloca_current.clone());
+        // Save state for dominator-based restoration in subsequent blocks
+        saved_stacks.insert(block_idx, stacks.clone());
+        saved_alloca.insert(block_idx, alloca_current.clone());
         ssa.blocks.push(ssa_block);
     }
 
@@ -471,32 +498,37 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
         });
     }
 
-    // Second pass: fill phi incomings from block_end_values per predecessor
+    // Second pass: fill phi incomings from block_end_values per predecessor.
+    // For predecessors with no store to the alloca, use the reaching definition
+    // from saved_alloca (the alloca's value at end of that predecessor block)
+    // instead of falling back to the entry block's value.
     for (block_idx, block) in ssa.blocks.iter_mut().enumerate() {
         let preds = predecessors(func, block_idx);
         for phi in &mut block.phis {
             for pred_label in &preds {
                 if let Some(pred_idx) = func.basic_blocks.iter().position(|b| &b.label == pred_label) {
                     let val = block_end_values.get(&(pred_idx, phi.alloca_id)).copied()
-                        .or_else(|| alloca_current.get(&phi.alloca_id).copied());
+                        .or_else(|| saved_alloca.get(&pred_idx).and_then(|m| m.get(&phi.alloca_id)).copied())
+                        .or_else(|| block_end_values.get(&(0, phi.alloca_id)).copied());
                     if let Some(v) = val {
                         phi.incomings.push((v, pred_label.clone()));
                     }
                 }
             }
             // Ensure phi has at least one incoming (LLVM requirement).
-            // Use the value from the entry block (block 0) as fallback.
             if phi.incomings.is_empty() {
                 let entry_label = func.basic_blocks.first().map(|b| b.label.clone()).unwrap_or_else(|| "entry".to_string());
                 let entry_val = block_end_values.get(&(0, phi.alloca_id)).copied()
-                    .or_else(|| alloca_current.get(&phi.alloca_id).copied())
                     .unwrap_or(phi.dest);
                 phi.incomings.push((entry_val, entry_label));
             }
         }
     }
 
-    // Step 7: Run GVN (Global Value Numbering) on the SSA function
+    // Step 7: Store param_value_ids
+    ssa.param_value_ids = param_value_ids;
+
+    // Step 8: Run GVN (Global Value Numbering) on the SSA function
     optimize_gvn(&mut ssa);
 
     Some(ssa)
@@ -739,12 +771,12 @@ fn intersect(dom: &[usize], b1: usize, b2: usize) -> usize {
     let mut safety = 0;
     while finger1 != finger2 && safety < limit {
         safety += 1;
-        while finger1 < finger2 {
+        while finger1 > finger2 {
             finger1 = dom.get(finger1).copied().unwrap_or(0);
             safety += 1;
             if safety >= limit { break; }
         }
-        while finger2 < finger1 {
+        while finger2 > finger1 {
             finger2 = dom.get(finger2).copied().unwrap_or(0);
             safety += 1;
             if safety >= limit { break; }

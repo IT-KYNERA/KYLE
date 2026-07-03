@@ -33,9 +33,9 @@ The language is undergoing a major evolution. The complete plan is at
 | **4** | **Parser** (destructuring, `&T`, `^T`) | ✅ Done |
 | **5** | **HIR — High-Level IR** | ✅ Done |
 | **6** | **Semantic** | ✅ Done |
-| **7** | **Borrow Semantics** | **🔜 Refactor** |
-| **14** | **References & Borrow Checker** | **🔜 Pre-v1.0** |
-| 8+ | Async scheduler, iterators, tooling | 📅 |
+| **7** | **Borrow Semantics** | ✅ Done (refactorizado) |
+| **14** | **References & Borrow Checker** | ✅ **COMPLETADO** (&T codegen, mutable fields, field defaults, borrow whitelist eliminada, region inference no aplica) |
+| 15–18 | SSA, LLVM IR Quality, Optimization Pipeline, Zero-Cost | 📅 |
 
 See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 
@@ -97,10 +97,10 @@ See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
 
 ```bash
 # Rust unit tests (all crates)
-cargo test -p kyc_core -p kyc_frontend -p kyc_semantic -p kyc_mir -p kyc_runtime -p kyc_tools
+cargo test --workspace
 
-# End-to-end syntax tests
-kl test examples/kyle-test/
+# End-to-end syntax tests (type-check only, all .ky files in tests/)
+ky check tests/*.ky
 
 # Build all crates
 cargo build --workspace

@@ -12,7 +12,7 @@ use inkwell::values::AsValueRef;
 use inkwell::values::InstructionValue as InkwellInstructionValue;
 use inkwell::values::PointerValue;
 use inkwell::IntPredicate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use kyc_mir::mir::*;
 use kyc_mir::ssa::{SsaFunction, SsaInst, SsaValueId};
@@ -86,6 +86,47 @@ impl<'ctx> Codegen<'ctx> {
             return Ok(*val);
         }
         Ok(self.context.i32_type().const_zero().as_basic_value_enum())
+    }
+
+    /// Collect all MirValue::Local references from an instruction.
+    fn collect_local_uses<F: FnMut(usize)>(&self, inst: &MirInst, callback: &mut F) {
+        match inst {
+            MirInst::Alloca { .. } => {}
+            MirInst::Store { value, .. } => {
+                if let MirValue::Local(id) = value { callback(*id); }
+            }
+            MirInst::Load { src, .. } => { callback(*src); }
+            MirInst::BinaryOp { left, right, .. } => {
+                if let MirValue::Local(id) = left { callback(*id); }
+                if let MirValue::Local(id) = right { callback(*id); }
+            }
+            MirInst::UnaryOp { operand, .. } => {
+                if let MirValue::Local(id) = operand { callback(*id); }
+            }
+            MirInst::Call { args, .. } => {
+                for a in args { if let MirValue::Local(id) = a { callback(*id); } }
+            }
+            MirInst::PtrOffset { index, .. } => {
+                if let MirValue::Local(id) = index { callback(*id); }
+            }
+            MirInst::FieldPtr { .. } => {}
+            MirInst::Cast { value, .. } => {
+                if let MirValue::Local(id) = value { callback(*id); }
+            }
+            MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
+                callback(*dest_ptr_local);
+                callback(*src_alloca_local);
+            }
+            MirInst::FnAddr { .. } => {}
+            MirInst::CallIndirect { fn_ptr, args, .. } => {
+                callback(*fn_ptr);
+                for a in args { if let MirValue::Local(id) = a { callback(*id); } }
+            }
+            MirInst::AsyncSpawn { arg, .. } => {
+                if let MirValue::Local(id) = arg { callback(*id); }
+            }
+            MirInst::AsyncAwait { handle, .. } => { callback(*handle); }
+        }
     }
 
     pub fn new(context: &'ctx Context, module_name: &str) -> Self {
@@ -374,6 +415,13 @@ impl<'ctx> Codegen<'ctx> {
         let mut alloca_current: HashMap<usize, BasicValueEnum<'ctx>> = HashMap::new();
         let mut block_vals: Vec<HashMap<usize, BasicValueEnum<'ctx>>> = vec![HashMap::new(); func.blocks.len()];
 
+        // Seed block_vals[0] with param values for ssa_read! in the entry block
+        for (&i, &p) in &self.param_values {
+            if let Some(&pid) = func.param_value_ids.get(i) {
+                block_vals[0].insert(pid, p);
+            }
+        }
+
         for (bi, block) in func.blocks.iter().enumerate() {
             if let Some(&llvm_bb) = block_map.get(&block.label) {
                 self.builder.position_at_end(llvm_bb);
@@ -422,14 +470,10 @@ impl<'ctx> Codegen<'ctx> {
                             MirValue::Local(mir_id) => {
                                 // Map MIR local → SsaValueId using block_local_map
                                 if let Some(ssa_id) = func.block_local_map.get(bi).and_then(|m| m.get(mir_id)).copied() {
-                                    // 1. Current block's computed values (SsaValueId key)
-                                    if let Some(&v) = block_vals[bi].get(&ssa_id) { v }
-                                    // 2. alloca_current keyed by MIR local ID (cross-block values)
-                                    else if let Some(&v) = alloca_current.get(mir_id) { v }
-                                    // 3. Constant values from const_values
-                                    else if let Some(c) = func.const_values.get(&ssa_id) { self.constant_to_llvm(c) }
-                                    // 4. Default zero
-                                    else { self.context.i32_type().const_zero().as_basic_value_enum() }
+                                    // ssa_read! searches block_vals (current + prior blocks by SsaValueId),
+                                    // then const_values, then default zero. This correctly finds the
+                                    // dominating value (e.g. loop header phi from a predecessor block).
+                                    ssa_read!(ssa_id)
                                 } else {
                                     // Fallback: try alloca_current directly
                                     alloca_current.get(mir_id).copied()
@@ -737,6 +781,11 @@ impl<'ctx> Codegen<'ctx> {
                                             _ => self.context.i32_type().const_zero().as_basic_value_enum(),
                                         }
                                     });
+                                // Auto-cast phi incoming to match phi type (e.g. i32 literal → i64 phi)
+                                let phi_type = self.llvm_type(&phi.type_);
+                                let val = if val.get_type() != phi_type {
+                                    self.ssa_cast(val, &phi_type).unwrap_or(val)
+                                } else { val };
                                 incomings.push((val, pred_bb));
                             }
                         }
@@ -1009,6 +1058,90 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&params, false);
             self.module.add_function("ky_list_extend", ft, None);
         }
+        // i64 kl_list_pop_first(ptr) — remove and return first element
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_pop_first", ft, None);
+        }
+        // void kl_list_clear(ptr) — remove all elements
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_clear", ft, None);
+        }
+        // i32 kl_list_contains(ptr, i64) — readonly
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.add_runtime_extern("ky_list_contains", ft, &[("memory", "read")]);
+        }
+        // void kl_list_insert(ptr, i64, i64) — insert at index
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_insert", ft, None);
+        }
+        // i64 kl_list_remove_at(ptr, i64) — remove element at index
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_remove_at", ft, None);
+        }
+        // ptr kl_list_map(ptr, ptr) — map with fn pointer
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_map", ft, None);
+        }
+        // ptr kl_list_filter(ptr, ptr) — filter with fn pointer
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_filter", ft, None);
+        }
+        // i64 kl_list_fold(ptr, i64, ptr) — fold with init + fn pointer
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_fold", ft, None);
+        }
+        // i64 kl_list_reduce(ptr, ptr) — reduce with fn pointer
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_reduce", ft, None);
+        }
+        // i64 kl_iter_new(i64) — create iterator from list (i64 cast pointer)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_iter_new", ft, None);
+        }
+        // i64 kl_iter_next(i64) — get next element
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_iter_next", ft, None);
+        }
+        // i64 kl_iter_map(i64, i64) — lazy map
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_iter_map", ft, None);
+        }
+        // i64 kl_iter_filter(i64, i64) — lazy filter
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_iter_filter", ft, None);
+        }
+        // ptr kl_iter_collect(i64) — collect iterator to list
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_iter_collect", ft, None);
+        }
         // ptr kl_dict_new()
         {
             let ft = ptr_ty.fn_type(&[], false);
@@ -1083,35 +1216,6 @@ impl<'ctx> Codegen<'ctx> {
         {
             let ft = void_ty.fn_type(&[], false);
             self.module.add_function("ky_yield", ft, None);
-        }
-        // ptr kl_dict_new()
-        {
-            let ft = ptr_ty.fn_type(&[], false);
-            self.module.add_function("ky_dict_new", ft, None);
-        }
-        // void kl_dict_free(ptr)
-        {
-            let params = [ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
-            self.module.add_function("ky_dict_free", ft, None);
-        }
-        // i64 kl_dict_get(ptr, ptr)  — get value by key (key is C string ptr) — readonly
-        {
-            let params = [ptr_ty.into(), ptr_ty.into()];
-            let ft = i64_ty.fn_type(&params, false);
-            self.add_runtime_extern("ky_dict_get", ft, &[("memory", "read")]);
-        }
-        // void kl_dict_set(ptr, ptr, i64)  — set key=value
-        {
-            let params = [ptr_ty.into(), ptr_ty.into(), i64_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
-            self.module.add_function("ky_dict_set", ft, None);
-        }
-        // i64 kl_dict_len(ptr) — readonly
-        {
-            let params = [ptr_ty.into()];
-            let ft = i64_ty.fn_type(&params, false);
-            self.add_runtime_extern("ky_dict_len", ft, &[("memory", "read")]);
         }
         // i32 kl_dict_contains(ptr, ptr) — readonly
         {
@@ -1293,6 +1397,88 @@ impl<'ctx> Codegen<'ctx> {
             }
         }
 
+        // Phase 17.5: identify single-block locals to skip allocas for
+        // A local is eligble if:
+        //   1. Simple type (i32/i64/f32/f64/bool — not struct/string/list)
+        //   2. Only used in FieldPtr/Memcpy/PtrOffset → needs alloca (always keep)
+        //   3. Defined and used within a single basic block (no cross-block flow)
+        let simple_types: [MirType; 5] = [MirType::I32, MirType::I64, MirType::F32, MirType::F64, MirType::Bool];
+        let mut escaping: HashSet<usize> = HashSet::new();
+        let mut def_blocks: HashMap<usize, usize> = HashMap::new();
+        let mut use_blocks: HashMap<usize, HashSet<usize>> = HashMap::new();
+        for (bi, bb) in func.basic_blocks.iter().enumerate() {
+            for inst in &bb.insts {
+                match inst {
+                    MirInst::Alloca { dest, type_, .. } => {
+                        if !simple_types.contains(type_) {
+                            escaping.insert(*dest);
+                        }
+                    }
+                    MirInst::FieldPtr { ptr, .. } => { escaping.insert(*ptr); }
+                    MirInst::PtrOffset { ptr, .. } => { escaping.insert(*ptr); }
+                    MirInst::Memcpy { dest_ptr_local, .. } => { escaping.insert(*dest_ptr_local); }
+                    _ => {}
+                }
+                // Track definitions (any instruction writing to dest)
+                let dest_opt = match inst {
+                    MirInst::Store { dest, .. } => Some(*dest),
+                    MirInst::Load { dest, .. } => Some(*dest),
+                    MirInst::BinaryOp { dest, .. } => Some(*dest),
+                    MirInst::UnaryOp { dest, .. } => Some(*dest),
+                    MirInst::Cast { dest, .. } => Some(*dest),
+                    MirInst::Call { dest, .. } => dest.map(|d| d),
+                    MirInst::CallIndirect { dest, .. } => dest.map(|d| d),
+                    MirInst::PtrOffset { dest, .. } => Some(*dest),
+                    MirInst::FieldPtr { dest, .. } => Some(*dest),
+                    MirInst::FnAddr { dest, .. } => Some(*dest),
+                    MirInst::AsyncSpawn { dest, .. } => Some(*dest),
+                    MirInst::AsyncAwait { dest, .. } => Some(*dest),
+                    _ => None,
+                };
+                if let Some(d) = dest_opt {
+                    def_blocks.entry(d).or_insert(bi);
+                }
+                // Track uses (MirValue::Local references)
+                self.collect_local_uses(inst, &mut |local_id| {
+                    use_blocks.entry(local_id).or_default().insert(bi);
+                });
+            }
+            // Track uses in terminator
+            match &bb.terminator {
+                MirTerminator::Return(val) => {
+                    if let MirValue::Local(lid) = val {
+                        use_blocks.entry(*lid).or_default().insert(bi);
+                    }
+                }
+                MirTerminator::CondBr { cond, .. } => {
+                    if let MirValue::Local(lid) = cond {
+                        use_blocks.entry(*lid).or_default().insert(bi);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut skip_allocas: HashSet<usize> = HashSet::new();
+        for (local, db) in &def_blocks {
+            if escaping.contains(local) { continue; }
+            let ub = use_blocks.get(local);
+            // Single-block: defined and all uses are in the same block
+            let is_single_block = ub.map_or(true, |blocks| blocks.len() == 1 && blocks.contains(db));
+            // Also skip locals with no uses (defined but never read — dead code)
+            let has_no_uses = ub.map_or(true, |blocks| blocks.is_empty());
+            if is_single_block || has_no_uses {
+                skip_allocas.insert(*local);
+            }
+        }
+        // Params always need allocas (value flows from entry to other blocks)
+        for (bi, bb) in func.basic_blocks.iter().enumerate() {
+            for inst in &bb.insts {
+                if let MirInst::Store { dest, value: MirValue::Param(_) } = inst {
+                    skip_allocas.remove(dest);
+                }
+            }
+        }
+
         // Pre-scan for struct function params: change their alloca type to `ptr`
         // so they receive a pointer to the caller's struct (pass-by-reference ABI).
         for bb in &func.basic_blocks {
@@ -1321,6 +1507,13 @@ impl<'ctx> Codegen<'ctx> {
                 self.builder.position_at_end(llvm_entry);
 
                 for (dest, llvm_type) in &self.alloca_types {
+                    if skip_allocas.contains(dest) {
+                        // Ensure the vec is sized correctly even without an alloca
+                        while self.alloca_map.len() <= *dest {
+                            self.alloca_map.push(None);
+                        }
+                        continue;
+                    }
                     while self.alloca_map.len() <= *dest {
                         self.alloca_map.push(None);
                     }
@@ -1440,6 +1633,15 @@ impl<'ctx> Codegen<'ctx> {
                                             .map_err(|e| format!("load-store: {}", e))?;
                                     }
                                     last_value_map.insert(*dest, loaded);
+                                }
+                            } else {
+                                // Promoted temp (no alloca): read from last_value_map
+                                if let Some(&val) = last_value_map.get(src) {
+                                    last_value_map.insert(*dest, val);
+                                    if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                        self.builder.build_store(dest_ptr, val)
+                                            .map_err(|e| format!("promoted-load-store: {}", e))?;
+                                    }
                                 }
                             }
                         }

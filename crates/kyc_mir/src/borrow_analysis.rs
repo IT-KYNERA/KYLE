@@ -32,8 +32,13 @@ impl BorrowAnalysis {
     }
 
     pub fn run(&mut self, module: &mut MirModule) {
+        // Build a function param_modes lookup map for is_move_func.
+        // Clone to avoid borrow conflicts with mutable iteration.
+        let func_map: std::collections::HashMap<String, Vec<ParamMode>> = module.functions.iter()
+            .map(|f| (f.name.clone(), f.param_modes.clone()))
+            .collect();
         for func in &mut module.functions {
-            self.process_function(func);
+            self.process_function(func, &func_map);
         }
     }
 
@@ -94,6 +99,7 @@ impl BorrowAnalysis {
         move_locals: &BTreeSet<usize>,
         local_types: &HashMap<usize, MirType>,
         param_locals: &BTreeSet<usize>,
+        func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
     ) -> Vec<BTreeSet<usize>> {
         let n = func.basic_blocks.len();
         let preds = Self::build_preds(func);
@@ -135,7 +141,7 @@ impl BorrowAnalysis {
 
             // Compute alive_out by processing instructions (no error checking)
             let mut alive = alive_in[b].clone();
-            Self::compute_alive_out(block, &mut alive, move_locals);
+            Self::compute_alive_out(block, &mut alive, move_locals, func_map);
             let new_out = alive;
 
             if new_out != alive_out[b] {
@@ -158,6 +164,7 @@ impl BorrowAnalysis {
         block: &MirBasicBlock,
         alive: &mut BTreeSet<usize>,
         move_locals: &BTreeSet<usize>,
+        func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
     ) {
         for inst in &block.insts {
             match inst {
@@ -182,7 +189,7 @@ impl BorrowAnalysis {
                 MirInst::Call { dest, name, args } => {
                     // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
                     // (only `^` params on user-defined functions would consume)
-                    let moves_arg = is_move_func(name, &[] as &[crate::mir::MirFunction]);
+                    let moves_arg = is_move_func_from_map(name, func_map);
                     for arg in args {
                         if let MirValue::Local(l) = arg {
                             if moves_arg {
@@ -205,7 +212,7 @@ impl BorrowAnalysis {
         }
     }
 
-    fn process_function(&mut self, func: &mut MirFunction) {
+    fn process_function(&mut self, func: &mut MirFunction, func_map: &std::collections::HashMap<String, Vec<ParamMode>>) {
         let move_locals = self.find_move_locals(func);
         let local_names = self.build_local_names(func);
         let local_types = self.build_local_types(func);
@@ -253,7 +260,7 @@ impl BorrowAnalysis {
             })
             .collect();
 
-        let alive_in = self.compute_alive_in(func, &move_locals, &local_types, &param_locals);
+        let alive_in = self.compute_alive_in(func, &move_locals, &local_types, &param_locals, func_map);
 
         let mut to_insert: Vec<(usize, usize)> = Vec::new();
 
@@ -265,7 +272,7 @@ impl BorrowAnalysis {
             };
 
             for inst in &block.insts {
-                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types);
+                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types, func_map);
             }
 
             // Handle terminator
@@ -330,6 +337,7 @@ impl BorrowAnalysis {
         move_locals: &BTreeSet<usize>,
         local_names: &HashMap<usize, String>,
         local_types: &HashMap<usize, MirType>,
+        func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
     ) {
         match inst {
             MirInst::Alloca { dest, type_, .. } => {
@@ -368,14 +376,18 @@ impl BorrowAnalysis {
             }
             MirInst::Call { dest, name, args } => {
                 // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
-                let moves_arg = is_move_func(name, &[] as &[crate::mir::MirFunction]);
-                for arg in args {
+                let moves_arg = is_move_func_from_map(name, func_map);
+                for (i, arg) in args.iter().enumerate() {
                     if let MirValue::Local(l) = arg {
                         if moves_arg {
                             self.check_alive(*l, alive, local_names, local_types, "move");
                             if alive.contains(l) {
                                 alive.remove(l);
                             }
+                        }
+                        // MutableBorrow params: ensure the arg is alive (not already moved)
+                        if is_mut_borrow_param(name, i, func_map) {
+                            self.check_alive(*l, alive, local_names, local_types, "use");
                         }
                     }
                 }
@@ -482,6 +494,17 @@ fn is_move_func(name: &str, _funcs: &[crate::mir::MirFunction]) -> bool {
     } else {
         false
     }
+}
+
+/// Lookup a function's param_modes from a pre-built map.
+/// Returns true if the function has any `ParamMode::Move` params.
+fn is_move_func_from_map(name: &str, func_map: &std::collections::HashMap<String, Vec<ParamMode>>) -> bool {
+    func_map.get(name).map_or(false, |modes| modes.iter().any(|m| *m == ParamMode::Move))
+}
+
+/// Check if a function has a `MutableBorrow` param at the given index.
+fn is_mut_borrow_param(name: &str, idx: usize, func_map: &std::collections::HashMap<String, Vec<ParamMode>>) -> bool {
+    func_map.get(name).map_or(false, |modes| idx < modes.len() && modes[idx] == ParamMode::MutableBorrow)
 }
 
 /// Returns true if this runtime function creates a heap-allocated value.

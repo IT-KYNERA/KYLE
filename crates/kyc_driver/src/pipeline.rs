@@ -15,7 +15,7 @@ use kyc_backend::codegen::Codegen;
 use kyc_backend::linker::Linker;
 use kyc_tools::package::{find_project_root, LockFile, cache::package_src_dir};
 use inkwell::context::Context;
-use inkwell::passes::{PassManager, PassBuilderOptions};
+use inkwell::passes::PassBuilderOptions;
 use inkwell::targets::{FileType, InitializationConfig, Target, TargetMachine};
 use inkwell::OptimizationLevel;
 use std::io::Write;

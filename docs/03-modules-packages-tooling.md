@@ -18,8 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 One line for the VS Code extension:
 
 ```bash
-curl -fsSL -o /tmp/ky.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
-code --install-extension /tmp/ky.vsix
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
 ```
 
 Verify:
@@ -465,12 +464,14 @@ Run these with an explicit file:
 
 ### 6.1 Install
 
-The extension `.vsix` is a single file in each release. Install it once:
+Instalación en una línea:
 
 ```bash
-curl -fsSL -o /tmp/ky.vsix https://github.com/IT-KYNERA/KYLE/releases/latest/download/kl-0.2.2.vsix
-code --install-extension /tmp/ky.vsix
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
 ```
+
+El script detecta automáticamente VS Code, construye desde source (Node 20+)
+o descarga el VSIX pre-compilado, y lo instala.
 
 Then in VS Code, run **Developer: Reload Window** (`Cmd+Shift+P`).
 
