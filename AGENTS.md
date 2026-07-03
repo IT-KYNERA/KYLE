@@ -1,109 +1,291 @@
 # Kyle — AI Agent Context
 
-> **Read this first.** It is the single entry-point for AI agents working on
-> the Kyle codebase. It tells you what Kyle is, where we are, and where to
-> look for detailed information.
+> **Read this first.** Single entry-point for AI agents working on the Kyle codebase.
+> Tells you what Kyle is, current state, project structure, and where to find details.
 
 ---
 
 ## What is Kyle?
 
-A compiled, statically-typed language for backend systems and CLI tools.
-Written in **Rust**, compiled via **LLVM 18**.
+A compiled, statically-typed language for backend systems, CLI tools, and full-stack development.
+Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 
 - Python readability (indentation blocks, no semicolons, no `self`)
-- Rust type safety (strong typing, generics, pattern matching)
-- Go simplicity (fast compilation, built-in tooling)
-- C performance (native code via LLVM)
+- Rust type safety (strong typing, generics, pattern matching, borrow checker)
+- Go simplicity (fast compilation, built-in tooling, package manager)
+- C performance (native code via LLVM O3 pipeline)
 
-**Implementation language is pure Rust — this will NOT change.**
-
----
-
-## Current Phase: Evolution to v1.0
-
-The language is undergoing a major evolution. The complete plan is at
-[`docs/05-roadmap-status.md`](docs/05-roadmap-status.md). Current focus is
-**Fase 17: Optimization Pipeline** (cerrar gap de rendimiento con Rust).
-
-| Phase | Focus | Status |
-|---|---|---|
-| **1–2** | Documentation + Spec updates | ✅ Done |
-| **3** | Lexer (`:=`, `&T`, `T?`, `final class`) | ✅ Done |
-| **4** | **Parser** (destructuring, `&T`, `^T`) | ✅ Done |
-| **5** | **HIR — High-Level IR** | ✅ Done |
-| **6** | **Semantic** | ✅ Done |
-| **7** | **Borrow Semantics** | ✅ Done (refactorizado) |
-| **14** | **References & Borrow Checker** | ✅ **COMPLETADO** (&T codegen, mutable fields, field defaults, borrow whitelist eliminada, region inference no aplica) |
-| 15–18 | SSA, LLVM IR Quality, Optimization Pipeline, Zero-Cost | 📅 |
-
-See [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) for full details.
+**The compiler and runtime are written in Rust.** Packages (`http`, `json`, `sqlite`) are written in **100% Kyle** using `extern fn` + `@link` for FFI to C libraries.
 
 ---
 
-## Key Syntax Decisions (NEW — Frozen)
+## Current Status: Fases 1–17 COMPLETED
 
-### Variables — No `mut`, No `let`, No `const` Keywords
+| Area | Status | Details |
+|------|--------|---------|
+| **Language syntax** | ✅ Complete | Generics, ranges, match, operator overloading, is, ptr, for-else, static fn, `**` |
+| **Borrow checker** | ✅ Complete | `&T` mutable, `^T` move, field mutability, call-site borrowing |
+| **SSA optimization** | ✅ Complete | mem2reg, phi nodes, GVN, dominator fix |
+| **LLVM IR quality** | ✅ Complete | nsw flags, TBAA, inbounds, noalias, readonly, noundef, !range |
+| **Optimization** | ✅ Complete | O3 pipeline, constant folding, alloca elimination |
+| **Tooling** | ✅ Complete | LSP, VS Code extension, formatter, package manager, test framework |
+| **Package manager** | ✅ Complete | Registry, cache, lock, publish, login, dependency resolution |
+| **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** | Pure Kyle FFI to C libraries — no Rust needed for packages |
+| **kyc_platform** | ✅ **Phase 1 started** | FS (file I/O), Time (now, sleep) in Rust crate |
 
-| Form | Syntax | Description |
-|---|---|---|
-| Immutable | `name = value` | Declaration + immutable binding |
-| Mutable | `name: &T = value` or `name = &value` | `&` in type/value = mutable |
-| Constant | `NAME := value` | Compile-time constant (replaces `::=`) |
+## What's Next
 
-### Types — Unification
+| Priority | Task | Est. |
+|----------|------|------|
+| 🔜 **Packages** | Build `http`, `json`, `sqlite`, `postgres`, `websocket`, `crypto` in Kyle | Weeks |
+| 🔜 **kyc_platform** | Networking module, macOS adapter, move I/O from runtime | Days |
+| 📅 **Phase 18** | Zero-Cost Abstractions (escape analysis, SSO, inlining, monomorphization) | Months |
+| 📅 **Async V3** | State machine, work-stealing, non-blocking I/O | Months |
+| 📅 **Windowing → UI** | Windowing system, graphics, scene graph, widget library | Long-term |
+| 📅 **KyleOS** | Operating system based on Linux kernel + Kyle platform | Long-term |
 
-- `T?` is the only public optional syntax (sugar for `Option<T>` internally)
-- `T!` stays as error-returning type (sugar for `Result<T, Error>`)
-- `&T` is the mutable type (for mutable variables, mutable borrow params, mutable fields)
-- `^T` is the move/ownership type (for ownership-transfer parameters)
-- `ptr` is the raw pointer type (for FFI/unsafe)
-- `final class` replaces `struct` (lightweight, no inheritance)
-- `abstract class` replaces `abs class`
-- `struct` is a temporary alias, will be removed
-
-### Other Frozen Decisions
-
-| Decision | Choice |
-|----------|--------|
-| Blocks | Indentation (4 spaces) |
-| Statement terminator | Newline (no semicolons) |
-| Instance reference | `this` (NOT `self`) |
-| Visibility | Convention: `_` = protected, `__` = private, none = public |
-| Error return | `T!` syntax |
-| Error propagation | `?` operator |
-| Exceptions | None — errors are values |
-| Entry point | `fn main(args: [str]) -> i32` in `src/main.ky` |
-| Memory | Borrow-by-default, ownership via `^`, Copy types + Clone |
-| Compiler | Pure Rust + LLVM 18 via `inkwell` |
+See [ROADMAP.md](ROADMAP.md) for complete implementation order.
 
 ---
 
-## Documentation (read before any task)
+## Project Structure
 
-| File | When to Read |
+```
+ky/
+├── crates/               # Rust crates (compiler + runtime + tools)
+│   ├── kyc_core/         # Foundation: AST types, diagnostics
+│   ├── kyc_frontend/     # Lexer + parser
+│   ├── kyc_hir/          # HIR desugaring
+│   ├── kyc_semantic/     # Type checker, scope resolver, borrow analysis
+│   ├── kyc_mir/          # MIR lowering, SSA construction, optimizations
+│   ├── kyc_backend/      # LLVM codegen (via inkwell), linker
+│   ├── kyc_driver/       # Compilation pipeline orchestration
+│   ├── kyc_cli/          # CLI binary (`ky`)
+│   ├── kyc_runtime/      # Runtime static library (memory, strings, lists, dicts, I/O, threads)
+│   ├── kyc_tools/        # LSP server, formatter, package manager
+│   └── kyc_platform/     # 🔜 Platform API: FS, networking, time (in progress)
+│
+├── packages/             # Official Kyle packages (100% Kyle)
+│   ├── http/             # HTTP client via libcurl FFI (GET, POST, PUT, DELETE)
+│   ├── json/             # JSON parse + stringify
+│   └── sqlite/           # SQLite database bindings
+│
+├── std/                  # Standard library (.ky files)
+│   ├── core.ky           # Option<T> enum (unwrap_or, is_some, is_none)
+│   ├── io.ky             # read_file, write_file
+│   ├── str.ky            # starts_with, ends_with, capitalize, repeat_str
+│   ├── collections.ky    # list_sum, list_product, list_max, list_min, list_range
+│   ├── math.ky           # pow, sqrt, gcd, clamp, absolute
+│   ├── json.ky           # parse, stringify
+│   ├── time.ky           # timestamp, sleep_ms, seconds_since
+│   └── testing.ky        # assert, assert_eq, assert_str, assert_ne
+│
+├── docs/                 # Documentation (72 files, reorganized)
+├── vscode-ky/            # VS Code extension (LSP client, debugger, syntax highlighting)
+├── examples/             # Example .ky project
+├── tests/                # End-to-end type-check test files
+└── ROADMAP.md            # Feature roadmap with phases and implementation order
+```
+
+---
+
+## Documentation Map (docs/)
+
+The docs are organized by **knowledge layer**, not by compiler component.
+
+| Section | Files | Content |
+|---------|:-----:|---------|
+| [01-overview/](docs/01-overview/README.md) | 5 | Vision, philosophy, principles, layered architecture |
+| [02-guide/](docs/02-guide/README.md) | 7 | Tutorial: install, first program, testing, debugging, patterns, performance, CI/CD |
+| [03-language-reference/](docs/03-language-reference/README.md) | **15** | **Formal language specification** (read for ANY syntax question) |
+| [04-platform/](docs/04-platform/README.md) | 17 | Compiler CLI, build system, standard library (8 modules), tools (PM, formatter, LSP, VS Code, editors), targets (WASM) |
+| [05-packages/](docs/05-packages/README.md) | 4 | Official package specs: HTTP, JSON, SQLite, PostgreSQL |
+| [06-reference/](docs/06-reference/README.md) | 4 | Quick lookup: keywords, operators, flags, CLI commands |
+| [07-engineering/](docs/07-engineering/README.md) | 5 | Compiler architecture, SSA, optimization pipeline, codegen |
+| [08-design/](docs/08-design/README.md) | 3 | ADRs, RFCs (architecture decisions, move semantics) |
+| [09-project/](docs/09-project/README.md) | 1 | Changelog |
+| [10-history/](docs/10-history/README.md) | 1 | Migration guide |
+
+### Quick reference links
+
+| You need... | Go to |
+|-------------|-------|
+| Syntax of `if`/`while`/`for`/`match` | `docs/03-language-reference/statements.md` |
+| Type system (`T?`, `T!`, `&T`, `^T`) | `docs/03-language-reference/types.md` |
+| Functions, methods, closures | `docs/03-language-reference/functions.md` |
+| Variables, constants, mutability | `docs/03-language-reference/variables.md` |
+| Ownership, borrowing, move semantics | `docs/03-language-reference/ownership.md` |
+| Error handling with `T!` and `?` | `docs/03-language-reference/error-handling.md` |
+| Pattern matching | `docs/03-language-reference/pattern-matching.md` |
+| FFI: `extern fn`, `@link`, `ptr` | `docs/03-language-reference/ffi.md` |
+| Quick keyword/operator lookup | `docs/06-reference/README.md` |
+| Compiler CLI flags | `docs/06-reference/cli-commands.md` + `docs/06-reference/compiler-flags.md` |
+| How to test | `docs/02-guide/testing.md` |
+| Standard library functions | `docs/04-platform/standard-library/overview.md` |
+| Package manager usage | `docs/04-platform/tools/package-manager.md` |
+| VS Code extension | `docs/04-platform/tools/vscode.md` |
+
+---
+
+## Language Syntax Reference (Quick)
+
+### Variables
+
+| Form | Syntax | Example |
+|------|--------|---------|
+| Immutable | `name = expr` | `count = 42` |
+| Mutable | `name: &T = expr` | `count: &i32 = 0` |
+| Mutable (sugar) | `name = &expr` | `count = &0` |
+| Constant | `NAME := expr` | `MAX_SIZE := 1024` |
+
+### Functions
+
+| Form | Syntax | Example |
+|------|--------|---------|
+| Regular | `fn name(params) ret_type:` | `fn add(a: i32, b: i32) i32:\n    a + b` |
+| Method | `fn name(params) ret_type:` inside class | `fn len() f64:\n    sqrt(...)` |
+| Static | `static fn name(params) ret_type:` | `static fn square(x: i32) i32:\n    x * x` |
+| Extern (FFI) | `extern fn name(params) ret_type` | `extern fn curl_easy_init() ptr` |
+| Constructor | `fn ClassName(params):` | `fn Config(name: str, port: i32 = 8080):\n    this.name = name` |
+
+**No `this`/`self` parameter** in method signatures — it's implicit.
+
+### Parameters
+
+| Mode | Syntax | Semantics |
+|------|--------|-----------|
+| Borrow (default) | `s: str` | Immutable borrow |
+| Mutable borrow | `s: &str` | Mutable borrow |
+| Move | `^s: str` | Ownership transfer |
+
+### Imports
+
+```ky
+from math import square
+from std import io, json
+from packages.http.src.lib import get
+```
+
+### Visibility
+
+| Prefix | Scope |
+|--------|-------|
+| `name` | Public |
+| `_name` | Protected (same package / subclasses) |
+| `__name` | Private (same module) |
+
+### Types
+
+| Type | Description |
 |------|-------------|
-| [`docs/00-vision.md`](docs/00-vision.md) | Philosophy, design principles |
-| [`docs/01-language-reference.md`](docs/01-language-reference.md) | **Every task.** Complete syntax with ✅/🔶/❌ |
-| [`docs/02-types-errors-memory.md`](docs/02-types-errors-memory.md) | Type system, memory model, error handling |
-| [`docs/03-modules-packages-tooling.md`](docs/03-modules-packages-tooling.md) | Modules, packages, CLI, VS Code |
-| [`docs/04-compiler-architecture.md`](docs/04-compiler-architecture.md) | 9-crate pipeline, runtime internals |
-| [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) | Feature matrix, phase details, release checklist |
-| [`docs/05-roadmap-status.md`](docs/05-roadmap-status.md) | **Master roadmap** (phases, priorities, v1.0 checklist) |
+| `i8`, `i16`, `i32`, `i64` | Signed integers |
+| `f32`, `f64` | Floating point |
+| `bool` | Boolean |
+| `str` | Heap-allocated immutable string |
+| `char` | Unicode code point (integer value) |
+| `ptr` | Raw pointer (FFI, unsafe) |
+| `T?` | Optional (`Option<T>`) |
+| `T!` | Fallible (`Result<T, Error>`) |
+| `&T` | Mutable type |
+| `^T` | Move/ownership type |
+| `[T]` | List of T |
+
+### Comments
+
+```ky
+# Line comment
+## Doc comment (before declarations)
+```
+
+### Classes
+
+```ky
+# Lightweight struct (no inheritance)
+final class Vec2:
+    x: i32
+    y: i32
+
+# Full class with inheritance
+class Animal:
+    name: str
+    fn speak():
+        println("...")
+class Dog :: Animal:
+    fn speak():
+        println("woof")
+
+# Abstract class
+abstract class Shape:
+    fn area() f64
+
+# Constructor
+class Config:
+    name: str
+    port: i32
+    fn Config(name: str, port: i32 = 8080):
+        this.name = name
+        this.port = port
+```
+
+### Operator Overloading
+
+```ky
+final class Vec2:
+    fn op_+(other: Vec2) Vec2:
+        Vec2 { x: this.x + other.x, y: this.y + other.y }
+a + b  # calls op_+
+```
+
+Supported operators: `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`
+
+### FFI
+
+```ky
+@link "curl"
+extern fn curl_easy_init() ptr
+extern fn curl_easy_setopt(handle: ptr, option: i32, value: ptr) i32
+```
 
 ---
 
-## Test Suite (run before any change)
+## Packages (100% Kyle)
+
+| Package | Description | Location |
+|---------|-------------|----------|
+| `http` | HTTP client via libcurl FFI | `packages/http/` |
+| `json` | JSON parse + stringify | `packages/json/` |
+| `sqlite` | SQLite database bindings | `packages/sqlite/` |
+
+All packages are written in pure Kyle using `extern fn` + `@link`. No Rust involved.
+
+---
+
+## Testing
 
 ```bash
 # Rust unit tests (all crates)
 cargo test --workspace
 
-# End-to-end syntax tests (type-check only, all .ky files in tests/)
-ky check tests/*.ky
-
-# Build all crates
+# Build (debug)
 cargo build --workspace
+
+# Build release
+cargo build --release --bin ky
+
+# Kyle checks
+ky check <file.ky>       # Type-check only
+ky build <file.ky>        # Compile to binary
+ky run <file.ky>           # Compile and run
+
+# Kyle tests
+ky test                    # Run #[test] functions in tests/
+
+# Format
+ky fmt src/                # Format source directory
+ky fmt --check             # Check formatting (CI mode)
+
+# Package tests
+cd packages/<name> && ky check src/lib.ky
 ```
 
 ---
@@ -111,12 +293,15 @@ cargo build --workspace
 ## Development Commands
 
 ```bash
+ky build <file.ky>        # Compile to binary
 ky run <file.ky>          # Compile and run
-ky build <file.ky>        # Compile to native binary
 ky check <file.ky>        # Type-check only (fast)
+ky fmt [file/dir]         # Format source
+ky test                   # Run test suite
 ky new <project>          # Create new project
-ky test <project>         # Type-check all tests/ files
-ky fmt src/               # Format project
+ky add <dep>[@<ver>]      # Add dependency
+ky publish                # Publish package
+ky lsp                    # Start LSP server (for editors)
 ```
 
 ---
@@ -125,21 +310,22 @@ ky fmt src/               # Format project
 
 LLVM 18.1 required.
 
-**Linux (Ubuntu ARM):** `sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev`
 **macOS (Apple Silicon):** `brew install llvm@18 && export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)`
+**Linux (Ubuntu ARM):** `sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev`
 
 ---
 
 ## What NOT to Do
 
-1. **Do not add new syntax features** without checking `docs/01-language-reference.md`.
-2. **Do not write C/C++ code** — the compiler and runtime are pure Rust.
-3. **Do not reintroduce `mut`, `let`, `var`, `const` keywords** for variables.
-4. **Do not reintroduce `Option<T>` as a public syntax** — use `T?`.
-5. **Do not reintroduce `struct`** as a separate keyword (use `final class`).
-6. **Do not reintroduce `::=`** — constants use `:=`.
-7. **Do not skip tests** — CI must pass before any merge.
+1. **Do not add syntax features** without checking `docs/03-language-reference/` first
+2. **Do not write C/C++ code** — the compiler and runtime are pure Rust
+3. **Do not reintroduce `mut`, `let`, `var`, `const`** — use `&T` or `:=`
+4. **Do not reintroduce `Option<T>` as public syntax** — use `T?`
+5. **Do not reintroduce `struct`** — use `final class`
+6. **Do not reintroduce `::=`** — constants use `:=`
+7. **Do not use `self`** — use `this` (instance reference)
+8. **Do not skip tests** — CI must pass before any merge
 
 ---
 
-*Version: v0.5.0 · Last updated: 2026-07-02*
+*Version: v0.5.0 · Last updated: 2026-07-03 — Fases 1-17 completadas, Phase 0 (FFI) ✅, packages iniciados*
