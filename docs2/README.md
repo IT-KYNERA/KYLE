@@ -1,27 +1,27 @@
-# Kyle Language — Documentación
+# Kyle Language — Official Documentation
 
-Bienvenido a la documentación oficial del lenguaje Kyle.
+Welcome to the official documentation for the Kyle programming language.
 
-## Estructura
+## Documentation structure
 
-| Sección | Descripción |
+| Section | Description |
 |---------|-------------|
-| [00-overview](00-overview/README.md) | Visión, filosofía, principios, arquitectura |
-| [01-philosophy](01-philosophy/README.md) | Decisiones de diseño fundamentales |
-| [02-specification](02-specification/README.md) | Especificación formal del lenguaje |
-| [03-platform](03-platform/README.md) | Compilador, runtime, stdlib |
-| [04-development](04-development/README.md) | Guías de desarrollo |
-| [05-reference](05-reference/README.md) | Referencia rápida (keywords, CLI, flags) |
-| [06-design](06-design/README.md) | ADRs, RFCs, propuestas |
-| [07-contributing](07-contributing/README.md) | Cómo contribuir |
-| [08-project](08-project/README.md) | Roadmap, versiones, licencias |
-| [09-history](09-history/README.md) | Changelog, release notes |
-| [10-engineering](10-engineering/README.md) | Internals del compilador |
+| [01-overview](01-overview/README.md) | Vision, philosophy, principles, ecosystem architecture |
+| [02-guide](02-guide/README.md) | Tutorial: learn Kyle step by step |
+| [03-language-reference](03-language-reference/README.md) | Formal language specification |
+| [04-platform](04-platform/README.md) | Compiler, standard library, tools |
+| [05-packages](05-packages/README.md) | Official package specifications |
+| [06-reference](06-reference/README.md) | Quick reference: keywords, flags, CLI |
+| [07-engineering](07-engineering/README.md) | Compiler architecture and implementation |
+| [08-design](08-design/README.md) | Design decisions, ADRs, RFCs |
+| [09-project](09-project/README.md) | Roadmap, versioning, license |
+| [10-history](10-history/README.md) | Changelog, migration guides |
 
-## Convenciones
+## Conventions
 
-- `.ky` = Kyle source code
-- `✅` = Implementado
-- `🔶` = Parcial
-- `❌` = No implementado
-- `📅` = Planificado
+- `.ky` = Kyle source file
+- `this` = instance reference
+- `T?` = optional type (`Option<T>`)
+- `T!` = fallible type (`Result<T, Error>`)
+- `&T` = mutable type
+- `^T` = move type (ownership transfer)
