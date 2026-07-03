@@ -343,11 +343,13 @@ impl ScopeResolver {
             Expr::MatchExpr { expression, arms, .. } => {
                 self.resolve_expr(expression);
                 for arm in arms {
-                    // Walk pattern variables and guard
+                    self.symbols.push_scope();
+                    self.bind_pattern(&arm.pattern);
                     if let Some(g) = &arm.guard {
                         self.resolve_expr(g);
                     }
                     self.resolve_block(&arm.body);
+                    self.symbols.pop_scope();
                 }
             }
         }

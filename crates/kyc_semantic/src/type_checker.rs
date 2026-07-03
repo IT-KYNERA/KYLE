@@ -356,8 +356,22 @@ impl TypeChecker {
                 let _ = self.symbols.insert(name.clone(),
                     Symbol::new_var(name.clone(), inferred, false));
             }
-            Pattern::EnumVariant { args, .. } => {
-                // Enum variant payload: each arg takes the type of the parent scrutinee
+            Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                // Look up the enum and variant to get actual payload types
+                if let Some(sym) = self.symbols.lookup(enum_name) {
+                    if let SymKind::Enum(edef) = &sym.kind {
+                        if let Some(vdef) = edef.variants.iter().find(|v| &v.name == variant) {
+                            let payload_types: Vec<Type> = vdef.payload.iter()
+                                .map(|t| self.resolve_ast_type(t)).collect();
+                            for (i, arg) in args.iter().enumerate() {
+                                let arg_type = payload_types.get(i).cloned();
+                                self.bind_pattern(arg, arg_type.as_ref());
+                            }
+                            return;
+                        }
+                    }
+                }
+                // Fallback: pass parent scrutinee type (less precise)
                 for arg in args {
                     self.bind_pattern(arg, match_type);
                 }

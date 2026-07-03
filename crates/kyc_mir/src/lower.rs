@@ -1864,8 +1864,8 @@ impl Lowerer {
             Stmt::Match(s) => {
                 let end_label = ctx.fresh_block();
                 let needs_val = s.arms.iter().any(|a| {
-                    matches!(a.pattern, Pattern::Literal { .. } | Pattern::EnumVariant { .. })
-                        || matches!(&a.pattern, Pattern::Or { patterns, .. } if patterns.iter().any(|p| matches!(p, Pattern::Literal { .. } | Pattern::EnumVariant { .. })))
+                    matches!(a.pattern, Pattern::Literal { .. } | Pattern::EnumVariant { .. } | Pattern::Tuple { .. })
+                        || matches!(&a.pattern, Pattern::Or { patterns, .. } if patterns.iter().any(|p| matches!(p, Pattern::Literal { .. } | Pattern::EnumVariant { .. } | Pattern::Tuple { .. })))
                 });
                 if needs_val {
                     ctx = self.lower_expr(ctx, &s.expression);
@@ -5330,6 +5330,92 @@ impl Lowerer {
                                         ctx.finish_block(MirTerminator::Br(arm_label.clone()));
                                         ctx.current_block = MirBasicBlock::new(arm_label);
                                         break;
+                                    }
+                                }
+                            }
+                            for stmt in &arm.body.statements {
+                                ctx = self.lower_stmt(ctx, stmt);
+                            }
+                            let last_val = ctx.next_local - 1;
+                            let last_type = ctx.local_types.get(&last_val).cloned().unwrap_or(MirType::I64);
+                            arm_types.push(last_type.clone());
+                            ctx.local_types.insert(result_local, last_type);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: result_local,
+                                value: MirValue::Local(last_val),
+                            });
+                            ctx.finish_block(MirTerminator::Br(merge_block.clone()));
+                            if !is_last {
+                                ctx.current_block = MirBasicBlock::new(next_target);
+                            }
+                        }
+                        Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                            let ev_map = self.enum_variants.borrow();
+                            let variant_idx = ev_map.get(enum_name)
+                                .and_then(|m| m.get(variant))
+                                .copied()
+                                .unwrap_or(0);
+                            let struct_type = MirType::Struct(enum_name.clone(), vec![
+                                ("disc".to_string(), MirType::I32),
+                                ("payload".to_string(), MirType::I64),
+                            ]);
+                            let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::Ptr(Box::new(MirType::I32)));
+                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                dest: disc_ptr,
+                                ptr: match_val,
+                                field_index: 0,
+                                struct_type: Box::new(struct_type.clone()),
+                            });
+                            let disc_val = ctx.alloc_local("_disc", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Load {
+                                dest: disc_val,
+                                src: disc_ptr,
+                            });
+                            let idx_local = ctx.alloc_local("_vidx", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: idx_local,
+                                value: MirValue::Constant(MirConstant::I32(variant_idx as i32)),
+                            });
+                            let eq = ctx.alloc_local("_eq", MirType::Bool);
+                            ctx.current_block.insts.push(MirInst::BinaryOp {
+                                dest: eq, op: MirBinaryOp::Eq,
+                                left: MirValue::Local(disc_val),
+                                right: MirValue::Local(idx_local),
+                            });
+                            if let Some(guard) = &arm.guard {
+                                let guard_label = ctx.fresh_block();
+                                ctx.finish_block(MirTerminator::CondBr {
+                                    cond: MirValue::Local(eq),
+                                    true_block: guard_label.clone(),
+                                    false_block: next_target.clone(),
+                                });
+                                ctx.current_block = MirBasicBlock::new(guard_label);
+                                ctx = self.lower_match_guard(ctx, guard, &arm_label, &next_target);
+                                ctx.current_block = MirBasicBlock::new(arm_label);
+                            } else {
+                                ctx.finish_block(MirTerminator::CondBr {
+                                    cond: MirValue::Local(eq),
+                                    true_block: arm_label.clone(),
+                                    false_block: next_target.clone(),
+                                });
+                                ctx.current_block = MirBasicBlock::new(arm_label);
+                            }
+                            if !args.is_empty() {
+                                let payload_ptr = ctx.alloc_local("_pay_ptr", MirType::I64);
+                                ctx.current_block.insts.push(MirInst::FieldPtr {
+                                    dest: payload_ptr,
+                                    ptr: match_val,
+                                    field_index: 1,
+                                    struct_type: Box::new(struct_type),
+                                });
+                                for arg in args.iter() {
+                                    if let Pattern::Identifier { name, .. } = arg {
+                                        let val = ctx.alloc_local(name, MirType::I64);
+                                        ctx.current_block.insts.push(MirInst::Load {
+                                            dest: val,
+                                            src: payload_ptr,
+                                        });
+                                        ctx.locals.insert(name.clone(), val);
                                     }
                                 }
                             }
