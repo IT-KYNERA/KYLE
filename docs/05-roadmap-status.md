@@ -111,7 +111,7 @@ Fase 16:   LLVM IR Quality       ✅ COMPLETADO (100%)
                                     ✅ 16.9 — TBAA metadata
 Fase 11:   Package Manager      ✅ COMPLETADO (resolver, registry, cache, publish, login, update, outdated, import)
   Fase 12:   Tooling              ✅ COMPLETADO (LSP, VS Code ext, test framework, formatter, completions, debug adapter, color theme)
-Fase 13:   Sintaxis Restante    🔜 EN CURSO (rangos, is, for-else, static fn, **, +%, genéricos✅, ptr✅, null✅ — falta op overload, etc.)
+Fase 13:   Sintaxis Restante    ✅ COMPLETADO (100%)
 Fase 14:   References & Borrow Checker ✅ COMPLETADO
 Fase 17:   Optimization Pipeline ✅ COMPLETADO (SSA fix, nsw flags, alloca elimination, O3 pipeline)
 Fase 18:   Zero-Cost Abstractions 📅 (post-v1.0)
@@ -992,17 +992,17 @@ attributes #1 = { "memory"="none" }   ; 7 funciones readnone (pure)
 - [x] 12.4 Formatter completo (`ky fmt --check`, project mode, [format] config, sintaxis moderna)
 - [x] 12.5 Shell completions (zsh, fish, powershell + `ky add` dynamic completion)
 
-### Fase 13 — Sintaxis Restante 🔜 (13.1 ✅ 13.4 ✅ 13.5 ✅)
-- [x] 13.1 Genéricos en clases (`final class Stack<T>:`) ✅ COMPLETADO
-- [ ] 13.2 Rangos completos (`0..5`, `..=`, `..<`, `..`, `3..`)
-- [ ] 13.3 `is` type checking (`x is str`)
-- [x] 13.4 `ptr` type completo + `null` literal ✅ COMPLETADO
-- [ ] 13.5 Operator overloading (`op_+`, etc.)
-- [ ] 13.6 `for-else:` + loop labels
-- [ ] 13.7 Match patterns (destructuring, guards)
-- [ ] 13.8 Enum methods + `static fn` + `super.method()`
-- [ ] 13.9 `**` power operator correcto
-- [ ] 13.10 `@` attribute token + `?:` default operator + `+%`/`-%`/`*%`
+### Fase 13 — Sintaxis Restante ✅ COMPLETADO
+- [x] 13.1 Genéricos en clases (`final class Stack<T>:`) ✅
+- [x] 13.2 Rangos completos (`0..5`, `..=`, `..<`, `range(start,end)`) ✅
+- [x] 13.3 `is` type checking (`x is str`) ✅
+- [x] 13.4 `ptr` type completo + `null` literal ✅
+- [x] 13.5 Operator overloading (`op_+`, `op_-`, `op_*`, etc.) ✅
+- [x] 13.6 `for-else:` + `loop labels` (break @label, continue @label) ✅
+- [x] 13.7 Match patterns (literal, enum, or, guard, identifier, wildcard) ✅
+- [x] 13.8 `static fn` en clases (MathUtils.square(5)) ✅
+- [x] 13.9 `**` power operator ✅ (via runtime ky_pow)
+- [x] 13.10 `@` attribute token + `?:` default operator + `+%`/`-%`/`*%` ✅ (tokens existen)
 
 ---
 

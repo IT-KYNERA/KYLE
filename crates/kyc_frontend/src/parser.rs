@@ -1298,14 +1298,24 @@ impl Parser {
         }
         if self.at(TokenKind::Break) {
             self.advance();
-            let value = if self.current_is_expr_start() {
+            let value = if self.at(TokenKind::At) {
+                None
+            } else if self.current_is_expr_start() {
                 Some(Box::new(self.parse_expr()?))
             } else { None };
-            return Ok(Stmt::Break(value, None));
+            let label = if self.at(TokenKind::At) {
+                self.advance();
+                Some(self.eat_identifier())
+            } else { None };
+            return Ok(Stmt::Break(value, label));
         }
         if self.at(TokenKind::Continue) {
             self.advance();
-            return Ok(Stmt::Continue(None));
+            let label = if self.at(TokenKind::At) {
+                self.advance();
+                Some(self.eat_identifier())
+            } else { None };
+            return Ok(Stmt::Continue(label));
         }
         if self.at(TokenKind::Defer) {
             let start = self.pos;
