@@ -558,6 +558,38 @@ impl TypeChecker {
                     }
                     return Type::Bool;
                 }
+                // Operator overloading: check if left type has an op_X method
+                let overloaded_op_name = match operator {
+                    BinaryOp::Add => Some("op_+"),
+                    BinaryOp::Sub => Some("op_-"),
+                    BinaryOp::Mul => Some("op_*"),
+                    BinaryOp::Div => Some("op_/"),
+                    BinaryOp::Rem => Some("op_%"),
+                    BinaryOp::Eq => Some("op_=="),
+                    BinaryOp::Neq => Some("op_!="),
+                    BinaryOp::Lt => Some("op_<"),
+                    BinaryOp::Gt => Some("op_>"),
+                    BinaryOp::Le => Some("op_<="),
+                    BinaryOp::Ge => Some("op_>="),
+                    _ => None,
+                };
+                if let Some(op_name) = overloaded_op_name {
+                    if let Type::Named(class_name) = &lt {
+                        if let Some(sym) = self.symbols.lookup(class_name) {
+                            if let SymKind::Class(cls) = &sym.kind {
+                                if let Some(m) = cls.members.iter().find_map(|m| {
+                                    if let ClassMember::Method(f) = m {
+                                        if f.name == op_name { Some(f.clone()) } else { None }
+                                    } else { None }
+                                }) {
+                                    if let Some(ret_type) = &m.return_type {
+                                        return self.resolve_ast_type(ret_type);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 let rt = self.infer_expr(right);
                 match operator {
                     BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem

@@ -600,7 +600,8 @@ impl Lowerer {
                                 MirType::Struct(c.name.clone(), vec![])
                             };
                             let this_local = ctx.alloc_local("this", this_type);
-                            ctx.locals.insert("this".to_string(), this_local);
+        ctx.locals.insert("this".to_string(), this_local);
+        ctx.locals.insert("self".to_string(), this_local);
                             // Bind constructor params to locals
                             for (i, param) in ctor.params.iter().enumerate() {
                                 let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
@@ -1076,6 +1077,7 @@ impl Lowerer {
             value: MirValue::Param(0),
         });
         ctx.locals.insert("this".to_string(), this_local);
+        ctx.locals.insert("self".to_string(), this_local);
 
         // Bind the explicit params (offset by 1 because of implicit `this`).
         // Skip the first explicit param if it's named "this" (it IS the receiver).
@@ -2758,6 +2760,41 @@ impl Lowerer {
                         return ctx;
                     }
                     return ctx;
+                }
+
+                // Operator overloading: dispatch to op_X method for struct types
+                let overload_op_name = match operator {
+                    BinaryOp::Add => Some("op_+"),
+                    BinaryOp::Sub => Some("op_-"),
+                    BinaryOp::Mul => Some("op_*"),
+                    BinaryOp::Div => Some("op_/"),
+                    BinaryOp::Rem => Some("op_%"),
+                    BinaryOp::Eq => Some("op_=="),
+                    BinaryOp::Neq => Some("op_!="),
+                    BinaryOp::Lt => Some("op_<"),
+                    BinaryOp::Gt => Some("op_>"),
+                    BinaryOp::Le => Some("op_<="),
+                    BinaryOp::Ge => Some("op_>="),
+                    _ => None,
+                };
+                if let Some(op_name) = overload_op_name {
+                    let left_type = ctx.local_types.get(&left_local).cloned().unwrap_or(MirType::I32);
+                    if let MirType::Struct(class_name, _) = &left_type {
+                        let method_table = self.method_table.borrow();
+                        if let Some(methods) = method_table.get(class_name) {
+                            if let Some(mangled) = methods.get(op_name) {
+                                let ret_type = self.fn_returns.borrow()
+                                    .get(mangled).cloned().unwrap_or(MirType::I64);
+                                let dest = ctx.alloc_local("_op", ret_type);
+                                ctx.current_block.insts.push(MirInst::Call {
+                                    dest: Some(dest),
+                                    name: mangled.clone(),
+                                    args: vec![MirValue::Local(left_local), MirValue::Local(right_local)],
+                                });
+                                return ctx;
+                            }
+                        }
+                    }
                 }
 
                 // Coerce operands to the same type for binary operations.

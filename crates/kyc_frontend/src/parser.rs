@@ -293,7 +293,27 @@ impl Parser {
             return Err("expected 'fn'".to_string());
         }
         self.advance();
-        let raw_name = self.eat_identifier();
+        let mut raw_name = self.eat_identifier();
+        // Operator overloading: "op_" followed by operator token → "op_+", "op_-", etc.
+        if raw_name == "op" || raw_name == "op_" {
+            let op_sym = match self.current()?.kind {
+                TokenKind::Plus => { self.advance(); "+" }
+                TokenKind::Minus => { self.advance(); "-" }
+                TokenKind::Star => { self.advance(); "*" }
+                TokenKind::Slash => { self.advance(); "/" }
+                TokenKind::Percent => { self.advance(); "%" }
+                TokenKind::Equals => { self.advance(); "==" }
+                TokenKind::BangEquals => { self.advance(); "!=" }
+                TokenKind::Less => { self.advance(); "<" }
+                TokenKind::Greater => { self.advance(); ">" }
+                TokenKind::LessEquals => { self.advance(); "<=" }
+                TokenKind::GreaterEquals => { self.advance(); ">=" }
+                _ => "",
+            };
+            if !op_sym.is_empty() {
+                raw_name = format!("op_{}", op_sym);
+            }
+        }
         // Visibility convention: `__` prefix → private, `_` prefix → protected, none → public.
         // The stored name is always stripped of the convention prefixes.
         let (name, visibility) = if raw_name.starts_with("__") {
