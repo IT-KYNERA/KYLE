@@ -219,6 +219,8 @@ pub struct Lowerer {
     /// Built during lower_program by scanning ClassMember::Method entries.
     /// Used to lower `obj.method(args)` into `Call ClassName::method(obj, args...)`.
     method_table: RefCell<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    /// Static method mangled names (no `this` param).
+    static_methods: RefCell<std::collections::HashSet<String>>,
     /// Maps each class to its optional parent class name, used to walk the
     /// inheritance chain when resolving method calls (polymorphism/override).
     class_parent_map: RefCell<std::collections::HashMap<String, Option<String>>>,
@@ -254,6 +256,7 @@ impl Lowerer {
             class_constructor_map: RefCell::new(std::collections::HashMap::new()),
             const_values: RefCell::new(std::collections::HashMap::new()),
             method_table: RefCell::new(std::collections::HashMap::new()),
+            static_methods: RefCell::new(std::collections::HashSet::new()),
             class_parent_map: RefCell::new(std::collections::HashMap::new()),
             enum_variants: RefCell::new(std::collections::HashMap::new()),
             closure_counter: RefCell::new(0),
@@ -467,10 +470,14 @@ impl Lowerer {
                     // Each method `fn foo()` inside `class C` becomes a free function
                     // named `C::foo` that takes `this: C` as its first parameter.
                     let mut methods: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                    let mut static_set = self.static_methods.borrow_mut();
                     for member in &c.members {
                         if let ClassMember::Method(m) = member {
                             let mangled = format!("{}::{}", c.name, m.name);
                             methods.insert(m.name.clone(), mangled.clone());
+                            if m.is_static {
+                                static_set.insert(mangled.clone());
+                            }
                             let defs = self.struct_defs.borrow();
                             let ret_type = m.return_type.as_ref()
                                 .map(|rt| ast_type_to_mir(rt, Some(&defs)))
@@ -1042,58 +1049,79 @@ impl Lowerer {
         let body = m.body.as_ref()?;
         let struct_defs = self.struct_defs.borrow().clone();
         let mut mir_func = MirFunction::new(&format!("{}::{}", class_name, m.name));
+        let is_static = m.is_static;
         let this_type = struct_defs.get(class_name)
             .map(|fields| MirType::Struct(class_name.to_string(), fields.clone()))
             .unwrap_or(MirType::Struct(class_name.to_string(), vec![]));
-        // First param is `this` (the receiver), then the explicit params
-        // (skipping the first explicit param if it's named "this").
-        let mut params: Vec<MirType> = vec![this_type.clone()];
-        for (i, p) in m.params.iter().enumerate() {
-            if i == 0 && (p.name == "this" || p.name == "self") {
-                continue;
+        // Static methods don't get a `this` parameter; instance methods do.
+        let mut ctx = LowerCtx::new();
+        ctx.struct_defs = struct_defs.clone();
+        if is_static {
+            // Static method: no `this`, just explicit params
+            let mut params: Vec<MirType> = Vec::new();
+            for p in &m.params {
+                params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
             }
-            params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
+            mir_func.params = params;
+            let param_modes: Vec<ParamMode> = m.params.iter().map(|p| p.mode).collect();
+            mir_func.param_modes = param_modes;
+        } else {
+            let mut params: Vec<MirType> = vec![this_type.clone()];
+            for (i, p) in m.params.iter().enumerate() {
+                if i == 0 && (p.name == "this" || p.name == "self") {
+                    continue;
+                }
+                params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
+            }
+            mir_func.params = params;
+            let mut param_modes = vec![ParamMode::Borrow];
+            param_modes.extend(m.params.iter().enumerate().filter(|(i, p)| !(*i == 0 && (p.name == "this" || p.name == "self"))).map(|(_, p)| p.mode));
+            mir_func.param_modes = param_modes;
         }
-        mir_func.params = params;
-        // Param modes: `this` is always Borrow, then explicit params
-        let mut param_modes = vec![ParamMode::Borrow];
-        param_modes.extend(m.params.iter().enumerate().filter(|(i, p)| !(*i == 0 && (p.name == "this" || p.name == "self"))).map(|(_, p)| p.mode));
-        mir_func.param_modes = param_modes;
         mir_func.return_type = m.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
             .unwrap_or(MirType::Void);
         let is_fallible = m.return_type.as_ref().map_or(false, |rt| matches!(rt, AstType::Error { .. }));
         mir_func.is_fallible = is_fallible;
 
-        let mut ctx = LowerCtx::new();
         ctx.struct_defs = struct_defs;
         ctx.is_fallible = is_fallible;
 
-        // Bind `this` (param 0) into a local so the body's `Expr::PropertyAccess`
-        // on `this` resolves to a struct field.
-        let this_local = ctx.alloc_local("this", this_type);
-        ctx.current_block.insts.push(MirInst::Store {
-            dest: this_local,
-            value: MirValue::Param(0),
-        });
-        ctx.locals.insert("this".to_string(), this_local);
-        ctx.locals.insert("self".to_string(), this_local);
-
-        // Bind the explicit params (offset by 1 because of implicit `this`).
-        // Skip the first explicit param if it's named "this" (it IS the receiver).
-        let mut param_offset = 1;
-        for (i, param) in m.params.iter().enumerate() {
-            if i == 0 && (param.name == "this" || param.name == "self") {
-                // This param IS the receiver (this) — already bound above
-                continue;
+        if is_static {
+            // Static method: bind explicit params directly (no `this`)
+            for (i, param) in m.params.iter().enumerate() {
+                let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+                ctx.current_block.insts.push(MirInst::Store {
+                    dest: local,
+                    value: MirValue::Param(i),
+                });
+                ctx.locals.insert(param.name.clone(), local);
             }
-            let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+        } else {
+            // Bind `this` (param 0) into a local so the body's `Expr::PropertyAccess`
+            // on `this` resolves to a struct field.
+            let this_local = ctx.alloc_local("this", this_type);
             ctx.current_block.insts.push(MirInst::Store {
-                dest: local,
-                value: MirValue::Param(param_offset),
+                dest: this_local,
+                value: MirValue::Param(0),
             });
-            ctx.locals.insert(param.name.clone(), local);
-            param_offset += 1;
+            ctx.locals.insert("this".to_string(), this_local);
+            ctx.locals.insert("self".to_string(), this_local);
+
+            // Bind the explicit params (offset by 1 because of implicit `this`).
+            let mut param_offset = 1usize;
+            for (i, param) in m.params.iter().enumerate() {
+                if i == 0 && (param.name == "this" || param.name == "self") {
+                    continue;
+                }
+                let local = ctx.alloc_local(&param.name, ast_type_to_mir(&param.type_, Some(&ctx.struct_defs)));
+                ctx.current_block.insts.push(MirInst::Store {
+                    dest: local,
+                    value: MirValue::Param(param_offset),
+                });
+                ctx.locals.insert(param.name.clone(), local);
+                param_offset += 1;
+            }
         }
 
         // Lower body statements
@@ -3035,6 +3063,34 @@ impl Lowerer {
                             }
                         }
                     }
+                    // Static method dispatch: ClassName.method(args) — no receiver needed
+                    if let Expr::Identifier { name: class_name, .. } = object.as_ref() {
+                        let method_table = self.method_table.borrow();
+                        if let Some(methods) = method_table.get(class_name) {
+                            if let Some(mangled) = methods.get(property) {
+                                if self.static_methods.borrow().contains(mangled) {
+                                    let mut call_args = Vec::new();
+                                    for arg in arguments {
+                                        ctx = self.lower_expr(ctx, arg);
+                                        call_args.push(MirValue::Local(ctx.next_local - 1));
+                                    }
+                                    let call_type = self.fn_returns.borrow()
+                                        .get(mangled).cloned().unwrap_or(MirType::I64);
+                                    let dest = ctx.alloc_local("_modcall", call_type.clone());
+                                    if call_type == MirType::Str {
+                                        ctx.string_locals.push(dest);
+                                    }
+                                    ctx.current_block.insts.push(MirInst::Call {
+                                        dest: Some(dest),
+                                        name: mangled.clone(),
+                                        args: call_args,
+                                    });
+                                    return ctx;
+                                }
+                            }
+                        }
+                    }
+
                     // Check for module-qualified function call: module.func(args)
                     // where `module` is not a local variable and not an enum name.
                     if let Expr::Identifier { name: mod_name, .. } = object.as_ref() {
@@ -3103,8 +3159,13 @@ impl Lowerer {
                         let method_table = self.method_table.borrow();
                         let parent_map = self.class_parent_map.borrow();
                         if let Some(mangled) = self.lookup_method_in_chain(class_name, property, &method_table, &parent_map) {
-                                // First argument is the receiver (this).
-                                let mut call_args = vec![MirValue::Local(obj_local)];
+                                // Static methods don't get `this` as first arg
+                                let is_static = self.static_methods.borrow().contains(&mangled);
+                                let mut call_args = if is_static {
+                                    Vec::new()
+                                } else {
+                                    vec![MirValue::Local(obj_local)]
+                                };
                                 for arg in arguments {
                                     // Struct-typed or Move-typed identifiers: pass original local
                                     if let Expr::Identifier { name, .. } = arg {
