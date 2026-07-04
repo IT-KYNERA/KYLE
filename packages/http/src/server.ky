@@ -12,7 +12,7 @@
 #               respond(client, 200, "\{\"status\":\"ok\"\}", "application/json")
 #           else:
 #               respond(client, 404, "Not Found", "text/plain")
-#           close(client)
+#           tcp_close(client)
 
 @link "c"
 
@@ -33,7 +33,7 @@ fn listen(port: i32) i32:
 fn accept(fd: i32) i32:
     ky_tcp_accept(fd)
 
-fn close(fd: i32):
+fn tcp_close(fd: i32):
     ky_tcp_close(fd)
 
 fn read_request(client_fd: i32) Request:
