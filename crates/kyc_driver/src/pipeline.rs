@@ -94,13 +94,10 @@ impl Pipeline {
                     import_decls.push((i, module_decls));
                 }
                 kyc_core::ast::Decl::FromImport(fi) => {
-                    let mut decl = resolver.get_imported_declaration(&fi.module_name, &fi.imported_name, fi.relative)?;
-                    if let Some(ref alias) = fi.alias {
-                        rename_decl(&mut decl, alias);
-                    }
+                    let module_decls = resolver.get_module_declarations(&fi.module_name, fi.relative)?;
                     let scope_name = fi.alias.clone().unwrap_or_else(|| fi.imported_name.clone());
                     scope_registrations.push((scope_name, fi.module_name.clone()));
-                    import_decls.push((i, vec![decl]));
+                    import_decls.push((i, module_decls));
                 }
                 _ => {}
             }
