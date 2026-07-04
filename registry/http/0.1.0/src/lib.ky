@@ -1,21 +1,78 @@
-# http — HTTP client for Kyle
+# http v3.0 — HTTP client for Kyle
 #
-# Usage:
-#   response = http.fetch("https://api.example.com/users")
-#   println(response.status_code)
-#   println(response.body)
+# Uso:
+#   from http import get, Response
+#   res = get("https://api.example.com/data")
+#   if res.is_ok: print(res.body)
 
 @link "curl"
 
 extern fn system(cmd: ptr) i32
 
-ZERO := 48
+# ═══════════════════════════════════════════════════════════
+# HttpMethod
+# ═══════════════════════════════════════════════════════════
+
+enum HttpMethod:
+    GET
+    POST
+    PUT
+    DELETE
+    PATCH
+    HEAD
+    OPTIONS
+
+fn method_str(m: HttpMethod) str:
+    match m:
+        HttpMethod.GET:     "GET"
+        HttpMethod.POST:    "POST"
+        HttpMethod.PUT:     "PUT"
+        HttpMethod.DELETE:  "DELETE"
+        HttpMethod.PATCH:   "PATCH"
+        HttpMethod.HEAD:    "HEAD"
+        HttpMethod.OPTIONS: "OPTIONS"
+
+# ═══════════════════════════════════════════════════════════
+# HttpStatus
+# ═══════════════════════════════════════════════════════════
+
+final class HttpStatus:
+    code: i32
+    text: str
+
+HttpStatusOk                  = HttpStatus { code: 200 text: "OK" }
+HttpStatusCreated             = HttpStatus { code: 201 text: "Created" }
+HttpStatusNoContent           = HttpStatus { code: 204 text: "No Content" }
+HttpStatusMovedPermanently    = HttpStatus { code: 301 text: "Moved Permanently" }
+HttpStatusNotFound            = HttpStatus { code: 404 text: "Not Found" }
+HttpStatusInternalServerError = HttpStatus { code: 500 text: "Internal Server Error" }
+
+fn status_from_code(code: i32) HttpStatus:
+    match code:
+        200: HttpStatusOk
+        201: HttpStatusCreated
+        204: HttpStatusNoContent
+        301: HttpStatusMovedPermanently
+        404: HttpStatusNotFound
+        500: HttpStatusInternalServerError
+        _:   HttpStatus { code: code text: "Unknown" }
+
+# ═══════════════════════════════════════════════════════════
+# Response
+# ═══════════════════════════════════════════════════════════
 
 final class Response:
     status_code: i32
+    status_text: str
     body: str
+    is_ok: bool
+    elapsed_ms: i64
 
-# ── Helpers ────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════
+# Internals
+# ═══════════════════════════════════════════════════════════
+
+ZERO := 48
 
 fn parse_int(s: str) i32:
     result: &i32 = 0
@@ -35,34 +92,64 @@ fn read_file(path: str) str:
         close(fd)
     s
 
-# ── Core request ───────────────────────────────────────────
-
-fn do_request(method: str, url: str, body: str) Response:
-    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}'"
+fn build_cmd(method: str, url: str, body: str) str:
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}:%\{time_total\}' --dump-header /tmp/ky_headers.txt"
     if method == "POST" or method == "PUT" or method == "PATCH":
         cmd = cmd + " -X " + method + " -d '" + body + "'"
     elif method == "DELETE":
         cmd = cmd + " -X DELETE"
+    elif method == "HEAD":
+        cmd = cmd + " -X HEAD"
+    cmd = cmd + " -L --max-redirs 10"
     cmd = cmd + " '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
-    system(cmd as ptr)
+    cmd
 
-    status = parse_int(read_file("/tmp/ky_status.txt"))
-    body_str = read_file("/tmp/ky_body.txt")
-    Response { status_code: status body: body_str }
+fn do_request(method: str, url: str, body: str) Response:
+    system(build_cmd(method, url, body) as ptr)
 
-# ── Public API ─────────────────────────────────────────────
+    raw = read_file("/tmp/ky_status.txt")
+    body_s = read_file("/tmp/ky_body.txt")
+    headers_raw = read_file("/tmp/ky_headers.txt")
 
-fn fetch(url: str) Response:
+    # Parse status from first line of headers: "HTTP/1.1 200 OK" or "HTTP/2 200"
+    sc = 0
+    hdr_mode: &i32 = 0
+    j: &i32 = 0
+    while j < len(headers_raw):
+        c = char_at(headers_raw, j)
+        if hdr_mode == 0:
+            # Skip "HTTP/" and status line prefix
+            if c == 32:
+                hdr_mode = 1
+        elif hdr_mode == 1 and c >= 48 and c <= 57:
+            sc = sc * 10 + (c - 48)
+        elif hdr_mode == 1:
+            hdr_mode = 2
+        j = j + 1
+
+    st = status_from_code(sc)
+    ok_flag = sc < 400
+
+    Response { status_code: sc status_text: st.text body: body_s is_ok: ok_flag elapsed_ms: 0 }
+
+# ═══════════════════════════════════════════════════════════
+# Convenience API
+# ═══════════════════════════════════════════════════════════
+
+fn http_get(url: str) Response:
     do_request("GET", url, "")
 
-fn post(url: str, data: str) Response:
-    do_request("POST", url, data)
+fn post(url: str, body: str) Response:
+    do_request("POST", url, body)
 
-fn put(url: str, data: str) Response:
-    do_request("PUT", url, data)
+fn put(url: str, body: str) Response:
+    do_request("PUT", url, body)
 
 fn delete(url: str) Response:
     do_request("DELETE", url, "")
 
-fn patch(url: str, data: str) Response:
-    do_request("PATCH", url, data)
+fn patch(url: str, body: str) Response:
+    do_request("PATCH", url, body)
+
+fn head(url: str) Response:
+    do_request("HEAD", url, "")
