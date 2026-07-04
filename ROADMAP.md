@@ -76,15 +76,25 @@ kyc_tools/         ✅ LSP, formatter, package manager
 | 16 | LLVM IR quality (nsw, TBAA, inbounds, readonly, noalias, noundef, !range, align, lifetime) | ✅ |
 | 17 | Optimization pipeline (O3, constant folding, alloca elimination, nsw verification) | ✅ |
 
-**Benchmarks (Kyle = C = Rust):**
+**Benchmarks (Kyle vs Rust vs C) — actualizado Jul 2026:**
 
-| Benchmark | Kyle | C (gcc -O3) | Rust (rustc -O) |
-|-----------|:----:|:-----------:|:---------------:|
-| Primes 3M | 0.18s | 0.18s | 0.20s |
-| Fibonacci 40 | 0.16s | 0.15s | 0.15s |
-| Arithmetic 500M | 0.00s* | 0.00s* | 0.00s* |
+Ejecutado en Apple M4 (ARM64). Compiladores: `clang -O3`, `rustc -O`, `ky build`.
 
-*\* LLVM constant folding*
+| Benchmark | Kyle | Rust | C | Relación (K/C) |
+|-----------|:----:|:----:|:-:|:--------------:|
+| Primes 3M | 672ms | 467ms | 444ms | 1.51x |
+| Fibonacci 40 | 406ms | 423ms | 410ms | **0.99x** |
+| Mandelbrot (float) | 294ms | 274ms | 271ms | 1.08x |
+| String concat 100k | 1.98s | 272ms | 238ms | 8.3x |
+| **Compile memory** | **7.0MB** | 18.9MB | 2.6MB | **2.7x vs Rust** |
+
+Kyle compite directamente con C y Rust en CPU-bound (primes, fib, mandelbrot).
+La brecha en strings se debe a que Kyle usa `ky_concat` (nueva alloc + copy en cada `+`).
+Rust usa `String::push` que amplía el buffer existente.
+
+Kyle usa 2.7x menos RAM que Rust durante compilación (sin LTO).
+
+Ver `BENCHMARK.md` para el suite completo y `docs/` para features faltantes.
 
 ---
 
