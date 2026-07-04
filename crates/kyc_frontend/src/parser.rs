@@ -728,7 +728,7 @@ impl Parser {
                 self.advance();
                 self.parse_type()?
             } else {
-                AstType::Primitive { name: "void".into(), span: self.span_from(param_start) }
+                AstType::Primitive { name: "i64".into(), span: self.span_from(param_start) }
             };
             // Determine param mode from type prefix and ^ prefix
             let mode = if is_move {

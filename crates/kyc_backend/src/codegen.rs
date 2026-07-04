@@ -2246,11 +2246,28 @@ impl<'ctx> Codegen<'ctx> {
                                 .map(|p| self.llvm_type(p).into())
                                 .collect();
                             let fn_ty = llvm_ret.fn_type(&llvm_params, false);
+                            let fn_param_types = fn_ty.get_param_types();
                             let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum> = args.iter()
-                                .map(|a| {
-                                    self.value_to_llvm(a, &last_value_map)
-                                        .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum())
-                                        .into()
+                                .enumerate()
+                                .map(|(i, a)| {
+                                    let val: BasicValueEnum = self.value_to_llvm(a, &last_value_map)
+                                        .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum());
+                                    // Auto-truncate i64 args to i32 if needed (for closure calls)
+                                    if i < fn_param_types.len() {
+                                        if let BasicValueEnum::IntValue(iv) = val {
+                                            let expected_ty = fn_param_types[i];
+                                            let actual_w = iv.get_type().get_bit_width();
+                                            if let inkwell::types::BasicMetadataTypeEnum::IntType(eit) = expected_ty {
+                                                let expected_w = eit.get_bit_width();
+                                                if actual_w > expected_w {
+                                                    if let Ok(trunc) = self.builder.build_int_truncate(iv, eit, "") {
+                                                        return trunc.as_basic_value_enum().into();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    val.into()
                                 })
                                 .collect();
                             let call_result = self.builder.build_indirect_call(fn_ty, fn_ptr, &llvm_args, "_icl")
