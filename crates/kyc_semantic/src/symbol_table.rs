@@ -66,6 +66,7 @@ impl SymbolTable {
             "print", "println", "print_err", "len", "str", "input", "range",
             "json_parse", "json_stringify", "serialize", "deserialize",
             "ky_struct_to_json", "ky_json_to_struct",
+            "ky_ptr_read_i32", "ky_ptr_read_ptr",
             "open", "read_str", "write_str", "close", "sleep", "now",
             "assert", "assert_eq", "assert_ne", "assert_str",
             "contains", "to_upper", "to_lower", "trim", "replace", "substr",
@@ -75,6 +76,7 @@ impl SymbolTable {
             "int", "float", "bool",
 
             "ceil", "floor", "round",
+            "push", "list_len", "list_get", "list_set", "list_pop",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {

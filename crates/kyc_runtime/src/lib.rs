@@ -18,7 +18,7 @@ pub use string::{ky_i64_to_str, ky_str_to_i64, ky_strlen, ky_concat, ky_str_cont
 pub use list::{ky_list_new, ky_list_free, ky_list_push, ky_list_pop, ky_list_get, ky_list_set, ky_list_len, ky_init_args};
 pub use async_::{ky_spawn_task, ky_await_task, ky_yield};
 pub use dict::{ky_dict_new, ky_dict_free, ky_dict_get, ky_dict_set, ky_dict_len, ky_struct_to_json, ky_json_to_struct};
-pub use net::{ky_tcp_listen, ky_tcp_accept, ky_tcp_read, ky_tcp_write, ky_tcp_close};
+pub use net::{ky_tcp_listen, ky_tcp_accept, ky_tcp_read, ky_tcp_write, ky_tcp_close, ky_ptr_read_i32, ky_ptr_read_ptr, ky_sha1, ky_base64_encode, ky_ws_accept, ky_ws_read_frame, ky_ws_send_frame};
 
 /// Power: compute base ** exp for i64 values. Returns i64 (truncated).
 #[unsafe(no_mangle)]

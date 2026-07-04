@@ -1024,11 +1024,53 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_tcp_write", ft, None);
         }
+        // i32 ky_ptr_read_i32(ptr) — read i32 from memory
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_ptr_read_i32", ft, None);
+        }
+        // ptr ky_ptr_read_ptr(ptr) — read ptr from memory
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_ptr_read_ptr", ft, None);
+        }
         // i32 ky_tcp_close(i32) — close socket
         {
             let params = [i32_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_tcp_close", ft, None);
+        }
+        // i32 ky_sha1(ptr, i32, ptr) — SHA-1 hash
+        {
+            let params = [ptr_ty.into(), i32_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_sha1", ft, None);
+        }
+        // ptr ky_base64_encode(ptr, i32) — Base64 encode
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_base64_encode", ft, None);
+        }
+        // ptr ky_ws_accept(ptr) — WebSocket handshake accept key
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_ws_accept", ft, None);
+        }
+        // ptr ky_ws_read_frame(i32) — read WebSocket frame
+        {
+            let params = [i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_ws_read_frame", ft, None);
+        }
+        // i32 ky_ws_send_frame(i32, i32, ptr, i32) — send WebSocket frame
+        {
+            let params = [i32_ty.into(), i32_ty.into(), ptr_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_ws_send_frame", ft, None);
         }
         // i64 ky_pow(i64, i64)
         {
