@@ -42,6 +42,12 @@ final class Response:
 final class Client:
     timeout: &i32
 
+    Client(timeout: i32 = 30):
+        if timeout <= 0:
+            this.timeout = 30
+        else:
+            this.timeout = timeout
+
     fn get(url: str) Response:
         do_request("GET", url, "")
 

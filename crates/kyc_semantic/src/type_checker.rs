@@ -653,13 +653,25 @@ impl TypeChecker {
                         let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(ty.clone())));
                     }
                 } else if let Expr::Tuple { elements: target_elems, .. } = target.as_ref() {
-                    if let Expr::Tuple { elements: value_elems, .. } = value.as_ref() {
-                        for (target_elem, value_elem) in target_elems.iter().zip(value_elems.iter()) {
-                            let elem_ty = self.infer_expr(value_elem);
-                            if let Expr::Identifier { name, .. } = target_elem {
-                                if self.symbols.lookup(name).is_none() {
-                                    let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(elem_ty)));
-                                }
+                    // Get types from the value expression's inferred type
+                    let val_ty = self.infer_expr(value);
+                    let elem_types: Vec<Type> = if let Expr::Tuple { elements: value_elems, .. } = value.as_ref() {
+                        value_elems.iter().map(|e| self.infer_expr(e)).collect()
+                    } else if let Type::Tuple(types) = &val_ty {
+                        types.clone()
+                    } else {
+                        let inferred = self.infer_expr(value);
+                        if let Type::Tuple(types) = &inferred {
+                            types.clone()
+                        } else {
+                            vec![val_ty.clone(); target_elems.len()]
+                        }
+                    };
+                    for (i, target_elem) in target_elems.iter().enumerate() {
+                        if let Expr::Identifier { name, .. } = target_elem {
+                            if self.symbols.lookup(name).is_none() {
+                                let elem_ty = elem_types.get(i).cloned().unwrap_or_else(|| Type::I32);
+                                let _ = self.symbols.insert(name.clone(), Symbol::new_auto(name.clone(), Some(elem_ty)));
                             }
                         }
                     }

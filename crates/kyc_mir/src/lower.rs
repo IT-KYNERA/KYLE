@@ -4358,7 +4358,7 @@ impl Lowerer {
                         }
                     }
                 } else if let Expr::Tuple { elements: target_elems, .. } = target.as_ref() {
-                    // Destructuring: (x, y) = (a, b)
+                    // Destructuring: (x, y) = (a, b) or (x, y) = func()
                     if let Expr::Tuple { elements: value_elems, .. } = value.as_ref() {
                         for (target_elem, value_elem) in target_elems.iter().zip(value_elems.iter()) {
                             ctx = self.lower_expr(ctx, value_elem);
@@ -4371,6 +4371,38 @@ impl Lowerer {
                                     dest: local,
                                     value: MirValue::Local(elem_val),
                                 });
+                            }
+                        }
+                    } else {
+                        // (x, y) = func() — lower func call, extract tuple elements
+                        ctx = self.lower_expr(ctx, value);
+                        let tuple_local = ctx.next_local - 1;
+                        let tuple_type = ctx.local_types.get(&tuple_local).cloned().unwrap_or(MirType::I32);
+                        if let MirType::Struct(ref sname, ref fields) = tuple_type {
+                            for (i, target_elem) in target_elems.iter().enumerate() {
+                                if let Expr::Identifier { name, .. } = target_elem {
+                                    if i < fields.len() {
+                                        let field_type = fields[i].1.clone();
+                                        let fptr = ctx.alloc_local("_tfptr", MirType::I64);
+                                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                                            dest: fptr,
+                                            ptr: tuple_local,
+                                            field_index: i,
+                                            struct_type: Box::new(tuple_type.clone()),
+                                        });
+                                        let val = ctx.alloc_local("_tval", field_type.clone());
+                                        ctx.current_block.insts.push(MirInst::Load {
+                                            dest: val,
+                                            src: fptr,
+                                        });
+                                        let local = ctx.alloc_local(name, field_type);
+                                        ctx.locals.insert(name.clone(), local);
+                                        ctx.current_block.insts.push(MirInst::Store {
+                                            dest: local,
+                                            value: MirValue::Local(val),
+                                        });
+                                    }
+                                }
                             }
                         }
                     }

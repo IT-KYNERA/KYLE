@@ -69,7 +69,7 @@ final class Header:
 ```kyle
 from http import Client
 
-client = Client(30)
+client = Client { timeout: 10 }
 
 # GET → Response con body string
 res = client.get("https://api.github.com/repos/IT-KYNERA/KYLE")

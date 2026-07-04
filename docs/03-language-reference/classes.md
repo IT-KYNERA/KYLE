@@ -27,7 +27,7 @@ class Config:
     name: str
     port: i32
 
-    fn Config(name: str, port: i32 = 8080):
+    Config(name: str, port: i32 = 8080):
         this.name = name
         this.port = port
 ```

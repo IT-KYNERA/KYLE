@@ -42,7 +42,7 @@ final class Response:
 final class Client:
     timeout: &i32
 
-    fn Client(timeout: i32):
+    Client(timeout: i32 = 30):
         if timeout <= 0:
             this.timeout = 30
         else:
