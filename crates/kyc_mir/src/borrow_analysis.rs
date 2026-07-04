@@ -260,6 +260,20 @@ impl BorrowAnalysis {
             })
             .collect();
 
+        // Track Load source locals: when a Load creates an alias for a move-type
+        // (like str), the source holds the same pointer as the alias. We must not
+        // free the source if an alias still holds its pointer.
+        let mut load_sources: BTreeSet<usize> = BTreeSet::new();
+        for block in &func.basic_blocks {
+            for inst in &block.insts {
+                if let MirInst::Load { dest, src } = inst {
+                    if local_types.get(dest).map_or(false, |t| is_move_type(t)) {
+                        load_sources.insert(*src);
+                    }
+                }
+            }
+        }
+
         let alive_in = self.compute_alive_in(func, &move_locals, &local_types, &param_locals, func_map);
 
         let mut to_insert: Vec<(usize, usize)> = Vec::new();
@@ -284,9 +298,14 @@ impl BorrowAnalysis {
                         // allocated value (e.g., constructor returning `this`).
                         alive.remove(l);
                     }
-                    // Free all remaining alive locals at function exit (except params, Load aliases, and string literals)
+                    // Free all remaining alive locals at function exit (except params, Load aliases,
+                    // load sources (their pointer is held by the alias), and string literals)
                     for l in &alive {
-                        if !param_locals.contains(l) && !load_only.contains(l) && !string_literal_locals.contains(l) {
+                        if !param_locals.contains(l)
+                            && !load_only.contains(l)
+                            && !load_sources.contains(l)
+                            && !string_literal_locals.contains(l)
+                        {
                             to_insert.push((block_idx, *l));
                         }
                     }
