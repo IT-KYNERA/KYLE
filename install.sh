@@ -13,7 +13,6 @@ if [ "${1:-}" = "uninstall" ]; then
   for d in "$HOME/.ky" "$HOME/.kl"; do
     if [ -d "$d" ]; then rm -rf "$d" && echo "  Removed $d"; fi
   done
-  # Clean PATH from shell config
   for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
     if [ -f "$rc" ]; then
       sed -i '' '/\.ky\/bin/d' "$rc" 2>/dev/null || true
@@ -24,34 +23,21 @@ if [ "${1:-}" = "uninstall" ]; then
   exit 0
 fi
 
-# --- Detect platform ---
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-
-case "$OS-$ARCH" in
-  linux-aarch64|linux-arm64|darwin-arm64|darwin-aarch64|linux-x86_64|linux-amd64)
-    ASSET="ky-$VERSION"
-    ;;
-  *)
-    echo "Unsupported: $OS-$ARCH. Build from source: https://github.com/$REPO"
-    exit 1
-    ;;
-esac
-
-# --- Download ---
-URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET"
 echo "Downloading Kyle $VERSION..."
-curl -fsSL "$URL" -o "/tmp/$ASSET"
-chmod +x "/tmp/$ASSET"
+
+# Download compressed binary from GitHub Releases
+curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky-v${VERSION#v}.gz" -o "/tmp/ky.gz"
+gunzip -f "/tmp/ky.gz"
+chmod +x "/tmp/ky"
 
 # --- Install ---
 if [ -w /usr/local/bin ]; then
   mkdir -p /usr/local/lib/ky
-  mv "/tmp/$ASSET" /usr/local/bin/ky
+  mv /tmp/ky /usr/local/bin/ky
   INSTALL_DIR="/usr/local/bin"
 else
   mkdir -p "$HOME/.ky/bin"
-  mv "/tmp/$ASSET" "$HOME/.ky/bin/ky"
+  mv /tmp/ky "$HOME/.ky/bin/ky"
   INSTALL_DIR="$HOME/.ky/bin"
 fi
 
