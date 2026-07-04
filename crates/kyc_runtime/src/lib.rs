@@ -9,6 +9,7 @@ pub mod async_;
 pub mod assert;
 pub mod error;
 pub mod panic;
+pub mod net;
 
 pub use memory::{ky_alloc, ky_free, ky_retain, ky_release};
 pub use io::{ky_print, ky_println, ky_input, ky_input_with_prompt, ky_open, ky_read_str, ky_write_str, ky_close, ky_sleep, ky_now};
@@ -17,6 +18,7 @@ pub use string::{ky_i64_to_str, ky_str_to_i64, ky_strlen, ky_concat, ky_str_cont
 pub use list::{ky_list_new, ky_list_free, ky_list_push, ky_list_pop, ky_list_get, ky_list_set, ky_list_len, ky_init_args};
 pub use async_::{ky_spawn_task, ky_await_task, ky_yield};
 pub use dict::{ky_dict_new, ky_dict_free, ky_dict_get, ky_dict_set, ky_dict_len};
+pub use net::{ky_tcp_listen, ky_tcp_accept, ky_tcp_read, ky_tcp_write, ky_tcp_close};
 
 /// Power: compute base ** exp for i64 values. Returns i64 (truncated).
 #[unsafe(no_mangle)]

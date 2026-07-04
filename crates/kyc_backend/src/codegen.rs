@@ -1000,6 +1000,36 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&[], false);
             self.module.add_function("ky_now", ft, None);
         }
+        // i32 ky_tcp_listen(i32) — create TCP listener
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_tcp_listen", ft, None);
+        }
+        // i32 ky_tcp_accept(i32) — accept connection
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_tcp_accept", ft, None);
+        }
+        // ptr ky_tcp_read(i32, i32) — read from socket
+        {
+            let params = [i32_ty.into(), i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_tcp_read", ft, None);
+        }
+        // i32 ky_tcp_write(i32, ptr, i32) — write to socket
+        {
+            let params = [i32_ty.into(), ptr_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_tcp_write", ft, None);
+        }
+        // i32 ky_tcp_close(i32) — close socket
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_tcp_close", ft, None);
+        }
         // i64 ky_pow(i64, i64)
         {
             let params = [i64_ty.into(), i64_ty.into()];
