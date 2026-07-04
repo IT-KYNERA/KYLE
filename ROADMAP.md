@@ -195,49 +195,45 @@ Implement `final class Dict<K, V>` in pure Kyle with:
 ```
 NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
    ↓
-      Packages (http, json, sqlite — pure Kyle) — ✅ DONE
+      Packages (http, json, sqlite, env — pure Kyle) — ✅ DONE
          ↓
-            Runtime Phase A (65 functions) — 2-3 days 🔜
+            HTTP Server + WebSocket/SSE — 1-2 weeks 🔜
                ↓
-                  Runtime Phase B (missing externs) — 1 day 🔜
+                  Runtime Phase A (65 functions) — 2-3 days 🔜
                      ↓
-                        Runtime Phase C (hash map) — 1-2 weeks 🔜
+                        Runtime Phase B (missing externs) — 1 day 🔜
                            ↓
-                              Runtime Phase D (threading) — 2-4 weeks 📅
+                              Runtime Phase C (hash map) — 1-2 weeks 🔜
                                  ↓
-                                    Phase 18 (Zero-Cost) — months 📅
+                                    Runtime Phase D (threading) — 2-4 weeks 📅
                                        ↓
-                                          Self-hosting — low priority 📅
+                                          Phase 18 (Zero-Cost) — months 📅
+                                             ↓
+                                                Self-hosting — low priority 📅
 ```
 
-**Current state:** Packages work (http, json, sqlite) in 100% Kyle with FFI. Runtime is 74% rewritable now. Hash map is the #1 blocker for full self-sufficiency.
+**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. Runtime is 74% rewritable now. Hash map is the #1 blocker for full self-sufficiency.
 
 ## Package Registry
 
-Kyle uses a registry API for package distribution. Currently a **file registry** (`KL_REGISTRY=file://`) serves packages from the repo's `registry/` directory. Future: dedicated HTTP server.
+Kyle packages are distributed via **GitHub Pages registry** at `https://IT-KYNERA.github.io/KYLE/docs`. No `KL_REGISTRY` needed.
 
-### Current setup
+### Available packages
 
-| Package | Registry path | Status |
-|---------|--------------|--------|
-| `http` | `registry/http/0.1.0.tar.gz` | ✅ Available |
-| `json` | `registry/json/0.1.0.tar.gz` | ✅ Available |
-| `sqlite` | `registry/sqlite/0.1.0.tar.gz` | ✅ Available |
+| Package | Registry | Status |
+|---------|----------|--------|
+| `http` | GitHub Pages | ✅ v3.0 (cliente) |
+| `json` | GitHub Pages | ✅ v0.1.0 |
+| `sqlite` | GitHub Pages | ✅ v0.1.0 |
+| `env` | GitHub Pages | ✅ v0.1.0 |
 
-### Usage
+### Development
 
 ```bash
-export KL_REGISTRY=file:///path/to/ky/registry
+# Local — apuntar al file registry del repo
+export KL_REGISTRY=file:///Users/me/KYLE/registry
 ky add http
 ```
-
-### Future plan
-
-| Phase | Description | ETA |
-|-------|-------------|-----|
-| **File registry** (current) | Static files in repo | ✅ |
-| **GitHub Pages registry** | Host registry data on GitHub Pages | 📅 |
-| **Production server** | Dedicated HTTP registry with auth, search, yanking | 📅 |
 
 See `docs/05-packages/registry.md` for full documentation.
 
