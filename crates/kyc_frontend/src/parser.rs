@@ -169,6 +169,7 @@ impl Parser {
                 if let TokenKind::String(s) = &self.current()?.kind {
                     let name = s.clone();
                     self.advance();
+                    self.links.push(name.clone());
                     return Ok(Decl::Link(name, self.span_from(start)));
                 }
                 return Err("expected string literal after '@link'".to_string());

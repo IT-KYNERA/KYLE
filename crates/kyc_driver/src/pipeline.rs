@@ -89,16 +89,28 @@ impl Pipeline {
             match decl {
                 kyc_core::ast::Decl::Import(imp) => {
                     if seen_modules.insert(imp.module_name.clone()) {
-                        let module_decls = resolver.get_module_declarations(&imp.module_name, imp.relative)?;
-                        import_decls.push((i, module_decls));
+                        let module = resolver.resolve_import(&imp.module_name, imp.relative)?;
+                        // Merge @link directives from imported module
+                        for link in &module.program.links {
+                            if !program.links.contains(link) {
+                                program.links.push(link.clone());
+                            }
+                        }
+                        import_decls.push((i, module.program.declarations.clone()));
                     } else {
                         import_decls.push((i, Vec::new()));
                     }
                 }
                 kyc_core::ast::Decl::FromImport(fi) => {
                     if seen_modules.insert(fi.module_name.clone()) {
-                        let module_decls = resolver.get_module_declarations(&fi.module_name, fi.relative)?;
-                        import_decls.push((i, module_decls));
+                        let module = resolver.resolve_import(&fi.module_name, fi.relative)?;
+                        // Merge @link directives from imported module
+                        for link in &module.program.links {
+                            if !program.links.contains(link) {
+                                program.links.push(link.clone());
+                            }
+                        }
+                        import_decls.push((i, module.program.declarations.clone()));
                     } else {
                         import_decls.push((i, Vec::new()));
                     }
