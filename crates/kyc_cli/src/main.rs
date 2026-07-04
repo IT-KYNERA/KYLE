@@ -99,6 +99,21 @@ fn resolve_project_dependencies(project_root: &Path, manifest: &Manifest) -> Res
                 cache::extract_tarball(&data, &dest)?;
                 println!("done");
             }
+            // Copy package source to project's std/<name>.ky for local imports
+            let src_dir = cache::package_src_dir(name, &version);
+            if src_dir.exists() {
+                let std_dir = project_root.join("std");
+                fs::create_dir_all(&std_dir)
+                    .map_err(|e| format!("Failed to create std/ dir: {}", e))?;
+                let std_file = std_dir.join(format!("{name}.ky"));
+                // Find the main source file (lib.ky or <name>.ky)
+                let main_src = src_dir.join("lib.ky");
+                if main_src.exists() {
+                    fs::copy(&main_src, &std_file)
+                        .map_err(|e| format!("Failed to copy to std/{name}.ky: {}", e))?;
+                    println!("  Installed to std/{name}.ky");
+                }
+            }
         }
     }
 
@@ -531,7 +546,7 @@ fn cmd_new(args: &[String]) {
         process::exit(1);
     });
 
-    let gitignore = "target/\n*.kyc-build/\nky.lock\n.vscode/\n";
+    let gitignore = "target/\n*.kyc-build/\nky.lock\n.vscode/\nstd/\n";
     fs::write(project_dir.join(".gitignore"), gitignore).unwrap_or_else(|e| {
         eprintln!("Error writing .gitignore: {}", e);
         process::exit(1);
@@ -933,6 +948,29 @@ fn cmd_add(args: &[String]) {
     }
 }
 
+/// Recursively copy a directory.
+fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
+    fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create dir '{}': {}", dst.display(), e))?;
+    for entry in fs::read_dir(src)
+        .map_err(|e| format!("Failed to read dir '{}': {}", src.display(), e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let file_type = entry.file_type()
+            .map_err(|e| format!("Failed to get file type: {}", e))?;
+        let name = entry.file_name();
+        let src_path = entry.path();
+        let dst_path = dst.join(&name);
+        if file_type.is_dir() {
+            copy_dir(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)
+                .map_err(|e| format!("Failed to copy '{}': {}", src_path.display(), e))?;
+        }
+    }
+    Ok(())
+}
+
 fn cmd_remove(args: &[String]) {
     if args.len() < 3 {
         eprintln!("Usage: {} remove <dependency>", bin_name());
@@ -945,6 +983,13 @@ fn cmd_remove(args: &[String]) {
                 if let Err(e) = manifest.save_to_dir(&std::env::current_dir().unwrap()) {
                     eprintln!("Error saving manifest: {}", e);
                     process::exit(1);
+                }
+                // Remove from std/<name>.ky
+                let std_file = std::env::current_dir().unwrap().join("std").join(format!("{name}.ky"));
+                if std_file.exists() {
+                    fs::remove_file(&std_file)
+                        .map_err(|e| format!("Failed to remove std/{name}.ky: {}", e)).ok();
+                    println!("  Removed std/{name}.ky");
                 }
                 println!("Removed dependency '{}'", name);
             } else {
