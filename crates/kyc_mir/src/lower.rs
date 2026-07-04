@@ -359,7 +359,14 @@ impl Lowerer {
                                 let field_types: Vec<(String, MirType)> = args.iter().enumerate()
                                     .map(|(i, el)| (format!("_{}", i), ast_type_to_mir(el, Some(&struct_defs))))
                                     .collect();
-                                struct_defs.entry(format!("__tuple_{}", field_types.len()))
+                                let type_suffix: String = args.iter()
+                                    .map(|a| match a {
+                                        AstType::Primitive { name, .. } => name.clone(),
+                                        _ => "x".to_string(),
+                                    })
+                                    .collect();
+                                let struct_name = format!("_tuple_{}_{}", field_types.len(), type_suffix);
+                                struct_defs.entry(struct_name)
                                     .or_insert_with(|| field_types);
                             }
                         }
@@ -5242,7 +5249,17 @@ impl Lowerer {
                     let field_types: Vec<(String, MirType)> = elem_ids.iter().enumerate()
                         .map(|(i, id)| (format!("_{}", i), ctx.local_types.get(id).cloned().unwrap_or(MirType::I32)))
                         .collect();
-                    let struct_type = MirType::Struct(format!("__tuple_{}", elements.len()), field_types.clone());
+                    let type_suffix: String = field_types.iter()
+                        .map(|(_, t)| match t {
+                            MirType::I32 => "i32",
+                            MirType::I64 => "i64",
+                            MirType::Str => "str",
+                            MirType::Bool => "bool",
+                            MirType::F64 => "f64",
+                            _ => "x",
+                        })
+                        .collect();
+                    let struct_type = MirType::Struct(format!("_tuple_{}_{}", elements.len(), type_suffix), field_types.clone());
                     let struct_local = ctx.alloc_local("_tup", struct_type.clone());
                     for (i, elem_id) in elem_ids.iter().enumerate() {
                         let fptr = ctx.alloc_local("_tfptr", MirType::I64);
@@ -6368,11 +6385,14 @@ fn ast_type_to_mir_with_subst(
                 let field_types: Vec<(String, MirType)> = args.iter().enumerate()
                     .map(|(i, el)| (format!("_{}", i), ast_type_to_mir_with_subst(el, struct_defs, subst)))
                     .collect();
-                let struct_name = format!("__tuple_{}", field_types.len());
-                // Register in struct_defs for field access resolution
-                if let Some(defs) = struct_defs {
-                    // We can't modify struct_defs through a reference, so this is best-effort
-                }
+                // Create unique name based on field types
+                let type_suffix: String = args.iter()
+                    .map(|a| match a {
+                        AstType::Primitive { name, .. } => name.clone(),
+                        _ => "x".to_string(),
+                    })
+                    .collect();
+                let struct_name = format!("_tuple_{}_{}", field_types.len(), type_suffix);
                 MirType::Struct(struct_name, field_types)
             } else if args.is_empty() {
                 if let Some(defs) = struct_defs {
@@ -6522,6 +6542,19 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
             if name == "list" {
                 if args.is_empty() { MirType::List(Box::new(MirType::I32)) }
                 else { MirType::List(Box::new(ast_type_to_mir(&args[0], struct_defs))) }
+            } else if name == "tuple" {
+                // (T, U, ...) → anonymous struct
+                let field_types: Vec<(String, MirType)> = args.iter().enumerate()
+                    .map(|(i, el)| (format!("_{}", i), ast_type_to_mir(el, struct_defs)))
+                    .collect();
+                let type_suffix: String = args.iter()
+                    .map(|a| match a {
+                        AstType::Primitive { name, .. } => name.clone(),
+                        _ => "x".to_string(),
+                    })
+                    .collect();
+                let struct_name = format!("_tuple_{}_{}", field_types.len(), type_suffix);
+                MirType::Struct(struct_name, field_types)
             } else if args.is_empty() {
                 if let Some(defs) = struct_defs {
                     if let Some(fields) = defs.get(name) {
