@@ -3,7 +3,7 @@ use kyc_core::semver::{parse_version, parse_requirement, version_to_string, Sema
 use serde::Deserialize;
 use std::collections::HashMap;
 
-const DEFAULT_REGISTRY: &str = "https://registry.kyle-lang.org/v1";
+const DEFAULT_REGISTRY: &str = "https://IT-KYNERA.github.io/KYLE/docs";
 const REGISTRY_ENV: &str = "KL_REGISTRY";
 
 /// Package version entry from the registry API.
@@ -63,7 +63,7 @@ impl RegistryClient {
     }
 
     fn fetch_versions_from_api(&self, name: &str) -> Result<Vec<SemanticVersion>, String> {
-        let url = format!("{}/packages/{}", self.registry_url, name);
+        let url = format!("{}/packages/{}.json", self.registry_url, name);
         let response = ureq::get(&url)
             .call()
             .map_err(|e| format!("Failed to fetch package '{}': {}", name, e))?;
@@ -98,7 +98,7 @@ impl RegistryClient {
         version: &SemanticVersion,
     ) -> Result<Vec<DepSpec>, String> {
         let ver_str = version_to_string(version);
-        let url = format!("{}/packages/{}/{}/dependencies", self.registry_url, name, ver_str);
+        let url = format!("{}/packages/{}/{}/deps.json", self.registry_url, name, ver_str);
 
         let response = ureq::get(&url)
             .call()
@@ -232,7 +232,7 @@ pub fn download_package(name: &str, version: &str) -> Result<Vec<u8>, String> {
             .map_err(|e| format!("Failed to read package file '{}': {}", tarball_path.display(), e));
     }
 
-    let url = format!("{}/packages/{}/{}/download", registry_url, name, version);
+    let url = format!("{}/packages/{}/{}/download.tar.gz", registry_url, name, version);
 
     let response = ureq::get(&url)
         .call()
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn test_registry_client_creation() {
         let client = RegistryClient::new();
-        assert!(client.registry_url.contains("registry.kyle-lang.org"));
+        assert!(client.registry_url.contains("IT-KYNERA.github.io"));
     }
 
     #[test]

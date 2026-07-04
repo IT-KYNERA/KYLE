@@ -166,10 +166,10 @@ ky check <file.ky>        # Type-check only (fast)
 ky fmt [file/dir]         # Format source
 ky test                   # Run test suite
 ky new <project>          # Create new project
-ky add <dep>[@<ver>]      # Add dependency (downloads + installs to std/)
+ky add <dep>[@<ver>]      # Add dependency (uses GitHub Pages registry by default)
 ky remove <dep>           # Remove dependency (cleans std/ + ky.toml)
 ky install                # Install all dependencies from ky.lock
-ky publish                # Publish package
+ky publish                # Publish package (creates tarball in registry/)
 ky lsp                    # Start LSP server (for editors)
 ```
 

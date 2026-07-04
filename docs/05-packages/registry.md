@@ -1,85 +1,83 @@
 # Package Registry System
 
-## How it works
+Kyle packages are distributed through a **GitHub Pages registry** — static JSON files + tarballs served from `https://IT-KYNERA.github.io/KYLE/docs`.
 
-Kyle packages are distributed through a registry — an HTTP server that serves package metadata and tarballs.
+No server needed, no API keys. Just push to `main` and the registry updates automatically.
 
-### Registry API
-
-| Endpoint | Method | Response |
-|----------|--------|----------|
-| `GET /packages/{name}` | Version list | `{ "versions": [{ "version": "0.1.0" }] }` |
-| `GET /packages/{name}/{version}/dependencies` | Dependencies | `{ "dependencies": [{ "name": "...", "version": "..." }] }` |
-| `GET /packages/{name}/{version}/download` | Binary tarball | `.tar.gz` file |
-
-### Default registry
+## Default registry
 
 ```
-https://registry.kyle-lang.org/v1
+https://IT-KYNERA.github.io/KYLE/docs
 ```
 
-Override with `KL_REGISTRY` environment variable.
+Override with `KL_REGISTRY` environment variable. Use `file:///path/to/registry` for local development.
 
-## Local file registry (current)
+## URL scheme (GitHub Pages)
 
-Until the production registry server is built, packages are distributed via a **file registry** — a local directory structure that mimics the HTTP API.
+| Purpose | URL |
+|---------|-----|
+| List versions | `GET /packages/{name}.json` |
+| Get dependencies | `GET /packages/{name}/{version}/deps.json` |
+| Download tarball | `GET /packages/{name}/{version}/download.tar.gz` |
 
-### Structure
+## Static file structure
 
 ```
-registry/
-├── http/
-│   ├── 0.1.0/                # package source
-│   │   ├── ky.toml
-│   │   └── src/lib.ky
-│   └── 0.1.0.tar.gz          # tarball for download
-├── json/
-│   ├── 0.1.0/
-│   │   ├── ky.toml
-│   │   └── src/lib.ky
-│   └── 0.1.0.tar.gz
-└── sqlite/
-    ├── 0.1.0/
-    │   ├── ky.toml
-    │   └── src/lib.ky
-    └── 0.1.0.tar.gz
+docs/
+├── packages/
+│   ├── http.json                → { "versions": [{ "version": "0.1.0", "yanked": false }] }
+│   ├── http/
+│   │   └── 0.1.0/
+│   │       ├── deps.json        → { "dependencies": [] }
+│   │       └── download.tar.gz  → binary tarball
+│   ├── json.json
+│   ├── json/0.1.0/...
+│   ├── sqlite.json
+│   └── sqlite/0.1.0/...
 ```
 
-### How to use
+## Usage
 
 ```bash
-# Point to local registry
-export KL_REGISTRY=file:///path/to/ky/registry
-
-# Add a package (downloads + installs to std/ + updates ky.toml + ky.lock)
+# Add a package (no KL_REGISTRY needed — uses GitHub Pages by default)
 ky add http
-ky add json
-ky add sqlite
+ky add json@0.1.0
 
-# Install all packages from ky.lock (e.g. after cloning a project)
+# Local development with file registry
+export KL_REGISTRY=file:///path/to/ky/registry
+ky add json
+
+# Install from lock file
 ky install
 
-# Remove a package (deletes std/<name>.ky + updates ky.toml)
+# Remove
 ky remove json
 ```
 
-### What happens when you `ky add`
+## How to publish a new version
 
-1. Adds the dependency to `ky.toml`
-2. Resolves all dependencies from the registry
-3. Downloads tarballs to `~/.ky/cache/<name>-<version>/`
-4. Extracts and copies `src/lib.ky` to `std/<name>.ky` (in your project)
-5. Writes `ky.lock` with pinned versions
+```bash
+# 1. Create package source in registry/
+mkdir -p registry/<name>/<version>/src
+cp packages/<name>/ky.toml registry/<name>/<version>/
+cp packages/<name>/src/lib.ky registry/<name>/<version>/src/
 
-### What happens when you `ky install`
+# 2. Create tarball
+cd registry
+tar czf <name>/<version>.tar.gz -C <name>/<version> .
 
-1. Reads `ky.lock` for the pinned package list
-2. For each package, checks `~/.ky/cache/` — if missing, downloads from registry
-3. Copies `src/lib.ky` to `std/<name>.ky` in your project
+# 3. Regenerate static JSON files for GitHub Pages
+bash scripts/generate-registry-json.sh
 
-Use this instead of `ky add` when cloning a project: the lock file guarantees reproducible builds. The `std/` directory is in `.gitignore`, so it must be regenerated.
+# 4. Commit and push
+git add registry/ docs/packages/
+git commit -m "registry: add <name> v<version>"
+git push
 
-### Lock file (`ky.lock`)
+# GitHub Pages updates automatically after ~1-2 minutes
+```
+
+## Lock file (`ky.lock`)
 
 ```toml
 version = 1
@@ -92,37 +90,20 @@ source = "registry"
 dependencies = []
 ```
 
-### How to publish a new version
+## Local file registry
 
-```bash
-# 1. Create the package directory
-mkdir -p registry/<name>/<version>/src
-cp packages/<name>/ky.toml registry/<name>/<version>/
-cp packages/<name>/src/lib.ky registry/<name>/<version>/src/
+For local development, point `KL_REGISTRY` to the `registry/` directory:
 
-# 2. Create the tarball
-cd registry
-tar czf <name>/<version>.tar.gz -C <name>/<version> .
-
-# 3. Commit and push to GitHub
-git add registry/
-git commit -m "registry: add <name> v<version>"
+```
+registry/
+├── http/
+│   ├── 0.1.0/                # package source
+│   │   ├── ky.toml
+│   │   └── src/lib.ky
+│   └── 0.1.0.tar.gz          # tarball
 ```
 
-## Future: production registry server
-
-The file registry is a temporary solution. The long-term plan is:
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| **File registry** | Static files in repo, `KL_REGISTRY=file://` | ✅ Working |
-| **GitHub registry** | Registry data hosted on GitHub Pages | 📅 |
-| **Registry server** | Dedicated HTTP server with auth, yanking, etc. | 📅 |
-
-### Directory vs HTTP mapping
-
-| File registry path | HTTP endpoint |
-|-------------------|---------------|
-| `registry/http/` | `GET /packages/http` |
-| `registry/http/0.1.0/ky.toml` | `GET /packages/http/0.1.0/ky.toml` |
-| `registry/http/0.1.0.tar.gz` | `GET /packages/http/0.1.0/download` |
+```bash
+export KL_REGISTRY=file://$(pwd)/registry
+ky add json
+```
