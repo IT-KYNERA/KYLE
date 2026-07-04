@@ -1,47 +1,36 @@
-# http — HTTP Client and Server for Kyle
+# http — HTTP Client + Server + WebSocket
 
-**Versión:** 5.0  
-**Estado:** Especificación
+**Versión:** 6.0  
+**Estado:** Especificación (Cliente ✅, Server 🔜, WS 🔜)
 
 ---
 
 ## 1. Filosofía
 
-El package `http` unifica cliente y servidor HTTP en una sola biblioteca.
-Todo se instancia. No hay funciones globales.
+Un solo package para todo HTTP. Cliente, servidor y WebSocket comparten tipos.
 
-Cualquier `final class` se serializa automáticamente a JSON.
+Nada de funciones globales. Todo se instancia.
 
 ```kyle
-from http import Client, HttpStatus, HttpMethod
-from http.server import Server, Request, Res
+from http.client import Client
+from http.server import Router
+from http.websocket import ws_upgrade, ws_read_text, ws_send_text
+from http import HttpStatus, HttpMethod, Header
+from json import serialize, deserialize
 ```
 
 ---
 
-## 2. Organización del package
+## 2. Tipos compartidos
 
-```
-packages/http/
-├── ky.toml
-└── src/
-    ├── lib.ky           # Tipos compartidos: HttpStatus, HttpMethod, Header, MimeType
-    ├── client.ky        # Client class
-    └── server.ky        # Server class + routing + middleware
-```
-
----
-
-## 3. Tipos compartidos (`http`)
-
-### `HttpMethod`
+### HttpMethod
 
 ```kyle
 enum HttpMethod:
     GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS
 ```
 
-### `HttpStatus`
+### HttpStatus
 
 ```kyle
 final class HttpStatus:
@@ -52,7 +41,7 @@ final class HttpStatus:
 Constantes: `HttpStatusOk` (200), `HttpStatusCreated` (201),
 `HttpStatusNotFound` (404), `HttpStatusInternalServerError` (500)
 
-### `Header`
+### Header
 
 ```kyle
 final class Header:
@@ -62,21 +51,21 @@ final class Header:
 
 ---
 
-## 4. Cliente HTTP
+## 3. Cliente HTTP (`http.client`)
 
-### Uso básico
+### Uso
 
 ```kyle
-from http import Client
+from http.client import Client
 
 client = Client { timeout: 10 }
 
-# GET → Response con body string
+# GET
 res = client.get("https://api.github.com/repos/IT-KYNERA/KYLE")
 if res.is_ok:
     print(res.body)
 
-# POST con JSON — cualquier clase se serializa automáticamente
+# POST con clase → JSON automático
 final class User:
     name: str
     age: i32
@@ -84,8 +73,13 @@ final class User:
 user = User { name: "Kyle", age: 1 }
 res = client.post("https://api.example.com/users", user)
 
-# POST con string raw (XML, texto, etc.)
+# POST con string raw
 res = client.post("https://api.example.com/data", "<xml>...</xml>")
+
+# PUT, PATCH, DELETE
+res = client.put(url, data)
+res = client.patch(url, data)
+res = client.delete(url)
 ```
 
 ### Response
@@ -97,65 +91,58 @@ final class Response:
     body: str
     is_ok: bool
     elapsed_ms: i64
-
-    # Deserializar body como JSON con tipo explícito
-    fn json[T]() T
-
-    # Sin genérico → JsonValue (dinámico)
-    fn json() JsonValue
 ```
 
-### Métodos del Client
+### Auto-JSON
 
-| Método | Descripción |
-|--------|-------------|
-| `client.get(url)` | GET |
-| `client.post(url, body)` | POST — body puede ser `str`, `JsonValue` o `final class` |
-| `client.put(url, body)` | PUT |
-| `client.patch(url, body)` | PATCH |
-| `client.delete(url)` | DELETE |
-
-`post()`/`put()`/`patch()` detectan el tipo del body:
-- `str` → se envía raw
-- `final class` → se serializa a JSON automáticamente
-- `JsonValue` → se serializa a JSON
+- `client.post(url, data)` donde `data` es `str` → se envía raw
+- `client.post(url, data)` donde `data` es `final class` → se serializa a JSON automáticamente
+- `client.post(url, data)` donde `data` es `dict` → se serializa a JSON
 
 ---
 
-## 5. Servidor HTTP
+## 4. Servidor HTTP (`http.server`)
+
+El servidor usa un `Router` con handlers como closures, estilo Express.
 
 ### Uso básico
 
 ```kyle
-from http.server import Server
+from http.server import Router
 
-server = Server()
+app = Router()
 
-server.get("/health", (req, res, next):
+app.get("/health", (req, res):
     res.json({ "status": "ok" })
 )
 
-server.listen(8080)
+app.listen(8080)
 ```
 
 ### Rutas con parámetros
 
 ```kyle
-server.get("/users/{id}", (req, res, next):
-    id = req.param("id")         # str por defecto
+app.get("/users/{id}", (req, res):
+    id = req.param("id")         # str
     res.json({ "user": id })
 )
 
-server.get("/users/{id:i32}", (req, res, next):
-    id = req.param("id")         # i32 — parseado automáticamente
+app.get("/users/{id:i32}", (req, res):
+    id = req.param("id")         # i32 — parseado automático
     res.json({ "user": id })
-)
-
-server.post("/users", (req, res, next):
-    user = req.body<User>()      # JSON → User automático
-    res.json(user, 201)
 )
 ```
+
+### Métodos del Router
+
+| Método | Descripción |
+|--------|-------------|
+| `app.get(path, handler)` | GET route |
+| `app.post(path, handler)` | POST route |
+| `app.put(path, handler)` | PUT route |
+| `app.patch(path, handler)` | PATCH route |
+| `app.delete(path, handler)` | DELETE route |
+| `app.listen(port)` | Inicia servidor |
 
 ### Request
 
@@ -165,22 +152,24 @@ final class Request:
     path: str
     params: dict<str, str>      # path params: {id} → "42"
     query: dict<str, str>       # query: ?page=1
-    body: str                   # raw body
+    body: str                   # raw body string
+    headers: dict<str, str>     # request headers
 
-    fn param(name: str) str     # path param por nombre
+    fn param[T](name: str) T    # path param con tipo
     fn header(name: str) str    # header por nombre
-    fn body[T]() T              # deserializar body como tipo T (JSON → clase)
+    fn body[T]() T              # body parseado como JSON → clase T
 ```
 
 ### Res
 
 ```kyle
 final class Res:
-    fn json(data: final class):           # 200 + cualquier clase → JSON
-    fn json(data: final class, code: i32): # status + JSON
-    fn text(body: str):                    # 200 + texto
-    fn text(body: str, code: i32):         # status + texto
-    fn redirect(url: str):                 # 302
+    fn json(data):                  # 200 + JSON (cualquier clase serializable)
+    fn json(data, code: i32):       # status + JSON
+    fn text(body: str):             # 200 + texto plano
+    fn text(body: str, code: i32):  # status + texto
+    fn redirect(url: str):          # 302 redirect
+    fn status(code: i32):           # solo status, sin body
 ```
 
 Cualquier `final class` se serializa a JSON automáticamente en `res.json()`.
@@ -188,39 +177,141 @@ Cualquier `final class` se serializa a JSON automáticamente en `res.json()`.
 ### Middleware
 
 ```kyle
-server.before("/api/*", (req, res, next):
+# Before — se ejecuta antes de las rutas
+app.before("/api/*", (req, res, next):
     if req.header("Authorization") == "":
         res.text("unauthorized", 401)
     else:
         next()
 )
 
-server.after("/api/*", (req, res, next):
+# After — se ejecuta después de las rutas
+app.after("/api/*", (req, res, next):
     next()
-    # modificar response después del handler
+    res.header("X-Powered-By", "Kyle")
 )
 ```
+
+Los middleware reciben `(req, res, next)` y deben llamar `next()` para continuar la cadena. Si no llaman `next()`, la respuesta se envía inmediatamente.
 
 ### Archivos estáticos
 
 ```kyle
-server.static("/static", "./public")
+app.static("/static", "./public")
+# GET /static/index.html → ./public/index.html
 ```
 
 ### CORS
 
 ```kyle
-server.cors(origin="*", methods="GET, POST")
+app.cors(
+    origin="*",
+    methods="GET, POST, PUT, DELETE",
+    headers="Content-Type, Authorization",
+)
+```
+
+### Error handling
+
+```kyle
+app.get("/users/{id:i32}", (req, res):
+    user = find_user(req.param("id"))
+    if user == none:
+        res.text("Not Found", 404)
+    else:
+        res.json(user)
+)
+```
+
+### Ejemplo completo: API REST
+
+```kyle
+from http.server import Router
+from json import deserialize
+
+final class User:
+    name: str
+    age: i32
+
+final class CreateUser:
+    name: str
+    age: i32
+
+app = Router()
+
+# Listar usuarios
+app.get("/users", (req, res):
+    res.json([
+        { "id": 1, "name": "Ana" },
+        { "id": 2, "name": "Juan" },
+    ])
+)
+
+# Obtener usuario por ID
+app.get("/users/{id:i32}", (req, res):
+    id = req.param("id")
+    res.json({ "id": id, "name": "User " + str(id) })
+)
+
+# Crear usuario
+app.post("/users", (req, res):
+    data = req.body[CreateUser]()
+    res.json({ "created": true, "name": data.name }, 201)
+)
+
+app.listen(3000)
+```
+
+---
+
+## 5. WebSocket (`http.websocket`)
+
+El WebSocket se integra con el Router existente.
+
+### Upgrade + echo server
+
+```kyle
+from http.server import Router
+from http.websocket import ws_upgrade, ws_read_text, ws_send_text
+
+app = Router()
+
+app.get("/ws", (req, res):
+    if ws_upgrade(res.client_fd, req.body):
+        handle_ws(res.client_fd)
+)
+
+fn handle_ws(client: i32):
+    while true:
+        msg = ws_read_text(client)
+        if msg == "":
+            break
+        ws_send_text(client, msg)   # echo
+
+app.listen(8080)
+```
+
+### Funciones
+
+```kyle
+ws_upgrade(client_fd, raw_request) → bool    # handshake
+ws_read_text(client_fd) → str                # leer mensaje texto
+ws_send_text(client_fd, text)                # enviar texto
+ws_send_binary(client_fd, data)              # enviar binario
+ws_send_pong(client_fd)                      # responder ping
+ws_close(client_fd)                          # cerrar conexión
 ```
 
 ---
 
 ## 6. Plan de implementación
 
-| Fase | Descripción | Depends on | Status |
+| Fase | Descripción | Depende de | Estado |
 |------|-------------|------------|--------|
-| 1 | Function pointers (`fn()` como tipo) | Compiler | 🔜 |
-| 2 | `JsonValue` type + auto-serialize | Union types | 🔜 |
-| 3 | HTTP Client con JSON integrado | Fase 2 | 🔜 |
-| 4 | Server routing real con callbacks + path params | Fase 1 + 3 | 🔜 |
+| 1 | Function pointers (closes como valores) | Compiler | ✅ |
+| 2 | JSON: serialize/deserialize<T> | Fase 1 | ✅ |
+| 3 | HTTP Client con auto-JSON | Fase 2 | ✅ |
+| 4 | **Router: rutas, path params, middleware** | Fase 1 + 3 | 🔜 |
 | 5 | WebSocket + SSE | Fase 4 | 🔜 |
+| 6 | PostgreSQL package | — | 🔜 |
+| 7 | WASM target + ky-web | — | 🔜 |

@@ -1,82 +1,107 @@
-# json — JSON Parsing and Generation for Kyle
+# json — JSON Parsing and Generation
 
 **Versión:** 2.0  
-**Estado:** ✅ Completo (Fase 3)
+**Estado:** Especificación
 
 ---
 
-## 1. Funciones básicas
+## 1. Funciones principales
+
+Built-in globales. No necesita import.
 
 ```kyle
-from json import parse, stringify
+# Clase → JSON string
+json = serialize(user)
 
-data = parse("{\"name\":\"Ana\",\"age\":30}")
-print(data["name"])     # "Ana"
+# JSON string → Clase (con <T> genérico)
+user = deserialize<User>(json_str)
 
+# Dict → JSON (legacy)
 text = stringify(data)
-print(text)             # {"name":"Ana","age":30}
+
+# JSON → Dict
+data = parse(json_str)
 ```
 
-## 2. Clase → JSON (`serialize`)
+---
 
-Built-in global. Sin descriptor manual:
+## 2. Clase → JSON (`serialize`)
 
 ```kyle
 final class User:
     name: str
     age: i32
+    active: bool
 
-user = User { name: "Kyle", age: 1 }
-json = serialize(user)       # → {"name":"Kyle","age":1}
+user = User { name: "Kyle", age: 1, active: true }
+json = serialize(user)
+# → {"name":"Kyle","age":1,"active":true}
 ```
 
-También soporta comas en struct literals:
+Auto-detecta los campos. Sin descriptor manual.
 
-```kyle
-user = User { name: "Kyle", age: 1 }    # con comas
-user = User { name: "Kyle" age: 1 }     # sin comas (legacy)
-```
+---
 
 ## 3. JSON → Clase (`deserialize<T>`)
 
 ```kyle
-final class User:
-    name: str
-    age: i32
-
-user = deserialize<User>("{\"name\":\"Ana\",\"age\":30}")
+json_str = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
+user = deserialize<User>(json_str)
 print(user.name)   # "Ana"
 print(user.age)    # 30
 ```
 
-## 4. Integración con HTTP
+---
+
+## 4. En HTTP
 
 ```kyle
-from http import Client
+from http.client import Client
 
-final class Post:
-    userId: i32
-    id: i32
+final class Todo:
     title: str
     body: str
+    userId: i32
 
 client = Client { timeout: 10 }
 
-# Enviar: clase → auto-JSON
-data = Post { userId: 1, id: 0, title: "test", body: "hello" }
-res = client.post("https://api.example.com/posts", data)
+# POST con clase → auto-JSON
+data = Todo { title: "Kyle", body: "test", userId: 1 }
+res = client.post(url, data)
 
-# Recibir: JSON → clase automático
-res = client.get("https://jsonplaceholder.typicode.com/posts/1")
-post = deserialize<Post>(res.body)
-print(post.title)
+# GET + deserializar
+res = client.get("https://api.example.com/todos/1")
+todo = deserialize<Todo>(res.body)
+print(todo.title)
 ```
 
-## 5. API completa
+---
+
+## 5. En el servidor
+
+```kyle
+from http.server import Router
+
+app = Router()
+
+app.post("/users", (req, res):
+    user = req.body[User]()
+    res.json({ "created": true, "id": 1 }, 201)
+)
+
+app.get("/users/{id:i32}", (req, res):
+    user = find_user(req.param("id"))
+    res.json(user)
+)
+```
+
+---
+
+## 6. Referencia rápida
 
 | Función | Descripción |
 |---------|-------------|
-| `parse(str) → dict` | JSON string → dict |
-| `stringify(dict) → str` | dict → JSON string |
-| `serialize(val) → str` | Cualquier `final class` → JSON string |
-| `deserialize<T>(str) → T` | JSON string → clase `T` |
+| `serialize(val)` | Cualquier `final class` → JSON string |
+| `deserialize[T](str)` | JSON string → clase `T` |
+| `stringify(dict)` | Dict → JSON string (legacy) |
+| `parse(str)` | JSON string → dict (legacy) |
