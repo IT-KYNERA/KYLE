@@ -4140,6 +4140,60 @@ impl Lowerer {
                     return ctx;
                 }
 
+                // Auto-generate descriptor for struct_to_json(val) and json_to_struct(json, out)
+                if resolved_name == "struct_to_json" && args.len() == 1 {
+                    // Infer descriptor from struct type
+                    let struct_local = match &args[0] {
+                        MirValue::Local(id) => *id,
+                        _ => { return ctx; },
+                    };
+                    let struct_type = ctx.local_types.get(&struct_local).cloned();
+                    if let Some(MirType::Struct(sname, fields)) = struct_type {
+                        let mut desc_parts: Vec<String> = Vec::new();
+                        for (fname, ftype) in &fields {
+                            let type_name = match ftype {
+                                MirType::Str => "str",
+                                MirType::I32 => "i32",
+                                MirType::I64 => "i64",
+                                MirType::Bool => "bool",
+                                MirType::F64 => "f64",
+                                _ => "i32",
+                            };
+                            desc_parts.push(format!("{}:{}", fname, type_name));
+                        }
+                        let descriptor = desc_parts.join(",");
+                        args.push(MirValue::Constant(MirConstant::String(descriptor)));
+                        resolved_name = "ky_struct_to_json".to_string();
+                    }
+                } else if resolved_name == "json_to_struct" && args.len() == 2 {
+                    // Infer descriptor from output struct type
+                    let struct_local = match &args[1] {
+                        MirValue::Local(id) => *id,
+                        _ => { return ctx; },
+                    };
+                    let struct_type = ctx.local_types.get(&struct_local).cloned();
+                    if let Some(MirType::Struct(sname, fields)) = struct_type {
+                        let mut desc_parts: Vec<String> = Vec::new();
+                        for (fname, ftype) in &fields {
+                            let type_name = match ftype {
+                                MirType::Str => "str",
+                                MirType::I32 => "i32",
+                                MirType::I64 => "i64",
+                                MirType::Bool => "bool",
+                                MirType::F64 => "f64",
+                                _ => "i32",
+                            };
+                            desc_parts.push(format!("{}:{}", fname, type_name));
+                        }
+                        let descriptor = desc_parts.join(",");
+                        // Insert descriptor between json and out: args[0]=json, args[1]=desc, args[2]=out
+                        let out_arg = args.pop().unwrap();
+                        args.push(MirValue::Constant(MirConstant::String(descriptor)));
+                        args.push(out_arg);
+                        resolved_name = "ky_json_to_struct".to_string();
+                    }
+                }
+
                 ctx.current_block.insts.push(MirInst::Call {
                     dest: Some(dest),
                     name: resolved_name.clone(),

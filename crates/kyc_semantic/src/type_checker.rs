@@ -74,8 +74,9 @@ impl TypeChecker {
             "assert" => Some(1),
             "assert_eq" | "assert_str" | "assert_ne" => Some(2),
             "range" => Some(2),
-            "json_parse" | "json_stringify" | "struct_to_json" => Some(2),
-            "json_to_struct" => Some(3),
+            "json_parse" | "json_stringify" => Some(1),
+            "struct_to_json" => Some(1),     // 1 arg = auto-desc, 2 args = manual desc
+            "json_to_struct" => Some(2),     // 2 args = auto-desc, 3 args = manual desc
             "list_push" => Some(2),
             "list_pop" | "list_len" => Some(1),
             "ceil" | "floor" | "round" => Some(1),
@@ -803,6 +804,8 @@ impl TypeChecker {
                                 "json_stringify" => Type::Str,
                                 "struct_to_json" => Type::Str,
                                 "json_to_struct" => Type::I32,
+                                "ky_struct_to_json" => Type::Str,
+                                "ky_json_to_struct" => Type::I32,
                                 "error" => Type::Option(Box::new(Type::Void)),
                                 _ => *ft.return_,
                             }

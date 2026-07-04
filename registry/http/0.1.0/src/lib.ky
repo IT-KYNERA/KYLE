@@ -40,13 +40,13 @@ final class Response:
 # ── Client ──
 
 final class Client:
-    timeout: i32
+    timeout: &i32
 
     fn Client(timeout: i32):
-        t = timeout
-        if t <= 0:
-            t = 30
-        this.timeout = t
+        if timeout <= 0:
+            this.timeout = 30
+        else:
+            this.timeout = timeout
 
     fn get(url: str) Response:
         do_request("GET", url, "")
