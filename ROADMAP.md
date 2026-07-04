@@ -311,3 +311,27 @@ LLVM stays as the machine-code backend. The same way we call libcurl via `extern
 |---------|---------|
 | Cranelift | Faster compilation (debug mode), no LLVM dependency |
 | WASM | Compile Kyle for browser and WebAssembly targets |
+
+---
+
+## 📊 Fases de Madurez del Lenguaje (Benchmark gaps)
+
+Features identificadas en los benchmarks que Kyle necesita para ser competitivo como lenguaje de bajo nivel:
+
+| Feature | Importancia | Dependencia | ETA |
+|---------|-------------|-------------|-----|
+| **SIMD intrinsics** (AVX, NEON) | ⭐⭐⭐⭐⭐ | Codegen + runtime | 📅 Fase 19 |
+| **Threads + Concurrency** | ⭐⭐⭐⭐⭐ | Runtime | 📅 Fase D |
+| **Async/Await en Kyle** | ⭐⭐⭐⭐ | Runtime + compiler | 📅 Fase D |
+| **HashMap completo** (String→any) | ⭐⭐⭐⭐ | Runtime | 📅 Fase C |
+| **Networking TCP/UDP** | ⭐⭐⭐⭐ | Runtime + packages | 📅 Fase 4-5 |
+| **WebSocket/SSE** | ⭐⭐⭐ | Packages | 📅 Fase 5 |
+| **Regex** | ⭐⭐⭐ | Package | 📅 Futuro |
+| **Crypto** | ⭐⭐⭐ | Package | 📅 Futuro |
+| **Compression** (gzip, brotli) | ⭐⭐⭐ | Package | 📅 Futuro |
+| **PGO** (Profile Guided Optimization) | ⭐⭐⭐ | Toolchain | 📅 Futuro |
+| **Cache Miss / IPC profiling** | ⭐⭐ | Toolchain | 📅 Futuro |
+| **Arena/Pool allocators** | ⭐⭐ | Runtime | 📅 Futuro |
+| **Vectorization control** (LLVM) | ⭐⭐ | Compiler | 📅 Futuro |
+
+Ver `BENCHMARK.md` para resultados completos.
