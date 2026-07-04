@@ -420,3 +420,47 @@ pub extern "C" fn ky_eq_str(a: *const u8, b: *const u8) -> i32 {
         }
     }
 }
+
+/// Convert a null-terminated C string pointer to a heap-allocated string.
+/// Returns null on null input.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_from_cstr(s: *const u8) -> *mut u8 {
+    if s.is_null() {
+        return core::ptr::null_mut();
+    }
+    let len = ky_strlen(s);
+    let buf = crate::ky_alloc((len + 1) as i64);
+    if buf.is_null() {
+        return core::ptr::null_mut();
+    }
+    unsafe {
+        core::ptr::copy_nonoverlapping(s, buf, len as usize);
+        *buf.add(len as usize) = 0;
+    }
+    buf
+}
+
+/// Read environment variable by name. Returns heap-allocated string or null.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_getenv(name: *const u8) -> *mut u8 {
+    if name.is_null() {
+        return core::ptr::null_mut();
+    }
+    let c_name = unsafe { core::ffi::CStr::from_ptr(name as *const i8) };
+    match std::env::var(c_name.to_str().unwrap_or("")) {
+        Ok(val) => {
+            let bytes = val.as_bytes();
+            let len = bytes.len();
+            let buf = crate::ky_alloc((len + 1) as i64);
+            if buf.is_null() {
+                return core::ptr::null_mut();
+            }
+            unsafe {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, len);
+                *buf.add(len) = 0;
+            }
+            buf
+        }
+        Err(_) => core::ptr::null_mut(),
+    }
+}

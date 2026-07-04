@@ -971,6 +971,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_close", ft, None);
         }
+        // ptr kl_from_cstr(ptr) — convert C string to Kyle string
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_from_cstr", ft, None);
+        }
+        // ptr kl_getenv(ptr) — read environment variable
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_getenv", ft, None);
+        }
         // void kl_sleep(i32)
         {
             let params = [i32_ty.into()];
