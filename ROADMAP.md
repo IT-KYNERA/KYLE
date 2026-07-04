@@ -5,7 +5,7 @@
 Kyle is a layered platform. Each layer only knows the layer below it.
 
 ```
-Applications (IDE, Desktop, KyleOS...)
+Applications (IDE, Desktop, KYOS...)
     │
 Kyle UI (widgets, navigation)
     │
@@ -23,8 +23,8 @@ Kyle Language (compiler)
 ```
 
 The **compiler and runtime are complete** (Phases 1-17).  
-The **upper layers (Windowing → Applications) are future work**.  
-The **Platform layer is next** — it enables backend packages (HTTP, SQLite, etc.).
+The **upper layers (Windowing → Applications) are aspirational — sin fecha estimada**.  
+El foco actual son **packages backend** (HTTP, SQLite, Postgres, WebSocket).
 
 ### Current crate structure
 
@@ -49,9 +49,11 @@ kyc_tools/         ✅ LSP, formatter, package manager
 | `kyc_platform_macos` | After Phase 0 | macOS platform adapter |
 | `kyc_platform_linux` | Future | Linux platform adapter |
 | Various `ky-*` | After Phase 0 | Kyle packages (HTTP, SQLite, JSON, etc.) |
-| `kyc_graphics` | Long-term | Canvas, GPU rendering |
-| `kyc_ui` | Long-term | Widget library |
-| `kyc_scene` | Long-term | Scene graph |
+| `kyc_graphics` | Aspiracional | Canvas, GPU rendering |
+| `kyc_ui` | Aspiracional | Widget library |
+| `kyc_scene` | Aspiracional | Scene graph |
+| `kyc_platform_macos` | Aspiracional | macOS platform adapter |
+| `kyc_platform_linux` | Aspiracional | Linux platform adapter |
 
 ---
 
@@ -167,65 +169,34 @@ These use only arithmetic, raw pointers, and libc FFI. All doable with current K
 
 ---
 
-## Runtime Rewrite Plan
+## Runtime Rewrite Plan — ⏸️ PAUSADO
 
-### Phase A — Low-hanging fruit (2-3 days)
-Rewrite 65 functions that are pure Kyle + libc FFI:
-- All of `string.rs` (except `ky_f64_to_str`)
-- All of `list.rs` (iterator functions use `extern fn malloc`/`free`)
-- All of `io.rs` (direct `extern fn` to libc: read, write, open, close, clock_gettime, etc.)
-- `lib.rs` utilities, `ky_assert`, `ky_yield`
+> **Decisión:** La reescritura del runtime Rust a Kyle está pausada hasta que Kyle se use en proyectos reales.  
+> El archivo `crates/kyc_runtime/src/string.ky` existe con 18 funciones pero permanece inerte.  
+> Reactivar cuando: (1) proyectos reales requieran auto-suficiencia, (2) el equipo lo considere necesario.
 
-### Phase B — Missing extern declarations (1 day)
-Add remaining `extern fn` declarations for:
-- `malloc`, `free`, `calloc`, `realloc` from libc
-- `snprintf` from libc (for `ky_f64_to_str`)
-- `__sync_fetch_and_add`, `__sync_fetch_and_sub`, `__sync_synchronize` (GCC builtins)
-
-### Phase C — Hash map in Kyle (1-2 weeks)
-Implement `final class Dict<K, V>` in pure Kyle with:
-- FNV-1a hash function
-- Open addressing with linear probing
-- Dynamic resizing
-- Wraps `extern fn malloc`/`free` for backing store
-
-### Phase D — Threading & Async (2-4 weeks)
-- `ky_spawn_thread`/`ky_join_thread` via `pthread_create` + C trampoline
-- Rebuild async executor on top of Kyle threads + channels
-
-### Phase E — Self-hosting compiler (4-8 weeks, low priority)
-- Declare ~85 LLVM C API functions as `extern fn`
-- Rewrite codegen logic (~2,400 lines) from Rust to Kyle
-- Compiler written in Kyle compiles itself
+| Phase | Descripción | Estado |
+|-------|-------------|--------|
+| A | Rewrite 65 functions (string, list, io) | ⏸️ Pausado |
+| B | Missing extern fn declarations | ⏸️ Pausado |
+| C | Hash map (Dict) en Kyle puro | ⏸️ Pausado |
+| D | Threading & Async | ⏸️ Pausado |
+| E | Self-hosting compiler | 📅 Baja prioridad |
 
 ---
 
 ## Implementation Order
 
 ```
-NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
+AHORA → Backend Packages + WebSocket/WASM — ✅ ENFOQUE ACTUAL
    ↓
-      Packages (http, json, sqlite, env — pure Kyle) — ✅ DONE
+      Runtime reescritura en Kyle — ⏸️ PAUSADA (hasta tener proyectos reales)
          ↓
-             Fase 1 — Function pointers (fn() como tipo) — ✅ DONE
+            Windowing, Graphics, Scene, UI — 📅 ASPIRACIONAL (sin fecha)
                ↓
-                  Fase 2 — JsonValue + auto-serialize — ✅ DONE
+                  KYOS (sistema operativo) — 📅 ASPIRACIONAL (sin fecha)
                      ↓
-                        Fase 3 — HTTP Client JSON integrado — ✅ DONE
-                           ↓
-                              Fase 4 — HTTP Server routing real — 🔜
-                                 ↓
-                                    Fase 5 — WebSocket + SSE — 🔜
-                                       ↓
-                                          Runtime Phase A (65 functions) — 📅
-                                             ↓
-                                                Runtime Phase B (missing externs) — 📅
-                                                   ↓
-                                                      Runtime Phase C (hash map) — 📅
-                                                         ↓
-                                                            Runtime Phase D (threading) — 📅
-                                                               ↓
-                                                                  Self-hosting — low priority 📅
+                        Self-hosting — 📅 BAJA PRIORIDAD
 ```
 
 ### Fases HTTP/JSON
@@ -238,7 +209,9 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
 | 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
 
-**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completados (Kyle vs Rust vs C). Bugs recientes arreglados: constructor sin `fn`, `@link` propagation, `from X import a, b, c`, tuple destructuring, `close()` name conflict. Runtime is 74% rewritable now.
+**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completados (Kyle vs Rust vs C). Bugs recientes arreglados: constructor sin `fn`, `@link` propagation, `from X import a, b, c`, tuple destructuring, `close()` name conflict.
+
+**Runtime reescritura en Kyle: PAUSADA.** El archivo `crates/kyc_runtime/src/string.ky` existe con 18 funciones pero NO se usa. Reactivar solo cuando Kyle se use en proyectos reales y la auto-suficiencia sea necesaria. Mientras tanto, el runtime Rust funciona y es estable.
 
 ### Bugs conocidos (no críticos)
 
