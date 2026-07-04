@@ -112,6 +112,13 @@ impl ModuleResolver {
             if candidate.exists() {
                 return Ok(candidate);
             }
+            // Also try <name>/lib.ky for directory-based packages
+            if !path_str.contains('/') {
+                let dir_candidate = search_path.join(&path_str).join("lib.ky");
+                if dir_candidate.exists() {
+                    return Ok(dir_candidate);
+                }
+            }
         }
         Err(format!("module '{}' not found in search paths", module_name))
     }

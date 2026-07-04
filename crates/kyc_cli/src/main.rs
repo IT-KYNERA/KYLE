@@ -135,17 +135,11 @@ fn install_package_to_std(project_root: &Path, name: &str, version: &str) -> Res
     if !src_dir.exists() {
         return Err(format!("Package '{}' not found in cache at {}", name, src_dir.display()));
     }
-    let std_dir = project_root.join("std");
-    fs::create_dir_all(&std_dir)
-        .map_err(|e| format!("Failed to create std/ dir: {}", e))?;
-    let std_file = std_dir.join(format!("{name}.ky"));
-    let main_src = src_dir.join("lib.ky");
-    if !main_src.exists() {
-        return Err(format!("Package '{}' has no src/lib.ky", name));
-    }
-    fs::copy(&main_src, &std_file)
-        .map_err(|e| format!("Failed to copy to std/{name}.ky: {}", e))?;
-    println!("  Installed to std/{name}.ky");
+    let pkg_dir = project_root.join("std").join(name);
+    fs::create_dir_all(&pkg_dir)
+        .map_err(|e| format!("Failed to create std/{name} dir: {}", e))?;
+    copy_dir(&src_dir, &pkg_dir)?;
+    println!("  Installed to std/{name}/");
     Ok(())
 }
 
@@ -992,12 +986,12 @@ fn cmd_remove(args: &[String]) {
                     eprintln!("Error saving manifest: {}", e);
                     process::exit(1);
                 }
-                // Remove from std/<name>.ky
-                let std_file = std::env::current_dir().unwrap().join("std").join(format!("{name}.ky"));
-                if std_file.exists() {
-                    fs::remove_file(&std_file)
-                        .map_err(|e| format!("Failed to remove std/{name}.ky: {}", e)).ok();
-                    println!("  Removed std/{name}.ky");
+                // Remove from std/<name>/
+                let std_dir = std::env::current_dir().unwrap().join("std").join(name);
+                if std_dir.exists() {
+                    fs::remove_dir_all(&std_dir)
+                        .map_err(|e| format!("Failed to remove std/{name}: {}", e)).ok();
+                    println!("  Removed std/{name}/");
                 }
                 println!("Removed dependency '{}'", name);
             } else {

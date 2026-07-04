@@ -1,65 +1,52 @@
 # http — HTTP Client and Server for Kyle
 
-**Version:** 3.0
-**Estado:** En desarrollo (Cliente v3, Servidor planeado)
+**Versión:** 4.0  
+**Estado:** Especificación
 
 ---
 
 ## 1. Filosofía
 
-El package `http` debe ser la puerta de entrada a la web para Kyle. No un wrapper, sino
-una biblioteca con identidad propia: tipada, idiomática, eficiente.
+El package `http` unifica cliente y servidor HTTP en una sola biblioteca.
+No hay funciones globales `get()`/`post()`. Todo se instancia:
 
-La implementación actual usa `system("curl ...")` como fase transitoria. La arquitectura
-está diseñada para migrar a libcurl directo por FFI sin cambios en la API pública.
+```kyle
+from http.client import Client
+from http.server import Server
+from http import HttpStatus, HttpMethod
+```
 
----
-
-## 2. Principios de diseño
-
-| Principio | Significado |
-|-----------|-------------|
-| **Tipado fuerte** | Cada concepto tiene su tipo: `HttpMethod`, `HttpStatus`, `Header`, `MimeType`. Sin strings mágicos. |
-| **API idiomática** | Kyle no es JavaScript. No hay option-objects, no hay `new` a pelo. Constructores y métodos con nombres claros. |
-| **Inmutable por defecto** | `Request` y `Response` son valores. `Client` tiene estado (conexiones, cookies). |
-| **Orientado a casos reales** | 80% del uso es GET/POST con JSON. Esos flujos deben ser una línea. |
-| **Extensible sin romper** | El core es estable. Las features avanzadas (websocket, http2) son módulos aparte. |
+El cliente y servidor comparten tipos (`HttpStatus`, `HttpMethod`, `Header`)
+pero son módulos separados internamente.
 
 ---
 
-## 3. Organización del package
+## 2. Organización del package
 
 ```
 packages/http/
-├── ky.toml                  # metadata del package
+├── ky.toml
 └── src/
-    ├── lib.ky               # API pública (todo se exporta desde aquí)
-    ├── client.ky            # Client + configuración
-    ├── request.ky           # Request builder
-    ├── response.ky          # Response + parseo
-    ├── types.ky             # HttpMethod, HttpStatus, MimeType, Header
-    ├── cookie.ky            # Cookie jar
-    ├── multipart.ky         # Multipart form data
-    ├── auth.ky              # Autenticación (Basic, Bearer, Digest)
-    └── server/              # (futuro)
-        ├── server.ky
-        ├── router.ky
-        └── middleware.ky
+    ├── lib.ky           # Tipos compartidos: HttpStatus, HttpMethod, Header, MimeType
+    ├── client.ky        # Client class + request execution
+    └── server.ky        # Server class + routing + middleware
 ```
 
-Cada archivo se importa internamente. El usuario solo ve:
+El usuario importa directamente de los submódulos:
 
-```ky
-from http import Client, Response, HttpStatus
+```kyle
+from http import HttpStatus
+from http.client import Client
+from http.server import Server
 ```
 
 ---
 
-## 4. Tipos públicos
+## 3. Tipos compartidos (`http`)
 
-### `HttpMethod` — enumeración tipada de métodos HTTP
+### `HttpMethod`
 
-```ky
+```kyle
 enum HttpMethod:
     GET
     POST
@@ -68,385 +55,289 @@ enum HttpMethod:
     PATCH
     HEAD
     OPTIONS
-    CONNECT
-    TRACE
 ```
 
-### `HttpStatus` — enumeración de códigos de estado
+### `HttpStatus`
 
-```ky
-enum HttpStatus:
-    # 2xx Success
-    OK = 200
-    Created = 201
-    Accepted = 202
-    NoContent = 204
-
-    # 3xx Redirect
-    MovedPermanently = 301
-    Found = 302
-    NotModified = 304
-
-    # 4xx Client Error
-    BadRequest = 400
-    Unauthorized = 401
-    Forbidden = 403
-    NotFound = 404
-    Conflict = 409
-    TooManyRequests = 429
-
-    # 5xx Server Error
-    InternalServerError = 500
-    BadGateway = 502
-    ServiceUnavailable = 503
-    GatewayTimeout = 504
+```kyle
+final class HttpStatus:
+    code: i32
+    text: str
 ```
 
-### `MimeType` — constantes de tipos MIME
+Constantes predefinidas:
 
-```ky
-final class MimeType:
-    json: str = "application/json"
-    html: str = "text/html"
-    text: str = "text/plain"
-    xml:  str = "application/xml"
-    form: str = "application/x-www-form-urlencoded"
-    multipart: str = "multipart/form-data"
-    octet_stream: str = "application/octet-stream"
-    png:  str = "image/png"
-    jpeg: str = "image/jpeg"
-    gif:  str = "image/gif"
-    svg:  str = "image/svg+xml"
-    pdf:  str = "application/pdf"
-    zip:  str = "application/zip"
-    mp4:  str = "video/mp4"
-    css:  str = "text/css"
-    js:   str = "application/javascript"
-```
+| Constante | Código |
+|-----------|--------|
+| `HttpStatusOk` | 200 |
+| `HttpStatusCreated` | 201 |
+| `HttpStatusNoContent` | 204 |
+| `HttpStatusMovedPermanently` | 301 |
+| `HttpStatusNotFound` | 404 |
+| `HttpStatusInternalServerError` | 500 |
 
-### `Header` — par nombre/valor
+### `Header`
 
-```ky
+```kyle
 final class Header:
     name: str
     value: str
 ```
 
-### `Request` — solicitud tipada
+### `MimeType` (constantes)
 
-```ky
-final class Request:
-    method: HttpMethod
-    url: str
-    headers: list<Header>
-    query: dict<str, str>
-    body: str
-    timeout: i32
-    follow_redirects: bool
-```
-
-### `Response` — respuesta completa
-
-```ky
-final class Response:
-    status: HttpStatus
-    status_code: i32        # acceso directo al código numérico
-    status_text: str        # "OK", "Not Found", etc.
-    headers: list<Header>
-    headers_dict: dict<str, str>  # acceso rápido por nombre
-    body: str
-    ok: bool                # true si status < 400
-    elapsed_ms: i64         # tiempo de respuesta
-    final_url: str          # URL después de redirecciones
-
-    fn json(self) dict<str, i64>:
-        # parsea body como JSON
-```
-
-### `ClientConfig` — configuración del cliente
-
-```ky
-final class ClientConfig:
-    timeout: i32            # segundos, default 30
-    headers: list<Header>   # headers por defecto
-    follow_redirects: bool  # default true
-    max_redirects: i32      # default 10
-    proxy: str              # opcional
-    user_agent: str         # default "Kyle/x.y.z"
-```
-
-### `Client` — el cliente HTTP
-
-```ky
-final class Client:
-    config: ClientConfig
-    cookie_jar: list<Cookie>
-
-    fn get(url: str) Response:
-    fn get(url: str, options: RequestOptions) Response:
-
-    fn post(url: str, body: str) Response:
-    fn post(url: str, body: str, options: RequestOptions) Response:
-
-    fn put(url: str, body: str) Response:
-    fn patch(url: str, body: str) Response:
-    fn delete(url: str) Response:
-    fn head(url: str) Response:
-    fn options(url: str) Response:
-
-    fn request(req: Request) Response:
-
-    # helpers
-    fn get_json(url: str) dict:
-    fn post_json(url: str, data: dict) Response:
-```
-
-### Funciones de alto nivel (convenience)
-
-```ky
-fn get(url: str) Response
-fn get(url: str, options: RequestOptions) Response
-fn post(url: str, body: str) Response
-fn put(url: str, body: str) Response
-fn patch(url: str, body: str) Response
-fn delete(url: str) Response
-fn head(url: str) Response
+```kyle
+MimeType.json   # "application/json"
+MimeType.html   # "text/html"
+MimeType.text   # "text/plain"
+MimeType.form   # "application/x-www-form-urlencoded"
 ```
 
 ---
 
-## 5. Ejemplos de uso
+## 4. Cliente HTTP (`http.client`)
 
-### GET simple
+### Uso básico
 
-```ky
-from http import get, Response
+```kyle
+from http.client import Client
 
-res = get("https://api.github.com/repos/IT-KYNERA/KYLE")
-if res.ok:
-    data = res.json()
-    print(data["description"])
-else:
-    print("Error: " + str(res.status_code))
+client = Client.new(timeout=30)
+
+# GET
+res = client.get("https://api.github.com/repos/IT-KYNERA/KYLE")
+if res.is_ok:
+    print(res.body)
+
+# POST con JSON
+res = client.post(
+    "https://jsonplaceholder.typicode.com/posts",
+    "{\"title\": \"Kyle\", \"body\": \"hello\", \"userId\": 1}"
+)
+
+# PUT
+res = client.put("https://api.example.com/users/1", json_data)
+
+# DELETE
+res = client.delete("https://api.example.com/users/1")
+
+# PATCH
+res = client.patch("https://api.example.com/users/1", json_data)
 ```
 
-### GET con headers y query params
+### Configuración del Client
 
-```ky
-from http import Client, Header
-
+```kyle
 client = Client.new(
-    timeout=15,
+    timeout=15,                    # segundos
     headers=[
         Header.new("User-Agent", "KyleApp/1.0"),
         Header.new("Accept", "application/json"),
     ],
+    follow_redirects=true,
+    max_redirects=10,
+)
+```
+
+### Response
+
+```kyle
+final class Response:
+    status_code: i32
+    status_text: str
+    headers: list<Header>
+    body: str
+    is_ok: bool
+    elapsed_ms: i64
+
+    fn header(self, name: str) str:
+        # Busca header por nombre (case-insensitive)
+```
+
+### Métodos del Client
+
+| Método | Descripción |
+|--------|-------------|
+| `client.get(url)` | GET request |
+| `client.post(url, body)` | POST con body |
+| `client.put(url, body)` | PUT con body |
+| `client.patch(url, body)` | PATCH con body |
+| `client.delete(url)` | DELETE |
+| `client.head(url)` | HEAD |
+| `client.options(url)` | OPTIONS |
+
+---
+
+## 5. Servidor HTTP (`http.server`)
+
+El servidor recibe **funciones handler** como callbacks, al estilo Express.js.
+
+Cada handler recibe `(req, res, next)` donde:
+- `req` — la request entrante
+- `res` — helper para construir la respuesta
+- `next` — función para pasar al siguiente middleware/ruta
+
+### Uso básico
+
+```kyle
+from http.server import Server, Request, Res
+
+server = Server()
+
+# GET /api/health — handler como función anónima
+server.get("/api/health", (req, res, next):
+    res.json({ "status": "ok" })
 )
 
-res = client.get("https://api.github.com/search/repositories",
-    {"q": "language:Kyle", "sort": "stars"})
+# POST /api/users — handler como función nombrada
+fn create_user(req, res, next):
+    body = req.json()
+    res.json({ "created": true, "id": 1 }, 201)
 
-if res.ok:
-    repos = res.json()
-    for repo in repos["items"]:
-        print(repo["full_name"])
+server.post("/api/users", create_user)
+
+server.listen(8080)
 ```
 
-### POST con JSON
+### Router — métodos
 
-```ky
-from http import post
-
-res = post("https://jsonplaceholder.typicode.com/posts",
-    '{"title": "Kyle", "body": "lenguaje chido", "userId": 1}')
-
-if res.status_code == 201:
-    created = res.json()
-    print("Created ID: " + str(created["id"]))
+```kyle
+server.get("/users", handler)          # GET /users
+server.get("/users/:id", handler)      # GET /users/42 → req.params["id"]
+server.post("/users", handler)         # POST /users
+server.put("/users/:id", handler)      # PUT /users/42
+server.delete("/users/:id", handler)   # DELETE /users/42
+server.patch("/users/:id", handler)    # PATCH /users/42
 ```
 
-### POST con form data
+### `Request` — objeto de solicitud
 
-```ky
-from http import Client, MimeType
-
-client = Client.new()
-res = client.post("https://httpbin.org/post", "key1=value1&key2=value2")
-
-# el Content-Type se auto-detecta como application/x-www-form-urlencoded
+```kyle
+final class Request:
+    method: HttpMethod
+    path: str
+    url: str
+    params: dict<str, str>      # path params (:id → "42")
+    query: dict<str, str>       # query params (?page=1)
+    body: str
+    
+    fn json() dict:             # parsea body como JSON
+    fn header(name: str) str    # header por nombre
 ```
 
-### Autenticación
+### `Res` — helper de respuesta
 
-```ky
+```kyle
+final class Res:
+    status: i32
+    body: str
+
+    fn json(data: dict):                   # 200 + JSON
+        this.status = 200
+        this.body = stringify(data)
+
+    fn json(data: dict, code: i32):        # status + JSON
+        this.status = code
+        this.body = stringify(data)
+
+    fn text(body: str):                    # 200 + texto
+        this.status = 200
+        this.body = body
+
+    fn text(body: str, code: i32):         # status + texto
+        this.status = code
+        this.body = body
+
+    fn redirect(url: str):                 # 302 redirect
+        this.status = 302
+```
+
+### Middleware
+
+Los middleware son handlers que llaman a `next()` para continuar la cadena.
+
+```kyle
+fn auth_handler(req, res, next):
+    if req.header("Authorization") == "":
+        res.text("unauthorized", 401)
+    else:
+        next()
+
+server.before("/api/*", auth_handler)
+
+fn cors_handler(req, res, next):
+    next()
+    # modificar respuesta después
+
+server.after("/api/*", cors_handler)
+```
+
+### Archivos estáticos
+
+```kyle
+server.static("/static", "./public")
+# GET /static/index.html → ./public/index.html
+```
+
+### CORS
+
+```kyle
+server.cors("*", "GET, POST, PUT, DELETE", "Content-Type, Authorization")
+```
+
+---
+
+## 6. Ejemplos completos
+
+### Cliente + JSON
+
+```kyle
 from http import Client
+from http import HttpStatus
 
-# Bearer token
-client = Client.new(
-    headers=[Header.new("Authorization", "Bearer " + token)]
+client = Client(10)
+res = client.get("https://jsonplaceholder.typicode.com/todos/1")
+
+if res.status_code == HttpStatusOk.code:
+    print(res.body)
+else:
+    print("error: " + str(res.status_code))
+```
+
+### Servidor mínimo
+
+```kyle
+from http.server import Server
+
+server = Server()
+
+server.get("/", (req, res, next):
+    res.json({ "message": "hello world" })
 )
 
-# Básica
-from http import auth
-basic_token = auth.basic("user", "pass")
-client = Client.new(
-    headers=[Header.new("Authorization", basic_token)]
-)
-```
-
-### Subida de archivo
-
-```ky
-from http import Client, Multipart
-
-client = Client.new()
-res = client.post("https://httpbin.org/post",
-    Multipart.new()
-        .add_field("name", "Kyle")
-        .add_file("avatar", "./profile.png"))
-```
-
-### Manejo de errores
-
-```ky
-from http import get, HttpStatus, HttpException
-
-res = get("https://api.example.com/data")
-match res.status:
-    HttpStatus.OK:
-        process(res.json())
-    HttpStatus.NotFound:
-        print("recurso no encontrado")
-    HttpStatus.InternalServerError:
-        print("error del servidor, reintentar luego")
-    _:
-        print("error " + str(res.status_code) + ": " + res.status_text)
+server.listen(3000)
 ```
 
 ---
 
-## 6. Arquitectura interna
+## 7. Fases de implementación
 
-### Capas
-
-```
-┌─────────────────────────────────────────────┐
-│             API Pública (lib.ky)            │
-│  get, post, put, delete, patch, head       │
-│  Client, Request, Response, HttpStatus     │
-├─────────────────────────────────────────────┤
-│           Capa de abstracción              │
-│  Client → ejecuta request                  │
-│  Response → parsea desde raw               │
-│  CookieJar → gestiona cookies             │
-├─────────────────────────────────────────────┤
-│            Transporte (FFI)                │
-│  extern fn curl_easy_*                    │
-│  @link "curl"                              │
-│  (hoy: system("curl ..."))                 │
-└─────────────────────────────────────────────┘
-```
-
-### Flujo de una request
-
-```
-1. El usuario llama a `client.get(url)`
-2. Se construye un `Request` interno con el método, URL, headers, body
-3. Se serializa a formato curl (hoy) o llamada libcurl FFI (futuro)
-4. Se ejecuta la petición
-5. Se parsea la respuesta cruda en un `Response` tipado
-6. Se devuelve `Response` al usuario
-```
+| Fase | Contenido | Estado |
+|------|-----------|--------|
+| 1 | Tipos compartidos (HttpStatus, HttpMethod, Header) | ✅ |
+| 2 | Client con `system("curl")` | ✅ |
+| 3 | Client con respuesta tipada (status_text, is_ok, elapsed_ms) | ✅ |
+| 4 | Server (router, listen, middleware) via libc sockets | 🔜 |
+| 5 | WebSocket sobre Server | 🔜 |
+| 6 | SSE sobre Server | 🔜 |
 
 ---
 
-## 7. Implementación: Fases
+## 8. Migración desde v3
 
-| Fase | Feature | Entrega |
-|------|---------|---------|
-| **3.0** | Client class, HttpMethod enum, HttpStatus enum, Response rico, headers, query params, auth básico | ✅ Ahora |
-| **3.1** | Cookie jar, multipart, streaming, progress | 📅 |
-| **3.2** | Migrar de `system("curl")` a libcurl FFI directo | 📅 |
-| **3.3** | HTTP/2 | 📅 |
-| **4.0** | Servidor HTTP (router, middleware, static) | 📅 |
-| **4.1** | WebSocket, SSE | 📅 |
-| **4.2** | HTTP/3, QUIC | 📅 |
-
----
-
-## 8. Documentación del package
-
-La documentación oficial de cada package vive en dos lugares:
-
-1. **`packages/<name>/README.md`** — Documentación técnica: API, ejemplos, changelog.
-   Esto es lo que ve el desarrollador cuando usa el package.
-
-2. **`docs/05-packages/<name>.md`** — Especificación de arquitectura: diseño, decisiones,
-   plan de implementación. Esto es para maintainers y contribuidores.
-
-Para el usuario final:
-
-```bash
-# El package se documenta a sí mismo
-ky add http
-# Luego en el código:
-from http import Client
-
-# Y en el README del package está la referencia completa
-```
-
----
-
-## 9. Referencia rápida
-
-```ky
-# ── Convenience functions ──
-get(url) -> Response
-get(url, options) -> Response
-post(url, body) -> Response
-put(url, body) -> Response
-delete(url) -> Response
-
-# ── Client ──
-client = Client.new(timeout=30, headers=[])
-client.get(url)
-client.post(url, body)
-client.put(url, body)
-client.patch(url, body)
-client.delete(url)
-client.head(url)
-client.options(url)
-client.request(Request)
-
-# ── Response ──
-res.status       -> HttpStatus enum
-res.status_code  -> i32
-res.status_text  -> str
-res.headers      -> list<Header>
-res.body         -> str
-res.ok           -> bool
-res.elapsed_ms   -> i64
-res.final_url    -> str
-res.json()       -> dict
-
-# ── RequestOptions (passed to get/post/...) ──
-{
-    "headers": [Header],
-    "query": {"key": "val"},
-    "auth": "Bearer ...",
-    "timeout": 30,
-}
-```
-
----
-
-## 10. Notas de migración desde v2
-
-| v2 | v3 |
-|----|----|
-| `fetch(url)` | `get(url)` |
-| `Response.status_code` | `Response.status_code` (igual) |
-| `Response.body` | `Response.body` (igual) |
-| `post(url, body)` | `post(url, body)` (igual) |
-| `Client.get(...)` | `Client.get(...)` (nuevo, v2 no tenía Client) |
-| `{ "timeout": 30 }` dict | `Client.new(timeout=30)` constructor tipado |
+| v3 | v4 |
+|----|-----|
+| `from http import http_get` | `from http import Client` |
+| `from http import post` | `client = Client(30)` → `client.post(url, body)` |
+| `from http import HttpStatus` | `from http import HttpStatus` (igual) |
+| `server.get("/path"):` | `server.get("/path", handler_fn)` |
