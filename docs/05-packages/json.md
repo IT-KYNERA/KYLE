@@ -1,95 +1,93 @@
 # json — JSON Parsing and Generation for Kyle
 
 **Versión:** 1.0  
-**Estado:** Especificación
+**Estado:** ✅ Completo (Fase 2)
 
 ---
 
-## 1. JsonValue — tipo unión para JSON
-
-Cualquier valor JSON se representa con `JsonValue`:
+## 1. Funciones básicas
 
 ```kyle
-type JsonValue = i64 | f64 | str | bool | list<JsonValue> | dict<str, JsonValue>
-```
+from json import parse, stringify
 
-## 2. Funciones principales
+data = parse("{\"name\":\"Ana\",\"age\":30}")
+print(data["name"])     # "Ana"
 
-```kyle
-from json import JsonValue, parse, stringify
-
-# String → JsonValue
-data = parse("{\"name\": \"Kyle\", \"version\": 1}")
-
-# JsonValue → String
 text = stringify(data)
+print(text)             # {"name":"Ana","age":30}
 ```
 
-## 3. Clases → JSON automático
+## 2. Clases → JSON (`struct_to_json`)
 
-Cualquier `final class` se serializa a JSON sin configuración:
+Cualquier `final class` se serializa a JSON usando un descriptor de campos:
 
 ```kyle
+from json import struct_to_json
+
 final class User:
     name: str
     age: i32
     active: bool
 
-user = User { name: "Kyle", age: 1, active: true }
-text = stringify(user)   # {"name":"Kyle","age":1,"active":true}
+user = User { name: "Kyle" age: 25 active: true }
+json = struct_to_json(user, "name:str,age:i32,active:bool")
+# → {"name":"Kyle","age":25,"active":true}
 ```
 
-Anidación:
+**Descriptor format:** `"field1:type1,field2:type2,..."`
+
+| Type | Bytes | JSON output |
+|------|-------|-------------|
+| `str` | 8 (ptr) | `"string"` |
+| `i32` | 4 | `42` |
+| `i64` | 8 | `42` |
+| `bool` | 1 | `true` / `false` |
+| `f64` | 8 | `3.14` |
+
+## 3. JSON → Clases (`json_to_struct`)
 
 ```kyle
-final class Address:
-    city: str
-    country: str
+from json import json_to_struct
 
-final class Person:
+final class User:
     name: str
-    address: Address
+    age: i32
+    active: bool
 
-p = Person {
-    name: "Ana",
-    address: Address { city: "CDMX", country: "MX" }
-}
-text = stringify(p)   # {"name":"Ana","address":{"city":"CDMX","country":"MX"}}
+user = User { name: "" age: 0 active: false }
+json_to_struct("\{\"name\":\"Ana\",\"age\":30,\"active\":true\}", 
+               "name:str,age:i32,active:bool", user)
+print(user.name)   # "Ana"
+print(user.age)    # 30
 ```
 
-## 4. JSON → Clases
+**Nota:** Escapar `\{` y `\}` en el string JSON para evitar interpolación.
+
+## 4. Integración con HTTP
 
 ```kyle
-json_str = "{\"name\":\"Kyle\",\"age\":1}"
-user = parse(json_str) as User   # casteo a User
+from http import Client
+from json import struct_to_json
+
+client = Client(30)
+
+final class Payload:
+    title: str
+    body: str
+    userId: i32
+
+data = Payload { title: "Kyle" body: "hello" userId: 1 }
+json_str = struct_to_json(data, "title:str,body:str,userId:i32")
+res = client.post("https://api.example.com/posts", json_str)
 ```
 
-Con genéricos (cuando existan):
+## 5. Plan de implementación
 
-```kyle
-user = parse[User](json_str)     # User inferido
-```
-
-## 5. En HTTP
-
-El cliente y servidor usan `JsonValue` automáticamente:
-
-```kyle
-# Cliente — cualquier clase se serializa al enviar
-res = client.post(url, user)        # User → JSON
-
-# Servidor — JSON se deserializa al tipo pedido
-fn create_user(req, res, next):
-    user = req.body<User>()          # JSON → User
-    res.json(user, 201)
-```
-
----
-
-## 6. Plan de implementación
-
-| Feature | Status |
+| Feature | Estado |
 |---------|--------|
-| `JsonValue` type (`A \| B`) | 🔜 Compiler |
-| `stringify(value: final class)` | 🔜 |
-| `parse[T](s: str)` | 🔜 |
+| `parse(str) → dict` | ✅ |
+| `stringify(dict) → str` | ✅ |
+| `struct_to_json[T](val, descriptor) → str` | ✅ |
+| `json_to_struct[T](json, descriptor, out)` | ✅ |
+| Auto-generación de descriptor por el compilador | 🔜 Fase 3 |
+| Union types (`JsonValue`) | 🔜 Futuro |
