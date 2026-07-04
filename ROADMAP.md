@@ -212,6 +212,35 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 
 **Current state:** Packages work (http, json, sqlite) in 100% Kyle with FFI. Runtime is 74% rewritable now. Hash map is the #1 blocker for full self-sufficiency.
 
+## Package Registry
+
+Kyle uses a registry API for package distribution. Currently a **file registry** (`KL_REGISTRY=file://`) serves packages from the repo's `registry/` directory. Future: dedicated HTTP server.
+
+### Current setup
+
+| Package | Registry path | Status |
+|---------|--------------|--------|
+| `http` | `registry/http/0.1.0.tar.gz` | ✅ Available |
+| `json` | `registry/json/0.1.0.tar.gz` | ✅ Available |
+| `sqlite` | `registry/sqlite/0.1.0.tar.gz` | ✅ Available |
+
+### Usage
+
+```bash
+export KL_REGISTRY=file:///path/to/ky/registry
+ky add http
+```
+
+### Future plan
+
+| Phase | Description | ETA |
+|-------|-------------|-----|
+| **File registry** (current) | Static files in repo | ✅ |
+| **GitHub Pages registry** | Host registry data on GitHub Pages | 📅 |
+| **Production server** | Dedicated HTTP registry with auth, search, yanking | 📅 |
+
+See `docs/05-packages/registry.md` for full documentation.
+
 ## Self-Hosting — Codegen Analysis
 
 To compile Kyle with Kyle, the compiler's codegen (`kyc_backend/src/codegen.rs`, ~2,400 lines of Rust) must be rewritten in Kyle. It currently uses **inkwell** (Rust wrapper for LLVM C API).

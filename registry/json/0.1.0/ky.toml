@@ -1,0 +1,9 @@
+[project]
+name = "ky-json"
+version = "0.1.0"
+edition = "2024"
+description = "JSON parsing and generation for Kyle"
+
+[compiler]
+optimization = "O2"
+target = "native"

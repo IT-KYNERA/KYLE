@@ -224,6 +224,14 @@ impl RegistryBackend for FileRegistry {
 /// Attempt to download a package tarball from the registry.
 pub fn download_package(name: &str, version: &str) -> Result<Vec<u8>, String> {
     let registry_url = std::env::var(REGISTRY_ENV).unwrap_or_else(|_| DEFAULT_REGISTRY.to_string());
+
+    // Support file:// URLs for local development
+    if let Some(path) = registry_url.strip_prefix("file://") {
+        let tarball_path = std::path::Path::new(path).join(name).join(format!("{}.tar.gz", version));
+        return std::fs::read(&tarball_path)
+            .map_err(|e| format!("Failed to read package file '{}': {}", tarball_path.display(), e));
+    }
+
     let url = format!("{}/packages/{}/{}/download", registry_url, name, version);
 
     let response = ureq::get(&url)

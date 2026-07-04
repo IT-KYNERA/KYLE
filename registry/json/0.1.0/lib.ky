@@ -1,0 +1,7 @@
+# ky-json — JSON parsing and generation
+
+fn parse(json_str: str) dict<str, i64>:
+    json_parse(json_str)
+
+fn stringify(dict_val: dict<str, i64>) str:
+    json_stringify(dict_val)

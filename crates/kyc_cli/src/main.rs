@@ -7,7 +7,7 @@ use kyc_core::resolver::RegistryBackend;
 use kyc_tools::package::{
     Manifest, LockFile, find_project_root, main_source_path,
     cache,
-    registry::RegistryClient,
+    registry::{FileRegistry, RegistryClient},
 };
 
 fn bin_name() -> String {
@@ -70,8 +70,15 @@ fn resolve_project_dependencies(project_root: &Path, manifest: &Manifest) -> Res
 
     println!("Resolving dependencies...");
 
-    let registry = RegistryClient::new();
-    let graph = manifest.resolve_dependencies(&registry)?;
+    let registry_url = std::env::var("KL_REGISTRY").unwrap_or_default();
+    let graph = if registry_url.starts_with("file://") {
+        let path = std::path::PathBuf::from(registry_url.strip_prefix("file://").unwrap_or(""));
+        let registry = FileRegistry::new(&path);
+        manifest.resolve_dependencies(&registry)?
+    } else {
+        let registry = RegistryClient::new();
+        manifest.resolve_dependencies(&registry)?
+    };
 
     if !graph.conflicts.is_empty() {
         for conflict in &graph.conflicts {
