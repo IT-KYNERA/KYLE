@@ -112,7 +112,7 @@ function startLanguageClient(context: vscode.ExtensionContext, klPath: string) {
     };
 
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'ky' }],
+        documentSelector: [{ scheme: 'file', language: 'kl' }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/{*.ky,ky.toml}'),
         },
