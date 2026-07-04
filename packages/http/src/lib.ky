@@ -1,40 +1,25 @@
 # http — HTTP client for Kyle
 #
-# Uses curl via system() for HTTP requests.
-# Status code and body captured to temp files.
-#
 # Usage:
-#   status, body = http.get("https://api.example.com/users")
-#   println("status: {status}")
+#   response = http.fetch("https://api.example.com/users")
+#   println(response.status_code)
+#   println(response.body)
 
 @link "curl"
 
 extern fn system(cmd: ptr) i32
 
-fn get(url: str) (i32, str):
-    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
-    system(cmd as ptr)
-    (parse_int(read_status()), read_body())
+ZERO := 48
 
-fn post(url: str, data: str) (i32, str):
-    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X POST -d '" + data + "' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
-    system(cmd as ptr)
-    (parse_int(read_status()), read_body())
+final class Response:
+    status_code: i32
+    body: str
 
-fn put(url: str, data: str) (i32, str):
-    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X PUT -d '" + data + "' '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
-    system(cmd as ptr)
-    (parse_int(read_status()), read_body())
-
-fn delete(url: str) (i32, str):
-    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}' -X DELETE '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
-    system(cmd as ptr)
-    (parse_int(read_status()), read_body())
+# ── Helpers ────────────────────────────────────────────────
 
 fn parse_int(s: str) i32:
     result: &i32 = 0
     i: &i32 = 0
-    ZERO := 48
     while i < len(s):
         c = char_at(s, i)
         if c >= ZERO and c <= 57:
@@ -42,18 +27,42 @@ fn parse_int(s: str) i32:
         i = i + 1
     result
 
-fn read_status() str:
-    fd = open("/tmp/ky_status.txt", 0)
-    s = ""
-    if fd >= 0:
-        s = read_str(fd, 32)
-        close(fd)
-    s
-
-fn read_body() str:
-    fd = open("/tmp/ky_body.txt", 0)
+fn read_file(path: str) str:
+    fd = open(path, 0 as ptr)
     s = ""
     if fd >= 0:
         s = read_str(fd, 65536)
         close(fd)
     s
+
+# ── Core request ───────────────────────────────────────────
+
+fn do_request(method: str, url: str, body: str) Response:
+    cmd = "curl -s -o /tmp/ky_body.txt -w '%\{http_code\}'"
+    if method == "POST" or method == "PUT" or method == "PATCH":
+        cmd = cmd + " -X " + method + " -d '" + body + "'"
+    elif method == "DELETE":
+        cmd = cmd + " -X DELETE"
+    cmd = cmd + " '" + url + "' > /tmp/ky_status.txt 2>/dev/null"
+    system(cmd as ptr)
+
+    status = parse_int(read_file("/tmp/ky_status.txt"))
+    body_str = read_file("/tmp/ky_body.txt")
+    Response { status_code: status body: body_str }
+
+# ── Public API ─────────────────────────────────────────────
+
+fn fetch(url: str) Response:
+    do_request("GET", url, "")
+
+fn post(url: str, data: str) Response:
+    do_request("POST", url, data)
+
+fn put(url: str, data: str) Response:
+    do_request("PUT", url, data)
+
+fn delete(url: str) Response:
+    do_request("DELETE", url, "")
+
+fn patch(url: str, data: str) Response:
+    do_request("PATCH", url, data)
