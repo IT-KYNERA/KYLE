@@ -244,7 +244,6 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 
 | Bug | Impacto | Workaround |
 |-----|---------|------------|
-| `from http.server import listen` — crash al importar modulo completo | Medio | Usar `extern fn` inline |
 | Closures como argumentos truncados a i32 | Bajo | Usar funciones nombradas |
 
 ## Package Registry
