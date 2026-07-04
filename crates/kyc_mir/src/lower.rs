@@ -350,6 +350,22 @@ impl Lowerer {
                     struct_defs.insert(e.name.clone(), fields);
                 }
             }
+            // Register tuple return types in struct_defs
+            for decl in &program.declarations {
+                if let Decl::Function(f) = decl {
+                    if let Some(ref rt) = f.return_type {
+                        if let AstType::Generic { name, args, .. } = rt {
+                            if name == "tuple" {
+                                let field_types: Vec<(String, MirType)> = args.iter().enumerate()
+                                    .map(|(i, el)| (format!("_{}", i), ast_type_to_mir(el, Some(&struct_defs))))
+                                    .collect();
+                                struct_defs.entry(format!("__tuple_{}", field_types.len()))
+                                    .or_insert_with(|| field_types);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Populate field defaults for classes
@@ -2295,19 +2311,13 @@ impl Lowerer {
                 ctx
             }
             Stmt::TypedVariable(v) => {
-                let mir_default = MirType::I32;
                 ctx = self.lower_expr(ctx, &v.value);
                 let val_local = ctx.next_local - 1;
-                let mut is_str = false;
-                for &id in &ctx.string_locals {
-                    if id == val_local {
-                        is_str = true;
-                        break;
-                    }
-                }
+                let inferred_type = ctx.local_types.get(&val_local).cloned();
                 let var_type = v.type_.as_ref()
                     .map(|t| ast_type_to_mir(t, Some(&ctx.struct_defs)))
-                    .unwrap_or(if is_str { MirType::Str } else { mir_default });
+                    .or(inferred_type)
+                    .unwrap_or(MirType::I32);
                 let local = ctx.alloc_local(&v.name, var_type);
                 ctx.locals.insert(v.name.clone(), local);
                 ctx.current_block.insts.push(MirInst::Store {
@@ -5213,10 +5223,48 @@ impl Lowerer {
                 ctx
             }
             Expr::Tuple { elements, .. } => {
-                for elem in elements {
-                    ctx = self.lower_expr(ctx, elem);
+                if elements.len() <= 1 {
+                    // Single-element tuple is just the element
+                    if elements.is_empty() {
+                        ctx
+                    } else {
+                        ctx = self.lower_expr(ctx, &elements[0]);
+                        ctx
+                    }
+                } else {
+                    // Multi-element tuple: build a struct
+                    let mut elem_ids = Vec::new();
+                    for elem in elements {
+                        ctx = self.lower_expr(ctx, elem);
+                        elem_ids.push(ctx.next_local - 1);
+                    }
+                    // Build struct type from element types
+                    let field_types: Vec<(String, MirType)> = elem_ids.iter().enumerate()
+                        .map(|(i, id)| (format!("_{}", i), ctx.local_types.get(id).cloned().unwrap_or(MirType::I32)))
+                        .collect();
+                    let struct_type = MirType::Struct(format!("__tuple_{}", elements.len()), field_types.clone());
+                    let struct_local = ctx.alloc_local("_tup", struct_type.clone());
+                    for (i, elem_id) in elem_ids.iter().enumerate() {
+                        let fptr = ctx.alloc_local("_tfptr", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: fptr,
+                            ptr: struct_local,
+                            field_index: i,
+                            struct_type: Box::new(struct_type.clone()),
+                        });
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: fptr,
+                            value: MirValue::Local(*elem_id),
+                        });
+                    }
+                    // Load the struct as the expression result (last local)
+                    let load_local = ctx.alloc_local("_tload", struct_type.clone());
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: load_local,
+                        src: struct_local,
+                    });
+                    ctx
                 }
-                ctx
             }
             Expr::Closure { params, body, .. } => {
                 let mut counter = self.closure_counter.borrow_mut();
@@ -6315,6 +6363,17 @@ fn ast_type_to_mir_with_subst(
             if name == "list" {
                 if args.is_empty() { MirType::List(Box::new(MirType::I32)) }
                 else { MirType::List(Box::new(ast_type_to_mir_with_subst(&args[0], struct_defs, subst))) }
+            } else if name == "tuple" {
+                // (T, U, ...) → anonymous struct with _0, _1, ... fields
+                let field_types: Vec<(String, MirType)> = args.iter().enumerate()
+                    .map(|(i, el)| (format!("_{}", i), ast_type_to_mir_with_subst(el, struct_defs, subst)))
+                    .collect();
+                let struct_name = format!("__tuple_{}", field_types.len());
+                // Register in struct_defs for field access resolution
+                if let Some(defs) = struct_defs {
+                    // We can't modify struct_defs through a reference, so this is best-effort
+                }
+                MirType::Struct(struct_name, field_types)
             } else if args.is_empty() {
                 if let Some(defs) = struct_defs {
                     if let Some(fields) = defs.get(name) {
