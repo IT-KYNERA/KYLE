@@ -83,30 +83,36 @@ impl Pipeline {
         }
 
         let mut import_decls: Vec<(usize, Vec<kyc_core::ast::Decl>)> = Vec::new();
-        let mut scope_registrations: Vec<(String, String)> = Vec::new();
+        let mut seen_modules: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for (i, decl) in program.declarations.iter().enumerate() {
             match decl {
                 kyc_core::ast::Decl::Import(imp) => {
-                    let module_decls = resolver.get_module_declarations(&imp.module_name, imp.relative)?;
-                    let scope_name = imp.alias.clone().unwrap_or_else(|| imp.module_name.clone());
-                    scope_registrations.push((scope_name, imp.module_name.clone()));
-                    import_decls.push((i, module_decls));
+                    if seen_modules.insert(imp.module_name.clone()) {
+                        let module_decls = resolver.get_module_declarations(&imp.module_name, imp.relative)?;
+                        import_decls.push((i, module_decls));
+                    } else {
+                        import_decls.push((i, Vec::new()));
+                    }
                 }
                 kyc_core::ast::Decl::FromImport(fi) => {
-                    let module_decls = resolver.get_module_declarations(&fi.module_name, fi.relative)?;
-                    let scope_name = fi.alias.clone().unwrap_or_else(|| fi.imported_name.clone());
-                    scope_registrations.push((scope_name, fi.module_name.clone()));
-                    import_decls.push((i, module_decls));
+                    if seen_modules.insert(fi.module_name.clone()) {
+                        let module_decls = resolver.get_module_declarations(&fi.module_name, fi.relative)?;
+                        import_decls.push((i, module_decls));
+                    } else {
+                        import_decls.push((i, Vec::new()));
+                    }
                 }
                 _ => {}
             }
         }
 
         for (idx, decls) in import_decls.into_iter().rev() {
-            let mut rest = program.declarations.split_off(idx + 1);
-            program.declarations.extend(decls);
-            program.declarations.append(&mut rest);
+            if !decls.is_empty() {
+                let mut rest = program.declarations.split_off(idx + 1);
+                program.declarations.extend(decls);
+                program.declarations.append(&mut rest);
+            }
         }
 
         // Transitive import resolution: resolve imports within each cached
