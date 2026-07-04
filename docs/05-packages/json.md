@@ -1,7 +1,7 @@
 # json — JSON Parsing and Generation for Kyle
 
-**Versión:** 1.0  
-**Estado:** ✅ Completo (Fase 2)
+**Versión:** 2.0  
+**Estado:** ✅ Completo (Fase 3)
 
 ---
 
@@ -17,77 +17,66 @@ text = stringify(data)
 print(text)             # {"name":"Ana","age":30}
 ```
 
-## 2. Clases → JSON (`struct_to_json`)
+## 2. Clase → JSON (`serialize`)
 
-Cualquier `final class` se serializa a JSON usando un descriptor de campos:
+Built-in global. Sin descriptor manual:
 
 ```kyle
-from json import struct_to_json
-
 final class User:
     name: str
     age: i32
-    active: bool
 
-user = User { name: "Kyle" age: 25 active: true }
-json = struct_to_json(user, "name:str,age:i32,active:bool")
-# → {"name":"Kyle","age":25,"active":true}
+user = User { name: "Kyle", age: 1 }
+json = serialize(user)       # → {"name":"Kyle","age":1}
 ```
 
-**Descriptor format:** `"field1:type1,field2:type2,..."`
-
-| Type | Bytes | JSON output |
-|------|-------|-------------|
-| `str` | 8 (ptr) | `"string"` |
-| `i32` | 4 | `42` |
-| `i64` | 8 | `42` |
-| `bool` | 1 | `true` / `false` |
-| `f64` | 8 | `3.14` |
-
-## 3. JSON → Clases (`json_to_struct`)
+También soporta comas en struct literals:
 
 ```kyle
-from json import json_to_struct
+user = User { name: "Kyle", age: 1 }    # con comas
+user = User { name: "Kyle" age: 1 }     # sin comas (legacy)
+```
 
+## 3. JSON → Clase (`deserialize<T>`)
+
+```kyle
 final class User:
     name: str
     age: i32
-    active: bool
 
-user = User { name: "" age: 0 active: false }
-json_to_struct("\{\"name\":\"Ana\",\"age\":30,\"active\":true\}", 
-               "name:str,age:i32,active:bool", user)
+user = deserialize<User>("{\"name\":\"Ana\",\"age\":30}")
 print(user.name)   # "Ana"
 print(user.age)    # 30
 ```
-
-**Nota:** Escapar `\{` y `\}` en el string JSON para evitar interpolación.
 
 ## 4. Integración con HTTP
 
 ```kyle
 from http import Client
-from json import struct_to_json
 
-client = Client(30)
-
-final class Payload:
+final class Post:
+    userId: i32
+    id: i32
     title: str
     body: str
-    userId: i32
 
-data = Payload { title: "Kyle" body: "hello" userId: 1 }
-json_str = struct_to_json(data, "title:str,body:str,userId:i32")
-res = client.post("https://api.example.com/posts", json_str)
+client = Client { timeout: 10 }
+
+# Enviar: clase → auto-JSON
+data = Post { userId: 1, id: 0, title: "test", body: "hello" }
+res = client.post("https://api.example.com/posts", data)
+
+# Recibir: JSON → clase automático
+res = client.get("https://jsonplaceholder.typicode.com/posts/1")
+post = deserialize<Post>(res.body)
+print(post.title)
 ```
 
-## 5. Plan de implementación
+## 5. API completa
 
-| Feature | Estado |
-|---------|--------|
-| `parse(str) → dict` | ✅ |
-| `stringify(dict) → str` | ✅ |
-| `struct_to_json[T](val, descriptor) → str` | ✅ |
-| `json_to_struct[T](json, descriptor, out)` | ✅ |
-| Auto-generación de descriptor por el compilador | 🔜 Fase 3 |
-| Union types (`JsonValue`) | 🔜 Futuro |
+| Función | Descripción |
+|---------|-------------|
+| `parse(str) → dict` | JSON string → dict |
+| `stringify(dict) → str` | dict → JSON string |
+| `serialize(val) → str` | Cualquier `final class` → JSON string |
+| `deserialize<T>(str) → T` | JSON string → clase `T` |

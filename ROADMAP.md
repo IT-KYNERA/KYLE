@@ -201,7 +201,7 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
                ↓
                   Fase 2 — JsonValue + auto-serialize — ✅ DONE
                      ↓
-                        Fase 3 — HTTP Client JSON integrado — 🔜
+                        Fase 3 — HTTP Client JSON integrado — ✅ DONE
                            ↓
                               Fase 4 — HTTP Server routing real — 🔜
                                  ↓
@@ -224,7 +224,7 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 |------|-------------|------------|--------|
 | 1 | Function pointers (`fn()` como tipo de primera clase) | Compiler | ✅ |
 | 2 | `JsonValue` type + auto-serialize de `final class` | Union types | ✅ |
-| 3 | HTTP Client: `client.post(url, class)` auto-JSON | Fase 2 | 🔜 |
+| 3 | HTTP Client: `client.post(url, class)` auto-JSON | Fase 2 | ✅ |
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
 | 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
 

@@ -64,7 +64,7 @@ impl SymbolTable {
         // to avoid "undefined symbol" errors from the scope resolver).
         let runtime_fns = [
             "print", "println", "print_err", "len", "str", "input", "range",
-            "json_parse", "json_stringify", "struct_to_json", "json_to_struct",
+            "json_parse", "json_stringify", "serialize", "deserialize",
             "ky_struct_to_json", "ky_json_to_struct",
             "open", "read_str", "write_str", "close", "sleep", "now",
             "assert", "assert_eq", "assert_ne", "assert_str",

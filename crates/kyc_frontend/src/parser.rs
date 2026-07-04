@@ -1248,7 +1248,13 @@ impl Parser {
                     self.advance(); // consume '{'
                     let mut fields = Vec::new();
                     while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                        // Skip newlines and indentation between fields
+                        while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                            self.advance();
+                        }
+                        if self.at(TokenKind::RBrace) { break; }
                         let key = self.eat_identifier();
+                        if key.is_empty() { break; }
                         self.expect(TokenKind::Colon)?;
                         let value = self.parse_expr()?;
                         fields.push((key, value));

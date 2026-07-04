@@ -2976,7 +2976,7 @@ impl Lowerer {
                 });
                 ctx
             }
-            Expr::FunctionCall { target, arguments, .. } => {
+            Expr::FunctionCall { target, arguments, type_args, .. } => {
                 // Method dispatch: obj.method(args) → Call ClassName::method(obj, args...)
                 // Checked BEFORE the list-specific shortcuts so real class methods win
                 // over the generic list.add/list.pop fallbacks.
@@ -4009,6 +4009,64 @@ impl Lowerer {
                     }
                 }
 
+                // Handle serialize(val) and deserialize<T>(str) before call_type setup
+                {
+                    fn build_descriptor(fields: &[(String, MirType)]) -> String {
+                        let mut parts: Vec<String> = Vec::new();
+                        for (fname, ftype) in fields {
+                            let type_name = match ftype {
+                                MirType::Str => "str",
+                                MirType::I32 => "i32",
+                                MirType::I64 => "i64",
+                                MirType::Bool => "bool",
+                                MirType::F64 => "f64",
+                                _ => "i32",
+                            };
+                            parts.push(format!("{}:{}", fname, type_name));
+                        }
+                        parts.join(",")
+                    }
+
+                    // serialize(val) — class to JSON
+                    if resolved_name == "serialize" && args.len() == 1 {
+                        if let MirValue::Local(id) = &args[0] {
+                            if let Some(MirType::Struct(_, fields)) = ctx.local_types.get(id).cloned() {
+                                let descriptor = build_descriptor(&fields);
+                                args.push(MirValue::Constant(MirConstant::String(descriptor)));
+                                resolved_name = "ky_struct_to_json".to_string();
+                            }
+                        }
+                    // deserialize<T>(str) — JSON to class T
+                    } else if resolved_name == "deserialize" && args.len() == 1 {
+                        if let Some(first_type_arg) = type_args.first() {
+                            let struct_defs = ctx.struct_defs.clone();
+                            let mir_type = ast_type_to_mir(first_type_arg, Some(&struct_defs));
+                            if let MirType::Struct(_, fields) = &mir_type {
+                                let descriptor = build_descriptor(fields);
+                                let json_arg = args.remove(0);
+                                let out_local = ctx.alloc_local("_dout", mir_type.clone());
+                                args.push(json_arg);
+                                args.push(MirValue::Constant(MirConstant::String(descriptor)));
+                                args.push(MirValue::Local(out_local));
+                                // Call ky_json_to_struct directly and return the output local
+                                let result = ctx.alloc_local("_dres", mir_type.clone());
+                                ctx.current_block.insts.push(MirInst::Call {
+                                    dest: Some(result),
+                                    name: "ky_json_to_struct".to_string(),
+                                    args,
+                                });
+                                // Load result from output struct
+                                let load = ctx.alloc_local("_dval", mir_type.clone());
+                                ctx.current_block.insts.push(MirInst::Load {
+                                    dest: load,
+                                    src: out_local,
+                                });
+                                return ctx;
+                            }
+                        }
+                    }
+                }
+
                 let call_type = builtin_return_type(&resolved_name).unwrap_or_else(|| {
                     self.fn_returns.borrow().get(&resolved_name).cloned().unwrap_or(MirType::I32)
                 });
@@ -4140,57 +4198,26 @@ impl Lowerer {
                     return ctx;
                 }
 
-                // Auto-generate descriptor for struct_to_json(val) and json_to_struct(json, out)
-                if resolved_name == "struct_to_json" && args.len() == 1 {
-                    // Infer descriptor from struct type
-                    let struct_local = match &args[0] {
-                        MirValue::Local(id) => *id,
-                        _ => { return ctx; },
-                    };
-                    let struct_type = ctx.local_types.get(&struct_local).cloned();
-                    if let Some(MirType::Struct(sname, fields)) = struct_type {
-                        let mut desc_parts: Vec<String> = Vec::new();
-                        for (fname, ftype) in &fields {
-                            let type_name = match ftype {
-                                MirType::Str => "str",
-                                MirType::I32 => "i32",
-                                MirType::I64 => "i64",
-                                MirType::Bool => "bool",
-                                MirType::F64 => "f64",
-                                _ => "i32",
-                            };
-                            desc_parts.push(format!("{}:{}", fname, type_name));
+                // Auto-JSON for client.post(url, data) where data is a class
+                if name == "post" && args.len() == 2 {
+                    if let MirValue::Local(id) = &args[1] {
+                        if let Some(MirType::Struct(_, fields)) = ctx.local_types.get(id).cloned() {
+                            let mut desc_parts: Vec<String> = Vec::new();
+                            for (fname, ftype) in &fields {
+                                let tn = match ftype { MirType::Str => "str", MirType::I32 => "i32", MirType::I64 => "i64", MirType::Bool => "bool", MirType::F64 => "f64", _ => "i32" };
+                                desc_parts.push(format!("{}:{}", fname, tn));
+                            }
+                            let desc = desc_parts.join(",");
+                            let data_arg = args.remove(1);
+                            let ser_dest = ctx.alloc_local("_ser", MirType::Str);
+                            ctx.string_locals.push(ser_dest);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(ser_dest),
+                                name: "ky_struct_to_json".to_string(),
+                                args: vec![data_arg, MirValue::Constant(MirConstant::String(desc))],
+                            });
+                            args.push(MirValue::Local(ser_dest));
                         }
-                        let descriptor = desc_parts.join(",");
-                        args.push(MirValue::Constant(MirConstant::String(descriptor)));
-                        resolved_name = "ky_struct_to_json".to_string();
-                    }
-                } else if resolved_name == "json_to_struct" && args.len() == 2 {
-                    // Infer descriptor from output struct type
-                    let struct_local = match &args[1] {
-                        MirValue::Local(id) => *id,
-                        _ => { return ctx; },
-                    };
-                    let struct_type = ctx.local_types.get(&struct_local).cloned();
-                    if let Some(MirType::Struct(sname, fields)) = struct_type {
-                        let mut desc_parts: Vec<String> = Vec::new();
-                        for (fname, ftype) in &fields {
-                            let type_name = match ftype {
-                                MirType::Str => "str",
-                                MirType::I32 => "i32",
-                                MirType::I64 => "i64",
-                                MirType::Bool => "bool",
-                                MirType::F64 => "f64",
-                                _ => "i32",
-                            };
-                            desc_parts.push(format!("{}:{}", fname, type_name));
-                        }
-                        let descriptor = desc_parts.join(",");
-                        // Insert descriptor between json and out: args[0]=json, args[1]=desc, args[2]=out
-                        let out_arg = args.pop().unwrap();
-                        args.push(MirValue::Constant(MirConstant::String(descriptor)));
-                        args.push(out_arg);
-                        resolved_name = "ky_json_to_struct".to_string();
                     }
                 }
 
@@ -4199,7 +4226,7 @@ impl Lowerer {
                     name: resolved_name.clone(),
                     args,
                 });
-                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify" | "struct_to_json") {
+                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify" | "serialize" | "ky_struct_to_json") {
                     ctx.string_locals.push(dest);
                 }
                 ctx
@@ -5773,8 +5800,8 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "eq_str" => Some(MirType::I32),
         "json_parse" => Some(MirType::Dict(Box::new(MirType::Str), Box::new(MirType::I64))),
         "json_stringify" => Some(MirType::Str),
-        "struct_to_json" => Some(MirType::Str),
-        "json_to_struct" => Some(MirType::I32),
+        "serialize" => Some(MirType::Str),
+        "ky_struct_to_json" => Some(MirType::Str),
         "error" => Some(MirType::Struct("__result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
