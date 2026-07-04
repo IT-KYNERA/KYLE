@@ -1,15 +1,18 @@
-# http v4.0 — Server HTTP
+# http v4.0 — Server HTTP (utilities)
+# from http.server import listen, accept, respond, read_request, Request
 #
-# NOTA: Kyle aún no soporta function pointers.
-# El routing se hace mediante match estructural en el código del usuario.
-#
-# from http.server import Server, Request, Res
-# server = Server()
-# server.listen(8080)  # llama a serve_client() automáticamente
-#
-# O directamente:
-#   from http.server import handle_request
-#   handle_request(method, path) -> (status, body, content_type)
+# Uso:
+#   fd = listen(9090)
+#   while true:
+#       client = accept(fd)
+#       if client >= 0:
+#           req = read_request(client)
+#           path = req.path
+#           if path == "/":
+#               respond(client, 200, "\{\"status\":\"ok\"\}", "application/json")
+#           else:
+#               respond(client, 404, "Not Found", "text/plain")
+#           close(client)
 
 @link "c"
 
@@ -24,12 +27,20 @@ final class Request:
     path: str
     body: str
 
+fn listen(port: i32) i32:
+    ky_tcp_listen(port)
+
+fn accept(fd: i32) i32:
+    ky_tcp_accept(fd)
+
+fn close(fd: i32):
+    ky_tcp_close(fd)
+
 fn read_request(client_fd: i32) Request:
     raw = ky_tcp_read(client_fd, 4096)
     if raw == 0 as ptr:
         return Request { method: "" path: "" body: "" }
     raw_str = raw as str
-
     method = ""
     path = ""
     i: &i32 = 0
@@ -43,50 +54,16 @@ fn read_request(client_fd: i32) Request:
     path = substr(raw_str, path_start, i - path_start)
     Request { method: method path: path body: "" }
 
-fn send_response(client_fd: i32, status: i32, body: str, content_type: str):
+fn respond(client_fd: i32, code: i32, body: str, ctype: str):
     st = "OK"
-    if status == 404:
+    if code == 404:
         st = "Not Found"
-    elif status == 500:
+    elif code == 500:
         st = "Internal Server Error"
-
-    response = "HTTP/1.1 " + str(status) + " " + st + "\r\n"
-    response = response + "Content-Type: " + content_type + "\r\n"
+    response = "HTTP/1.1 " + str(code) + " " + st + "\r\n"
+    response = response + "Content-Type: " + ctype + "\r\n"
     response = response + "Content-Length: " + str(len(body)) + "\r\n"
     response = response + "Connection: close\r\n"
     response = response + "\r\n"
     response = response + body
     ky_tcp_write(client_fd, response as ptr, len(response))
-
-final class Server:
-    fd: &i32
-
-    fn Server():
-        this.fd = -1
-
-    fn listen(port: i32):
-        fd = ky_tcp_listen(port)
-        if fd < 0:
-            print("Error: cannot listen on port ")
-            print(port)
-            print("\n")
-            return
-        this.fd = fd
-        print("Server listening on port ")
-        print(port)
-        print("\n")
-        while true:
-            client = ky_tcp_accept(fd)
-            if client >= 0:
-                req = read_request(client)
-                if len(req.method) > 0:
-                    status = route(req.method, req.path)
-                    if status == 200:
-                        send_response(client, 200, "\{\"status\":\"ok\"\}", "application/json")
-                    else:
-                        send_response(client, 404, "Not Found", "text/plain")
-                ky_tcp_close(client)
-
-fn route(method: str, path: str) i32:
-    # Default handler — sobreescribe esta función para tu routing
-    200
