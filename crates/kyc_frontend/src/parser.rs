@@ -1052,48 +1052,37 @@ impl Parser {
             TokenKind::LParen => {
                 let start = self.pos;
                 self.advance(); // consume '('
-                // Try closure: (params) => expr
+                // Try closure: (params) => expr or (params) RetType: body
                 let saved = self.pos;
                 let params = self.parse_closure_params();
                 if self.at(TokenKind::RParen) {
                     self.advance(); // consume ')'
-                    if self.at(TokenKind::FatArrow) {
+                    let result = if self.at(TokenKind::FatArrow) {
                         self.advance(); // consume '=>'
                         let body = self.parse_expr()?;
                         Expr::Closure { params, body: Box::new(body), span: self.span_from(start) }
-                    } else {
-                        // Not a closure — backtrack and try tuple or parenthesized expr
-                        self.pos = saved;
-                        let first = self.parse_expr()?;
-                        if self.at(TokenKind::Comma) {
-                            let mut elements = vec![first];
-                            while self.at(TokenKind::Comma) {
-                                self.advance();
-                                elements.push(self.parse_expr()?);
-                            }
-                            self.expect(TokenKind::RParen)?;
-                            Expr::Tuple { elements, span: self.span_from(start) }
+                    } else if self.at_identifier() {
+                        // Closure with return type: (params) RetType: body
+                        let saved2 = self.pos;
+                        let _ret_type = self.eat_identifier();
+                        if self.at(TokenKind::Colon) {
+                            self.advance(); // consume ':'
+                            // Parse same-line body only
+                            let body = self.parse_expr()?;
+                            Expr::Closure { params, body: Box::new(body), span: self.span_from(start) }
                         } else {
-                            self.expect(TokenKind::RParen)?;
-                            first
+                            self.pos = saved;
+                            self.parse_tuple_or_paren_expr(start)?
                         }
-                    }
+                    } else {
+                        self.pos = saved;
+                        self.parse_tuple_or_paren_expr(start)?
+                    };
+                    result
                 } else {
                     // Not a closure — try tuple or parenthesized expr
                     self.pos = saved;
-                    let first = self.parse_expr()?;
-                    if self.at(TokenKind::Comma) {
-                        let mut elements = vec![first];
-                        while self.at(TokenKind::Comma) {
-                            self.advance();
-                            elements.push(self.parse_expr()?);
-                        }
-                        self.expect(TokenKind::RParen)?;
-                        Expr::Tuple { elements, span: self.span_from(start) }
-                    } else {
-                        self.expect(TokenKind::RParen)?;
-                        first
-                    }
+                    self.parse_tuple_or_paren_expr(start)?
                 }
             }
             TokenKind::LBracket => {
@@ -1903,6 +1892,23 @@ impl Parser {
             else { break; }
         }
         params
+    }
+
+    /// Parse a tuple or parenthesized expression (after backtracking from closure).
+    fn parse_tuple_or_paren_expr(&mut self, start: usize) -> Result<Expr, String> {
+        let first = self.parse_expr()?;
+        if self.at(TokenKind::Comma) {
+            let mut elements = vec![first];
+            while self.at(TokenKind::Comma) {
+                self.advance();
+                elements.push(self.parse_expr()?);
+            }
+            self.expect(TokenKind::RParen)?;
+            Ok(Expr::Tuple { elements, span: self.span_from(start) })
+        } else {
+            self.expect(TokenKind::RParen)?;
+            Ok(first)
+        }
     }
 
     /// Expect a specific token kind; return error if not found.
