@@ -238,7 +238,14 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
 | 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
 
-**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. HTTP Server TCP accepted working. Function pointers implemented (closures como valores + CallIndirect + sintaxis `(params) RetType: expr`). Runtime is 74% rewritable now.
+**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completados (Kyle vs Rust vs C). Bugs recientes arreglados: constructor sin `fn`, `@link` propagation, `from X import a, b, c`, tuple destructuring, `close()` name conflict. Runtime is 74% rewritable now.
+
+### Bugs conocidos (no críticos)
+
+| Bug | Impacto | Workaround |
+|-----|---------|------------|
+| `from http.server import listen` — crash al importar modulo completo | Medio | Usar `extern fn` inline |
+| Closures como argumentos truncados a i32 | Bajo | Usar funciones nombradas |
 
 ## Package Registry
 

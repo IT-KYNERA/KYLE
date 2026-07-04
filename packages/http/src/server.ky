@@ -2,7 +2,7 @@
 # from http.server import listen, accept, respond, read_request, Request
 #
 # Uso:
-#   fd = listen(9090)
+#   fd = tcp_listen(9090)
 #   while true:
 #       client = accept(fd)
 #       if client >= 0:
@@ -27,10 +27,10 @@ final class Request:
     path: str
     body: str
 
-fn listen(port: i32) i32:
+fn tcp_listen(port: i32) i32:
     ky_tcp_listen(port)
 
-fn accept(fd: i32) i32:
+fn tcp_accept(fd: i32) i32:
     ky_tcp_accept(fd)
 
 fn tcp_close(fd: i32):
