@@ -246,9 +246,11 @@ impl Formatter {
         } else {
             write!(out, "from {} ", fi.module_name).unwrap();
         }
-        write!(out, "import {}", fi.imported_name).unwrap();
-        if let Some(alias) = &fi.alias {
-            write!(out, " as {}", alias).unwrap();
+        write!(out, "import {}", fi.imported_names.join(", ")).unwrap();
+        if fi.imported_names.len() == 1 {
+            if let Some(alias) = &fi.alias {
+                write!(out, " as {}", alias).unwrap();
+            }
         }
     }
 

@@ -148,12 +148,12 @@ impl Pipeline {
             }
 
             // Collect FromImport info from this cached module
-            let import_info: Vec<(usize, String, String, bool)> = {
+            let import_info: Vec<(usize, String, Vec<String>, bool)> = {
                 if let Some(module) = resolver.cache.get(cache_key) {
                     module.program.declarations.iter().enumerate()
                         .filter_map(|(i, d)| {
                             if let kyc_core::ast::Decl::FromImport(fi) = d {
-                                Some((i, fi.module_name.clone(), fi.imported_name.clone(), fi.relative))
+                                Some((i, fi.module_name.clone(), fi.imported_names.clone(), fi.relative))
                             } else { None }
                         })
                         .collect()
@@ -162,9 +162,15 @@ impl Pipeline {
 
             // Resolve each import
             let mut import_decls: Vec<(usize, Vec<kyc_core::ast::Decl>)> = Vec::new();
-            for (i, mod_name, imported_name, rel) in import_info {
-                if let Ok(decl) = resolver.get_imported_declaration(&mod_name, &imported_name, rel) {
-                    import_decls.push((i, vec![decl]));
+            for (i, mod_name, imported_names, rel) in import_info {
+                let mut decls = Vec::new();
+                for name in &imported_names {
+                    if let Ok(decl) = resolver.get_imported_declaration(&mod_name, name, rel) {
+                        decls.push(decl);
+                    }
+                }
+                if !decls.is_empty() {
+                    import_decls.push((i, decls));
                 }
             }
 

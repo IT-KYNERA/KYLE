@@ -288,14 +288,19 @@ impl Parser {
         };
         let module_name = self.read_dotted_name()?;
         self.expect_keyword("import")?;
-        let imported_name = self.eat_identifier();
-        let alias = if self.at(TokenKind::As) {
+        let mut imported_names = Vec::new();
+        imported_names.push(self.eat_identifier());
+        while self.at(TokenKind::Comma) {
+            self.advance(); // ,
+            imported_names.push(self.eat_identifier());
+        }
+        let alias = if imported_names.len() == 1 && self.at(TokenKind::As) {
             self.advance();
             Some(self.eat_identifier())
         } else {
             None
         };
-        Ok(Decl::FromImport(FromImport { module_name, imported_name, alias, relative, span: self.span_from(start) }))
+        Ok(Decl::FromImport(FromImport { module_name, imported_names, alias, relative, span: self.span_from(start) }))
     }
 
     fn parse_type_alias(&mut self) -> Result<Decl, String> {

@@ -81,7 +81,7 @@ pub struct Import {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FromImport {
     pub module_name: String,
-    pub imported_name: String,
+    pub imported_names: Vec<String>,
     pub alias: Option<String>,
     pub relative: bool,
     pub span: Span,
@@ -656,13 +656,14 @@ impl DisplayDepth for Import {
 impl DisplayDepth for FromImport {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         write_indent(f, d)?;
+        let names = self.imported_names.join(", ");
         if let Some(alias) = &self.alias {
-            writeln!(f, "FromImport module=\"{}\" name=\"{}\" as=\"{}\"{}",
-                self.module_name, self.imported_name, alias,
+            writeln!(f, "FromImport module=\"{}\" names=\"{}\" as=\"{}\"{}",
+                self.module_name, names, alias,
                 if self.relative { " relative" } else { "" })
         } else {
-            writeln!(f, "FromImport module=\"{}\" name=\"{}\"{}",
-                self.module_name, self.imported_name,
+            writeln!(f, "FromImport module=\"{}\" names=\"{}\"{}",
+                self.module_name, names,
                 if self.relative { " relative" } else { "" })
         }
     }

@@ -1883,7 +1883,9 @@ impl LanguageServer {
                     semantic_tokens.push((c.span.start.line, c.span.start.column, c.name.len(), T_CLASS, M_DECLARATION));
                 }
                 Decl::FromImport(fi) => {
-                    semantic_tokens.push((fi.span.start.line, fi.span.start.column, fi.imported_name.len(), T_TYPE, 0));
+                    for name in &fi.imported_names {
+                        semantic_tokens.push((fi.span.start.line, fi.span.start.column, name.len(), T_TYPE, 0));
+                    }
                 }
                 _ => {}
             }
