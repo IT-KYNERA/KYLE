@@ -197,22 +197,38 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
    ↓
       Packages (http, json, sqlite, env — pure Kyle) — ✅ DONE
          ↓
-            HTTP Server + WebSocket/SSE — 1-2 weeks 🔜
+            Fase 1 — Function pointers (fn() como tipo) — 🔜 Compiler
                ↓
-                  Runtime Phase A (65 functions) — 2-3 days 🔜
+                  Fase 2 — JsonValue + auto-serialize — 🔜
                      ↓
-                        Runtime Phase B (missing externs) — 1 day 🔜
+                        Fase 3 — HTTP Client JSON integrado — 🔜
                            ↓
-                              Runtime Phase C (hash map) — 1-2 weeks 🔜
+                              Fase 4 — HTTP Server routing real — 🔜
                                  ↓
-                                    Runtime Phase D (threading) — 2-4 weeks 📅
+                                    Fase 5 — WebSocket + SSE — 🔜
                                        ↓
-                                          Phase 18 (Zero-Cost) — months 📅
+                                          Runtime Phase A (65 functions) — 📅
                                              ↓
-                                                Self-hosting — low priority 📅
+                                                Runtime Phase B (missing externs) — 📅
+                                                   ↓
+                                                      Runtime Phase C (hash map) — 📅
+                                                         ↓
+                                                            Runtime Phase D (threading) — 📅
+                                                               ↓
+                                                                  Self-hosting — low priority 📅
 ```
 
-**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. Runtime is 74% rewritable now. Hash map is the #1 blocker for full self-sufficiency.
+### Fases HTTP/JSON
+
+| Fase | Descripción | Depende de | Estado |
+|------|-------------|------------|--------|
+| 1 | Function pointers (`fn()` como tipo de primera clase) | Compiler | 🔜 |
+| 2 | `JsonValue` type + auto-serialize de `final class` | Union types | 🔜 |
+| 3 | HTTP Client: `client.post(url, class)` auto-JSON | Fase 2 | 🔜 |
+| 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
+| 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
+
+**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. HTTP Server TCP accepted working. Runtime is 74% rewritable now.
 
 ## Package Registry
 
