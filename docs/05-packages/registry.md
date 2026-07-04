@@ -51,10 +51,45 @@ registry/
 # Point to local registry
 export KL_REGISTRY=file:///path/to/ky/registry
 
-# Add a package
+# Add a package (downloads + installs to std/ + updates ky.toml + ky.lock)
 ky add http
 ky add json
 ky add sqlite
+
+# Install all packages from ky.lock (e.g. after cloning a project)
+ky install
+
+# Remove a package (deletes std/<name>.ky + updates ky.toml)
+ky remove json
+```
+
+### What happens when you `ky add`
+
+1. Adds the dependency to `ky.toml`
+2. Resolves all dependencies from the registry
+3. Downloads tarballs to `~/.ky/cache/<name>-<version>/`
+4. Extracts and copies `src/lib.ky` to `std/<name>.ky` (in your project)
+5. Writes `ky.lock` with pinned versions
+
+### What happens when you `ky install`
+
+1. Reads `ky.lock` for the pinned package list
+2. For each package, checks `~/.ky/cache/` — if missing, downloads from registry
+3. Copies `src/lib.ky` to `std/<name>.ky` in your project
+
+Use this instead of `ky add` when cloning a project: the lock file guarantees reproducible builds. The `std/` directory is in `.gitignore`, so it must be regenerated.
+
+### Lock file (`ky.lock`)
+
+```toml
+version = 1
+
+[[packages]]
+name = "json"
+version = "0.1.0"
+checksum = ""
+source = "registry"
+dependencies = []
 ```
 
 ### How to publish a new version

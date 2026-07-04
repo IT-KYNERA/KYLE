@@ -40,6 +40,7 @@ fn main() {
         "new" | "init" => cmd_new(&args),
         "add" => cmd_add(&args),
         "remove" => cmd_remove(&args),
+        "install" => cmd_install(&args),
         "info" => cmd_info(&args),
         "publish" => cmd_publish(&args),
         "login" => cmd_login(&args),
@@ -99,21 +100,7 @@ fn resolve_project_dependencies(project_root: &Path, manifest: &Manifest) -> Res
                 cache::extract_tarball(&data, &dest)?;
                 println!("done");
             }
-            // Copy package source to project's std/<name>.ky for local imports
-            let src_dir = cache::package_src_dir(name, &version);
-            if src_dir.exists() {
-                let std_dir = project_root.join("std");
-                fs::create_dir_all(&std_dir)
-                    .map_err(|e| format!("Failed to create std/ dir: {}", e))?;
-                let std_file = std_dir.join(format!("{name}.ky"));
-                // Find the main source file (lib.ky or <name>.ky)
-                let main_src = src_dir.join("lib.ky");
-                if main_src.exists() {
-                    fs::copy(&main_src, &std_file)
-                        .map_err(|e| format!("Failed to copy to std/{name}.ky: {}", e))?;
-                    println!("  Installed to std/{name}.ky");
-                }
-            }
+            install_package_to_std(project_root, name, &version)?;
         }
     }
 
@@ -140,6 +127,26 @@ fn resolve_and_check(project_root: &Path) {
             }
         }
     }
+}
+
+/// Copy a package's main source file to the project's std/<name>.ky.
+fn install_package_to_std(project_root: &Path, name: &str, version: &str) -> Result<(), String> {
+    let src_dir = cache::package_src_dir(name, version);
+    if !src_dir.exists() {
+        return Err(format!("Package '{}' not found in cache at {}", name, src_dir.display()));
+    }
+    let std_dir = project_root.join("std");
+    fs::create_dir_all(&std_dir)
+        .map_err(|e| format!("Failed to create std/ dir: {}", e))?;
+    let std_file = std_dir.join(format!("{name}.ky"));
+    let main_src = src_dir.join("lib.ky");
+    if !main_src.exists() {
+        return Err(format!("Package '{}' has no src/lib.ky", name));
+    }
+    fs::copy(&main_src, &std_file)
+        .map_err(|e| format!("Failed to copy to std/{name}.ky: {}", e))?;
+    println!("  Installed to std/{name}.ky");
+    Ok(())
 }
 
 // ── Command Implementations ──
@@ -760,6 +767,7 @@ fn print_usage() {
     eprintln!("  {name} info                Show project info");
     eprintln!("  {name} add   <dep>[@<ver>] Add dependency");
     eprintln!("  {name} remove <dep>        Remove dependency");
+    eprintln!("  {name} install             Install all dependencies from ky.lock");
     eprintln!("  {name} update              Update lock file to latest compatible versions");
     eprintln!("  {name} outdated            List outdated dependencies");
     eprintln!("  {name} publish             Publish project to registry");
@@ -999,6 +1007,51 @@ fn cmd_remove(args: &[String]) {
         }
         Err(e) => { eprintln!("Error: {}", e); process::exit(1); }
     }
+}
+
+fn cmd_install(args: &[String]) {
+    let cwd = std::env::current_dir().unwrap();
+    let project_root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => { eprintln!("No ky.toml found in current or parent directories"); process::exit(1); }
+    };
+    let lock_path = project_root.join("ky.lock");
+    let lock = match LockFile::read(&lock_path) {
+        Ok(l) => l,
+        Err(e) => { eprintln!("Failed to read ky.lock: {}", e); process::exit(1); }
+    };
+    if lock.packages.is_empty() {
+        eprintln!("No packages in ky.lock");
+        process::exit(1);
+    }
+
+    println!("Installing packages from ky.lock...");
+    let mut count = 0;
+    for entry in &lock.packages {
+        if !cache::is_cached(&entry.name, &entry.version) {
+            print!("  Downloading {} v{} ... ", entry.name, entry.version);
+            match kyc_tools::package::registry::download_package(&entry.name, &entry.version) {
+                Ok(data) => {
+                    let dest = cache::package_cache_dir(&entry.name, &entry.version);
+                    if let Err(e) = cache::extract_tarball(&data, &dest) {
+                        eprintln!("Failed to extract {}: {}", entry.name, e);
+                        continue;
+                    }
+                    println!("done");
+                }
+                Err(e) => {
+                    eprintln!("Failed to download {}: {}", entry.name, e);
+                    continue;
+                }
+            }
+        }
+        if let Err(e) = install_package_to_std(&project_root, &entry.name, &entry.version) {
+            eprintln!("Warning: {}: {}", entry.name, e);
+        } else {
+            count += 1;
+        }
+    }
+    println!("Installed {}/{} packages", count, lock.packages.len());
 }
 
 fn cmd_info(args: &[String]) {

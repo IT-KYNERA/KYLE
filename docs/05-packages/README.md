@@ -2,6 +2,10 @@
 
 Official Kyle packages and their specifications.
 
+| Guide | Description |
+|-------|-------------|
+| [registry.md](registry.md) | Registry setup, publishing, `ky add` / `ky install` / `ky remove` |
+
 | Package | Description |
 |---------|-------------|
 | [http.md](http.md) | HTTP client and server |

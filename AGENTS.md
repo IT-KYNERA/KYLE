@@ -108,7 +108,7 @@ ky/
 | Compiler CLI flags | `docs/06-reference/cli-commands.md` + `docs/06-reference/compiler-flags.md` |
 | How to test | `docs/02-guide/testing.md` |
 | Standard library functions | `docs/04-platform/standard-library/overview.md` |
-| Package manager usage | `docs/04-platform/tools/package-manager.md` |
+| Package manager usage | `docs/05-packages/registry.md` |
 | VS Code extension | `docs/04-platform/tools/vscode.md` |
 | Performance tips | `docs/02-guide/performance.md` |
 | Common patterns | `docs/02-guide/patterns.md` |
@@ -166,7 +166,9 @@ ky check <file.ky>        # Type-check only (fast)
 ky fmt [file/dir]         # Format source
 ky test                   # Run test suite
 ky new <project>          # Create new project
-ky add <dep>[@<ver>]      # Add dependency
+ky add <dep>[@<ver>]      # Add dependency (downloads + installs to std/)
+ky remove <dep>           # Remove dependency (cleans std/ + ky.toml)
+ky install                # Install all dependencies from ky.lock
 ky publish                # Publish package
 ky lsp                    # Start LSP server (for editors)
 ```
