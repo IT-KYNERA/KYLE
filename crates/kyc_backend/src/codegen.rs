@@ -983,6 +983,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_getenv", ft, None);
         }
+        // i32 kl_setenv(ptr, ptr, i32) — set environment variable
+        {
+            let params = [ptr_ty.into(), ptr_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_setenv", ft, None);
+        }
         // void kl_sleep(i32)
         {
             let params = [i32_ty.into()];

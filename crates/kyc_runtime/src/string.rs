@@ -440,6 +440,17 @@ pub extern "C" fn ky_from_cstr(s: *const u8) -> *mut u8 {
     buf
 }
 
+/// Set an environment variable. Returns 0 on success.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32 {
+    if name.is_null() || value.is_null() {
+        return -1;
+    }
+    unsafe {
+        libc::setenv(name as *const i8, value as *const i8, overwrite)
+    }
+}
+
 /// Read environment variable by name. Returns heap-allocated string or null.
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_getenv(name: *const u8) -> *mut u8 {
