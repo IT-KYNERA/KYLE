@@ -197,7 +197,7 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
    ↓
       Packages (http, json, sqlite, env — pure Kyle) — ✅ DONE
          ↓
-            Fase 1 — Function pointers (fn() como tipo) — 🔜 Compiler
+             Fase 1 — Function pointers (fn() como tipo) — ✅ DONE
                ↓
                   Fase 2 — JsonValue + auto-serialize — 🔜
                      ↓
@@ -222,13 +222,13 @@ NOW → Phase 0 (extern fn, @link, ptr) — ✅ DONE
 
 | Fase | Descripción | Depende de | Estado |
 |------|-------------|------------|--------|
-| 1 | Function pointers (`fn()` como tipo de primera clase) | Compiler | 🔜 |
+| 1 | Function pointers (`fn()` como tipo de primera clase) | Compiler | ✅ |
 | 2 | `JsonValue` type + auto-serialize de `final class` | Union types | 🔜 |
 | 3 | HTTP Client: `client.post(url, class)` auto-JSON | Fase 2 | 🔜 |
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
 | 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
 
-**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. HTTP Server TCP accepted working. Runtime is 74% rewritable now.
+**Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. Module import bug fixed. HTTP Server TCP accepted working. Function pointers implemented (closures como valores + CallIndirect + sintaxis `(params) RetType: expr`). Runtime is 74% rewritable now.
 
 ## Package Registry
 
