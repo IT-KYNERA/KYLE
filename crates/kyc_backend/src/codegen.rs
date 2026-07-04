@@ -1339,6 +1339,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_clone_dict", ft, None);
         }
+        // ptr kl_struct_to_json(ptr, ptr) — serialize struct to JSON
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_struct_to_json", ft, None);
+        }
+        // i32 kl_json_to_struct(ptr, ptr, ptr) — deserialize JSON to struct
+        {
+            let params = [ptr_ty.into(), ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_json_to_struct", ft, None);
+        }
         // void kl_assert(i32)
         {
             let params = [i32_ty.into()];
@@ -1965,6 +1977,8 @@ impl<'ctx> Codegen<'ctx> {
                                 "list_len" => "ky_list_len",
                                 "json_parse" => "ky_json_parse",
                                 "json_stringify" => "ky_json_stringify",
+                                "struct_to_json" => "ky_struct_to_json",
+                                "json_to_struct" => "ky_json_to_struct",
                                 "assert" => "ky_assert",
                                 "assert_eq" => "ky_assert_eq",
                                 "assert_ne" => "ky_assert_ne",

@@ -1,7 +1,13 @@
-# ky-json — JSON parsing and generation
+# json v1.0 — JSON parsing and generation for Kyle
 
 fn parse(json_str: str) dict<str, i64>:
     json_parse(json_str)
 
-fn stringify(dict_val: dict<str, i64>) str:
-    json_stringify(dict_val)
+fn stringify(val: dict<str, i64>) str:
+    json_stringify(val)
+
+fn struct_to_json[T](val: T, descriptor: str) str:
+    ky_struct_to_json(val as ptr, descriptor as ptr)
+
+fn json_to_struct[T](json_str: str, descriptor: str, out: T):
+    ky_json_to_struct(json_str as ptr, descriptor as ptr, out as ptr)

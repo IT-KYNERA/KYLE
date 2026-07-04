@@ -74,7 +74,8 @@ impl TypeChecker {
             "assert" => Some(1),
             "assert_eq" | "assert_str" | "assert_ne" => Some(2),
             "range" => Some(2),
-            "json_parse" | "json_stringify" => Some(1),
+            "json_parse" | "json_stringify" | "struct_to_json" => Some(2),
+            "json_to_struct" => Some(3),
             "list_push" => Some(2),
             "list_pop" | "list_len" => Some(1),
             "ceil" | "floor" | "round" => Some(1),
@@ -800,6 +801,8 @@ impl TypeChecker {
                                 "now" => Type::I64,
                                 "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
                                 "json_stringify" => Type::Str,
+                                "struct_to_json" => Type::Str,
+                                "json_to_struct" => Type::I32,
                                 "error" => Type::Option(Box::new(Type::Void)),
                                 _ => *ft.return_,
                             }

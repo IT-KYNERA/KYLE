@@ -4145,7 +4145,7 @@ impl Lowerer {
                     name: resolved_name.clone(),
                     args,
                 });
-                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify") {
+                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify" | "struct_to_json") {
                     ctx.string_locals.push(dest);
                 }
                 ctx
@@ -5719,6 +5719,8 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "eq_str" => Some(MirType::I32),
         "json_parse" => Some(MirType::Dict(Box::new(MirType::Str), Box::new(MirType::I64))),
         "json_stringify" => Some(MirType::Str),
+        "struct_to_json" => Some(MirType::Str),
+        "json_to_struct" => Some(MirType::I32),
         "error" => Some(MirType::Struct("__result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
