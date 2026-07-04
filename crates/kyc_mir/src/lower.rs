@@ -3613,36 +3613,34 @@ impl Lowerer {
                     "_call".to_string()
                 };
 
-                // Check for closure call: if `name` refers to a closure-typed local,
-                // emit an indirect call through the function pointer.
+                // Check for closure call: if `name` refers to a local or parameter
+                // (not a function declaration), emit an indirect call through the function pointer.
                 if let Some(&local) = ctx.locals.get(&name) {
-                    if let Some(MirType::Ptr(_)) = ctx.local_types.get(&local) {
-                        // Lower arguments
-                        let mut args = Vec::new();
-                        for arg in arguments {
-                            ctx = self.lower_expr(ctx, arg);
-                            args.push(MirValue::Local(ctx.next_local - 1));
-                        }
-                        // Infer param_types and ret_type from actual lowered arg types
-                        let param_types: Vec<MirType> = args.iter().map(|a| {
-                            match a {
-                                MirValue::Local(id) => ctx.local_types.get(id).cloned().unwrap_or(MirType::I32),
-                                _ => MirType::I32,
-                            }
-                        }).collect();
-                        let ret_type = param_types.first().map(|t| {
-                            if *t == MirType::Str { MirType::Str } else { MirType::I32 }
-                        }).unwrap_or(MirType::I32);
-                        let dest = ctx.alloc_local("_ccall", ret_type.clone());
-                        ctx.current_block.insts.push(MirInst::CallIndirect {
-                            dest: Some(dest),
-                            fn_ptr: local,
-                            ret_type,
-                            param_types,
-                            args,
-                        });
-                        return ctx;
+                    // Lower arguments
+                    let mut args = Vec::new();
+                    for arg in arguments {
+                        ctx = self.lower_expr(ctx, arg);
+                        args.push(MirValue::Local(ctx.next_local - 1));
                     }
+                    // Infer param_types and ret_type from actual lowered arg types
+                    let param_types: Vec<MirType> = args.iter().map(|a| {
+                        match a {
+                            MirValue::Local(id) => ctx.local_types.get(id).cloned().unwrap_or(MirType::I32),
+                            _ => MirType::I32,
+                        }
+                    }).collect();
+                    let ret_type = param_types.first().map(|t| {
+                        if *t == MirType::Str { MirType::Str } else { MirType::I32 }
+                    }).unwrap_or(MirType::I32);
+                    let dest = ctx.alloc_local("_ccall", ret_type.clone());
+                    ctx.current_block.insts.push(MirInst::CallIndirect {
+                        dest: Some(dest),
+                        fn_ptr: local,
+                        ret_type,
+                        param_types,
+                        args,
+                    });
+                    return ctx;
                 }
 
                 // Special case: range(n) — create a list [0, 1, ..., n-1]

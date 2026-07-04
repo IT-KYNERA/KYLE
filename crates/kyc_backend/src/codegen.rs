@@ -2220,7 +2220,14 @@ impl<'ctx> Codegen<'ctx> {
                         }
                         MirInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
                             let ptr_val = self.load_value(*fn_ptr, &last_value_map)?;
-                            let fn_ptr = ptr_val.into_pointer_value();
+                            let fn_ptr = match ptr_val {
+                                BasicValueEnum::IntValue(iv) => {
+                                    let ptr_ty = self.context.ptr_type(Default::default());
+                                    self.builder.build_int_to_ptr(iv, ptr_ty, "_fnptr")
+                                        .map_err(|e| format!("callindirect inttoptr: {}", e))?
+                                }
+                                _ => ptr_val.into_pointer_value(),
+                            };
                             let llvm_ret = self.llvm_type(ret_type);
                             let llvm_params: Vec<inkwell::types::BasicMetadataTypeEnum> = param_types.iter()
                                 .map(|p| self.llvm_type(p).into())
