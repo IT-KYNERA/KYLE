@@ -88,7 +88,7 @@ conn.close()
 
 ```kyle
 final class Row:
-    fn get[T](name: str) T       # con tipo explícito
+    fn get<T>(name: str) T       # con tipo explícito
     fn get(name: str) i64        # default i64
     fn get_str(name: str) str
     fn get_i64(name: str) i64
@@ -131,23 +131,9 @@ from postgres import Pool
 
 pool = Pool.new(conn_string)
 
-pool.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE,
-        age INTEGER DEFAULT 0
-    )
-""")
+pool.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, age INTEGER DEFAULT 0)")
 
-pool.execute("""
-    CREATE TABLE IF NOT EXISTS posts (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
-        title TEXT NOT NULL,
-        body TEXT
-    )
-""")
+pool.execute("CREATE TABLE IF NOT EXISTS posts (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), title TEXT NOT NULL, body TEXT)")
 ```
 
 ---

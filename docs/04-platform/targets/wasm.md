@@ -41,9 +41,9 @@ ky build --target wasm32-unknown-unknown -O3 app.ky
 
 ---
 
-## 3. ky-web — Browser API bindings
+## 3. web — Browser API bindings
 
-El package `ky-web` expone APIs del navegador a Kyle compilado a WASM.
+El package `web` expone APIs del navegador a Kyle compilado a WASM.
 
 ```kyle
 from web import document, console, fetch
@@ -104,10 +104,10 @@ ctx.fillText("Kyle!", 20, 80)
 
 ---
 
-## 4. Estructura del package ky-web
+## 4. Estructura del package web
 
 ```
-packages/ky-web/
+packages/web/
 ├── ky.toml
 └── src/
     ├── lib.ky          # Exportaciones principales
@@ -145,7 +145,7 @@ ky build --target wasm32-unknown-unknown app.ky -o app.wasm
 # 2. Crear HTML con JS glue
 cat > index.html << 'HTML'
 <!DOCTYPE html>
-<script src="ky-runtime.js"></script>
+<script src="runtime.js"></script>
 <script>
     const wasm = await WebAssembly.instantiateStreaming(
         fetch("app.wasm"), { js: KyJsGlue }
@@ -163,7 +163,7 @@ HTML
 |------|-------------|--------|
 | 1 | Compilación WASM vía LLVM | ✅ (LLVM target existe) |
 | 2 | JS glue runtime básico | 🔜 |
-| 3 | ky-web: console + DOM básico | 🔜 |
-| 4 | ky-web: fetch, canvas, events | 🔜 |
+| 3 | web: console + DOM básico | 🔜 |
+| 4 | web: fetch, canvas, events | 🔜 |
 | 5 | Optimización de tamaño WASM | 🔜 |
 | 6 | Reactive UI framework (JSX-like) | 📅 |

@@ -266,40 +266,61 @@ app.listen(3000)
 
 ## 5. WebSocket (`http.websocket`)
 
-El WebSocket se integra con el Router existente.
+WebSocket se maneja como una ruta más. El Router hace el upgrade automático.
 
-### Upgrade + echo server
+### Echo server
 
 ```kyle
 from http.server import Router
-from http.websocket import ws_upgrade, ws_read_text, ws_send_text
 
 app = Router()
 
-app.get("/ws", (req, res):
-    if ws_upgrade(res.client_fd, req.body):
-        handle_ws(res.client_fd)
+app.ws("/echo", (ws):
+    ws.on("message", (msg):
+        ws.send(msg)
+    )
 )
-
-fn handle_ws(client: i32):
-    while true:
-        msg = ws_read_text(client)
-        if msg == "":
-            break
-        ws_send_text(client, msg)   # echo
 
 app.listen(8080)
 ```
 
-### Funciones
+### Chat server
 
 ```kyle
-ws_upgrade(client_fd, raw_request) → bool    # handshake
-ws_read_text(client_fd) → str                # leer mensaje texto
-ws_send_text(client_fd, text)                # enviar texto
-ws_send_binary(client_fd, data)              # enviar binario
-ws_send_pong(client_fd)                      # responder ping
-ws_close(client_fd)                          # cerrar conexión
+from http.server import Router
+
+app = Router()
+
+app.ws("/chat", (ws):
+    ws.on("message", (msg):
+        ws.broadcast(msg)
+    )
+)
+
+app.listen(8080)
+```
+
+### WebSocket handler
+
+```kyle
+app.ws("/path", (ws):
+    ws.on("message", (msg): ...)   # mensaje de texto
+    ws.on("binary", (data): ...)   # datos binarios
+    ws.on("close", (): ...)        # cierre de conexión
+    ws.on("ping", (): ...)         # ping (auto-responder)
+)
+```
+
+### WebSocket object
+
+```kyle
+final class WebSocket:
+    fn send(text: str)           # enviar mensaje texto
+    fn send(data: bytes)         # enviar datos binarios
+    fn broadcast(msg: str)       # enviar a todos los conectados
+    fn broadcast(msg: str, except: list<WebSocket>)  # a todos menos uno
+    fn close()                   # cerrar conexión
+    fn on(event: str, handler)   # registrar evento
 ```
 
 ---
