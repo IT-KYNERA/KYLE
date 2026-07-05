@@ -1,0 +1,121 @@
+# http v6.0 — Router HTTP
+# from http.router import Router, Request, Res, HandlerResponse
+#
+# Uso:
+#   from http.router import Router
+#
+#   app = Router()
+#
+#   fn route(req: Request) HandlerResponse:
+#       if req.method == "GET" and req.path == "/":
+#           HandlerResponse.json({"status": "ok"})
+#       else:
+#           HandlerResponse.not_found()
+#
+#   app.listen(8080, route)
+
+@link "c"
+
+extern fn ky_tcp_listen(port: i32) i32
+extern fn ky_tcp_accept(fd: i32) i32
+extern fn ky_tcp_read(fd: i32, count: i32) ptr
+extern fn ky_tcp_write(fd: i32, buf: ptr, len: i32) i32
+extern fn ky_tcp_close(fd: i32) i32
+
+# ═══════════════════════════════════════════════════════════
+# HandlerResponse
+# ═══════════════════════════════════════════════════════════
+
+final class HandlerResponse:
+    code: &i32
+    body: str
+    ctype: str
+
+fn res_json(data: str) HandlerResponse:
+    HandlerResponse { code: 200, body: data, ctype: "application/json" }
+
+fn res_json_status(data: str, status_code: i32) HandlerResponse:
+    HandlerResponse { code: status_code, body: data, ctype: "application/json" }
+
+fn text(body: str) HandlerResponse:
+    HandlerResponse { code: 200, body: body, ctype: "text/plain" }
+
+fn text_status(body: str, status_code: i32) HandlerResponse:
+    HandlerResponse { code: status_code, body: body, ctype: "text/plain" }
+
+fn not_found() HandlerResponse:
+    HandlerResponse { code: 404, body: "Not Found", ctype: "text/plain" }
+
+# ═══════════════════════════════════════════════════════════
+# Request
+# ═══════════════════════════════════════════════════════════
+
+final class Request:
+    method: str
+    path: str
+    body: str
+    headers: str
+
+# ═══════════════════════════════════════════════════════════
+# Router
+# ═══════════════════════════════════════════════════════════
+
+final class Router:
+    fd: &i32
+    port: &i32
+
+    fn Router(port: i32 = 8080):
+        this.fd = -1
+        this.port = port
+
+    fn listen(self, route_fn):
+        fd = ky_tcp_listen(self.port)
+        if fd < 0:
+            print("Error: cannot listen on port ")
+            print(self.port)
+            print("\n")
+            return
+        self.fd = fd
+        print("Listening on port ")
+        print(self.port)
+        print("\n")
+        while true:
+            client = ky_tcp_accept(fd)
+            if client >= 0:
+                serve(client, route_fn)
+                ky_tcp_close(client)
+
+fn serve(client_fd: i32, route_fn):
+    raw = ky_tcp_read(client_fd, 4096)
+    if raw == 0 as ptr:
+        return
+    raw_str = raw as str
+
+    method = ""
+    path = ""
+    i: &i32 = 0
+    while i < len(raw_str) and char_at(raw_str, i) != 32:
+        i = i + 1
+    method = substr(raw_str, 0, i)
+    i = i + 1
+    path_start = i
+    while i < len(raw_str) and char_at(raw_str, i) != 32 and char_at(raw_str, i) != 10 and char_at(raw_str, i) != 13:
+        i = i + 1
+    path = substr(raw_str, path_start, i - path_start)
+
+    req = Request { method: method, path: path, body: raw_str, headers: raw_str }
+    res = route_fn(req)
+
+    st = "OK"
+    if res.code == 404:
+        st = "Not Found"
+    elif res.code == 500:
+        st = "Internal Server Error"
+
+    response = "HTTP/1.1 " + str(res.code) + " " + st + "\r\n"
+    response = response + "Content-Type: " + res.ctype + "\r\n"
+    response = response + "Content-Length: " + str(len(res.body)) + "\r\n"
+    response = response + "Connection: close\r\n"
+    response = response + "\r\n"
+    response = response + res.body
+    ky_tcp_write(client_fd, response as ptr, len(response))
