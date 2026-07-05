@@ -1,5 +1,0 @@
-fn parse(json_str: str) dict<str, i64>:
-    json_parse(json_str)
-
-fn stringify(d: dict<str, i64>) str:
-    json_stringify(d)

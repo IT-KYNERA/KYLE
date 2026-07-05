@@ -1,0 +1,26 @@
+# decimal v1.0
+# from decimal import decimal
+
+@link "c"
+
+extern fn ky_decimal_from_str(ptr) i64
+extern fn ky_decimal_to_str(val: i64) ptr
+extern fn ky_decimal_round(val: i64, decimals: i32) i64
+extern fn ky_decimal_truncate(val: i64) i64
+
+final class decimal:
+    val: &i64
+
+    static fn from_str(s: str) decimal:
+        decimal { val: ky_decimal_from_str(s as ptr) }
+
+    fn round(self, n: i32) decimal:
+        decimal { val: ky_decimal_round(this.val, n) }
+
+    fn truncate(self) i64:
+        ky_decimal_truncate(this.val)
+
+    fn to_str(self) str:
+        raw = ky_decimal_to_str(this.val) as i64
+        if raw == 0: return ""
+        (raw as ptr) as str

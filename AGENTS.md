@@ -69,12 +69,11 @@ ky/
 │   ├── kyc_tools/        # LSP server, formatter, package manager
 │   └── kyc_platform/     # 🔜 Platform API: FS, networking, time (in progress)
 │
-├── packages/             # Official Kyle packages (100% Kyle)
-│   ├── http/             # HTTP client via libcurl FFI
+├── packages/             # Official Kyle packages (100% Kyle, src/ subdir)
+│   ├── http/             # HTTP client + server + router + websocket
 │   ├── json/             # JSON parse + stringify
 │   └── sqlite/           # SQLite database bindings
 │
-├── std/                  # Standard library (.ky files, 8 modules)
 ├── docs/                 # Documentation (72 files, reorganized)
 ├── vscode-ky/            # VS Code extension
 ├── examples/             # Example .ky project
@@ -128,6 +127,19 @@ All packages use `extern fn` + `@link` for FFI. See `docs/03-language-reference/
 
 ---
 
+## Module resolution
+
+El compilador busca módulos en este orden:
+1. Relativo al archivo fuente (`./`)
+2. `src/` del proyecto raíz
+3. `packages/` del proyecto raíz (desarrollo local)
+4. `std/` del proyecto raíz (packages instalados vía `ky add`)
+5. Caché de packages (`~/.ky/cache/`)
+
+Esto significa que `from http.server import Router` resuelve a:
+- `packages/http/src/server.ky` (desarrollo)
+- `std/http/server.ky` (instalado)
+
 ## Testing
 
 ```bash
@@ -140,16 +152,10 @@ cargo build --workspace
 # Build release
 cargo build --release --bin ky
 
-# Kyle checks
+# Kyle checks (sin fn main — implicit main auto-generado)
 ky check <file.ky>       # Type-check only
 ky build <file.ky>        # Compile to binary
-ky run <file.ky>           # Compile and run
-
-# Kyle tests
-ky test                    # Run #[test] functions in tests/
-
-# Format
-ky fmt src/                # Format source directory
+ky run <file.ky>          # Compile and run
 
 # Package tests
 cd packages/<name> && ky check src/lib.ky
@@ -160,14 +166,14 @@ cd packages/<name> && ky check src/lib.ky
 ## Development Commands
 
 ```bash
-ky build <file.ky>        # Compile to binary
-ky run <file.ky>          # Compile and run
+ky build <file.ky>        # Compile to binary (auto-genera main si falta)
+ky run <file.ky>          # Compile and run (sin fn main necesario)
 ky check <file.ky>        # Type-check only (fast)
 ky fmt [file/dir]         # Format source
 ky test                   # Run test suite
 ky new <project>          # Create new project
-ky add <dep>[@<ver>]      # Add dependency (uses GitHub Pages registry by default)
-ky remove <dep>           # Remove dependency (cleans std/ + ky.toml)
+ky add <dep>[@<ver>]      # Add dependency (GitHub Pages registry)
+ky remove <dep>           # Remove dependency
 ky install                # Install all dependencies from ky.lock
 ky publish                # Publish package (creates tarball in registry/)
 ky lsp                    # Start LSP server (for editors)

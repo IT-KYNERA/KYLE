@@ -1,0 +1,24 @@
+# uuid v1.0
+# from uuid import uuid
+#
+# id = uuid.v4()
+# print(id.to_str())
+
+@link "c"
+
+extern fn ky_uuid_v4() ptr
+extern fn ky_uuid_parse(ptr) ptr
+
+final class uuid:
+    data: &ptr
+
+    static fn v4() uuid:
+        uuid { data: ky_uuid_v4() }
+
+    static fn parse(s: str) uuid:
+        uuid { data: ky_uuid_parse(s as ptr) }
+
+    fn to_str(self) str:
+        raw = this.data as i64
+        if raw == 0: return ""
+        (raw as ptr) as str

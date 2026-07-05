@@ -1,0 +1,45 @@
+# bytes v1.0
+# from bytes import bytes
+
+@link "c"
+
+extern fn ky_bytes_new(size: i32) ptr
+extern fn ky_bytes_free(ptr, size: i32)
+extern fn ky_bytes_get(ptr, index: i32) i32
+extern fn ky_bytes_set(ptr, index: i32, val: i32)
+extern fn ky_bytes_to_hex(ptr, size: i32) ptr
+extern fn ky_bytes_from_hex(ptr) ptr
+extern fn ky_bytes_to_base64(ptr, size: i32) ptr
+
+final class bytes:
+    data: &ptr
+    size: &i32
+
+    static fn with_size(n: i32) bytes:
+        raw = ky_bytes_new(n)
+        bytes { data: raw, size: n }
+
+    fn len(self) i32:
+        this.size
+
+    fn get(self, i: i32) i32:
+        if i < 0:
+            return -1
+        if i >= this.size:
+            return -1
+        ky_bytes_get(this.data, i)
+
+    fn set(self, i: i32, val: i32):
+        if i >= 0:
+            if i < this.size:
+                ky_bytes_set(this.data, i, val)
+
+    fn hex(self) str:
+        raw = ky_bytes_to_hex(this.data, this.size) as i64
+        if raw == 0: return ""
+        (raw as ptr) as str
+
+    fn to_str(self) str:
+        raw = this.data as i64
+        if raw == 0: return ""
+        (raw as ptr) as str

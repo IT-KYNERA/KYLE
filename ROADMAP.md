@@ -242,6 +242,108 @@ ky add http
 
 See `docs/05-packages/registry.md` for full documentation.
 
+---
+
+## Estado real del compilador (verificado 2026-07-04)
+
+### ✅ Todo funciona — sin bugs conocidos
+
+| Feature | Ejemplo |
+|---------|---------|
+| Funciones importadas de módulos | `from http.server import send_json` ✅ |
+| Clases importadas de módulos | `from http.server import Router` ✅ |
+| Struct return con strings | `fn json_res(data: str) Res: Res { body: data }` ✅ |
+| Generic function calls con `<T>` | `identity<i32>(42)`, `deserialize<LoginReq>(body)` ✅ |
+| Generic function/class decls con `<T>` | `fn identity<T>(x: T) T:`, `class Box<T>:` ✅ |
+| Type alias con `<T>` | `type Maybe<T> = T?` ✅ |
+| `serialize(val)` / `deserialize<T>(str)` | Builtin global ✅ |
+| Clases + métodos | `client.get(url)` ✅ |
+| Struct literal con type args | `Container<i32> { value: 42 }` ✅ |
+| Multi-level module imports | `from http.server import ...` ✅ |
+| Package @link propagation | `@link "c"` se mergea al programa automáticamente ✅ |
+| **Implicit main** | `ky run app.ky` sin `fn main()` — código módulo ejecutado automáticamente ✅ |
+| **Closures multi-line** | `(req, client):\n    send_json(...)` con bloque indentado ✅ |
+| **Function pointers** | `handler as ptr`, llamado vía `fn_ptr(args)` con CallIndirect ✅ |
+| **Router HTTP alto nivel** | `app.get("/path", handler)` con `get` como método (keyword) ✅ |
+| **Packages sin std/** | `from http.server import ...` busca directamente en `packages/http/src/` ✅ |
+
+### 🔜 En desarrollo
+
+| Feature | Ejemplo | Estado |
+|---------|---------|--------|
+| `res.json()` | `res.json(serialize(data), 200)` | ✅ Implementado |
+| `req.param()` | `req.param("id")` | ✅ Implementado |
+| `req.body<T>()` | `req.body<CreateUser>()` | Requiere generic method call |
+| `obj.method<T>(args)` | Llamada a método con tipo genérico | Parser + lowerer |
+
+---
+
+## Tipos faltantes — Plan de implementación
+
+> La especificación completa de cada tipo está en [`docs/03-language-reference/types.md`](docs/03-language-reference/types.md) sección "Platform types (futuro)".
+> Todos los nombres de tipo van en **minúscula**: `datetime`, `bytes`, `decimal`, `uuid`, `url`, `regex`, `duration`.
+
+### Tipos actuales de Kyle
+
+| Categoría | Tipos |
+|-----------|-------|
+| **Primitivos** | `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `bool`, `char`, `str` |
+| **Compuestos** | `list<T>`, `dict<K,V>`, `ptr` |
+| **Funciones** | `fn(T) U` (function pointers) |
+| **Usuario** | `class`, `struct`, `enum`, `type alias` |
+| **Genéricos builtin** | `Option<T>` (`T?`), `Result<T, str>` (`T!`) |
+
+### Tipos faltantes con prioridad alta (necesarios para PostgreSQL)
+
+| Tipo | Descripción | Subtipos/Operaciones | Depende de |
+|------|-------------|---------------------|------------|
+| `datetime` | Fecha y hora | `date`, `time` — sumar/restar días/horas, formatear, parsear | Runtime en Rust |
+| `bytes` | Datos binarios | `len()`, `[i]`, `slice()`, `hex()`, `base64()` | Runtime en Rust |
+| `decimal` | Precisión fija | `round()`, `truncate()`, operaciones aritméticas | Runtime en Rust |
+
+### Tipos faltantes con prioridad media
+
+| Tipo | Descripción | Operaciones |
+|------|-------------|-------------|
+| `uuid` | Identificador único | `uuid.v4()`, `uuid.parse()`, `uuid.to_string()` |
+| `url` | Localizador | `url.scheme()`, `url.host()`, `url.path()` |
+| `regex` | Expresión regular | `regex.match()`, `regex.find()`, `regex.replace()` |
+| `duration` | Intervalo de tiempo | `duration.seconds()`, `duration.hours()`, `a + b` |
+
+### ⚠️ Option<T> y Result<T,E> — ¿Qué significa?
+
+`Option<T>` (`T?`) y `Result<T, str>` (`T!`) existen como **enums genéricos** del compilador:
+
+```kyle
+x = maybe_value?          # T? = Option<T>
+y = fallible_operation!   # T! = Result<T, str>
+
+if x is Some(val):        # pattern matching en Option
+    print(val)
+```
+
+Están implementados con `Option.Some(value)` / `Option.None` y `Result.Ok(value)` / `Result.Error(msg)`. La sintaxis `T?` y `T!` es azúcar del compilador.
+
+**Limitaciones:** No tienen métodos ricos como `map()`, `and_then()`, `unwrap_or()` (típicos de Rust). Solo pattern matching básico y el operador `??` (default).
+
+### Plan de fases
+
+| Fase | Tipos | Archivos | Esfuerzo |
+|------|-------|----------|----------|
+| **1** | `datetime` + `duration` (runtime) | `kyc_runtime/src/datetime.rs` + FFI | 3-4 días |
+| **2** | `bytes` (runtime) | `kyc_runtime/src/bytes.rs` + FFI | 2-3 días |
+| **3** | `decimal` (runtime) | `kyc_runtime/src/decimal.rs` + FFI | 2-3 días |
+| **4** | `uuid` (runtime) | `kyc_runtime/src/uuid.rs` + FFI | 1-2 días |
+| **5** | Métodos ricos en `Option<T>`/`Result<T,E>` | Compiler + runtime | 2-3 días |
+
+Cada tipo nuevo necesita:
+1. **Struct en runtime** (`kyc_runtime/src/`) con operaciones básicas
+2. **Extern functions** (`@link "c"` + `extern fn`)
+3. **Package Kyle** (`packages/<type>/`) con API de alto nivel
+4. **Tests** en el package
+
+---
+
 ## Self-Hosting — Codegen Analysis
 
 To compile Kyle with Kyle, the compiler's codegen (`kyc_backend/src/codegen.rs`, ~2,400 lines of Rust) must be rewritten in Kyle. It currently uses **inkwell** (Rust wrapper for LLVM C API).
@@ -261,6 +363,97 @@ To compile Kyle with Kyle, the compiler's codegen (`kyc_backend/src/codegen.rs`,
 LLVM stays as the machine-code backend. The same way we call libcurl via `extern fn`, we would call LLVM via `extern fn LLVMBuildAdd(...)`. The ~85 LLVM C API functions map 1:1 to the existing inkwell calls.
 
 **Verdict:** Technically feasible. Not a priority — the Rust compiler is stable and the codegen doesn't need to be self-hosted to ship packages.
+
+### Plan de auto-hospedaje (Self-Hosting)
+
+```kyle
+# El objetivo: ky compilado por ky
+ky build compiler.ky  # actual: Rust → binario
+                     # futuro: Kyle → binario
+```
+
+#### Fase 1 — LLVM C API bindings (`packages/llvm`)
+
+Declarar las ~85 funciones de la LLVM C API como `extern fn` en Kyle:
+
+```kyle
+@link "LLVM"
+extern fn LLVMContextCreate() ptr
+extern fn LLVMModuleCreateWithName(name: ptr) ptr
+extern fn LLVMAddFunction(mod: ptr, name: ptr, type_: ptr) ptr
+# ... ~82 más
+```
+
+| Archivo | Funciones | Esfuerzo |
+|---------|-----------|----------|
+| `packages/llvm/src/core.ky` | Context, Module, Type, Value | 40 funciones |
+| `packages/llvm/src/builder.ky` | IRBuilder (BuildAdd, BuildCall...) | 30 funciones |
+| `packages/llvm/src/target.ky` | TargetMachine, emit object | 15 funciones |
+
+#### Fase 2 — MIR types en Kyle (`packages/mir`)
+
+Los tipos del compilador (hoy en Rust) se definen en Kyle:
+
+```kyle
+final class MirType:
+    kind: i32  # 0=i32, 1=str, 2=struct...
+    name: str
+
+final class MirInst:
+    opcode: i32
+    dest: i32
+    args: &[i32]
+```
+
+| Archivo | Contenido |
+|---------|-----------|
+| `packages/mir/src/types.ky` | MirType, MirValue, MirConstant |
+| `packages/mir/src/inst.ky` | MirInst (25 variants) |
+| `packages/mir/src/function.ky` | MirFunction, MirBasicBlock |
+
+#### Fase 3 — Codegen en Kyle (`packages/codegen`)
+
+Traducir `codegen.rs` (~2,400 líneas Rust → Kyle):
+
+```kyle
+from llvm import core, builder
+from mir import types, inst, function
+
+fn compile_function(f: MirFunction) ptr:
+    fn_type = llvm_fn_type(f.return_type, f.params)
+    llvm_fn = LLVMAddFunction(module, f.name, fn_type)
+    # ...
+```
+
+| Módulo | Líneas | Dificultad |
+|--------|:------:|:----------:|
+| Type lowering | ~300 | 🟢 |
+| Function compilation | ~800 | 🟡 |
+| Instruction compilation | ~1,000 | 🔴 |
+| SSA construction | ~300 | 🟡 |
+
+#### Fase 4 — Bootstrap
+
+```bash
+# 1. Compilar el codegen Kyle usando el compilador Rust
+ky build codegen.ky -o ky-step1
+
+# 2. Compilar el codegen Kyle usando ky-step1
+./ky-step1 codegen.ky -o ky-step2
+
+# 3. Verificar que ky-step2 produce el mismo output
+diff <(ky-step1) <(ky-step2)  # bootstrap completado!
+```
+
+#### Timeline estimado
+
+| Fase | Descripción | Dependencias | Esfuerzo |
+|------|-------------|-------------|----------|
+| 1 | LLVM C API bindings | — | 1 día |
+| 2 | MIR types en Kyle | — | 2 días |
+| 3 | Codegen en Kyle | Fase 1 + 2 | 2 semanas |
+| 4 | Bootstrap | Fase 3 | 1 día |
+| 5 | Rewrite frontend (lexer+parser) en Kyle | Fase 4 | 4 semanas |
 
 ---
 
