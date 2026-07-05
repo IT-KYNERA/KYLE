@@ -613,7 +613,15 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         SsaInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
-                            let ptr_val = ssa_read!(*fn_ptr);
+                            let raw_val = ssa_read!(*fn_ptr);
+                            let fn_ptr = match raw_val {
+                                BasicValueEnum::IntValue(iv) => {
+                                    let ptr_ty = self.context.ptr_type(Default::default());
+                                    self.builder.build_int_to_ptr(iv, ptr_ty, "_ssa_fnptr")
+                                        .map_err(|e| format!("ssaic inttoptr: {}", e))?
+                                }
+                                _ => raw_val.into_pointer_value(),
+                            };
                             let llvm_ret = self.llvm_type(ret_type);
                             let llvm_params: Vec<inkwell::types::BasicMetadataTypeEnum> = param_types.iter()
                                 .map(|p| self.llvm_type(p).into()).collect();
@@ -621,7 +629,7 @@ impl<'ctx> Codegen<'ctx> {
                             let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum> = args.iter()
                                 .map(|a| { let v = ssa_read!(*a); v.into() }).collect();
                             let call_res = unsafe {
-                                self.builder.build_indirect_call(fn_ty, ptr_val.into_pointer_value(), &llvm_args, "_sicl")
+                                self.builder.build_indirect_call(fn_ty, fn_ptr, &llvm_args, "_sicl")
                                     .map_err(|e| format!("ssaic: {}", e))?
                             };
                             if let Some(d) = dest {
@@ -691,9 +699,52 @@ impl<'ctx> Codegen<'ctx> {
                                     }
                                     let zero = self.context.i32_type().const_zero();
                                     let idx_v = self.context.i32_type().const_int(*field_index as u64, false);
-                                    let gep = unsafe {
-                                        self.builder.build_in_bounds_gep(st, base, &[zero, idx_v], "_ssfptr")
-                                            .map_err(|e| format!("ssfptr: {}", e))?
+                                    // Check if the alloca stores a pointer to the struct (Ptr(Struct) closure param)
+                                    let gep = if self.ref_param_struct_types.contains_key(ptr) {
+                                        // Ref param: load pointer from alloca, GEP on struct
+                                        let struct_ptr = self.builder.build_load(
+                                            self.context.ptr_type(Default::default()), base, "_ssref_load"
+                                        ).map_err(|e| format!("ssrefld: {}", e))?;
+                                        unsafe {
+                                            self.builder.build_in_bounds_gep(st, struct_ptr.into_pointer_value(), &[zero, idx_v], "_ssrfptr")
+                                                .map_err(|e| format!("ssrfptr: {}", e))?
+                                        }
+                                    } else if let Some(&alloca_ty) = self.alloca_types.get(ptr) {
+                                        if alloca_ty.is_pointer_type() {
+                                            // Ptr(Struct): load pointer from alloca, GEP on struct
+                                            if let MirType::Struct(sname, fields) = struct_type.as_ref() {
+                                                if !fields.is_empty() {
+                                                    let struct_llvm = self.llvm_type(&MirType::Struct(sname.clone(), fields.clone()));
+                                                    let struct_ptr = self.builder.build_load(
+                                                        self.context.ptr_type(Default::default()), base, "_ssptrld"
+                                                    ).map_err(|e| format!("ssptrld: {}", e))?;
+                                                    unsafe {
+                                                        self.builder.build_in_bounds_gep(struct_llvm, struct_ptr.into_pointer_value(), &[zero, idx_v], "_sspptr")
+                                                            .map_err(|e| format!("sspptr: {}", e))?
+                                                    }
+                                                } else {
+                                                    unsafe {
+                                                        self.builder.build_in_bounds_gep(st, base, &[zero, idx_v], "_ssfptr")
+                                                            .map_err(|e| format!("ssfptr: {}", e))?
+                                                    }
+                                                }
+                                            } else {
+                                                unsafe {
+                                                    self.builder.build_in_bounds_gep(st, base, &[zero, idx_v], "_ssfptr")
+                                                        .map_err(|e| format!("ssfptr: {}", e))?
+                                                }
+                                            }
+                                        } else {
+                                            unsafe {
+                                                self.builder.build_in_bounds_gep(st, base, &[zero, idx_v], "_ssfptr")
+                                                    .map_err(|e| format!("ssfptr: {}", e))?
+                                            }
+                                        }
+                                    } else {
+                                        unsafe {
+                                            self.builder.build_in_bounds_gep(st, base, &[zero, idx_v], "_ssfptr")
+                                                .map_err(|e| format!("ssfptr: {}", e))?
+                                        }
                                     };
                                     self.builder.build_store(fpa, gep)
                                         .map_err(|e| format!("ssfptr2: {}", e))?;
@@ -1911,37 +1962,49 @@ impl<'ctx> Codegen<'ctx> {
                                         let cmp = self.builder.build_int_compare(IntPredicate::EQ, li, ri, "")
                                             .map_err(|e| format!("eq: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("eqz: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                     MirBinaryOp::Neq => {
                                         let cmp = self.builder.build_int_compare(IntPredicate::NE, li, ri, "")
                                             .map_err(|e| format!("neq: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("nqz: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                     MirBinaryOp::Lt => {
                                         let cmp = self.builder.build_int_compare(IntPredicate::SLT, li, ri, "")
                                             .map_err(|e| format!("lt: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("ltz: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                     MirBinaryOp::Gt => {
                                         let cmp = self.builder.build_int_compare(IntPredicate::SGT, li, ri, "")
                                             .map_err(|e| format!("gt: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("gtz: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                     MirBinaryOp::Le => {
                                         let cmp = self.builder.build_int_compare(IntPredicate::SLE, li, ri, "")
                                             .map_err(|e| format!("le: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("lez: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                     MirBinaryOp::Ge => {
                                         let cmp = self.builder.build_int_compare(IntPredicate::SGE, li, ri, "")
                                             .map_err(|e| format!("ge: {}", e))?;
                                         self.add_bool_range(cmp);
-                                        cmp.as_basic_value_enum()
+                                        self.builder.build_int_z_extend(cmp, self.context.i32_type(), "")
+                                            .map_err(|e| format!("gez: {}", e))?
+                                            .as_basic_value_enum()
                                     }
                                 }
                             };
@@ -2026,19 +2089,45 @@ impl<'ctx> Codegen<'ctx> {
                                 "assert_str" => "ky_assert_eq",
                                 _ => name,
                             };
-                            if self.module.get_function(runtime_name).is_none() {
+                             if self.module.get_function(runtime_name).is_none() {
                                 // Auto-declare extern function on first use with inferred types
                                 let ret_type: BasicTypeEnum = if let Some(d) = dest {
-                                    self.alloca_types.get(&d).copied()
-                                        .unwrap_or(self.context.i64_type().as_basic_type_enum())
+                                    let raw = self.alloca_types.get(&d).copied()
+                                        .unwrap_or(self.context.i64_type().as_basic_type_enum());
+                                    // Struct return types are actually i32 (runtime returns status code)
+                                    if matches!(raw, BasicTypeEnum::StructType(_)) {
+                                        self.context.i32_type().as_basic_type_enum()
+                                    } else {
+                                        raw
+                                    }
                                 } else {
                                     self.context.i64_type().as_basic_type_enum()
                                 };
                                 let param_types: Vec<inkwell::types::BasicMetadataTypeEnum> = args.iter()
-                                    .filter_map(|a| {
-                                        if let MirValue::Local(id) = a {
-                                            self.alloca_types.get(id).copied().map(|t| t.into())
-                                        } else { None }
+                                    .map(|a| {
+                                        let t = match a {
+                                            MirValue::Local(id) => {
+                                                let raw = self.alloca_types.get(id).copied()
+                                                    .unwrap_or(self.context.i32_type().as_basic_type_enum());
+                                                // Struct allocas are passed by pointer, so use ptr type
+                                                if matches!(raw, BasicTypeEnum::StructType(_)) {
+                                                    self.context.ptr_type(Default::default()).as_basic_type_enum()
+                                                } else {
+                                                    raw
+                                                }
+                                            }
+                                            MirValue::Constant(c) => {
+                                                match c {
+                                                    MirConstant::String(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
+                                                    MirConstant::I32(_) => self.context.i32_type().as_basic_type_enum(),
+                                                    MirConstant::I64(_) => self.context.i64_type().as_basic_type_enum(),
+                                                    MirConstant::Bool(_) => self.context.i8_type().as_basic_type_enum(),
+                                                    _ => self.context.i32_type().as_basic_type_enum(),
+                                                }
+                                            }
+                                            _ => self.context.i32_type().as_basic_type_enum(),
+                                        };
+                                        t.into()
                                     }).collect();
                                 let fn_type = ret_type.fn_type(&param_types, false);
                                 self.module.add_function(runtime_name, fn_type, None);
@@ -2151,14 +2240,14 @@ impl<'ctx> Codegen<'ctx> {
                                         self.field_ptr_types.insert(*dest, field_llvm);
                                     }
                                 }
+                                let zero = self.context.i32_type().const_zero();
+                                let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
                                 // Ref param: alloca stores pointer-to-struct, load it first
                                 if let Some(&orig_struct_type) = self.ref_param_struct_types.get(ptr) {
                                     let struct_ptr = self.builder.build_load(
                                         self.context.ptr_type(Default::default()),
                                         base_ptr, "_ref_load"
                                     ).map_err(|e| format!("ref_field_ptr load: {}", e))?;
-                                    let zero = self.context.i32_type().const_zero();
-                                    let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
                                     let gep = unsafe {
                                         self.builder.build_in_bounds_gep(orig_struct_type, struct_ptr.into_pointer_value(), &[zero, idx_val], "")
                                             .map_err(|e| format!("ref_field_ptr: {}", e))?
@@ -2167,16 +2256,36 @@ impl<'ctx> Codegen<'ctx> {
                                         self.builder.build_store(alloca, gep)
                                             .map_err(|e| format!("ref_fgep store: {}", e))?;
                                     }
-                                } else if let Some(struct_type) = self.alloca_types.get(ptr) {
-                                    let zero = self.context.i32_type().const_zero();
-                                    let idx_val = self.context.i32_type().const_int(*field_index as u64, false);
-                                    let gep = unsafe {
-                                        self.builder.build_in_bounds_gep(*struct_type, base_ptr, &[zero, idx_val], "")
-                                            .map_err(|e| format!("field_ptr: {}", e))?
-                                    };
-                                    if let Some(alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
-                                        self.builder.build_store(alloca, gep)
-                                            .map_err(|e| format!("fgep store: {}", e))?;
+                                } else if let Some(ptr_type) = self.alloca_types.get(ptr) {
+                                    if ptr_type.is_pointer_type() {
+                                        // Ptr(Struct) closure param: alloca stores a pointer to the struct.
+                                        // Load the pointer, then GEP on the pointed-to struct.
+                                        if let MirType::Struct(sname, fields) = struct_type.as_ref() {
+                                            if !fields.is_empty() {
+                                                let struct_llvm = self.llvm_type(&MirType::Struct(sname.clone(), fields.clone()));
+                                                let struct_ptr = self.builder.build_load(
+                                                    self.context.ptr_type(Default::default()),
+                                                    base_ptr, "_ptr_param_load"
+                                                ).map_err(|e| format!("ptr_param_field_ptr load: {}", e))?;
+                                                let gep = unsafe {
+                                                    self.builder.build_in_bounds_gep(struct_llvm, struct_ptr.into_pointer_value(), &[zero, idx_val], "")
+                                                        .map_err(|e| format!("ptr_param_field_ptr: {}", e))?
+                                                };
+                                                if let Some(alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                                    self.builder.build_store(alloca, gep)
+                                                        .map_err(|e| format!("ptr_param_fgep store: {}", e))?;
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        let gep = unsafe {
+                                            self.builder.build_in_bounds_gep(*ptr_type, base_ptr, &[zero, idx_val], "")
+                                                .map_err(|e| format!("field_ptr: {}", e))?
+                                        };
+                                        if let Some(alloca) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                            self.builder.build_store(alloca, gep)
+                                                .map_err(|e| format!("fgep store: {}", e))?;
+                                        }
                                     }
                                 }
                             }
@@ -2292,6 +2401,21 @@ impl<'ctx> Codegen<'ctx> {
                             let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum> = args.iter()
                                 .enumerate()
                                 .map(|(i, a)| {
+                                    // If the function expects ptr but the MIR arg is a struct alloca,
+                                    // pass the alloca pointer instead of loading the struct value.
+                                    if i < fn_param_types.len() {
+                                        if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = fn_param_types[i] {
+                                            if let MirValue::Local(id) = a {
+                                                if let Some(Some(alloca)) = self.alloca_map.get(*id) {
+                                                    if let Some(pointee_type) = self.alloca_types.get(id) {
+                                                        if matches!(pointee_type, BasicTypeEnum::StructType(_)) {
+                                                            return alloca.as_basic_value_enum().into();
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     let val: BasicValueEnum = self.value_to_llvm(a, &last_value_map)
                                         .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum());
                                     // Auto-truncate i64 args to i32 if needed (for closure calls)
@@ -2594,12 +2718,12 @@ impl<'ctx> Codegen<'ctx> {
                 MirBinaryOp::Xor => self.builder.build_xor(li, ri, "").map_err(|e| format!("ixor: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "").map_err(|e| format!("ishl: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "").map_err(|e| format!("ishr: {}", e))?.as_basic_value_enum(),
-                MirBinaryOp::Eq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::EQ, li, ri, "").map_err(|e| format!("ieq: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
-                MirBinaryOp::Neq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::NE, li, ri, "").map_err(|e| format!("ine: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
-                MirBinaryOp::Lt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLT, li, ri, "").map_err(|e| format!("ilt: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
-                MirBinaryOp::Gt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGT, li, ri, "").map_err(|e| format!("igt: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
-                MirBinaryOp::Le => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLE, li, ri, "").map_err(|e| format!("ile: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
-                MirBinaryOp::Ge => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGE, li, ri, "").map_err(|e| format!("ige: {}", e))?; self.add_bool_range(c); c.as_basic_value_enum() }
+                MirBinaryOp::Eq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::EQ, li, ri, "").map_err(|e| format!("ieq: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("iez: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Neq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::NE, li, ri, "").map_err(|e| format!("ine: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("inz: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Lt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLT, li, ri, "").map_err(|e| format!("ilt: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Gt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGT, li, ri, "").map_err(|e| format!("igt: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Le => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLE, li, ri, "").map_err(|e| format!("ile: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz2: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Ge => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGE, li, ri, "").map_err(|e| format!("ige: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz2: {}", e))?.as_basic_value_enum() }
             })
         }
     }

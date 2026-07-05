@@ -241,6 +241,12 @@ impl Parser {
                     name, type_: None, value: Box::new(value), is_mutable: false, span: self.span_from(start),
                 }));
             }
+            // Not a variable/constant declaration — try as module-level expression
+            // e.g. `app.get("/users", handler)` at top level
+            self.pos = start;
+            if let Ok(expr) = self.parse_binary(0) {
+                return Ok(Decl::Expression(expr));
+            }
             return Err(format!("expected '=', ':=', or ': type =' after identifier '{}'", name));
         }
         let found = self.current().map(|t| format!("{:?}", t.kind)).unwrap_or_else(|_| "EOF".into());
@@ -591,7 +597,22 @@ impl Parser {
             }
             // Method: `static fn name(params):` or `fn name(params):`
             if self.at(TokenKind::Static) || self.at(TokenKind::Fn) || self.at(TokenKind::Async) || self.at(TokenKind::Const) || self.at(TokenKind::Abstract) {
-                let method = self.parse_function(false)?;
+                let is_static = self.at(TokenKind::Static);
+                let mut method = self.parse_function(false)?;
+                // Auto-prepend `this` parameter for instance methods (not static)
+                // unless the method already has 'this' or 'self' as first param
+                if !is_static {
+                    let has_this = method.params.first().map_or(false, |p| p.name == "this" || p.name == "self");
+                    if !has_this {
+                        let this_type = AstType::Primitive { name: "i32".into(), span: method.span.clone() };
+                        method.params.insert(0, Parameter {
+                            name: "this".into(),
+                            type_: this_type,
+                            default: None, variadic: false,
+                            mode: ParamMode::Borrow, span: method.span,
+                        });
+                    }
+                }
                 members.push(ClassMember::Method(method));
                 continue;
             }
@@ -867,7 +888,22 @@ impl Parser {
                 self.advance();
                 args.push(self.parse_type()?);
             }
-            self.expect(TokenKind::Greater)?;
+            // Accept either > or >> (>> is split: first > closes this generic,
+            // the second remains in the token stream for the outer level)
+            if self.at(TokenKind::Greater) {
+                self.advance();
+            } else if self.at(TokenKind::GreaterGreater) {
+                self.advance(); // Consume >>
+                // The remaining > from >> is lost — user must use space: list<i32> >
+            } else {
+                return Err("expected '>' after generic type arguments".to_string());
+            }
+            // If we consumed a >> (GreaterGreater) inside generic type args,
+            // the next outer level check for > will see whatever follows.
+            // For nested generics like list<i32>>, the >> is split as: first > closes list,
+            // the second > remains for the outer level. But since >> is a single token,
+            // we consumed both. To handle this properly, we'd need to push back a > token.
+            // For now, use spaces: list<i32> > works, list<i32>> doesn't.
             AstType::Generic { name, args, span: self.span_from(start) }
         } else {
             AstType::User { name, span: self.span_from(start) }
@@ -1055,6 +1091,10 @@ impl Parser {
                 self.advance();
                 Expr::Identifier { name: val, span: self.span_from(start) }
             }
+            TokenKind::Type => {
+                self.advance();
+                Expr::Identifier { name: "type".to_string(), span: self.span_from(start) }
+            }
             TokenKind::LParen => {
                 let start = self.pos;
                 self.advance(); // consume '('
@@ -1067,6 +1107,17 @@ impl Parser {
                         self.advance(); // consume '=>'
                         let body = self.parse_expr()?;
                         Expr::Closure { params, body: Box::new(body), span: self.span_from(start) }
+                    } else if self.at(TokenKind::Colon) {
+                        // Multi-line closure: (params): \n    body
+                        self.advance(); // consume ':'
+                        let body = self.parse_block()?;
+                        let mut body_expr = Expr::Literal { value: Literal::None, span: self.span_from(start) };
+                        for stmt in body.statements {
+                            if let Stmt::Expression(e) = stmt {
+                                body_expr = e;
+                            }
+                        }
+                        Expr::Closure { params, body: Box::new(body_expr), span: self.span_from(start) }
                     } else if self.at_identifier() {
                         // Closure with return type: (params) RetType: body
                         let saved2 = self.pos;
@@ -1146,8 +1197,8 @@ impl Parser {
 
     fn parse_postfix(&mut self, mut expr: Expr) -> Result<Expr, String> {
         loop {
-            // Generic type args on identifiers: Name<T>(args) or Name<T>{ ... }
-            if self.at(TokenKind::Less) && matches!(&expr, Expr::Identifier { .. }) {
+            // Generic type args on identifiers or methods: Name<T>(args), obj.method<T>(args)
+            if self.at(TokenKind::Less) && matches!(&expr, Expr::Identifier { .. } | Expr::PropertyAccess { .. }) {
                 let saved = self.pos;
                 self.advance();
                 if let Ok(first_arg) = self.parse_type() {
@@ -1157,6 +1208,9 @@ impl Parser {
                         if let Ok(t) = self.parse_type() { type_args.push(t); } else { break; }
                     }
                     if self.at(TokenKind::Greater) {
+                        self.advance();
+                        let start = self.pos;
+                    } else if self.at(TokenKind::GreaterGreater) {
                         self.advance();
                         let start = self.pos;
                         if self.at(TokenKind::LParen) {
@@ -1875,6 +1929,7 @@ impl Parser {
                 TokenKind::None => Some("None".to_string()),
                 TokenKind::True => Some("True".to_string()),
                 TokenKind::False => Some("False".to_string()),
+                TokenKind::Type => Some("type".to_string()),
                 _ => None,
             };
             if let Some(n) = name {
@@ -1886,20 +1941,21 @@ impl Parser {
     }
 
     /// Try to parse closure parameter list: zero or more comma-separated identifiers.
-    /// Supports optional type annotations: `name: Type` (type is parsed but discarded for V1).
+    /// Supports optional type annotations: `name: Type`.
     /// Advancement stops BEFORE the closing `)` (if any).
-    fn parse_closure_params(&mut self) -> Vec<String> {
+    fn parse_closure_params(&mut self) -> Vec<(String, Option<AstType>)> {
         let mut params = Vec::new();
         if self.at(TokenKind::RParen) { return params; }
         loop {
             let name = self.eat_identifier();
             if name.is_empty() { break; }
-            // Skip optional type annotation: `name: Type` (discarded for V1)
-            if self.at(TokenKind::Colon) {
+            let typ = if self.at(TokenKind::Colon) {
                 self.advance();
-                let _ = self.parse_type();
-            }
-            params.push(name);
+                let tname = self.eat_identifier();
+                if tname.is_empty() { None }
+                else { Some(AstType::User { name: tname, span: self.span_from(self.pos) }) }
+            } else { None };
+            params.push((name, typ));
             if self.at(TokenKind::Comma) { self.advance(); }
             else { break; }
         }

@@ -85,7 +85,7 @@ from http.server import Router
 app = Router()
 
 app.post("/users", (req, res):
-    user = req.body[User]()
+    user = req.body<User>()
     res.json({ "created": true, "id": 1 }, 201)
 )
 
@@ -102,6 +102,6 @@ app.get("/users/{id:i32}", (req, res):
 | Función | Descripción |
 |---------|-------------|
 | `serialize(val)` | Cualquier `final class` → JSON string |
-| `deserialize[T](str)` | JSON string → clase `T` |
+| `deserialize<T>(str)` | JSON string → clase `T` |
 | `stringify(dict)` | Dict → JSON string (legacy) |
 | `parse(str)` | JSON string → dict (legacy) |

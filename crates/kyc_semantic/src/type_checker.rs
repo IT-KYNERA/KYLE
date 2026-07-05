@@ -76,6 +76,7 @@ impl TypeChecker {
             "range" => Some(2),
             "json_parse" | "json_stringify" | "serialize" => Some(1),
             "deserialize" => Some(1),
+            "type" => Some(0),
             "list_push" => Some(2),
             "list_pop" | "list_len" => Some(1),
             "ceil" | "floor" | "round" => Some(1),
@@ -813,9 +814,14 @@ impl TypeChecker {
                                 "ceil" | "floor" | "round" => Type::F64,
                                 "open" | "read_str" | "write_str" | "close" => Type::I32,
                                 "now" => Type::I64,
+                                "substr" | "to_upper" | "to_lower" | "trim" | "replace" => Type::Str,
+                                "char_at" => Type::I32,
+                                "ord" => Type::I32,
+                                "contains" | "is_digit" | "is_alpha" | "is_alnum" | "is_whitespace" | "is_upper" | "is_lower" => Type::I32,
                                 "json_parse" => Type::Dict(Box::new(Type::Str), Box::new(Type::I64)),
                                 "json_stringify" => Type::Str,
                                 "serialize" => Type::Str,
+                                "type" => Type::Named("TypeInfo".to_string()),
                                 "ky_struct_to_json" => Type::Str,
                                 "ky_json_to_struct" => Type::I32,
                                 "ky_ptr_read_i32" => Type::I32,
@@ -834,11 +840,14 @@ impl TypeChecker {
                                 if let Some(ctor) = c.members.iter().find_map(|m| {
                                     if let ClassMember::Constructor(f) = m { Some(f) } else { None }
                                 }) {
-                                    let expected = ctor.params.len();
-                                    if arg_count != expected {
+                                    let required = ctor.params.iter()
+                                        .filter(|p| p.default.is_none())
+                                        .count();
+                                    let max = ctor.params.len();
+                                    if arg_count < required || arg_count > max {
                                         self.reporter.report(
                                             Diagnostic::error(ErrorCode::E0001,
-                                                format!("'{}' expects {} argument(s), got {}", class_name, expected, arg_count))
+                                                format!("'{}' expects {}-{} argument(s), got {}", class_name, required, max, arg_count))
                                         );
                                     }
                                 }
@@ -922,13 +931,16 @@ impl TypeChecker {
             }
             Expr::Closure { params, body, .. } => {
                 self.symbols.push_scope();
-                for p in params {
-                    let _ = self.symbols.insert(p.clone(),
-                        Symbol::new_var(p.clone(), Some(Type::I32), false));
+                let mut param_types = Vec::new();
+                for (pname, ptype) in params {
+                    let t = ptype.as_ref().map(|a| self.resolve_ast_type(a))
+                        .unwrap_or(Type::I32);
+                    let _ = self.symbols.insert(pname.clone(),
+                        Symbol::new_var(pname.clone(), Some(t.clone()), false));
+                    param_types.push(t);
                 }
                 let ret = self.infer_expr(body);
                 self.symbols.pop_scope();
-                let param_types = params.iter().map(|_| Type::I32).collect();
                 Type::Function(FunctionType {
                     is_async: false, is_const: false,
                     params: param_types, return_: Box::new(ret), fallible: false,

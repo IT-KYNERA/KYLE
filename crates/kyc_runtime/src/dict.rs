@@ -214,11 +214,18 @@ pub extern "C" fn ky_json_to_struct(json: *const u8, descriptor: *const u8, out:
     if json.is_null() || descriptor.is_null() || out.is_null() {
         return -1;
     }
-    let json_str = match unsafe { std::ffi::CStr::from_ptr(json as *const i8) }.to_str() {
-        Ok(s) => s.trim().to_string(),
+    let json_cstr = unsafe { std::ffi::CStr::from_ptr(json as *const i8) };
+    let json_str = match json_cstr.to_str() {
+        Ok(s) => {
+            // Debug: print first 50 chars
+            let preview: String = s.chars().take(50).collect();
+            // Actually, for stdout debugging use eprintln
+            s.trim().to_string()
+        }
         Err(_) => return -1,
     };
-    let desc = match unsafe { std::ffi::CStr::from_ptr(descriptor as *const i8) }.to_str() {
+    let desc_cstr = unsafe { std::ffi::CStr::from_ptr(descriptor as *const i8) };
+    let desc = match desc_cstr.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => return -1,
     };

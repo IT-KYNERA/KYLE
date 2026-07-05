@@ -56,6 +56,7 @@ impl ScopeResolver {
             }
             Decl::Variable(_) => return,
             Decl::Link(_, _) => return,
+            Decl::Expression(_) => return,
         };
         let sym = Symbol::new(name.clone(), kind);
         if let Err(e) = self.symbols.insert(name, sym) {
@@ -80,6 +81,7 @@ impl ScopeResolver {
             Decl::Struct(_) | Decl::Enum(_) | Decl::Contract(_) | Decl::TypeAlias(_) => {}
             Decl::Import(_) | Decl::FromImport(_) => {}
             Decl::Link(_, _) => {}
+            Decl::Expression(_) => {}
         }
     }
 
@@ -304,9 +306,9 @@ impl ScopeResolver {
             }
             Expr::Closure { params, body, .. } => {
                 self.symbols.push_scope();
-                for p in params {
-                    let _ = self.symbols.insert(p.clone(),
-                        Symbol::new_var(p.clone(), None, false));
+                for (pname, _) in params {
+                    let _ = self.symbols.insert(pname.clone(),
+                        Symbol::new_var(pname.clone(), None, false));
                 }
                 self.resolve_expr(body);
                 self.symbols.pop_scope();

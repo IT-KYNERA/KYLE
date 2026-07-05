@@ -262,6 +262,7 @@ pub enum Decl {
     Contract(ContractDecl),
     TypeAlias(TypeAlias),
     Link(String, Span),
+    Expression(Expr),
 }
 
 // ---------------------------------------------------------------------------
@@ -445,7 +446,7 @@ pub enum Expr {
         span: Span,
     },
     Closure {
-        params: Vec<String>,
+        params: Vec<(String, Option<AstType>)>,
         body: Box<Expr>,
         span: Span,
     },
@@ -634,6 +635,11 @@ impl DisplayDepth for Decl {
             Decl::Link(name, _) => {
                 write_indent(f, d)?;
                 writeln!(f, "Link \"{}\"", name)
+            }
+            Decl::Expression(e) => {
+                write_indent(f, d)?;
+                writeln!(f, "ExprDecl")?;
+                e.fmt_depth(f, d + 1)
             }
         }
     }

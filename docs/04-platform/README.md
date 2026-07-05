@@ -20,6 +20,7 @@
 | [math.md](standard-library/math.md) | Math functions |
 | [time.md](standard-library/time.md) | Time and timestamps |
 | [testing.md](standard-library/testing.md) | Test assertions |
+| [types.md](../03-language-reference/types.md) | Type system + platform types (DateTime, Bytes, Decimal) |
 
 ## Tools
 

@@ -45,11 +45,37 @@ impl Linker {
         }
 
         for link in links {
-            cmd.arg(format!("-l{}", link));
+            if link.starts_with("-framework ") {
+                let framework_name = link.trim_start_matches("-framework ");
+                cmd.arg("-framework");
+                cmd.arg(framework_name);
+            } else if link.starts_with("-L") {
+                // Library search path
+                cmd.arg(link);
+            } else {
+                cmd.arg(format!("-l{}", link));
+            }
         }
 
         if release {
             cmd.arg("-lm");
+        }
+
+        // On macOS, link CoreFoundation (needed by chrono/iana-time-zone)
+        if cfg!(target_os = "macos") {
+            cmd.arg("-framework").arg("CoreFoundation");
+            // Common Homebrew library paths
+            let homebrew_paths = [
+                "/opt/homebrew/opt/libpq/lib",
+                "/opt/homebrew/lib",
+                "/usr/local/lib",
+            ];
+            for p in &homebrew_paths {
+                if std::path::Path::new(p).exists() {
+                    cmd.arg(format!("-L{}", p));
+                    cmd.arg(format!("-Wl,-rpath,{}", p));
+                }
+            }
         }
 
         let status = cmd.status().map_err(|e| format!("Linker failed: {}", e))?;

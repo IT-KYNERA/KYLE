@@ -112,11 +112,27 @@ impl ModuleResolver {
             if candidate.exists() {
                 return Ok(candidate);
             }
-            // Also try <name>/lib.ky for directory-based packages
+            // Try <name>/lib.ky for directory-based packages
             if !path_str.contains('/') {
                 let dir_candidate = search_path.join(&path_str).join("lib.ky");
                 if dir_candidate.exists() {
                     return Ok(dir_candidate);
+                }
+                // Try packages/<name>/src/lib.ky for package dirs
+                let src_candidate = search_path.join(&path_str).join("src").join("lib.ky");
+                if src_candidate.exists() {
+                    return Ok(src_candidate);
+                }
+            }
+            // Try packages/<name>/src/<file> for submodules (e.g. http/server.ky → http/src/server.ky)
+            if path_str.contains('/') {
+                if let Some(parent) = PathBuf::from(&path_str).parent() {
+                    if let Some(file) = PathBuf::from(&path_str).file_name() {
+                        let src_candidate = search_path.join(parent).join("src").join(file).with_extension("ky");
+                        if src_candidate.exists() {
+                            return Ok(src_candidate);
+                        }
+                    }
                 }
             }
         }
@@ -151,6 +167,7 @@ impl ModuleResolver {
                     Decl::TypeAlias(t) => &t.name,
                     Decl::Link(_, _) => return false,
                     Decl::Import(_) | Decl::FromImport(_) => return false,
+                    Decl::Expression(_) => return false,
                 };
                 Self::is_public(name)
             })
@@ -176,6 +193,7 @@ impl ModuleResolver {
                 Decl::TypeAlias(t) => &t.name,
                 Decl::Link(_, _) => continue,
                 Decl::Import(_) | Decl::FromImport(_) => continue,
+                Decl::Expression(_) => continue,
             };
             if decl_name == name {
                 if !Self::is_not_private(name) {

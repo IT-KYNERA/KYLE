@@ -54,10 +54,19 @@ impl Pipeline {
             if std_path.exists() {
                 resolver.add_search_path(std_path);
             }
+            // Add packages/ for local package development
+            let pkg_path = cwd.join("packages");
+            if pkg_path.exists() {
+                resolver.add_search_path(pkg_path);
+            }
         }
         let local_std = base_dir.join("std");
         if local_std.exists() {
             resolver.add_search_path(local_std);
+        }
+        let local_pkg = base_dir.join("packages");
+        if local_pkg.exists() {
+            resolver.add_search_path(local_pkg);
         }
 
         // Add package cache search paths from lock file and cache
@@ -110,7 +119,31 @@ impl Pipeline {
                                 program.links.push(link.clone());
                             }
                         }
-                        import_decls.push((i, module.program.declarations.clone()));
+                        // Clone module data to avoid borrow conflicts with resolver
+                        let module_decls = module.program.declarations.clone();
+                        // Apply alias renaming to the requested declarations
+                        let mut selected: Vec<kyc_core::ast::Decl> = module_decls;
+                        if let Some(ref alias) = fi.alias {
+                            if fi.imported_names.len() == 1 {
+                                for decl in &mut selected {
+                                    let name = match decl {
+                                        kyc_core::ast::Decl::Function(f) => Some(f.name.clone()),
+                                        kyc_core::ast::Decl::Variable(v) => Some(v.name.clone()),
+                                        kyc_core::ast::Decl::Constant(c) => Some(c.name.clone()),
+                                        kyc_core::ast::Decl::Class(c) => Some(c.name.clone()),
+                                        kyc_core::ast::Decl::Struct(s) => Some(s.name.clone()),
+                                        kyc_core::ast::Decl::Enum(e) => Some(e.name.clone()),
+                                        kyc_core::ast::Decl::TypeAlias(t) => Some(t.name.clone()),
+                                        _ => None,
+                                    };
+                                    if name.as_deref() == Some(&fi.imported_names[0]) {
+                                        rename_decl(decl, alias);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        import_decls.push((i, selected));
                     } else {
                         import_decls.push((i, Vec::new()));
                     }
@@ -437,6 +470,7 @@ fn rename_decl(decl: &mut kyc_core::ast::Decl, new_name: &str) {
         Decl::TypeAlias(t) => t.name = new_name.to_string(),
         Decl::Import(_) | Decl::FromImport(_) => {}
         Decl::Link(_, _) => {}
+        Decl::Expression(_) => {}
     }
 }
 

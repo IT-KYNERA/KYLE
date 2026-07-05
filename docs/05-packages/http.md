@@ -155,9 +155,9 @@ final class Request:
     body: str                   # raw body string
     headers: dict<str, str>     # request headers
 
-    fn param[T](name: str) T    # path param con tipo
+    fn param<T>(name: str) T    # path param con tipo
     fn header(name: str) str    # header por nombre
-    fn body[T]() T              # body parseado como JSON → clase T
+    fn body<T>() T              # body parseado como JSON → clase T
 ```
 
 ### Res
@@ -255,7 +255,7 @@ app.get("/users/{id:i32}", (req, res):
 
 # Crear usuario
 app.post("/users", (req, res):
-    data = req.body[CreateUser]()
+    data = req.body<CreateUser>()
     res.json({ "created": true, "name": data.name }, 201)
 )
 

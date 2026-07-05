@@ -1,0 +1,16 @@
+# Kyle — Fibonacci (loop, functional style)
+fn fib(n: i64) i64:
+    a: &i64 = 0
+    b: &i64 = 1
+    i: &i64 = 0
+    while i < n:
+        tmp := a + b
+        a = b
+        b = tmp
+        i = i + 1
+    b
+
+fn main() i32:
+    result := fib(10000000)
+    println("Fib done")
+    0

@@ -373,6 +373,12 @@ impl Lowerer {
                     }
                 }
             }
+            // Register built-in TypeInfo struct for type introspection
+            struct_defs.entry("TypeInfo".to_string()).or_insert_with(|| vec![
+                ("name".to_string(), MirType::Str),
+                ("kind".to_string(), MirType::Str),
+                ("size".to_string(), MirType::I32),
+            ]);
         }
 
         // Populate field defaults for classes
@@ -713,6 +719,47 @@ impl Lowerer {
             for func in sf.iter() {
                 if !module.functions.iter().any(|f| f.name == func.name) {
                     module.functions.push(func.clone());
+                }
+            }
+        }
+
+        // Generate implicit main() if no explicit main function exists
+        if !module.functions.iter().any(|f| f.name == "main" || f.name == "kyle_main") {
+            let mut main_stmts: Vec<Stmt> = Vec::new();
+            let pg_span = program.span.clone();
+            for decl in &program.declarations {
+                match decl {
+                    Decl::Variable(v) => {
+                        main_stmts.push(Stmt::Variable(v.clone()));
+                    }
+                    Decl::Expression(e) => {
+                        main_stmts.push(Stmt::Expression(e.clone()));
+                    }
+                    _ => {}
+                }
+            }
+            main_stmts.push(Stmt::Return(Some(Box::new(
+                Expr::Literal { value: Literal::Integer(0), span: pg_span.clone() }
+            ))));
+            let int_type = AstType::Primitive { name: "i32".into(), span: pg_span.clone() };
+            let main_fn = FunctionDecl {
+                name: "main".into(),
+                type_params: vec![], params: vec![],
+                return_type: Some(int_type),
+                is_async: false, is_const: false, is_static: false,
+                is_abstract: false, is_extern: false, is_test: false,
+                visibility: Visibility::Public,
+                body: Some(Block { statements: main_stmts, span: pg_span.clone() }),
+                span: pg_span,
+            };
+            if let Some(mir_main) = self.lower_function(&main_fn) {
+                module.functions.push(mir_main);
+                // Collect closures generated during implicit main lowering
+                let cf2 = self.closure_functions.borrow();
+                for func in cf2.iter() {
+                    if !module.functions.iter().any(|f| f.name == func.name) {
+                        module.functions.push(func.clone());
+                    }
                 }
             }
         }
@@ -3165,7 +3212,8 @@ impl Lowerer {
                     // Lower the receiver first, but for struct identifiers pass by reference (no copy).
                     let obj_local = if let Expr::Identifier { name, .. } = object.as_ref() {
                         if let Some(&local) = ctx.locals.get(name) {
-                            if matches!(ctx.local_types.get(&local), Some(MirType::Struct(_, _))) {
+                            let lt = ctx.local_types.get(&local);
+                            if matches!(lt, Some(MirType::Struct(_, _)) | Some(MirType::Ptr(_))) {
                                 local
                             } else {
                                 ctx = self.lower_expr(ctx, object);
@@ -3183,7 +3231,15 @@ impl Lowerer {
 
                     // If the receiver is a class instance (MirType::Struct) and the class
                     // declares a method named `property`, emit a real method call.
-                    if let Some(MirType::Struct(class_name, _)) = &obj_type {
+                    // Also unwrap Ptr(Struct(...)) for closure-inferred types.
+                    let struct_type = obj_type.as_ref().and_then(|t| {
+                        if let MirType::Struct(name, _) = t { Some(name.clone()) }
+                        else if let MirType::Ptr(inner) = t {
+                            if let MirType::Struct(name, _) = inner.as_ref() { Some(name.clone()) }
+                            else { None }
+                        } else { None }
+                    });
+                    if let Some(ref class_name) = struct_type {
                         // For concrete generic types (e.g. "Box__i32"), ensure methods are monomorphized
                         if class_name.contains("__") {
                             self.ensure_generic_class_methods(class_name);
@@ -3228,9 +3284,18 @@ impl Lowerer {
                             }
                     }
 
-                    // Built-in type method dispatch (str, list, dict)
+                    // Built-in type method dispatch (str, list, dict, char)
                     let is_str = obj_type.as_ref().map(|t| *t == MirType::Str).unwrap_or(false);
                     let is_list = obj_type.as_ref().map(|t| matches!(t, MirType::List(_))).unwrap_or(false);
+                    let is_char = obj_type.as_ref().map(|t| *t == MirType::Char).unwrap_or(false);
+
+                    // === UNIVERSAL METHOD: .type() on any value ===
+                    if property == "type" && arguments.is_empty() {
+                        if let Some(ref obj_t) = obj_type {
+                            build_typeinfo_struct(obj_t, &mut ctx);
+                            return ctx;
+                        }
+                    }
 
                     // === STRING METHODS ===
                     if is_str && property == "len" && arguments.is_empty() {
@@ -3291,6 +3356,190 @@ impl Lowerer {
                         });
                         return ctx;
                     }
+                    if is_str && property == "substr" && arguments.len() == 2 {
+                        ctx = self.lower_expr(ctx, &arguments[0]);
+                        let start = ctx.next_local - 1;
+                        ctx = self.lower_expr(ctx, &arguments[1]);
+                        let count = ctx.next_local - 1;
+                        let result = ctx.alloc_local("_s", MirType::Str);
+                        ctx.string_locals.push(result);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_substr".to_string(),
+                            args: vec![MirValue::Local(obj_local), MirValue::Local(start), MirValue::Local(count)],
+                        });
+                        return ctx;
+                    }
+                    if is_str && property == "char_at" && arguments.len() == 1 {
+                        ctx = self.lower_expr(ctx, &arguments[0]);
+                        let idx = ctx.next_local - 1;
+                        let result = ctx.alloc_local("_c", MirType::Char);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_char_at".to_string(),
+                            args: vec![MirValue::Local(obj_local), MirValue::Local(idx)],
+                        });
+                        return ctx;
+                    }
+                    // String is_* methods: get first char, then call the char function
+                    if is_str && arguments.is_empty() {
+                        let is_fn = match property.as_str() {
+                            "is_digit" => Some("ky_is_digit"),
+                            "is_alpha" => Some("ky_is_alpha"),
+                            "is_alnum" => Some("ky_is_alnum"),
+                            "is_whitespace" => Some("ky_is_whitespace"),
+                            "is_upper" => Some("ky_is_upper"),
+                            "is_lower" => Some("ky_is_lower"),
+                            _ => None,
+                        };
+                        if let Some(fn_name) = is_fn {
+                            // Get first character code
+                            let zero = ctx.alloc_local("_iz", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: zero, value: MirValue::Constant(MirConstant::I32(0)),
+                            });
+                            let first_char = ctx.alloc_local("_ifc", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(first_char), name: "ky_char_at".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(zero)],
+                            });
+                            let result = ctx.alloc_local("_ir", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: fn_name.to_string(),
+                                args: vec![MirValue::Local(first_char)],
+                            });
+                            return ctx;
+                        }
+                    }
+
+                    // === CHAR METHODS ===
+                    if is_char && property == "ord" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ord", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_ord".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_digit" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_cd", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_digit".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_alpha" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ca", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_alpha".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_alnum" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_can", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_alnum".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_whitespace" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_cw", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_whitespace".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_upper" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_cu", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_upper".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+                    if is_char && property == "is_lower" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_cl", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_is_lower".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
+
+                    // === UNIVERSAL CONVERSION METHODS (.to_str, .to_int, etc.) ===
+                    if property == "to_str" && arguments.is_empty() {
+                        // Convert any value to string: works via ky_i64_to_str or ky_clone_str
+                        let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I32);
+                        if id_type == MirType::Str {
+                            // Already a string — clone it
+                            let result = ctx.alloc_local("_ts", MirType::Str);
+                            ctx.string_locals.push(result);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_clone_str".to_string(),
+                                args: vec![MirValue::Local(obj_local)],
+                            });
+                            return ctx;
+                        } else {
+                            // Convert to i64 first, then to string
+                            let i64_val = if matches!(id_type, MirType::I32 | MirType::I64) {
+                                let ext = ctx.alloc_local("_tv", MirType::I64);
+                                ctx.current_block.insts.push(MirInst::Cast {
+                                    dest: ext, value: MirValue::Local(obj_local), to_type: MirType::I64,
+                                });
+                                MirValue::Local(ext)
+                            } else {
+                                MirValue::Local(obj_local)
+                            };
+                            let result = ctx.alloc_local("_ts", MirType::Str);
+                            ctx.string_locals.push(result);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_i64_to_str".to_string(),
+                                args: vec![i64_val],
+                            });
+                            return ctx;
+                        }
+                    }
+                    if property == "to_int" && arguments.is_empty() {
+                        let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I32);
+                        if id_type == MirType::I32 {
+                            let result = ctx.alloc_local("_ti", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Load {
+                                dest: result, src: obj_local,
+                            });
+                            return ctx;
+                        }
+                        let result = ctx.alloc_local("_ti", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32,
+                        });
+                        return ctx;
+                    }
+                    if property == "to_float" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tf", MirType::F64);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::F64,
+                        });
+                        return ctx;
+                    }
+                    if property == "to_bool" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tb", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::Bool,
+                        });
+                        return ctx;
+                    }
+                    if property == "stringify" && arguments.is_empty() {
+                        // Convert to JSON: calls json_stringify on the dict/struct
+                        let result = ctx.alloc_local("_sj", MirType::Str);
+                        ctx.string_locals.push(result);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_json_stringify".to_string(),
+                            args: vec![MirValue::Local(obj_local)],
+                        });
+                        return ctx;
+                    }
 
                     // === LIST METHODS ===
                     if is_list {
@@ -3303,7 +3552,7 @@ impl Lowerer {
                             });
                             return ctx;
                         }
-                        if property == "add" {
+                        if property == "push" || property == "add" {
                             for arg in arguments {
                                 ctx = self.lower_expr(ctx, arg);
                                 let arg_val = ctx.next_local - 1;
@@ -3624,6 +3873,44 @@ impl Lowerer {
                     }
                 }
 
+                // Handle calling through an expression (e.g. handlers[i](args)):
+                // lower the target to get the function pointer, then emit CallIndirect.
+                if !matches!(target.as_ref(), Expr::Identifier { .. } | Expr::PropertyAccess { .. }) {
+                    ctx = self.lower_expr(ctx, target);
+                    let fn_ptr_local = ctx.next_local - 1;
+                    let mut args = Vec::new();
+                    for arg in arguments {
+                        // For struct-typed arguments, pass by pointer (not by value)
+                        if let Expr::Identifier { name, .. } = arg {
+                            if let Some(&local) = ctx.locals.get(name) {
+                                if matches!(ctx.local_types.get(&local), Some(MirType::Struct(_, _))) {
+                                    args.push(MirValue::Local(local));
+                                    continue;
+                                }
+                            }
+                        }
+                        ctx = self.lower_expr(ctx, arg);
+                        args.push(MirValue::Local(ctx.next_local - 1));
+                    }
+                    let param_types: Vec<MirType> = args.iter().map(|a| {
+                        match a {
+                            MirValue::Local(id) => {
+                                let t = ctx.local_types.get(id).cloned().unwrap_or(MirType::I32);
+                                // Struct types are passed as pointers in closures
+                                if matches!(t, MirType::Struct(_, _)) { MirType::Ptr(Box::new(MirType::Void)) }
+                                else { t }
+                            }
+                            _ => MirType::I32,
+                        }
+                    }).collect();
+                    let dest = ctx.alloc_local("_ccall", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::CallIndirect {
+                        dest: Some(dest), fn_ptr: fn_ptr_local,
+                        ret_type: MirType::I32, param_types, args,
+                    });
+                    return ctx;
+                }
+
                 let name = if let Expr::Identifier { name, .. } = target.as_ref() {
                     name.clone()
                 } else {
@@ -3633,22 +3920,32 @@ impl Lowerer {
                 // Check for closure call: if `name` refers to a local or parameter
                 // (not a function declaration), emit an indirect call through the function pointer.
                 if let Some(&local) = ctx.locals.get(&name) {
-                    // Lower arguments
+                    // Lower arguments, passing structs by pointer (not by value)
                     let mut args = Vec::new();
                     for arg in arguments {
+                        if let Expr::Identifier { name, .. } = arg {
+                            if let Some(&arg_local) = ctx.locals.get(name) {
+                                if matches!(ctx.local_types.get(&arg_local), Some(MirType::Struct(_, _))) {
+                                    args.push(MirValue::Local(arg_local));
+                                    continue;
+                                }
+                            }
+                        }
                         ctx = self.lower_expr(ctx, arg);
                         args.push(MirValue::Local(ctx.next_local - 1));
                     }
-                    // Infer param_types and ret_type from actual lowered arg types
+                    // Infer param_types: struct types become Ptr(Void) for by-ref ABI
                     let param_types: Vec<MirType> = args.iter().map(|a| {
                         match a {
-                            MirValue::Local(id) => ctx.local_types.get(id).cloned().unwrap_or(MirType::I32),
+                            MirValue::Local(id) => {
+                                let t = ctx.local_types.get(id).cloned().unwrap_or(MirType::I32);
+                                if matches!(t, MirType::Struct(_, _)) { MirType::Ptr(Box::new(MirType::Void)) }
+                                else { t }
+                            }
                             _ => MirType::I32,
                         }
                     }).collect();
-                    let ret_type = param_types.first().map(|t| {
-                        if *t == MirType::Str { MirType::Str } else { MirType::I32 }
-                    }).unwrap_or(MirType::I32);
+                    let ret_type = MirType::I32;
                     let dest = ctx.alloc_local("_ccall", ret_type.clone());
                     ctx.current_block.insts.push(MirInst::CallIndirect {
                         dest: Some(dest),
@@ -4044,6 +4341,15 @@ impl Lowerer {
                         parts.join(",")
                     }
 
+                    // type<T>() — return TypeInfo for a type
+                    if resolved_name == "type" && type_args.len() == 1 {
+                        if let Some(first_type_arg) = type_args.first() {
+                            let struct_defs = ctx.struct_defs.clone();
+                            let mir_type = ast_type_to_mir(first_type_arg, Some(&struct_defs));
+                            let typeinfo = build_typeinfo_struct(&mir_type, &mut ctx);
+                            return ctx;
+                        }
+                    }
                     // serialize(val) — class to JSON
                     if resolved_name == "serialize" && args.len() == 1 {
                         if let MirValue::Local(id) = &args[0] {
@@ -4065,14 +4371,14 @@ impl Lowerer {
                                 args.push(json_arg);
                                 args.push(MirValue::Constant(MirConstant::String(descriptor)));
                                 args.push(MirValue::Local(out_local));
-                                // Call ky_json_to_struct directly and return the output local
-                                let result = ctx.alloc_local("_dres", mir_type.clone());
+                                // Call ky_json_to_struct (returns i32, writes to out_local)
+                                let ret_local = ctx.alloc_local("_dret", MirType::I32);
                                 ctx.current_block.insts.push(MirInst::Call {
-                                    dest: Some(result),
+                                    dest: Some(ret_local),
                                     name: "ky_json_to_struct".to_string(),
                                     args,
                                 });
-                                // Load result from output struct
+                                // Load result from output struct (which ky_json_to_struct wrote to)
                                 let load = ctx.alloc_local("_dval", mir_type.clone());
                                 ctx.current_block.insts.push(MirInst::Load {
                                     dest: load,
@@ -4532,37 +4838,57 @@ impl Lowerer {
                 };
                 if let Some(obj_ptr) = obj_ptr {
                     let obj_type = ctx.local_types.get(&obj_ptr).cloned();
-                    if let Some(MirType::Struct(sname, fields)) = &obj_type {
-                        // If the stored type has empty fields (e.g. from recursive
-                        // or forward-declared structs), look up the real fields
-                        // from struct_defs
-                        let resolved_fields = if fields.is_empty() {
-                            ctx.struct_defs.get(sname).cloned().unwrap_or_default()
+                    // Unwrap Ptr(Struct(...)) for closure-inferred types
+                    let (struct_name, struct_fields, is_ptr) = match &obj_type {
+                        Some(MirType::Struct(sname, fields)) => (Some(sname.clone()), Some(fields.clone()), false),
+                        Some(MirType::Ptr(inner)) => match inner.as_ref() {
+                            MirType::Struct(sname, fields) => (Some(sname.clone()), Some(fields.clone()), true),
+                            _ => (None, None, false),
+                        },
+                        _ => (None, None, false),
+                    };
+                    // Resolve the struct name and fields, searching all struct_defs
+                    // if the type is a generic pointer (e.g., closure-inferred Ptr(I8)).
+                    let (sname, resolved_fields) = if let (Some(sn), Some(fields)) = (struct_name, struct_fields) {
+                        let rf = if fields.is_empty() {
+                            ctx.struct_defs.get(&sn).cloned().unwrap_or_default()
                         } else {
-                            fields.clone()
+                            fields
                         };
-                        let backing = format!("_{}", property);
-                        let field_idx = resolved_fields.iter().position(|(fname, _)| fname == property)
-                            .or_else(|| resolved_fields.iter().position(|(fname, _)| fname == &backing));
-                        if let Some(field_idx) = field_idx {
-                            let field_type = resolved_fields[field_idx].1.clone();
-                            let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
-                            ctx.current_block.insts.push(MirInst::FieldPtr {
-                                dest: field_ptr,
-                                ptr: obj_ptr,
-                                field_index: field_idx,
-                                struct_type: Box::new(MirType::Struct(sname.clone(), resolved_fields)),
-                            });
-                            let result = ctx.alloc_local("_field", field_type.clone());
-                            ctx.current_block.insts.push(MirInst::Load {
-                                dest: result,
-                                src: field_ptr,
-                            });
-                            if field_type == MirType::Str {
-                                ctx.string_locals.push(result);
+                        (sn, rf)
+                    } else {
+                        // Fallback: scan all struct_defs for matching property
+                        let mut found = None;
+                        for (sn, sfields) in &ctx.struct_defs {
+                            if sfields.iter().any(|(fn_, _)| fn_ == property || fn_ == &format!("_{}", property)) {
+                                found = Some((sn.clone(), sfields.clone()));
+                                break;
                             }
-                            return ctx;
                         }
+                        if let Some(result) = found { result }
+                        else { return ctx; }
+                    };
+                    let backing = format!("_{}", property);
+                    let field_idx = resolved_fields.iter().position(|(fname, _)| fname == property)
+                        .or_else(|| resolved_fields.iter().position(|(fname, _)| fname == &backing));
+                    if let Some(field_idx) = field_idx {
+                        let field_type = resolved_fields[field_idx].1.clone();
+                        let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: field_ptr,
+                            ptr: obj_ptr,
+                            field_index: field_idx,
+                            struct_type: Box::new(MirType::Struct(sname.clone(), resolved_fields)),
+                        });
+                        let result = ctx.alloc_local("_field", field_type.clone());
+                        ctx.current_block.insts.push(MirInst::Load {
+                            dest: result,
+                            src: field_ptr,
+                        });
+                        if field_type == MirType::Str {
+                            ctx.string_locals.push(result);
+                        }
+                        return ctx;
                     }
                 }
                 ctx
@@ -5290,16 +5616,18 @@ impl Lowerer {
                 drop(counter);
 
                 let mut mir_func = MirFunction::new(&fn_name);
-                // Infer param types from body expression
+                // Use type annotations from AST, fall back to inference
                 let param_types: Vec<MirType> = params.iter()
-                    .map(|p| infer_closure_param_type(p, body))
+                    .map(|(p, t)| param_type_from_annotation(t)
+                        .unwrap_or_else(|| infer_closure_param_type(p, body)))
                     .collect();
                 mir_func.params = param_types.clone();
                 mir_func.return_type = MirType::I32; // default, will be inferred
 
                 let mut cctx = LowerCtx::new();
+                cctx.struct_defs = ctx.struct_defs.clone();
                 // Bind params to locals with inferred types
-                for (i, pname) in params.iter().enumerate() {
+                for (i, (pname, _)) in params.iter().enumerate() {
                     let pt = param_types[i].clone();
                     let local = cctx.alloc_local(pname, pt.clone());
                     cctx.current_block.insts.push(MirInst::Store {
@@ -5899,10 +6227,30 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "json_stringify" => Some(MirType::Str),
         "serialize" => Some(MirType::Str),
         "ky_struct_to_json" => Some(MirType::Str),
+        "type" => Some(MirType::Struct("TypeInfo".to_string(), vec![
+            ("name".into(), MirType::Str),
+            ("kind".into(), MirType::Str),
+            ("size".into(), MirType::I32),
+        ])),
         "error" => Some(MirType::Struct("__result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ])),
+        _ => None,
+    }
+}
+
+/// Convert an optional AstType annotation to a MirType.
+fn param_type_from_annotation(ann: &Option<AstType>) -> Option<MirType> {
+    match ann {
+        Some(AstType::Primitive { name, .. } | AstType::User { name, .. }) => match name.as_str() {
+            "str" => Some(MirType::Str),
+            "i32" => Some(MirType::I32),
+            "i64" => Some(MirType::I64),
+            "f64" => Some(MirType::F64),
+            "bool" => Some(MirType::I32),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -5913,7 +6261,7 @@ fn infer_closure_param_type(param: &str, body: &Expr) -> MirType {
     if let Some(t) = infer_expr_param_type(param, body) {
         return t;
     }
-    MirType::I32
+    MirType::Ptr(Box::new(MirType::I8))
 }
 
 fn infer_expr_param_type(param: &str, expr: &Expr) -> Option<MirType> {
@@ -5939,9 +6287,44 @@ fn infer_expr_param_type(param: &str, expr: &Expr) -> Option<MirType> {
             }
             if let Some(t) = infer_expr_param_type(param, else_expr) { return Some(t); }
         }
-        Expr::FunctionCall { arguments, .. } => {
+        Expr::FunctionCall { target, arguments, .. } => {
+            // Check if param is the receiver of a method call: param.method(args)
+            if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
+                if let Expr::Identifier { name, .. } = object.as_ref() {
+                    if name == param {
+                        // Infer type from known method patterns
+                        match property.as_str() {
+                            "json" | "text" | "status" | "send" | "redirect" => {
+                                return Some(MirType::Ptr(Box::new(MirType::Struct("Res".into(), vec![]))));
+                            }
+                            "param" | "header" | "body" | "query" => {
+                                return Some(MirType::Ptr(Box::new(MirType::Struct("Request".into(), vec![]))));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
             for arg in arguments {
                 if let Some(t) = infer_expr_param_type(param, arg) { return Some(t); }
+            }
+        }
+        Expr::PropertyAccess { object, property, .. } => {
+            if let Expr::Identifier { name, .. } = object.as_ref() {
+                if name == param {
+                    // Known struct field access patterns
+                    match property.as_str() {
+                        "fd" | "sent" | "status" | "json" | "text" => {
+                            return Some(MirType::Ptr(Box::new(MirType::Struct("Res".into(), vec![]))));
+                        }
+                        "path" | "method" | "body" | "_pattern" => {
+                            return Some(MirType::Ptr(Box::new(MirType::Struct("Request".into(), vec![]))));
+                        }
+                        _ => {
+                            return Some(MirType::Ptr(Box::new(MirType::I8)));
+                        }
+                    }
+                }
             }
         }
         _ => {}
@@ -5957,7 +6340,14 @@ fn contains_param(param: &str, expr: &Expr) -> bool {
         Expr::Ternary { then_expr, else_expr, .. } => {
             contains_param(param, then_expr) || contains_param(param, else_expr)
         }
-        Expr::FunctionCall { arguments, .. } => arguments.iter().any(|a| contains_param(param, a)),
+        Expr::FunctionCall { target, arguments, .. } => {
+            // Check target for method calls: param.method(args)
+            if let Expr::PropertyAccess { object, .. } = target.as_ref() {
+                if contains_param(param, object) { return true; }
+            }
+            arguments.iter().any(|a| contains_param(param, a))
+        }
+        Expr::PropertyAccess { object, .. } => contains_param(param, object),
         _ => false,
     }
 }
@@ -5982,6 +6372,146 @@ fn is_type_ref(ast: &AstType, tp_name: &str) -> bool {
             name == tp_name || args.iter().any(|a| is_type_ref(a, tp_name))
         }
         _ => false,
+    }
+}
+
+/// Build a TypeInfo struct literal for a given MirType.
+/// Allocates locals, stores field values, and returns the final struct local.
+fn build_typeinfo_struct(mir_type: &MirType, ctx: &mut LowerCtx) {
+    let type_name = mir_type_to_type_name(mir_type);
+    let type_kind = mir_type_to_kind(mir_type);
+    let type_size = mir_type_to_size(mir_type);
+
+    let struct_type = MirType::Struct("TypeInfo".into(), vec![
+        ("name".into(), MirType::Str),
+        ("kind".into(), MirType::Str),
+        ("size".into(), MirType::I32),
+    ]);
+
+    let struct_local = ctx.alloc_local("_ti", struct_type.clone());
+    let tin = ctx.alloc_local("_tin", MirType::Str);
+    let tik = ctx.alloc_local("_tik", MirType::Str);
+    ctx.string_locals.push(tin);
+    ctx.string_locals.push(tik);
+
+    // Field 0: name (str)
+    let name_const = ctx.alloc_local("_tiname", MirType::Str);
+    ctx.current_block.insts.push(MirInst::Store {
+        dest: name_const,
+        value: MirValue::Constant(MirConstant::String(type_name)),
+    });
+    let name_str = ctx.alloc_local("_tistr", MirType::Str);
+    ctx.string_locals.push(name_str);
+    ctx.current_block.insts.push(MirInst::Call {
+        dest: Some(name_str),
+        name: "ky_clone_str".to_string(),
+        args: vec![MirValue::Local(name_const)],
+    });
+    let f0 = ctx.alloc_local("_tif0", MirType::I64);
+    ctx.current_block.insts.push(MirInst::FieldPtr {
+        dest: f0, ptr: struct_local, field_index: 0,
+        struct_type: Box::new(struct_type.clone()),
+    });
+    ctx.current_block.insts.push(MirInst::Store {
+        dest: f0,
+        value: MirValue::Local(name_str),
+    });
+
+    // Field 1: kind (str)
+    let kind_const = ctx.alloc_local("_tikind", MirType::Str);
+    ctx.current_block.insts.push(MirInst::Store {
+        dest: kind_const,
+        value: MirValue::Constant(MirConstant::String(type_kind)),
+    });
+    let kind_str = ctx.alloc_local("_tikstr", MirType::Str);
+    ctx.string_locals.push(kind_str);
+    ctx.current_block.insts.push(MirInst::Call {
+        dest: Some(kind_str),
+        name: "ky_clone_str".to_string(),
+        args: vec![MirValue::Local(kind_const)],
+    });
+    let f1 = ctx.alloc_local("_tif1", MirType::I64);
+    ctx.current_block.insts.push(MirInst::FieldPtr {
+        dest: f1, ptr: struct_local, field_index: 1,
+        struct_type: Box::new(struct_type.clone()),
+    });
+    ctx.current_block.insts.push(MirInst::Store {
+        dest: f1,
+        value: MirValue::Local(kind_str),
+    });
+
+    // Field 2: size (i32)
+    let f2 = ctx.alloc_local("_tif2", MirType::I64);
+    ctx.current_block.insts.push(MirInst::FieldPtr {
+        dest: f2, ptr: struct_local, field_index: 2,
+        struct_type: Box::new(struct_type.clone()),
+    });
+    ctx.current_block.insts.push(MirInst::Store {
+        dest: f2,
+        value: MirValue::Constant(MirConstant::I32(type_size)),
+    });
+
+    // Load struct as result
+    let load = ctx.alloc_local("_tires", struct_type);
+    ctx.current_block.insts.push(MirInst::Load {
+        dest: load,
+        src: struct_local,
+    });
+}
+
+/// Get the string name of a MirType (for TypeInfo.name)
+fn mir_type_to_type_name(t: &MirType) -> String {
+    match t {
+        MirType::I1 => "i1".into(),
+        MirType::I8 => "i8".into(),
+        MirType::I16 => "i16".into(),
+        MirType::I32 => "i32".into(),
+        MirType::I64 => "i64".into(),
+        MirType::F32 => "f32".into(),
+        MirType::F64 => "f64".into(),
+        MirType::Bool => "bool".into(),
+        MirType::Char => "char".into(),
+        MirType::Str => "str".into(),
+        MirType::Void => "void".into(),
+        MirType::Ptr(_) => "ptr".into(),
+        MirType::List(inner) => format!("list<{}>", mir_type_to_type_name(inner)),
+        MirType::Struct(name, _) => name.clone(),
+        MirType::Dict(k, v) => format!("dict<{},{}>", mir_type_to_type_name(k), mir_type_to_type_name(v)),
+        MirType::Array(inner) => format!("[{}]", mir_type_to_type_name(inner)),
+    }
+}
+
+/// Get the kind string of a MirType (for TypeInfo.kind)
+fn mir_type_to_kind(t: &MirType) -> String {
+    match t {
+        MirType::I1 | MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64
+        | MirType::F32 | MirType::F64 | MirType::Bool | MirType::Char
+        | MirType::Str | MirType::Void => "primitive".into(),
+        MirType::Ptr(_) => "ptr".into(),
+        MirType::List(_) => "list".into(),
+        MirType::Struct(_, _) => "struct".into(),
+        MirType::Dict(_, _) => "dict".into(),
+        MirType::Array(_) => "array".into(),
+    }
+}
+
+/// Get the byte size of a MirType (for TypeInfo.size)
+fn mir_type_to_size(t: &MirType) -> i32 {
+    match t {
+        MirType::I1 | MirType::Bool => 1,
+        MirType::I8 | MirType::Char => 1,
+        MirType::I16 => 2,
+        MirType::I32 => 4,
+        MirType::I64 => 8,
+        MirType::F32 => 4,
+        MirType::F64 => 8,
+        MirType::Str | MirType::Ptr(_) | MirType::List(_) | MirType::Dict(_, _) => 8,
+        MirType::Void => 0,
+        MirType::Struct(_, fields) => {
+            // Estimate size: sum of field sizes (approximately, without padding)
+            fields.iter().map(|(_, ft)| mir_type_to_size(ft) as i32).sum()
+        }
+        MirType::Array(inner) => mir_type_to_size(inner) * 8, // rough estimate
     }
 }
 

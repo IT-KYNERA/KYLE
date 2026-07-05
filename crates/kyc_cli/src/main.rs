@@ -183,7 +183,7 @@ fn cmd_build(args: &[String]) {
     // Single-file mode
     let file = file_arg.unwrap();
     let file_idx = args.iter().position(|a| a == file).unwrap();
-    let source = ensure_main(&load_source(args, file_idx));
+    let source = load_source(args, file_idx);
     let file_stem = Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string();
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
     let output = exe_path(&build_dir.join(&file_stem));
@@ -245,7 +245,7 @@ fn cmd_run(args: &[String]) {
     // Single-file mode
     let file = file_arg.unwrap();
     let file_idx = args.iter().position(|a| a == file).unwrap();
-    let source = ensure_main(&load_source(args, file_idx));
+    let source = load_source(args, file_idx);
     let file_stem = Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string();
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
     let output = exe_path(&build_dir.join(&file_stem));
@@ -1373,17 +1373,47 @@ fn ensure_main(source: &str) -> String {
     if source.contains("fn main(") || source.contains("fn main ") {
         source.to_string()
     } else {
-        let body: String = source.lines()
-            .map(|l| {
-                let t = l.trim();
-                if t.is_empty() || t.starts_with('#') {
-                    l.to_string()
-                } else {
-                    format!("    {}", l)
+        let mut top = Vec::new();
+        let mut body = Vec::new();
+        let mut in_top_decl = false;
+        for line in source.lines() {
+            let trimmed = line.trim();
+            let leading = line.len() - trimmed.len();
+            if leading == 0 && !in_top_decl {
+                let is_top = trimmed.is_empty()
+                    || trimmed.starts_with('#')
+                    || trimmed.starts_with("from ")
+                    || trimmed.starts_with("import ")
+                    || trimmed.starts_with("final ")
+                    || trimmed.starts_with("class ")
+                    || trimmed.starts_with("abstract ")
+                    || trimmed.starts_with("struct ")
+                    || trimmed.starts_with("enum ")
+                    || trimmed.starts_with("type ")
+                    || trimmed.starts_with("fn ");
+                if is_top {
+                    top.push(line.to_string());
+                    in_top_decl = trimmed.ends_with(':');
+                    continue;
                 }
-            })
+                body.push(line.to_string());
+            } else if leading > 0 && in_top_decl {
+                top.push(line.to_string());
+                in_top_decl = trimmed.ends_with(':');
+            } else {
+                body.push(line.to_string());
+                in_top_decl = false;
+            }
+        }
+        let top_str = top.join("\n");
+        let body_str: String = body.iter()
+            .map(|l| format!("    {}", l))
             .collect::<Vec<_>>()
             .join("\n");
-        format!("fn main() i32:\n{}\n    0", body)
+        if top_str.trim().is_empty() {
+            format!("fn main() i32:\n{}\n    0", body_str)
+        } else {
+            format!("{}\n\nfn main() i32:\n{}\n    0", top_str, body_str)
+        }
     }
 }

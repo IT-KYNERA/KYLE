@@ -30,6 +30,7 @@ fn desugar_decl(decl: &Decl) -> Decl {
         Decl::Contract(c) => Decl::Contract(c.clone()),
         Decl::TypeAlias(t) => Decl::TypeAlias(t.clone()),
         Decl::Link(name, span) => Decl::Link(name.clone(), *span),
+        Decl::Expression(e) => Decl::Expression(e.clone()),
     }
 }
 
