@@ -17,3 +17,11 @@ csharp_bench*
 *.deps.json
 *.runtimeconfig.json
 *.pdb
+*.class
+*.dll
+*.deps.json
+*.runtimeconfig.json
+*.pdb
+fib_cs
+concat_cs
+primes_cs

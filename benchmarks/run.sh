@@ -1,48 +1,62 @@
 #!/bin/bash
-# Kyle Language Benchmark Runner
+# Benchmark runner for Kyle v0.5
 # Usage: bash run.sh
 
 cd "$(dirname "$0")"
 
-run_bench() {
-    local label=$1
-    local cmd=$2
-    local warmup=$3
-    local runs=$4
-    python3 -c "
-import subprocess, time
-times = []
-for _ in range($warmup + $runs):
-    start = time.time()
-    subprocess.run('$cmd', shell=True, capture_output=True)
-    times.append(time.time() - start)
-times = times[$warmup:]
-avg = sum(times) / len(times)
-print(f'{avg*1000:8.1f}ms')
-" 2>/dev/null
-}
-
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
-echo "║         KYLE v0.5 BENCHMARKS (Apple M1/macOS)   ║"
+echo "║       KYLE v0.5 — BENCHMARKS (Apple M1/macOS)  ║"
 echo "╠══════════════════════════════════════════════════╣"
 echo ""
-echo "┌─ Prime Sieve (1..1,000,000)"
-printf "│  %-18s %s\n" "C (gcc -O3)"   "$(run_bench C ./primes/primes_c 3 5)"
-printf "│  %-18s %s\n" "Rust (opt=3)"  "$(run_bench Rust ./primes/primes_rs 3 5)"
-printf "│  %-18s %s\n" "C# (.NET 9)"   "$(run_bench CSharp ./primes/primes_cs 3 5)"
-printf "│  %-18s %s\n" "Java 21"       "$(run_bench Java 'java -cp primes primes' 3 5)"
-printf "│  %-18s %s\n" "Python 3.14"   "$(run_bench Python 'python3 primes/primes.py' 2 3)"
-printf "│  %-18s %s\n" "Kyle 0.5"      "$(run_bench Kyle ./primes/primes_ky 3 5)"
+echo "  Los benchmarks se ejecutan con:"
+echo "  3 warmup + 5 mediciones, usando /usr/bin/time"
 echo ""
-echo "┌─ Fibonacci Loop (10,000,000 iterations)"
-printf "│  %-18s %s\n" "C (gcc -O3)"   "$(run_bench C ./fib/fib_c 3 5)"
-printf "│  %-18s %s\n" "Rust (opt=3)"  "$(run_bench Rust ./fib/fib_rs 3 5)"
-printf "│  %-18s %s\n" "Kyle 0.5"      "$(run_bench Kyle ./fib/fib_ky 3 5)"
-echo ""
-echo "┌─ String Concat (50,000 operations)"
-printf "│  %-18s %s\n" "C (gcc -O3)"   "$(run_bench C ./concat/concat_c 2 5)"
-printf "│  %-18s %s\n" "Rust (opt=3)"  "$(run_bench Rust ./concat/concat_rs 2 5)"
-printf "│  %-18s %s\n" "Kyle 0.5"      "$(run_bench Kyle ./concat/concat_ky 2 5)"
-echo ""
-echo "╚══════════════════════════════════════════════════╝"
+
+bench() {
+    local name=$1
+    local cmd=$2
+    local warmup=${3:-3}
+    local runs=${4:-5}
+    for i in $(seq 1 $warmup); do eval $cmd > /dev/null 2>&1; done
+    total=0
+    for i in $(seq 1 $runs); do
+        t=$(/usr/bin/time -p bash -c "$cmd" 2>&1 | grep real | awk '{print $2}')
+        ms=$(python3 -c "print(int(round(float('$t')*1000)))")
+        total=$((total + ms))
+    done
+    echo $((total / runs))
+}
+
+printf "│  %-22s %s  %s  %s  %s  %s  %s\n" "" "C" "Rust" "C#" "Java" "Python" "Kyle"
+echo "├──────────────────────────────────────────────────────────────"
+
+t_c=$(bench "C" "./primes/primes_c")
+t_rs=$(bench "Rust" "./primes/primes_rs")
+t_cs=$(bench "C#" "./primes/primes_cs")
+t_jv=$(bench "Java" "java -cp primes primes")
+t_py=$(bench "Python" "python3 primes/primes.py" 2 3)
+t_kl=$(bench "Kyle" "./primes/primes_ky")
+printf "│  %-22s %4sms %5sms %5sms %5sms %6sms %5sms\n" "Prime Sieve (1M)" "$t_c" "$t_rs" "$t_cs" "$t_jv" "$t_py" "$t_kl"
+
+echo "├──────────────────────────────────────────────────────────────"
+
+t_c=$(bench "C" "./fib/fib_c")
+t_rs=$(bench "Rust" "./fib/fib_rs")
+t_cs=$(bench "C#" "dotnet exec ./fib/fib_cs.dll")
+t_jv=$(bench "Java" "java -cp ./fib fib")
+t_py=$(bench "Python" "python3 ./fib/fib.py" 2 3)
+t_kl=$(bench "Kyle" "./fib/fib_ky")
+printf "│  %-22s %4sms %5sms %5sms %5sms %6sms %5sms\n" "Fibonacci (10M)" "$t_c" "$t_rs" "$t_cs" "$t_jv" "$t_py" "$t_kl"
+
+echo "├──────────────────────────────────────────────────────────────"
+
+t_c=$(bench "C" "./concat/concat_c" 2 5)
+t_rs=$(bench "Rust" "./concat/concat_rs" 2 5)
+t_cs=$(bench "C#" "dotnet exec ./concat/concat_cs.dll" 2 5)
+t_jv=$(bench "Java" "java -cp ./concat concat" 2 5)
+t_py=$(bench "Python" "python3 ./concat/concat.py" 2 3)
+t_kl=$(bench "Kyle" "./concat/concat_ky" 2 5)
+printf "│  %-22s %4sms %5sms %5sms %5sms %6sms %5sms\n" "String Concat (50k)" "$t_c" "$t_rs" "$t_cs" "$t_jv" "$t_py" "$t_kl"
+
+echo "└──────────────────────────────────────────────────────────────"
