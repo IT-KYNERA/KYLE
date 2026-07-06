@@ -26,3 +26,9 @@ fib_cs
 concat_cs
 primes_cs
 prime_cs
+csharp_bench*
+*.dll
+*.deps.json
+*.runtimeconfig.json
+*.pdb
+prime_cs

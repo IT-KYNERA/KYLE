@@ -1,9 +1,9 @@
 fn main() i32:
-    n := 3000000
-    sieve := []
+    n := 100000
+    sieve: [i32; 100001] = []
     i: &i64 = 0
     while i <= n:
-        sieve.push(0)
+        sieve[i] = 0
         i = i + 1
     count: &i32 = 0
     i2: &i64 = 2
@@ -15,5 +15,5 @@ fn main() i32:
                 sieve[j] = 1
                 j = j + i2
         i2 = i2 + 1
-    println("Primes: " + str(count))
+    println(str(count))
     0

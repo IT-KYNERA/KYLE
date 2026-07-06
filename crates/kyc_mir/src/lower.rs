@@ -2420,6 +2420,50 @@ impl Lowerer {
 
     fn lower_expr(&self, mut ctx: LowerCtx, expr: &Expr) -> LowerCtx {
         match expr {
+            Expr::Array { elements, .. } => {
+                if elements.is_empty() {
+                    let arr_local = ctx.alloc_local("_arr", MirType::Array(Box::new(MirType::I32), 0));
+                    let arr_val = ctx.alloc_local("_arrv", MirType::Array(Box::new(MirType::I32), 0));
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: arr_val,
+                        src: arr_local,
+                    });
+                    return ctx;
+                }
+                let mut elem_locals = Vec::new();
+                for elem in elements {
+                    ctx = self.lower_expr(ctx, elem);
+                    elem_locals.push(ctx.next_local - 1);
+                }
+                let elem_type = ctx.local_types.get(&elem_locals[0]).cloned()
+                    .unwrap_or(MirType::I32);
+                let size = elem_locals.len();
+                let arr_type = MirType::Array(Box::new(elem_type.clone()), size);
+                let arr_local = ctx.alloc_local("_arr", arr_type.clone());
+                // Store each element into the array via computed GEP
+                for (i, &elem_local) in elem_locals.iter().enumerate() {
+                    let idx_val = MirValue::Constant(MirConstant::I32(i as i32));
+                    let elem_ptr = ctx.alloc_local("_aeptr", elem_type.clone());
+                    ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                        dest: elem_ptr,
+                        ptr: arr_local,
+                        index: idx_val,
+                        arr_type: Box::new(arr_type.clone()),
+                        elem_type: Box::new(elem_type.clone()),
+                    });
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: elem_ptr,
+                        value: MirValue::Local(elem_local),
+                    });
+                }
+                // Load the array value from alloca so assignment can store it
+                let arr_val = ctx.alloc_local("_arrv", arr_type.clone());
+                ctx.current_block.insts.push(MirInst::Load {
+                    dest: arr_val,
+                    src: arr_local,
+                });
+                ctx
+            }
             Expr::Literal { value, .. } => {
                 let (mir_type, constant) = match value {
                     Literal::Integer(n) => (MirType::I32, MirConstant::I32(*n as i32)),
@@ -2607,8 +2651,30 @@ impl Lowerer {
                         ctx = self.lower_expr(ctx, index);
                         let idx_val = ctx.next_local - 1;
                         let target_type = ctx.local_types.get(&target_val).cloned();
+                        // Array set: arr[i] = val → ArrayElemPtr + Store
+                        if matches!(&target_type, Some(MirType::Array(_, _))) {
+                            ctx = self.lower_expr(ctx, right);
+                            if let Some(MirType::Array(ref inner_box, _)) = target_type {
+                                let et = inner_box.as_ref().clone();
+                                let arr_ty_clone = target_type.clone().unwrap();
+                                let elem_ptr = ctx.alloc_local("_aelem_ptr", MirType::Ptr(Box::new(MirType::I8)));
+                                ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                                    dest: elem_ptr,
+                                    ptr: target_val,
+                                    index: MirValue::Local(idx_val),
+                                    arr_type: Box::new(arr_ty_clone),
+                                    elem_type: Box::new(et),
+                                });
+                                let val_local2 = ctx.next_local - 1;
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: elem_ptr,
+                                    value: MirValue::Local(val_local2),
+                                });
+                            }
+                            return ctx;
+                        }
                         // Dict set: dict["key"] = val → kl_dict_set
-                        if matches!(target_type, Some(MirType::Dict(_, _))) {
+                        if matches!(&target_type, Some(MirType::Dict(_, _))) {
                             ctx = self.lower_expr(ctx, right);
                             let val_local = ctx.next_local - 1;
                             let val_i64 = ctx.alloc_local("_dict_val", MirType::I64);
@@ -2706,7 +2772,50 @@ impl Lowerer {
                 if matches!(operator, BinaryOp::Assign) {
                     ctx = self.lower_expr(ctx, right);
                     let val_local = ctx.next_local - 1;
-                    if let Expr::Identifier { name, .. } = left.as_ref() {
+                    if let Expr::Index { target: list_expr, index, .. } = left.as_ref() {
+                        // array[index] = value or list[index] = value or dict[key] = value
+                        ctx = self.lower_expr(ctx, list_expr);
+                        let target_val = ctx.next_local - 1;
+                        let target_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I32);
+                        ctx = self.lower_expr(ctx, index);
+                        let idx_val = ctx.next_local - 1;
+                        ctx = self.lower_expr(ctx, right);
+                        let val_local2 = ctx.next_local - 1;
+                        if matches!(&target_type, MirType::Array(_, _)) {
+                            let arr_ty_clone = target_type.clone();
+                            let et = match &target_type {
+                                MirType::Array(inner_box, _) => { inner_box.as_ref().clone() },
+                                _ => MirType::I32,
+                            };
+                            let elem_ptr = ctx.alloc_local("_aelem_ptr", MirType::Ptr(Box::new(MirType::I8)));
+                            ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                                dest: elem_ptr,
+                                ptr: target_val,
+                                index: MirValue::Local(idx_val),
+                                arr_type: Box::new(arr_ty_clone),
+                                elem_type: Box::new(et),
+                            });
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: elem_ptr,
+                                value: MirValue::Local(val_local2),
+                            });
+                        } else if matches!(&target_type, MirType::Dict(_, _)) {
+                            let val_i64 = ctx.alloc_local("_val64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast { dest: val_i64, value: MirValue::Local(val_local2), to_type: MirType::I64 });
+                            let key_arg = if ctx.local_types.get(&idx_val).map(|t| *t == MirType::Str).unwrap_or(false) {
+                                MirValue::Local(idx_val)
+                            } else {
+                                MirValue::Local(idx_val)
+                            };
+                            ctx.current_block.insts.push(MirInst::Call { dest: None, name: "ky_dict_set".to_string(), args: vec![MirValue::Local(target_val), key_arg, MirValue::Local(val_i64)] });
+                        } else {
+                            let idx_i64 = ctx.alloc_local("_idx64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast { dest: idx_i64, value: MirValue::Local(idx_val), to_type: MirType::I64 });
+                            let val_i64 = ctx.alloc_local("_val64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast { dest: val_i64, value: MirValue::Local(val_local2), to_type: MirType::I64 });
+                            ctx.current_block.insts.push(MirInst::Call { dest: None, name: "ky_list_set".to_string(), args: vec![MirValue::Local(target_val), MirValue::Local(idx_i64), MirValue::Local(val_i64)] });
+                        }
+                    } else if let Expr::Identifier { name, .. } = left.as_ref() {
                         if let Some(local) = ctx.locals.get(name) {
                             ctx.current_block.insts.push(MirInst::Store {
                                 dest: *local,
@@ -4573,7 +4682,29 @@ impl Lowerer {
                         to_type: MirType::I64,
                     });
 
-                    if matches!(&target_type, MirType::Dict(_, _)) {
+                    if matches!(&target_type, MirType::Array(_, _)) {
+                        let arr_ty_clone = target_type.clone();
+                        let et = match &target_type {
+                            MirType::Array(inner_box, _) => {
+                                match inner_box.as_ref() {
+                                    t => t.clone(),
+                                }
+                            },
+                            _ => MirType::I32,
+                        };
+                        let elem_ptr = ctx.alloc_local("_aelem_ptr", MirType::Ptr(Box::new(MirType::I8)));
+                        ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                            dest: elem_ptr,
+                            ptr: target_val,
+                            index: MirValue::Local(idx_val),
+                            arr_type: Box::new(arr_ty_clone),
+                            elem_type: Box::new(et),
+                        });
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: elem_ptr,
+                            value: MirValue::Local(val_local),
+                        });
+                    } else if matches!(&target_type, MirType::Dict(_, _)) {
                         let key_arg = if let MirValue::Local(id) = MirValue::Local(idx_val) {
                             if ctx.local_types.get(&id).map(|t| *t == MirType::Str).unwrap_or(false) {
                                 MirValue::Local(id)
@@ -5253,6 +5384,23 @@ impl Lowerer {
                         ],
                     });
                     ctx.string_locals.push(result);
+                    return ctx;
+                }
+                if matches!(&target_type, MirType::Array(_, _)) {
+                    let et = match &target_type { MirType::Array(e, _) => *(e.clone()), _ => MirType::I32 };
+                    let elem_ptr = ctx.alloc_local("_aelem_ptr", MirType::Ptr(Box::new(MirType::I8)));
+                    ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                        dest: elem_ptr,
+                        ptr: target_val,
+                        index: MirValue::Local(index_val),
+                        arr_type: Box::new(target_type.clone()),
+                        elem_type: Box::new(et.clone()),
+                    });
+                    let loaded = ctx.alloc_local("_aelem_val", et);
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: loaded,
+                        src: elem_ptr,
+                    });
                     return ctx;
                 }
                 if let MirType::Dict(_, v) = &target_type {
@@ -6477,7 +6625,7 @@ fn mir_type_to_type_name(t: &MirType) -> String {
         MirType::List(inner) => format!("list<{}>", mir_type_to_type_name(inner)),
         MirType::Struct(name, _) => name.clone(),
         MirType::Dict(k, v) => format!("dict<{},{}>", mir_type_to_type_name(k), mir_type_to_type_name(v)),
-        MirType::Array(inner) => format!("[{}]", mir_type_to_type_name(inner)),
+        MirType::Array(inner, _size) => format!("[{}]", mir_type_to_type_name(inner)),
     }
 }
 
@@ -6491,7 +6639,7 @@ fn mir_type_to_kind(t: &MirType) -> String {
         MirType::List(_) => "list".into(),
         MirType::Struct(_, _) => "struct".into(),
         MirType::Dict(_, _) => "dict".into(),
-        MirType::Array(_) => "array".into(),
+        MirType::Array(_, _) => "array".into(),
     }
 }
 
@@ -6511,7 +6659,7 @@ fn mir_type_to_size(t: &MirType) -> i32 {
             // Estimate size: sum of field sizes (approximately, without padding)
             fields.iter().map(|(_, ft)| mir_type_to_size(ft) as i32).sum()
         }
-        MirType::Array(inner) => mir_type_to_size(inner) * 8, // rough estimate
+        MirType::Array(inner, _) => mir_type_to_size(inner) * 8, // rough estimate
     }
 }
 
@@ -6532,7 +6680,7 @@ fn mir_type_to_string(t: &MirType) -> String {
         MirType::List(inner) => format!("list_{}", mir_type_to_string(inner)),
         MirType::Struct(n, _) => n.clone(),
         MirType::I1 => "i1".into(),
-        MirType::Array(inner) => format!("arr_{}", mir_type_to_string(inner)),
+        MirType::Array(inner, _) => format!("arr_{}", mir_type_to_string(inner)),
         MirType::Dict(key, val) => format!("dict_{}_{}", mir_type_to_string(key), mir_type_to_string(val)),
     }
 }
@@ -6709,9 +6857,9 @@ fn mir_type_to_ast_type(t: &MirType, _span: kyc_core::span::Span) -> AstType {
             span: _span,
         },
         MirType::I1 => AstType::Primitive { name: "bool".into(), span: _span },
-        MirType::Array(inner) => AstType::Generic {
-            name: "list".into(),
-            args: vec![mir_type_to_ast_type(inner, _span)],
+        MirType::Array(inner, size) => AstType::Array {
+            inner: Box::new(mir_type_to_ast_type(inner, _span)),
+            size: *size,
             span: _span,
         },
     }
@@ -6780,6 +6928,11 @@ fn substitute_ast_type(ast: &AstType, subst: &std::collections::HashMap<String, 
             }
         }
         AstType::Ptr { span } => AstType::Ptr { span: *span },
+        AstType::Array { inner, size, span, .. } => AstType::Array {
+            inner: Box::new(substitute_ast_type(inner, subst)),
+            size: *size,
+            span: *span,
+        },
     }
 }
 
@@ -6984,6 +7137,7 @@ fn ast_type_to_mir_with_subst(
         AstType::Mutable { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
         AstType::Move { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
+        AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir_with_subst(inner, struct_defs, subst)), *size),
     }
 }
 
@@ -7145,5 +7299,6 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
         AstType::Mutable { inner, .. } => ast_type_to_mir(inner, struct_defs),
         AstType::Move { inner, .. } => ast_type_to_mir(inner, struct_defs),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
+        AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir(inner, struct_defs)), *size),
     }
 }

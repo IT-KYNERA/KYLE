@@ -914,6 +914,10 @@ impl TypeChecker {
                 if elements.is_empty() { return Type::List(Box::new(Type::I32)); }
                 Type::List(Box::new(self.infer_expr(&elements[0])))
             }
+            Expr::Array { elements, .. } => {
+                for e in elements { self.infer_expr(e); }
+                Type::Array(Box::new(Type::I32), elements.len())
+            }
             Expr::Dictionary { entries, .. } => {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }
                 let first_type = self.infer_expr(&entries[0].1);
@@ -1144,16 +1148,22 @@ impl TypeChecker {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,
+            AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
         }
     }
 
     fn types_match(&self, a: &Type, b: &Type) -> bool {
         if a == b { return true; }
-        matches!((a, b),
-            (Type::I32, Type::I64) | (Type::I64, Type::I32) |
-            (Type::F32, Type::F64) | (Type::F64, Type::F32) |
-            (Type::I8, Type::I16) | (Type::I16, Type::I8)
-        )
+        match (a, b) {
+            (Type::I32, Type::I64) | (Type::I64, Type::I32) => return true,
+            (Type::F32, Type::F64) | (Type::F64, Type::F32) => return true,
+            (Type::I8, Type::I16) | (Type::I16, Type::I8) => return true,
+            // Empty array [] matches any [T; N] (zero-init)
+            (Type::Array(ia, 0), Type::Array(_, _)) |
+            (Type::Array(_, _), Type::Array(ia, 0)) if **ia == Type::I32 => return true,
+            _ => {}
+        }
+        false
     }
 }
 

@@ -195,6 +195,12 @@ impl Formatter {
             AstType::Ptr { .. } => {
                 out.push_str("ptr");
             }
+            AstType::Array { inner, size, .. } => {
+                out.push('[');
+                self.write_type(out, inner);
+                write!(out, "; {}", size).unwrap();
+                out.push(']');
+            }
         }
     }
 
@@ -701,13 +707,21 @@ impl Formatter {
                     }
                 }
             }
-            Expr::List { elements, .. } => {
+            Expr::Array { elements, .. } => {
                 out.push('[');
                 for (i, e) in elements.iter().enumerate() {
                     if i > 0 { out.push_str(", "); }
                     self.write_expr(out, e);
                 }
                 out.push(']');
+            }
+            Expr::List { elements, .. } => {
+                out.push('{');
+                for (i, e) in elements.iter().enumerate() {
+                    if i > 0 { out.push_str(", "); }
+                    self.write_expr(out, e);
+                }
+                out.push('}');
             }
             Expr::Dictionary { entries, .. } => {
                 out.push('{');
@@ -912,6 +926,7 @@ fn expr_span(expr: &Expr) -> kyc_core::span::Span {
         Expr::ErrorProp { span, .. } => *span,
         Expr::Index { span, .. } => *span,
         Expr::List { span, .. } => *span,
+        Expr::Array { span, .. } => *span,
         Expr::Dictionary { span, .. } => *span,
         Expr::Tuple { span, .. } => *span,
         Expr::Closure { span, .. } => *span,

@@ -634,6 +634,11 @@ impl Optimizer {
                         used.insert(*dest);
                         used.insert(*ptr);
                     }
+                    MirInst::ArrayElemPtr { dest, ptr, index, .. } => {
+                        used.insert(*dest);
+                        used.insert(*ptr);
+                        Self::collect_value_refs(index, &mut used);
+                    }
                     MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
                         used.insert(*dest_ptr_local);
                         used.insert(*src_alloca_local);

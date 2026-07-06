@@ -199,6 +199,10 @@ fn desugar_expr(expr: &Expr) -> Expr {
             elements: elements.iter().map(desugar_expr).collect(),
             span: span.clone(),
         },
+        Expr::Array { elements, span } => Expr::Array {
+            elements: elements.into_iter().map(desugar_expr).collect(),
+            span: span.clone(),
+        },
         Expr::Tuple { elements, span } => Expr::Tuple {
             elements: elements.iter().map(desugar_expr).collect(),
             span: span.clone(),

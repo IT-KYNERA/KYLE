@@ -59,6 +59,8 @@ pub enum SsaInst {
     PtrStore { ptr: usize, index: SsaValueId, value: SsaValueId },
     /// Get pointer to struct field (non-promotable)
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
+    /// Get pointer to array element (non-promotable)
+    ArrayElemPtr { dest: usize, ptr: usize, index: SsaValueId, arr_type: Box<MirType>, elem_type: Box<MirType> },
     /// Copy struct memory (non-promotable)
     Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
     /// Allocate stack space (non-promotable)
@@ -436,6 +438,21 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                 MirInst::FieldPtr { dest, ptr, field_index, struct_type } => {
                     ssa_block.insts.push(SsaInst::FieldPtr { dest: *dest, ptr: *ptr, field_index: *field_index, struct_type: struct_type.clone() });
                 }
+                MirInst::ArrayElemPtr { dest, ptr, index, arr_type, elem_type } => {
+                    let index_id = match index {
+                        MirValue::Local(id) => alloca_current.get(id).copied().unwrap_or(*id),
+                        MirValue::Param(id) => param_value_ids.get(*id).copied().unwrap_or(*id),
+                        MirValue::Constant(_) => {
+                            let val_id = ssa.values.len();
+                            ssa.values.push(SsaValue {
+                                type_: MirType::I32, name: format!("_idx{}", *dest)
+                            });
+                            stacks.entry(*dest).or_default().push(val_id);
+                            val_id
+                        }
+                    };
+                    ssa_block.insts.push(SsaInst::ArrayElemPtr { dest: *dest, ptr: *ptr, index: index_id, arr_type: arr_type.clone(), elem_type: elem_type.clone() });
+                }
                 MirInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
                     ssa_block.insts.push(SsaInst::Memcpy { dest_ptr_local: *dest_ptr_local, src_alloca_local: *src_alloca_local, struct_type: struct_type.clone() });
                 }
@@ -679,6 +696,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                     }
                 }
                 MirInst::FieldPtr { ptr, .. } => { escaped.insert(*ptr); }
+                MirInst::ArrayElemPtr { ptr, .. } => { escaped.insert(*ptr); }
                 MirInst::PtrOffset { ptr, .. } => { escaped.insert(*ptr); }
                 MirInst::PtrStore { ptr, .. } => { escaped.insert(*ptr); }
                 MirInst::Memcpy { .. } => {

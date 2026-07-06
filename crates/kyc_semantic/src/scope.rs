@@ -295,6 +295,9 @@ impl ScopeResolver {
             Expr::List { elements, .. } => {
                 for e in elements { self.resolve_expr(e); }
             }
+            Expr::Array { elements, .. } => {
+                for e in elements { self.resolve_expr(e); }
+            }
             Expr::Dictionary { entries, .. } => {
                 for (_, v) in entries { self.resolve_expr(v); }
             }
@@ -402,6 +405,7 @@ impl ScopeResolver {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,
+            AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
         }
     }
 }

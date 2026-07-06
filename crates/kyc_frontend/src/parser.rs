@@ -515,7 +515,7 @@ impl Parser {
             if self.at(TokenKind::Newline) { self.advance(); continue; }
             // Constructor: `Name(params):`
             if self.at_identifier() {
-                let name = self.eat_identifier();
+        let name = self.eat_identifier();
                 // Check for constructor: identifier followed by '('
                 if self.at(TokenKind::LParen) {
                     let constructor_start = self.pos;
@@ -811,12 +811,18 @@ impl Parser {
         if self.at(TokenKind::LBracket) {
             self.advance();
             let inner = self.parse_type()?;
+            if self.at(TokenKind::Semicolon) {
+                self.advance();
+                let size = self.parse_expr()?;  // parse integer expression for size
+                let size_val = if let Expr::Literal { value: Literal::Integer(n), .. } = &size {
+                    *n as usize
+                } else { 0 };
+                self.expect(TokenKind::RBracket)?;
+                return Ok(AstType::Array { inner: Box::new(inner), size: size_val, span: self.span_from(start) });
+            }
             self.expect(TokenKind::RBracket)?;
-            return Ok(AstType::Generic {
-                name: "list".to_string(),
-                args: vec![inner],
-                span: self.span_from(start),
-            });
+            // [T] sin ; N ya no es válido — usa {T} para lista o [T; N] para array
+            return Err("[T] no es válido. Usa {T} para lista o [T; N] para array".to_string());
         }
         // Handle function pointer type: fn(T, U) V
         if self.at(TokenKind::Fn) {
@@ -870,6 +876,19 @@ impl Parser {
                 args: elems,
                 span: self.span_from(start),
             });
+        }
+        // Handle {T} (list type) or {K: V} (dict type)
+        if self.at(TokenKind::LBrace) {
+            self.advance();
+            let inner = self.parse_type()?;
+            if self.at(TokenKind::Colon) {
+                self.advance();
+                let val_type = self.parse_type()?;
+                self.expect(TokenKind::RBrace)?;
+                return Ok(AstType::Dict { key: Box::new(inner), value: Box::new(val_type), span: self.span_from(start) });
+            }
+            self.expect(TokenKind::RBrace)?;
+            return Ok(AstType::Generic { name: "list".to_string(), args: vec![inner], span: self.span_from(start) });
         }
         let name = self.eat_identifier();
         if name.is_empty() {
@@ -1157,25 +1176,52 @@ impl Parser {
                     if self.at(TokenKind::Comma) { self.advance(); }
                 }
                 self.expect(TokenKind::RBracket)?;
-                Expr::List { elements, span: self.span_from(start) }
+                Expr::Array { elements, span: self.span_from(start) }
             }
             TokenKind::LBrace => {
+                let start = self.pos;
                 self.advance();
-                let mut entries = Vec::new();
-                while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
-                    let key = if let Ok(tok) = self.current() {
-                        match &tok.kind {
-                            TokenKind::String(s) => { let val = s.clone(); self.advance(); val }
-                            _ => self.eat_identifier()
+                // {} → dict vacío (backward compatible)
+                if self.at(TokenKind::RBrace) {
+                    self.advance();
+                    Expr::Dictionary { entries: vec![], span: self.span_from(start) }
+                } else {
+                    // Lookahead: después del primer elemento, ¿hay : o ,/}?
+                    let saved = self.pos;
+                    let first = self.parse_expr()?;
+                    if self.at(TokenKind::Colon) {
+                        // {key: val, ...} → DICT
+                        self.pos = saved;
+                        let mut entries = Vec::new();
+                        loop {
+                            if self.at(TokenKind::RBrace) { break; }
+                            let key = if let Ok(tok) = self.current() {
+                                match &tok.kind {
+                                    TokenKind::String(s) => { let val = s.clone(); self.advance(); val }
+                                    _ => self.eat_identifier()
+                                }
+                            } else { String::new() };
+                            self.expect(TokenKind::Colon)?;
+                            let value = self.parse_expr()?;
+                            entries.push((key, value));
+                            if self.at(TokenKind::Comma) { self.advance(); }
+                            else { break; }
                         }
-                    } else { String::new() };
-                    self.expect(TokenKind::Colon)?;
-                    let value = self.parse_expr()?;
-                    entries.push((key, value));
-                    if self.at(TokenKind::Comma) { self.advance(); }
+                        self.expect(TokenKind::RBrace)?;
+                        Expr::Dictionary { entries, span: self.span_from(start) }
+                    } else {
+                        // {val, val, ...} → LIST
+                        self.pos = saved;
+                        let mut elements = vec![self.parse_expr()?];
+                        while self.at(TokenKind::Comma) {
+                            self.advance();
+                            if self.at(TokenKind::RBrace) { break; }
+                            elements.push(self.parse_expr()?);
+                        }
+                        self.expect(TokenKind::RBrace)?;
+                        Expr::List { elements, span: self.span_from(start) }
+                    }
                 }
-                self.expect(TokenKind::RBrace)?;
-                Expr::Dictionary { entries, span: self.span_from(start) }
             }
             TokenKind::Async => {
                 self.advance();

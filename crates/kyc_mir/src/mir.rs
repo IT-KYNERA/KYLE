@@ -36,7 +36,7 @@ pub enum MirType {
     Str,
     Void,
     Ptr(Box<MirType>),
-    Array(Box<MirType>),
+    Array(Box<MirType>, usize),
     List(Box<MirType>),
     /// A struct type with name, field names, and field types.
     Struct(String, Vec<(String, MirType)>),
@@ -80,6 +80,8 @@ pub enum MirInst {
     PtrStore { dest: usize, ptr: usize, index: MirValue, value: MirValue },
     /// Get pointer to a struct field by index.
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
+    /// Get pointer to an array element by index: dest = GEP(ptr, 0, index)
+    ArrayElemPtr { dest: usize, ptr: usize, index: MirValue, arr_type: Box<MirType>, elem_type: Box<MirType> },
     /// Cast between types.
     Cast { dest: usize, value: MirValue, to_type: MirType },
     /// Copy struct value from a local alloca to a heap pointer (i64).
@@ -159,7 +161,7 @@ pub fn is_move_type(t: &MirType) -> bool {
         MirType::Str => true,
         MirType::List(_) => true,
         MirType::Dict(_, _) => true,
-        MirType::Array(_) => true,
+        MirType::Array(_, _) => true,
         // Struct is NOT heap-allocated — it's a value type on the stack.
         // Excluding it from Move prevents kl_free of stack addresses (crash).
         // String fields inside structs are tracked independently.
@@ -205,7 +207,7 @@ impl fmt::Display for MirType {
             MirType::Str => write!(f, "str"),
             MirType::Void => write!(f, "void"),
             MirType::Ptr(inner) => write!(f, "{}*", inner),
-            MirType::Array(inner) => write!(f, "[{}]", inner),
+            MirType::Array(inner, size) => write!(f, "[{}; {}]", inner, size),
             MirType::List(inner) => write!(f, "list<{}>", inner),
             MirType::Struct(name, fields) => {
                 write!(f, "{} {{ ", name)?;
@@ -310,6 +312,9 @@ impl fmt::Display for MirInst {
             }
             MirInst::FieldPtr { dest, ptr, field_index, .. } => {
                 write!(f, "  %{} = field_ptr %{}, field {}", dest, ptr, field_index)
+            }
+            MirInst::ArrayElemPtr { dest, ptr, index, .. } => {
+                write!(f, "  %{} = elem_ptr %{}[{}]", dest, ptr, index)
             }
             MirInst::Cast { dest, value, to_type } => {
                 write!(f, "  %{} = cast {} to {}", dest, value, to_type)

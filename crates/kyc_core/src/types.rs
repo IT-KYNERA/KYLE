@@ -22,6 +22,7 @@ pub enum Type {
     Option(Box<Type>),
     Error(Box<Type>),
     Function(FunctionType),
+    Array(Box<Type>, usize),
     List(Box<Type>),
     Dict(Box<Type>, Box<Type>),
     Set(Box<Type>),
@@ -56,6 +57,9 @@ impl Type {
                     return_: Box::new(Type::from_ast_type(return_)),
                     fallible: false,
                 })
+            }
+            AstType::Array { inner, size, .. } => {
+                Type::Array(Box::new(Type::from_ast_type(inner)), *size)
             }
             AstType::Mutable { inner, .. } => Type::from_ast_type(inner),
             AstType::Move { inner, .. } => Type::from_ast_type(inner),
@@ -184,6 +188,7 @@ impl fmt::Display for Type {
             }
             Type::Error(inner) => write!(f, "{}!", inner),
             Type::Option(inner) => write!(f, "Option<{}>", inner),
+            Type::Array(inner, size) => write!(f, "[{}; {}]", inner, size),
             Type::List(inner) => write!(f, "list<{}>", inner),
             Type::Dict(k, v) => write!(f, "Dict<{}, {}>", k, v),
             Type::Set(inner) => write!(f, "Set<{}>", inner),

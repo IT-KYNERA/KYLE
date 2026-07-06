@@ -184,6 +184,7 @@ impl Lexer {
                 }
             }
             ',' => { self.advance(); Some(TokenKind::Comma) }
+            ';' => { self.advance(); Some(TokenKind::Semicolon) }
             ':' => {
                 self.advance();
                 if self.current() == '=' {

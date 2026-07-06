@@ -141,6 +141,7 @@ pub enum TokenKind {
     DotDotLess,     // ..<
     Comma,          // ,
     Colon,          // :
+    Semicolon,      // ;
     Arrow,          // ->
     FatArrow,       // =>
     Question,       // ?
