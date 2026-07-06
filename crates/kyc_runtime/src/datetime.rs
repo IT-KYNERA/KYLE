@@ -1,4 +1,4 @@
-use chrono::{Utc, Local, NaiveDateTime, NaiveDate, NaiveTime, Duration, Datelike, Timelike};
+use chrono::{Utc, NaiveDateTime, NaiveDate, NaiveTime, Duration, Datelike, Timelike};
 
 /// Get current UTC timestamp in milliseconds since epoch.
 #[unsafe(no_mangle)]
@@ -11,7 +11,7 @@ pub extern "C" fn ky_datetime_now() -> i64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_datetime_parse(ptr: *const u8) -> i64 {
     if ptr.is_null() { return -1; }
-    let s = unsafe { std::ffi::CStr::from_ptr(ptr as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(ptr .cast()) };
     let s = match s.to_str() {
         Ok(s) => s.trim(),
         Err(_) => return -1,
@@ -35,7 +35,7 @@ pub extern "C" fn ky_datetime_parse(ptr: *const u8) -> i64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_datetime_format(ms: i64, fmt: *const u8) -> *mut u8 {
     if fmt.is_null() { return std::ptr::null_mut(); }
-    let fmt_str = unsafe { std::ffi::CStr::from_ptr(fmt as *const i8) };
+    let fmt_str = unsafe { std::ffi::CStr::from_ptr(fmt .cast()) };
     let fmt_str = match fmt_str.to_str() {
         Ok(s) => s,
         Err(_) => return std::ptr::null_mut(),

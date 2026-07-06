@@ -5,7 +5,7 @@
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_decimal_from_str(s: *const u8) -> i64 {
     if s.is_null() { return 0; }
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s.trim(),
         Err(_) => return 0,

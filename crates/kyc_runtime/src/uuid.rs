@@ -18,7 +18,7 @@ pub extern "C" fn ky_uuid_v4() -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_uuid_parse(s: *const u8) -> *mut u8 {
     if s.is_null() { return std::ptr::null_mut(); }
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s.trim(),
         Err(_) => return std::ptr::null_mut(),

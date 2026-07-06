@@ -1,6 +1,5 @@
 use std::ffi::CString;
-use std::os::unix::io::RawFd;
-use libc::{c_int, size_t};
+use libc::size_t;
 
 pub fn open(path: &str) -> Result<i32, String> {
     let cpath = CString::new(path).map_err(|e| format!("invalid path: {}", e))?;

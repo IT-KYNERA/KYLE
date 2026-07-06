@@ -31,7 +31,7 @@ pub extern "C" fn ky_i64_to_str(val: i64) -> *const u8 {
         std::ptr::copy_nonoverlapping(s.as_ptr(), buf, alloc_len);
         *buf.add(alloc_len) = 0;
     }
-    buf as *const u8
+    buf .cast()
 }
 
 /// Convert an f64 to its string representation.
@@ -57,7 +57,7 @@ pub extern "C" fn ky_f64_to_str(val: f64) -> *const u8 {
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, len);
         *buf.add(len) = 0;
     }
-    buf as *const u8
+    buf .cast()
 }
 
 /// Parse a null-terminated C string as a signed integer (i64).
@@ -375,7 +375,7 @@ pub extern "C" fn ky_substr(s: *const u8, start: i64, count: i64) -> *const u8 {
         }
         *buf.add(len) = 0;
     }
-    buf as *const u8
+    buf .cast()
 }
 
 /// Clone a heap-allocated string.
@@ -400,7 +400,7 @@ pub extern "C" fn ky_clone_str(s: *const u8) -> *const u8 {
         }
         *buf.add(len as usize) = 0;
     }
-    buf as *const u8
+    buf .cast()
 }
 
 /// Compare two C strings for equality.
@@ -451,7 +451,7 @@ pub extern "C" fn ky_setenv(name: *const u8, value: *const u8, overwrite: i32) -
         return -1;
     }
     unsafe {
-        libc::setenv(name as *const i8, value as *const i8, overwrite)
+        libc::setenv(name .cast(), value .cast(), overwrite)
     }
 }
 
@@ -461,7 +461,7 @@ pub extern "C" fn ky_getenv(name: *const u8) -> *mut u8 {
     if name.is_null() {
         return core::ptr::null_mut();
     }
-    let c_name = unsafe { core::ffi::CStr::from_ptr(name as *const i8) };
+    let c_name = unsafe { core::ffi::CStr::from_ptr(name .cast()) };
     match std::env::var(c_name.to_str().unwrap_or("")) {
         Ok(val) => {
             let bytes = val.as_bytes();

@@ -3,7 +3,7 @@ use url::Url;
 /// Helper: parse URL string, return Url or None
 fn parse_url(s: *const u8) -> Option<Url> {
     if s.is_null() { return None; }
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = s.to_str().ok()?.trim();
     Url::parse(s).ok()
 }

@@ -20,7 +20,7 @@ pub extern "C" fn ky_date_from_ymd(year: i32, month: i32, day: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_date_parse(s: *const u8) -> i32 {
     if s.is_null() { return -1; }
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s.trim(),
         Err(_) => return -1,
@@ -74,7 +74,7 @@ pub extern "C" fn ky_date_add_days(packed: i32, days: i32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_date_format(packed: i32, fmt: *const u8) -> *mut u8 {
     if fmt.is_null() { return std::ptr::null_mut(); }
-    let fmt_str = unsafe { std::ffi::CStr::from_ptr(fmt as *const i8) };
+    let fmt_str = unsafe { std::ffi::CStr::from_ptr(fmt .cast()) };
     let fmt_str = match fmt_str.to_str() {
         Ok(s) => s,
         Err(_) => return std::ptr::null_mut(),
@@ -119,7 +119,7 @@ pub extern "C" fn ky_time_now() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_time_parse(s: *const u8) -> i32 {
     if s.is_null() { return -1; }
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s.trim(),
         Err(_) => return -1,

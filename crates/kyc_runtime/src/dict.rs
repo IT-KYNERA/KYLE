@@ -115,7 +115,7 @@ pub extern "C" fn ky_struct_to_json(ptr: *const u8, descriptor: *const u8) -> *m
     if ptr.is_null() || descriptor.is_null() {
         return std::ptr::null_mut();
     }
-    let desc = unsafe { std::ffi::CStr::from_ptr(descriptor as *const i8) };
+    let desc = unsafe { std::ffi::CStr::from_ptr(descriptor .cast()) };
     let desc_str = desc.to_str().unwrap_or("");
     if desc_str.is_empty() {
         return std::ptr::null_mut();
@@ -147,7 +147,7 @@ pub extern "C" fn ky_struct_to_json(ptr: *const u8, descriptor: *const u8) -> *m
                         if str_ptr.is_null() {
                             result.push_str("null");
                         } else {
-                            let c_str = std::ffi::CStr::from_ptr(str_ptr as *const i8);
+                            let c_str = std::ffi::CStr::from_ptr(str_ptr .cast());
                             let s = c_str.to_str().unwrap_or("");
                             result.push_str(&format!("\"{}\"", s));
                         }
@@ -214,7 +214,7 @@ pub extern "C" fn ky_json_to_struct(json: *const u8, descriptor: *const u8, out:
     if json.is_null() || descriptor.is_null() || out.is_null() {
         return -1;
     }
-    let json_cstr = unsafe { std::ffi::CStr::from_ptr(json as *const i8) };
+    let json_cstr = unsafe { std::ffi::CStr::from_ptr(json .cast()) };
     let json_str = match json_cstr.to_str() {
         Ok(s) => {
             // Debug: print first 50 chars
@@ -224,7 +224,7 @@ pub extern "C" fn ky_json_to_struct(json: *const u8, descriptor: *const u8, out:
         }
         Err(_) => return -1,
     };
-    let desc_cstr = unsafe { std::ffi::CStr::from_ptr(descriptor as *const i8) };
+    let desc_cstr = unsafe { std::ffi::CStr::from_ptr(descriptor .cast()) };
     let desc = match desc_cstr.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => return -1,

@@ -5,7 +5,7 @@ use regex::Regex;
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_regex_new(pattern: *const u8) -> *mut std::ffi::c_void {
     if pattern.is_null() { return std::ptr::null_mut(); }
-    let s = unsafe { std::ffi::CStr::from_ptr(pattern as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(pattern .cast()) };
     let s = match s.to_str() {
         Ok(s) => s,
         Err(_) => return std::ptr::null_mut(),
@@ -28,7 +28,7 @@ pub extern "C" fn ky_regex_free(re: *mut std::ffi::c_void) {
 pub extern "C" fn ky_regex_is_match(re: *mut std::ffi::c_void, s: *const u8) -> i32 {
     if re.is_null() || s.is_null() { return -1; }
     let re = unsafe { &*(re as *const Regex) };
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s,
         Err(_) => return -1,
@@ -41,7 +41,7 @@ pub extern "C" fn ky_regex_is_match(re: *mut std::ffi::c_void, s: *const u8) -> 
 pub extern "C" fn ky_regex_find(re: *mut std::ffi::c_void, s: *const u8) -> *mut u8 {
     if re.is_null() || s.is_null() { return std::ptr::null_mut(); }
     let re = unsafe { &*(re as *const Regex) };
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s,
         Err(_) => return std::ptr::null_mut(),
@@ -68,12 +68,12 @@ pub extern "C" fn ky_regex_find(re: *mut std::ffi::c_void, s: *const u8) -> *mut
 pub extern "C" fn ky_regex_replace(re: *mut std::ffi::c_void, s: *const u8, with: *const u8) -> *mut u8 {
     if re.is_null() || s.is_null() || with.is_null() { return std::ptr::null_mut(); }
     let re = unsafe { &*(re as *const Regex) };
-    let s = unsafe { std::ffi::CStr::from_ptr(s as *const i8) };
+    let s = unsafe { std::ffi::CStr::from_ptr(s .cast()) };
     let s = match s.to_str() {
         Ok(s) => s,
         Err(_) => return std::ptr::null_mut(),
     };
-    let with = unsafe { std::ffi::CStr::from_ptr(with as *const i8) };
+    let with = unsafe { std::ffi::CStr::from_ptr(with .cast()) };
     let with = match with.to_str() {
         Ok(w) => w,
         Err(_) => return std::ptr::null_mut(),

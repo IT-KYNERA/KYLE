@@ -164,7 +164,7 @@ pub extern "C" fn ky_base64_encode(data: *const u8, data_len: i32) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_ws_accept(key: *const u8) -> *mut u8 {
     if key.is_null() { return std::ptr::null_mut(); }
-    let key_str = unsafe { std::ffi::CStr::from_ptr(key as *const i8) }
+    let key_str = unsafe { std::ffi::CStr::from_ptr(key .cast()) }
         .to_str().unwrap_or("");
     let concat = format!("{}258EAFA5-E914-47DA-95CA-C5AB0DC85B11", key_str);
     let hash = ring::digest::digest(&ring::digest::SHA1_FOR_LEGACY_USE_ONLY, concat.as_bytes());
