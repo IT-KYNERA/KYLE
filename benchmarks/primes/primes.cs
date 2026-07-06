@@ -2,17 +2,15 @@ using System;
 
 class Primes {
     static void Main() {
-        int n = 1_000_000;
+        int n = 3000000;
+        byte[] sieve = new byte[n + 1];
         int count = 0;
         for (int i = 2; i <= n; i++) {
-            bool isPrime = true;
-            for (int j = 2; j * j <= i; j++) {
-                if (i % j == 0) {
-                    isPrime = false;
-                    break;
-                }
+            if (sieve[i] == 0) {
+                count++;
+                for (int j = i + i; j <= n; j += i)
+                    sieve[j] = 1;
             }
-            if (isPrime) count++;
         }
         Console.WriteLine("Primes: " + count);
     }
