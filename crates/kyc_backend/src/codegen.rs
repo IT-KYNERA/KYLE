@@ -580,15 +580,27 @@ impl<'ctx> Codegen<'ctx> {
                                 let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum<'ctx>> = args.iter()
                                     .enumerate().map(|(i, a)| {
                                         let v = ssa_read!(*a);
-                                        // Auto-cast i64 → ptr when callee expects ptr
                                         if i < param_tys.len() {
-                                            if let inkwell::types::BasicMetadataTypeEnum::PointerType(_) = param_tys[i] {
-                                                if let BasicValueEnum::IntValue(iv) = v {
-                                                    let ptr_ty = self.context.ptr_type(Default::default());
-                                                    if let Ok(pv) = self.builder.build_int_to_ptr(iv, ptr_ty, "_aptr") {
-                                                        return pv.into();
+                                            match param_tys[i] {
+                                                inkwell::types::BasicMetadataTypeEnum::PointerType(_) => {
+                                                    if let BasicValueEnum::IntValue(iv) = v {
+                                                        let ptr_ty = self.context.ptr_type(Default::default());
+                                                        if let Ok(pv) = self.builder.build_int_to_ptr(iv, ptr_ty, "_aptr") {
+                                                            return pv.into();
+                                                        }
                                                     }
                                                 }
+                                                inkwell::types::BasicMetadataTypeEnum::IntType(it) if it.get_bit_width() > 32 => {
+                                                    if let BasicValueEnum::IntValue(iv) = v {
+                                                        let vw = iv.get_type().get_bit_width();
+                                                        if vw < it.get_bit_width() {
+                                                            if let Ok(ext) = self.builder.build_int_s_extend(iv, it, "_ssac") {
+                                                                return ext.into();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                _ => {}
                                             }
                                         }
                                         v.into()
@@ -2774,6 +2786,18 @@ impl<'ctx> Codegen<'ctx> {
             })
         } else {
             let li = to_int(l); let ri = to_int(r);
+            // Auto-widen mismatched integer widths
+            let lw = li.get_type().get_bit_width();
+            let rw = ri.get_type().get_bit_width();
+            let widen = |val: inkwell::values::IntValue<'ctx>, target_w: u32| -> Option<inkwell::values::IntValue<'ctx>> {
+                let ty = match target_w { 8 => self.context.i8_type(), 16 => self.context.i16_type(), 32 => self.context.i32_type(), 64 => self.context.i64_type(), _ => return None };
+                self.builder.build_int_s_extend(val, ty, "_ssaw").ok()
+            };
+            let (li, ri) = if lw < rw {
+                (widen(li, rw).unwrap_or(li), ri)
+            } else if rw < lw {
+                (li, widen(ri, lw).unwrap_or(ri))
+            } else { (li, ri) };
             Ok(match op {
                 MirBinaryOp::Add => self.int_nsw_nuw_add(li, ri).map_err(|e| format!("iadd: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Sub => self.int_nsw_nuw_sub(li, ri).map_err(|e| format!("isub: {}", e))?.as_basic_value_enum(),
