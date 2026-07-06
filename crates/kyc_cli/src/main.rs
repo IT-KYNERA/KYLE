@@ -489,22 +489,30 @@ fn cmd_fmt(args: &[String]) {
 }
 
 fn cmd_new(args: &[String]) {
-    if args.len() < 3 {
+    let mut project_type = "app";
+    let mut project_name_arg: &str;
+
+    if args.len() == 4 {
+        // ky new <type> <name>
+        project_type = &args[2];
+        project_name_arg = &args[3];
+    } else if args.len() >= 3 {
+        // ky new <name>
+        project_name_arg = &args[2];
+        // Check if the first arg is actually a type keyword
+        let first = &args[2];
+        if first == "api" || first == "bare" {
+            eprintln!("Error: missing project name for type '{}'", first);
+            eprintln!("Usage: {} new {} <project>", bin_name(), first);
+            process::exit(1);
+        }
+    } else {
         eprintln!("Error: missing project name");
         eprintln!("Usage: {} new [type] <project>", bin_name());
         eprintln!("Types: app  — standard project (default)");
         eprintln!("       api  — HTTP API server project");
         eprintln!("       bare — single script file, no main");
         process::exit(1);
-    }
-
-    let mut project_type = "app";
-    let mut project_name_arg: &str;
-    if args.len() >= 4 {
-        project_type = &args[2];
-        project_name_arg = &args[3];
-    } else {
-        project_name_arg = &args[2];
     }
 
     let project_dir = Path::new(project_name_arg);
