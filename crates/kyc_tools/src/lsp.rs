@@ -214,6 +214,146 @@ impl LanguageServer {
         });
     }
 
+    /// Parse a file, resolve its imports, and run semantic analysis.
+    /// Returns the resolved program, analyzer, and the file name.
+    fn resolve_and_analyze(&self, uri: &str, source: &str) -> Option<(Program, kyc_semantic::analyzer::SemanticAnalyzer, String)> {
+        let mut lexer = kyc_frontend::lexer::Lexer::new(source);
+        let tokens = lexer.tokenize();
+        let mut parser = kyc_frontend::parser::Parser::new(tokens);
+        let mut program = parser.parse().ok()?;
+        let file_name = uri.trim_start_matches("file://");
+
+        let base_dir = PathBuf::from(file_name)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."));
+        let mut resolver = ModuleResolver::new();
+        resolver.set_source_dir(base_dir.clone());
+        resolver.add_search_path(base_dir.clone());
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let src_dir = project_root.join("src");
+            if src_dir.exists() && src_dir != base_dir {
+                resolver.add_search_path(src_dir);
+            }
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            let std_path = cwd.join("std");
+            if std_path.exists() { resolver.add_search_path(std_path); }
+            let pkg_path = cwd.join("packages");
+            if pkg_path.exists() { resolver.add_search_path(pkg_path); }
+        }
+        let local_std = base_dir.join("std");
+        if local_std.exists() { resolver.add_search_path(local_std); }
+        let local_pkg = base_dir.join("packages");
+        if local_pkg.exists() { resolver.add_search_path(local_pkg); }
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let lock_path = project_root.join("ky.lock");
+            if let Ok(lock) = LockFile::read(&lock_path) {
+                for entry in &lock.packages {
+                    let src_dir = package_src_dir(&entry.name, &entry.version);
+                    if src_dir.exists() { resolver.add_search_path(src_dir); }
+                }
+            }
+            if let Ok(entries) = std::fs::read_dir(crate::package::cache::cache_root()) {
+                for entry in entries.flatten() {
+                    let src_dir = entry.path().join("src");
+                    if src_dir.exists() { resolver.add_search_path(src_dir); }
+                }
+            }
+        }
+
+        // Resolve all imports
+        let mut import_decls: Vec<(usize, Vec<Decl>)> = Vec::new();
+        let mut seen_modules: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for (i, decl) in program.declarations.iter().enumerate() {
+            match decl {
+                Decl::Import(imp) => {
+                    if seen_modules.insert(imp.module_name.clone()) {
+                        if let Ok(module) = resolver.resolve_import(&imp.module_name, imp.relative) {
+                            import_decls.push((i, module.program.declarations.clone()));
+                        }
+                    }
+                }
+                Decl::FromImport(fi) => {
+                    if seen_modules.insert(fi.module_name.clone()) {
+                        if let Ok(module) = resolver.resolve_import(&fi.module_name, fi.relative) {
+                            let mut selected = Vec::new();
+                            for name in &fi.imported_names {
+                                if let Ok(decl) = resolver.get_imported_declaration(&fi.module_name, name, fi.relative) {
+                                    selected.push(decl);
+                                }
+                            }
+                            import_decls.push((i, selected));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for (idx, decls) in import_decls.into_iter().rev() {
+            if !decls.is_empty() {
+                let mut rest = program.declarations.split_off(idx + 1);
+                program.declarations.extend(decls);
+                program.declarations.append(&mut rest);
+            }
+        }
+
+        let mut source_map = kyc_core::source_map::SourceMap::new();
+        let _file_id = source_map.add(file_name.to_string(), source.to_string());
+        let mut analyzer = kyc_semantic::analyzer::SemanticAnalyzer::new()
+            .with_source(source_map, file_name.to_string());
+        analyzer.analyze(&program);
+        Some((program, analyzer, file_name.to_string()))
+    }
+
+    /// Collect all search paths where .ky modules/packages can be found.
+    fn collect_search_paths(&self, uri: &str) -> Vec<PathBuf> {
+        let file_name = uri.trim_start_matches("file://");
+        let base_dir = PathBuf::from(file_name)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."));
+        let mut paths = Vec::new();
+        paths.push(base_dir.clone());
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let src_dir = project_root.join("src");
+            if src_dir.exists() { paths.push(src_dir); }
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            let std_path = cwd.join("std");
+            if std_path.exists() { paths.push(std_path); }
+            let pkg_path = cwd.join("packages");
+            if pkg_path.exists() { paths.push(pkg_path); }
+        }
+        let local_std = base_dir.join("std");
+        if local_std.exists() { paths.push(local_std); }
+        let local_pkg = base_dir.join("packages");
+        if local_pkg.exists() { paths.push(local_pkg); }
+        if let Some(project_root) = find_project_root(&base_dir) {
+            let lock_path = project_root.join("ky.lock");
+            if let Ok(lock) = LockFile::read(&lock_path) {
+                for entry in &lock.packages {
+                    let src_dir = package_src_dir(&entry.name, &entry.version);
+                    if src_dir.exists() { paths.push(src_dir); }
+                }
+            }
+            if let Ok(entries) = std::fs::read_dir(crate::package::cache::cache_root()) {
+                for entry in entries.flatten() {
+                    let src_dir = entry.path().join("src");
+                    if src_dir.exists() { paths.push(src_dir); }
+                }
+            }
+        }
+        // Also add search paths from the compiler binary
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                let dev_pkg = exe_dir.join("../packages");
+                if dev_pkg.exists() { paths.push(dev_pkg); }
+            }
+        }
+        paths
+    }
+
     fn publish_diagnostics(&self, uri: &str) {
         let source = match self.sources.get(uri) {
             Some(s) => s.clone(),
@@ -225,107 +365,10 @@ impl LanguageServer {
             return;
         }
 
-        let mut lexer = kyc_frontend::lexer::Lexer::new(&source);
-        let tokens = lexer.tokenize();
-        let mut parser = kyc_frontend::parser::Parser::new(tokens);
         let mut lsp_diags = Vec::new();
 
-        match parser.parse() {
-            Ok(mut program) => {
-                let file_name = uri.trim_start_matches("file://");
-                // Resolve imports for this file
-                let base_dir = PathBuf::from(file_name)
-                    .parent()
-                    .map(|p| p.to_path_buf())
-                    .unwrap_or_else(|| PathBuf::from("."));
-                let mut resolver = ModuleResolver::new();
-                resolver.set_source_dir(base_dir.clone());
-                resolver.add_search_path(base_dir.clone());
-                if let Some(project_root) = find_project_root(&base_dir) {
-                    let src_dir = project_root.join("src");
-                    if src_dir.exists() && src_dir != base_dir {
-                        resolver.add_search_path(src_dir);
-                    }
-                }
-                if let Ok(cwd) = std::env::current_dir() {
-                    let std_path = cwd.join("std");
-                    if std_path.exists() {
-                        resolver.add_search_path(std_path);
-                    }
-                    let pkg_path = cwd.join("packages");
-                    if pkg_path.exists() {
-                        resolver.add_search_path(pkg_path);
-                    }
-                }
-                let local_std = base_dir.join("std");
-                if local_std.exists() {
-                    resolver.add_search_path(local_std);
-                }
-                let local_pkg = base_dir.join("packages");
-                if local_pkg.exists() {
-                    resolver.add_search_path(local_pkg);
-                }
-                if let Some(project_root) = find_project_root(&base_dir) {
-                    let lock_path = project_root.join("ky.lock");
-                    if let Ok(lock) = LockFile::read(&lock_path) {
-                        for entry in &lock.packages {
-                            let src_dir = package_src_dir(&entry.name, &entry.version);
-                            if src_dir.exists() {
-                                resolver.add_search_path(src_dir);
-                            }
-                        }
-                    }
-                    if let Ok(entries) = std::fs::read_dir(crate::package::cache::cache_root()) {
-                        for entry in entries.flatten() {
-                            let src_dir = entry.path().join("src");
-                            if src_dir.exists() {
-                                resolver.add_search_path(src_dir);
-                            }
-                        }
-                    }
-                }
-                // Resolve all imports in the program
-                let mut import_decls: Vec<(usize, Vec<Decl>)> = Vec::new();
-                let mut seen_modules: std::collections::HashSet<String> = std::collections::HashSet::new();
-                for (i, decl) in program.declarations.iter().enumerate() {
-                    match decl {
-                        Decl::Import(imp) => {
-                            if seen_modules.insert(imp.module_name.clone()) {
-                                if let Ok(module) = resolver.resolve_import(&imp.module_name, imp.relative) {
-                                    import_decls.push((i, module.program.declarations.clone()));
-                                }
-                            }
-                        }
-                        Decl::FromImport(fi) => {
-                            if seen_modules.insert(fi.module_name.clone()) {
-                                if let Ok(module) = resolver.resolve_import(&fi.module_name, fi.relative) {
-                                    let mut selected = Vec::new();
-                                    for name in &fi.imported_names {
-                                        if let Ok(decl) = resolver.get_imported_declaration(&fi.module_name, name, fi.relative) {
-                                            selected.push(decl);
-                                        }
-                                    }
-                                    import_decls.push((i, selected));
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                // Inject resolved declarations after their import statement
-                for (idx, decls) in import_decls.into_iter().rev() {
-                    if !decls.is_empty() {
-                        let mut rest = program.declarations.split_off(idx + 1);
-                        program.declarations.extend(decls);
-                        program.declarations.append(&mut rest);
-                    }
-                }
-                // Now run semantic analysis with imports resolved
-                let mut source_map = kyc_core::source_map::SourceMap::new();
-                let _file_id = source_map.add(file_name.to_string(), source);
-                let mut analyzer = kyc_semantic::analyzer::SemanticAnalyzer::new()
-                    .with_source(source_map, file_name.to_string());
-                analyzer.analyze(&program);
+        match self.resolve_and_analyze(uri, &source) {
+            Some((_program, analyzer, _file_name)) => {
 
                 for diag in analyzer.reporter().diagnostics() {
                     let range = diag.span
@@ -350,7 +393,7 @@ impl LanguageServer {
                     });
                 }
             }
-            Err(e) => {
+            None => {
                 lsp_diags.push(Diagnostic {
                     range: Range {
                         start: Position { line: 0, character: 0 },
@@ -358,7 +401,7 @@ impl LanguageServer {
                     },
                     severity: Some(DiagnosticSeverity::ERROR),
                     source: Some("ky".to_string()),
-                    message: format!("Parse error: {}", e),
+                    message: "Parse error".to_string(),
                     ..Default::default()
                 });
             }
@@ -651,11 +694,8 @@ impl LanguageServer {
             }
         }
 
-        // Project symbols — parse source and extract all declarations
-        let mut lexer = kyc_frontend::lexer::Lexer::new(&source);
-        let tokens = lexer.tokenize();
-        let mut parser = kyc_frontend::parser::Parser::new(tokens);
-        if let Ok(prog) = parser.parse() {
+        // Project symbols — parse with import resolution to include package symbols
+        if let Some((prog, analyzer, _)) = self.resolve_and_analyze(&uri, &source) {
             for decl in &prog.declarations {
                 let (name, kind, detail): (String, CompletionItemKind, String) = match decl {
                     Decl::Function(f) => {
@@ -682,6 +722,25 @@ impl LanguageServer {
                         sort_text: Some(format!("2{}", &name)),
                         ..Default::default()
                     });
+                }
+            }
+            // Also add type info from the symbol table for richer completions
+            let symbols = analyzer.type_checker.symbols();
+            for name in symbols.all_top_level_names() {
+                if (prefix.is_empty() || name.starts_with(&prefix) || name.to_lowercase().starts_with(&prefix_lower))
+                    && !items.iter().any(|i| i.label == name)
+                {
+                    if let Some(sym) = symbols.lookup(&name) {
+                        let detail = Self::format_symbol_hover(sym, &name);
+                        items.push(CompletionItem {
+                            label: name.clone(),
+                            kind: Some(CompletionItemKind::FUNCTION),
+                            detail: Some(detail),
+                            insert_text: None,
+                            sort_text: Some(format!("2{}", &name)),
+                            ..Default::default()
+                        });
+                    }
                 }
             }
         }
@@ -743,6 +802,39 @@ impl LanguageServer {
             }
         }
 
+        // Suggest importable modules when typing "from " or "import "
+        let line_text: String = source.lines().nth(pos.line as usize).unwrap_or("").to_string();
+        let trimmed = line_text.trim_start();
+        if trimmed.starts_with("from ") || trimmed.starts_with("import ") {
+            // Scan search paths for available .ky files and directories
+            let search_dirs = self.collect_search_paths(&uri);
+            let mut seen_mods = std::collections::HashSet::new();
+            for dir in &search_dirs {
+                if let Ok(entries) = std::fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let name = path.file_stem()
+                            .and_then(|s| s.to_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_default();
+                        if name.starts_with('.') || name.starts_with('_') { continue; }
+                        if !seen_mods.insert(name.clone()) { continue; }
+                        let is_pkg = path.is_dir() && path.join("lib.ky").exists();
+                        if prefix.is_empty() || name.starts_with(&prefix) || name.to_lowercase().starts_with(&prefix_lower) {
+                            items.push(CompletionItem {
+                                label: name.clone(),
+                                kind: Some(if is_pkg { CompletionItemKind::MODULE } else { CompletionItemKind::FILE }),
+                                detail: Some(if is_pkg { format!("package {}", name) } else { format!("module {}", name) }),
+                                insert_text: Some(name.clone()),
+                                sort_text: Some(format!("1{}", &name)),
+                                ..Default::default()
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         let result = CompletionResponse::Array(items);
         let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
         let _ = self.connection.sender.send(Message::Response(resp));
@@ -765,6 +857,15 @@ impl LanguageServer {
     }
 
     fn find_hover_info(&self, source: &str, line: usize, col: usize) -> String {
+        // We need a URI for import resolution — use a placeholder
+        let uri = "file:///input.ky";
+
+        // First try with import resolution
+        if let Some((program, analyzer, _)) = self.resolve_and_analyze(uri, source) {
+            return self.hover_from_analysis(&program, &analyzer, source, line, col);
+        }
+
+        // Fallback: parse + analyze without imports
         let mut lexer = kyc_frontend::lexer::Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = kyc_frontend::parser::Parser::new(tokens);
@@ -772,13 +873,15 @@ impl LanguageServer {
             Ok(p) => p,
             Err(_) => return "KL source file".to_string(),
         };
-
-        // Run semantic analysis to get the symbol table with resolved types
         let mut source_map = kyc_core::source_map::SourceMap::new();
         let _file_id = source_map.add("input.ky".to_string(), source.to_string());
         let mut analyzer = kyc_semantic::analyzer::SemanticAnalyzer::new()
             .with_source(source_map, "input.ky".to_string());
         analyzer.analyze(&program);
+        self.hover_from_analysis(&program, &analyzer, source, line, col)
+    }
+
+    fn hover_from_analysis(&self, program: &Program, analyzer: &kyc_semantic::analyzer::SemanticAnalyzer, source: &str, line: usize, col: usize) -> String {
         let symbols = analyzer.type_checker.symbols();
 
         let word = self.word_at(source, line, col);
