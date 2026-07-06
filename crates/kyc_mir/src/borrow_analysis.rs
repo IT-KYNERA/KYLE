@@ -264,11 +264,23 @@ impl BorrowAnalysis {
         // (like str), the source holds the same pointer as the alias. We must not
         // free the source if an alias still holds its pointer.
         let mut load_sources: BTreeSet<usize> = BTreeSet::new();
+        let mut field_loaded: BTreeSet<usize> = BTreeSet::new();
+        // First pass: find all FieldPtr targets
+        let field_ptrs: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::FieldPtr { dest, .. } = inst { Some(*dest) } else { None }
+            })
+            .collect();
         for block in &func.basic_blocks {
             for inst in &block.insts {
                 if let MirInst::Load { dest, src } = inst {
                     if local_types.get(dest).map_or(false, |t| is_move_type(t)) {
                         load_sources.insert(*src);
+                        // Values loaded from struct fields should NOT be freed (field still owns them)
+                        if field_ptrs.contains(src) {
+                            field_loaded.insert(*dest);
+                        }
                     }
                 }
             }
@@ -305,6 +317,7 @@ impl BorrowAnalysis {
                             && !load_only.contains(l)
                             && !load_sources.contains(l)
                             && !string_literal_locals.contains(l)
+                            && !field_loaded.contains(l)
                         {
                             to_insert.push((block_idx, *l));
                         }
