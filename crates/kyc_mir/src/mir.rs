@@ -161,7 +161,7 @@ pub fn is_move_type(t: &MirType) -> bool {
         MirType::Str => true,
         MirType::List(_) => true,
         MirType::Dict(_, _) => true,
-        MirType::Array(_, _) => true,
+        // Array is NOT heap-allocated — value type on stack. No ky_free.
         // Struct is NOT heap-allocated — it's a value type on the stack.
         // Excluding it from Move prevents kl_free of stack addresses (crash).
         // String fields inside structs are tracked independently.
