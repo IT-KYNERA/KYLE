@@ -26,7 +26,7 @@ fi
 echo "Downloading Kyle $VERSION..."
 
 # Download compressed binary from GitHub Releases
-curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky-v${VERSION#v}.gz" -o "/tmp/ky.gz"
+curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky.gz" -o "/tmp/ky.gz"
 gunzip -f "/tmp/ky.gz"
 chmod +x "/tmp/ky"
 
