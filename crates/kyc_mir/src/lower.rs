@@ -2791,7 +2791,7 @@ impl Lowerer {
                                 let field_idx = fields.iter().position(|(fname, _)| fname == property)
                                     .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
                                 if let Some(field_idx) = field_idx {
-                                    let field_type = fields[field_idx].1.clone();
+                                    let _field_type = fields[field_idx].1.clone();
                                     let ft = ctx.alloc_local("_fptr", MirType::I64);
                                     ctx.current_block.insts.push(MirInst::FieldPtr {
                                         dest: ft,
@@ -4497,7 +4497,7 @@ impl Lowerer {
                         if let Some(first_type_arg) = type_args.first() {
                             let struct_defs = ctx.struct_defs.clone();
                             let mir_type = ast_type_to_mir(first_type_arg, Some(&struct_defs));
-                            let typeinfo = build_typeinfo_struct(&mir_type, &mut ctx);
+                            let _typeinfo = build_typeinfo_struct(&mir_type, &mut ctx);
                             return ctx;
                         }
                     }
@@ -4914,7 +4914,7 @@ impl Lowerer {
                         ctx = self.lower_expr(ctx, value);
                         let tuple_local = ctx.next_local - 1;
                         let tuple_type = ctx.local_types.get(&tuple_local).cloned().unwrap_or(MirType::I32);
-                        if let MirType::Struct(ref sname, ref fields) = tuple_type {
+                        if let MirType::Struct(ref _sname, ref fields) = tuple_type {
                             for (i, target_elem) in target_elems.iter().enumerate() {
                                 if let Expr::Identifier { name, .. } = target_elem {
                                     if i < fields.len() {
@@ -5052,7 +5052,7 @@ impl Lowerer {
                 if let Some(obj_ptr) = obj_ptr {
                     let obj_type = ctx.local_types.get(&obj_ptr).cloned();
                     // Unwrap Ptr(Struct(...)) for closure-inferred types
-                    let (struct_name, struct_fields, is_ptr) = match &obj_type {
+                    let (struct_name, struct_fields, _is_ptr) = match &obj_type {
                         Some(MirType::Struct(sname, fields)) => (Some(sname.clone()), Some(fields.clone()), false),
                         Some(MirType::Ptr(inner)) => match inner.as_ref() {
                             MirType::Struct(sname, fields) => (Some(sname.clone()), Some(fields.clone()), true),
