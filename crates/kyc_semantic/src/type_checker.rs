@@ -956,7 +956,7 @@ impl TypeChecker {
                 // Await on an async task handle returns i64 (the widened result)
                 Type::I64
             }
-            Expr::Async { .. } => {
+            Expr::Async { .. } | Expr::AsyncBlock { .. } => {
                 // async expr returns a task handle (i64), not a function
                 Type::I64
             }

@@ -464,6 +464,10 @@ pub enum Expr {
         expression: Box<Expr>,
         span: Span,
     },
+    AsyncBlock {
+        body: Block,
+        span: Span,
+    },
     Spread {
         expression: Box<Expr>,
         span: Span,
@@ -1207,6 +1211,10 @@ impl DisplayDepth for Expr {
                 write_indent(f, d)?;
                 writeln!(f, "Async")?;
                 expression.fmt_depth(f, d + 1)
+            }
+            Expr::AsyncBlock { body, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "AsyncBlock {} stmts", body.statements.len())
             }
             Expr::Spread { expression, .. } => {
                 write_indent(f, d)?;

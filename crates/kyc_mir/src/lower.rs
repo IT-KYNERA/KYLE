@@ -827,28 +827,48 @@ impl Lowerer {
     }
 
     /// Lower an `async fn` declaration. Generates two MIR functions:
-    ///   1. `_async_body_{name}` — the actual body (with i64 dummy param, returns i64)
-    ///   2. `{name}` — the wrapper that spawns the body on the thread pool via kl_spawn_task
+    ///   1. `_async_body_{name}` — the actual body (returns i64)
+    ///   2. `{name}` — the wrapper that spawns and returns the task handle
     fn lower_async_fn(&self, f: &FunctionDecl, body: &Block) -> Option<MirFunction> {
         let struct_defs = self.struct_defs.borrow().clone();
         let body_fn_name = format!("_async_body_{}", f.name);
+        let real_params: Vec<&Parameter> = f.params.iter()
+            .filter(|p| !(p.name == "this" || p.name == "self"))
+            .collect();
+        let param_count = real_params.len();
 
         // === 1. Generate the async body function ===
         let mut body_func = MirFunction::new(&body_fn_name);
-        body_func.params = vec![MirType::I64];
+        body_func.params = vec![MirType::I64]; // receives args_ptr as i64
         body_func.return_type = MirType::I64;
 
         let mut cctx = LowerCtx::new();
         cctx.struct_defs = struct_defs.clone();
 
-        // Allocate dummy param (unused for now)
-        let dummy = cctx.alloc_local("_dummy", MirType::I64);
-        cctx.current_block.insts.push(MirInst::Store {
-            dest: dummy,
-            value: MirValue::Param(0),
-        });
+        if param_count == 0 {
+            // No params — ignore the arg
+        } else if param_count == 1 {
+            // Single param: pass value directly as i64
+            let ptype = ast_type_to_mir(&real_params[0].type_, Some(&struct_defs));
+            let raw_val = cctx.alloc_local("_arg0", ptype.clone());
+            cctx.current_block.insts.push(MirInst::Store {
+                dest: raw_val,
+                value: MirValue::Param(0),
+            });
+            if ptype != MirType::I64 {
+                let cast_local = cctx.alloc_local(&real_params[0].name, ptype.clone());
+                cctx.current_block.insts.push(MirInst::Cast {
+                    dest: cast_local,
+                    value: MirValue::Local(raw_val),
+                    to_type: ptype,
+                });
+                cctx.locals.insert(real_params[0].name.clone(), cast_local);
+            } else {
+                cctx.locals.insert(real_params[0].name.clone(), raw_val);
+            }
+        }
 
-        // Lower the body statements (same logic as lower_function)
+        // Lower the body statements
         let last_is_tail = matches!(body.statements.last(), Some(Stmt::Expression(_)));
         let stmt_count = body.statements.len();
         for (i, stmt) in body.statements.iter().enumerate() {
@@ -888,17 +908,64 @@ impl Lowerer {
 
         // === 2. Generate the wrapper function (returns i64 task handle) ===
         let mut wrapper = MirFunction::new(&f.name);
+        wrapper.params = f.params.iter().map(|p| {
+            ast_type_to_mir(&p.type_, Some(&struct_defs))
+        }).collect();
         wrapper.return_type = MirType::I64;
 
         let mut ctx = LowerCtx::new();
         ctx.struct_defs = struct_defs;
 
+        // Bind wrapper params to locals (same as regular function lowering)
+        for (i, param) in f.params.iter().enumerate() {
+            let ptype = ast_type_to_mir(&param.type_, Some(&ctx.struct_defs));
+            let local = ctx.alloc_local(&param.name, ptype);
+            ctx.current_block.insts.push(MirInst::Store {
+                dest: local,
+                value: MirValue::Param(i),
+            });
+            ctx.locals.insert(param.name.clone(), local);
+        }
+
         let dest = ctx.alloc_local("_async_h", MirType::I64);
-        ctx.current_block.insts.push(MirInst::AsyncSpawn {
-            dest,
-            function_name: body_fn_name,
-            arg: MirValue::Constant(MirConstant::I64(0)),
-        });
+        if param_count <= 1 {
+            // Single param or no param: pass value directly (or 0)
+            let arg_val = if param_count == 1 {
+                let pname = &real_params[0].name;
+                if let Some(&local) = ctx.locals.get(pname) {
+                    let ptype = ast_type_to_mir(&real_params[0].type_, Some(&ctx.struct_defs));
+                    if ptype != MirType::I64 {
+                        let widened = ctx.alloc_local("_pw", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: widened,
+                            value: MirValue::Local(local),
+                            to_type: MirType::I64,
+                        });
+                        MirValue::Local(widened)
+                    } else {
+                        MirValue::Local(local)
+                    }
+                } else {
+                    MirValue::Constant(MirConstant::I64(0))
+                }
+            } else {
+                MirValue::Constant(MirConstant::I64(0))
+            };
+            ctx.current_block.insts.push(MirInst::AsyncSpawn {
+                dest,
+                function_name: body_fn_name,
+                arg: arg_val,
+            });
+        } else {
+            // Multiple params: pack into heap-allocated array
+            // which is TODO for multi-param case
+            // For now just pass 0 (params will be lost)
+            ctx.current_block.insts.push(MirInst::AsyncSpawn {
+                dest,
+                function_name: body_fn_name,
+                arg: MirValue::Constant(MirConstant::I64(0)),
+            });
+        }
         ctx.emit_return(MirValue::Local(dest));
         wrapper.local_count = ctx.next_local;
         wrapper.basic_blocks = ctx.blocks;
@@ -5956,6 +6023,63 @@ impl Lowerer {
                 ctx.current_block.insts.push(MirInst::AsyncSpawn {
                     dest,
                     function_name: fn_name,
+                    arg: MirValue::Constant(MirConstant::I64(0)),
+                });
+                ctx
+            }
+            Expr::AsyncBlock { body, .. } => {
+                // async: block — generate a zero-param function and spawn it
+                let mut counter = self.async_counter.borrow_mut();
+                let fn_name = format!("_async_block_{}", *counter);
+                *counter += 1;
+                drop(counter);
+
+                let mut mir_func = MirFunction::new(&fn_name);
+                mir_func.params = vec![];
+                mir_func.return_type = MirType::I64;
+
+                let mut cctx = LowerCtx::new();
+                cctx.struct_defs = self.struct_defs.borrow().clone();
+
+                let last_is_tail = matches!(body.statements.last(), Some(Stmt::Expression(_)));
+                let stmt_count = body.statements.len();
+                for (i, stmt) in body.statements.iter().enumerate() {
+                    if i + 1 == stmt_count {
+                        if let Stmt::If(_) = stmt {
+                            cctx.tail_if_as_return = true;
+                        }
+                    }
+                    cctx = self.lower_stmt(cctx, stmt);
+                }
+
+                if cctx.current_block.terminator == MirTerminator::Unreachable {
+                    if last_is_tail {
+                        let val_local = cctx.next_local.checked_sub(1);
+                        if let Some(vl) = val_local {
+                            let vt = cctx.local_types.get(&vl).cloned().unwrap_or(MirType::I32);
+                            if vt != MirType::I64 {
+                                let w = cctx.alloc_local("_bw", MirType::I64);
+                                cctx.current_block.insts.push(MirInst::Cast {
+                                    dest: w, value: MirValue::Local(vl), to_type: MirType::I64,
+                                });
+                                cctx.emit_return(MirValue::Local(w));
+                            } else {
+                                cctx.emit_return(MirValue::Local(vl));
+                            }
+                        } else {
+                            cctx.emit_return(MirValue::Constant(MirConstant::I64(0)));
+                        }
+                    } else {
+                        cctx.emit_return(MirValue::Constant(MirConstant::I64(0)));
+                    }
+                }
+                mir_func.local_count = cctx.next_local;
+                mir_func.basic_blocks = cctx.blocks;
+                self.async_functions.borrow_mut().push(mir_func);
+
+                let dest = ctx.alloc_local("_async_h", MirType::I64);
+                ctx.current_block.insts.push(MirInst::AsyncSpawn {
+                    dest, function_name: fn_name,
                     arg: MirValue::Constant(MirConstant::I64(0)),
                 });
                 ctx

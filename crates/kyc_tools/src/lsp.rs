@@ -1477,7 +1477,7 @@ impl LanguageServer {
             }
             Expr::OptionalChain { target, .. } => Self::infer_type_from_expr(target),
             Expr::StringInterp { .. } => Some("str".to_string()),
-            Expr::Async { .. } => Some("i64".to_string()), // task handle
+            Expr::Async { .. } | Expr::AsyncBlock { .. } => Some("i64".to_string()), // task handle
             Expr::Spread { expression, .. } => Self::infer_type_from_expr(expression),
             _ => None,
         }

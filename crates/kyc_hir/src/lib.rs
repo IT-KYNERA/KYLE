@@ -230,6 +230,10 @@ fn desugar_expr(expr: &Expr) -> Expr {
             expression: Box::new(desugar_expr(expression)),
             span: span.clone(),
         },
+        Expr::AsyncBlock { body, span } => Expr::AsyncBlock {
+            body: desugar_block(body),
+            span: span.clone(),
+        },
         Expr::Spread { expression, span } => Expr::Spread {
             expression: Box::new(desugar_expr(expression)),
             span: span.clone(),

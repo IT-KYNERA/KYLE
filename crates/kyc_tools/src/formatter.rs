@@ -773,6 +773,10 @@ impl Formatter {
                 write!(out, "async ").unwrap();
                 self.write_expr(out, expression);
             }
+            Expr::AsyncBlock { body, .. } => {
+                write!(out, "async:\n").unwrap();
+                self.write_block(out, body, 0);
+            }
             Expr::Spread { expression, .. } => {
                 write!(out, "..").unwrap();
                 self.write_expr(out, expression);
@@ -932,6 +936,7 @@ fn expr_span(expr: &Expr) -> kyc_core::span::Span {
         Expr::Closure { span, .. } => *span,
         Expr::Await { span, .. } => *span,
         Expr::Async { span, .. } => *span,
+        Expr::AsyncBlock { span, .. } => *span,
         Expr::Spread { span, .. } => *span,
         Expr::RangeSlice { span, .. } => *span,
         Expr::Loop { span, .. } => *span,

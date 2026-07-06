@@ -68,6 +68,7 @@ impl Drop for Executor {
 
 /// Spawn an async task on the global thread pool.
 /// `func` is a C-callable function pointer.
+/// `arg` is a pointer to a heap-allocated i64 array (first word = count, rest = args).
 /// Returns a handle (pointer to oneshot receiver).
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_spawn_task(

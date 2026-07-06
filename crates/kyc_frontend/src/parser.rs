@@ -1225,8 +1225,18 @@ impl Parser {
             }
             TokenKind::Async => {
                 self.advance();
-                let expr = self.parse_expr()?;
-                Expr::Async { expression: Box::new(expr), span: self.span_from(start) }
+                // Check for async: block syntax
+                if self.at(TokenKind::Colon) {
+                    self.advance(); // consume ':'
+                    let body = self.parse_block()?;
+                    Expr::AsyncBlock { body, span: self.span_from(start) }
+                } else if self.at(TokenKind::Newline) {
+                    let body = self.parse_block()?;
+                    Expr::AsyncBlock { body, span: self.span_from(start) }
+                } else {
+                    let expr = self.parse_expr()?;
+                    Expr::Async { expression: Box::new(expr), span: self.span_from(start) }
+                }
             }
             TokenKind::Match => {
                 return self.parse_match_expr();

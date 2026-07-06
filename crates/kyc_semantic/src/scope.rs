@@ -318,6 +318,11 @@ impl ScopeResolver {
             }
             Expr::Await { expression, .. } => self.resolve_expr(expression),
             Expr::Async { expression, .. } => self.resolve_expr(expression),
+            Expr::AsyncBlock { body, .. } => {
+                for stmt in &body.statements {
+                    self.resolve_stmt(stmt);
+                }
+            }
             Expr::Spread { expression, .. } => self.resolve_expr(expression),
             Expr::Index { target, index, .. } => {
                 self.resolve_expr(target);
