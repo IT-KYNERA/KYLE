@@ -550,8 +550,26 @@ impl TypeChecker {
                 let lt = self.infer_expr(left);
                 if matches!(operator, BinaryOp::As) {
                     if let Expr::Identifier { name, .. } = right.as_ref() {
-                        let type_ast = AstType::User { name: name.clone(), span: *span };
-                        return self.resolve_ast_type(&type_ast);
+                        match name.as_str() {
+                            "i8" => return Type::I8,
+                            "i16" => return Type::I16,
+                            "i32" => return Type::I32,
+                            "i64" => return Type::I64,
+                            "u8" => return Type::U8,
+                            "u16" => return Type::U16,
+                            "u32" => return Type::U32,
+                            "u64" => return Type::U64,
+                            "f32" => return Type::F32,
+                            "f64" => return Type::F64,
+                            "bool" => return Type::Bool,
+                            "char" => return Type::Char,
+                            "str" => return Type::Str,
+                            "ptr" => return Type::Ptr,
+                            _ => {
+                                let type_ast = AstType::User { name: name.clone(), span: *span };
+                                return self.resolve_ast_type(&type_ast);
+                            }
+                        }
                     } else {
                         return Type::I32;
                     }

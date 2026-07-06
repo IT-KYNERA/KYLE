@@ -344,6 +344,41 @@ rm -rf /tmp/verify_release_*
 
 ---
 
+## Syntax Status por Documento
+
+Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-language-reference/` fue verificado.
+
+| # | Documento | Status | Notas |
+|---|-----------|--------|-------|
+| 1 | [lexical-structure.md](docs/03-language-reference/lexical-structure.md) | [x] | Keywords, literales, comentarios `#`, escapes `\n \t \r \0`. `\u{XXXX}` unicode no expandido. No hay `/* */` |
+| 2 | [variables.md](docs/03-language-reference/variables.md) | [x] | `:=` const, `&T` mutable, `^T` move |
+| 3 | [types.md](docs/03-language-reference/types.md) | [ ] | `ptr = 0 as ptr` type mismatch (bug #2). `char = 'a'` mismatch. `{str: i64}` con literal `1` inferido como i32 |
+| 4 | [expressions.md](docs/03-language-reference/expressions.md) | [x] | Aritmética, comparaciones, bitwise, `as` casts, rangos `..` |
+| 5 | [statements.md](docs/03-language-reference/statements.md) | [x] | if/elif/else, while, for-in range, match, return |
+| 6 | [functions.md](docs/03-language-reference/functions.md) | [ ] | Default params sí. `static fn` syntax (expected LParen before Static). `Calc.double()` undefined symbol |
+| 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia |
+| 8 | [enums.md](docs/03-language-reference/enums.md) | [x] | Enum con variants, match con `Enum.Variant` |
+| 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class Box<T>`, `fn identity<T>`, `Box<T> {value: 7}`, `identity<i32>(42)` |
+| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [x] | `^T` move semantics, `&T` mutable ref, default borrow-by-default |
+| 11 | [pattern-matching.md](docs/03-language-reference/pattern-matching.md) | [ ] | `..=` range pattern no existe. `1 \| 2` or-pattern no funciona. Match básico con `_:` sí |
+| 12 | [error-handling.md](docs/03-language-reference/error-handling.md) | [ ] | `-> Type` syntax no existe. `ok(v)`/`error(e)` result match no funciona. `return -1` sí |
+| 13 | [modules.md](docs/03-language-reference/modules.md) | [x] | `from X import Y` funciona (con packages instalados). `import X` funciona |
+| 14 | [ffi.md](docs/03-language-reference/ffi.md) | [x] | `@link`, `extern fn` funcionan |
+| 15 | [concurrency.md](docs/03-language-reference/concurrency.md) | [x] | `async fn` con 1 param, `async:` block, `await`, `ky_parallel_for`, `ky_spawn_thread` |
+
+### Bugs activos (de sintaxis documentada que no funciona)
+
+| Bug | Docs ref | Síntoma | Location |
+|-----|----------|---------|----------|
+| `ptr = 0 as ptr` type mismatch | types.md | "expected 'ptr', found 'ptr'" | type_checker.rs:551 |
+| `static fn` syntax error | functions.md | "expected LParen, found Static" | parser.rs |
+| `Calc.double()` not found | functions.md | "undefined symbol 'double'" | lower.rs o scope.rs |
+| `char = 'a'` type mismatch | types.md | "expected 'char', found 'i32'" | type_checker.rs |
+| `..=` range pattern | pattern-matching.md | "expected Colon, found DotDotEquals" | parser.rs |
+| `1 \| 2` or-pattern | pattern-matching.md | No implementado | parser.rs |
+| `-> Type` return syntax | error-handling.md | "expected type name, found Arrow" | parser.rs |
+| `ok(v)`/`error(e)` result | error-handling.md | "expected pattern, found OkKw" | parser.rs |
+
 ## Documentation Map
 
 Toda la documentación del lenguaje está en [`docs/`](docs/README.md):
