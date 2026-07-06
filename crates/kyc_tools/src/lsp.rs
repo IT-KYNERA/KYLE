@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::collections::HashMap;
 use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::*;
@@ -6,6 +7,8 @@ use kyc_core::span::Span;
 use kyc_core::types::Type;
 use kyc_frontend::token::TokenKind;
 use kyc_semantic::symbol_table::{Symbol, SymKind, SymbolTable};
+use kyc_semantic::module_resolver::ModuleResolver;
+use crate::package::{find_project_root, LockFile, cache::package_src_dir};
 
 /// KL Language Server — provides diagnostics, completion, hover, and
 /// go-to-definition via the Language Server Protocol.
@@ -228,8 +231,96 @@ impl LanguageServer {
         let mut lsp_diags = Vec::new();
 
         match parser.parse() {
-            Ok(program) => {
+            Ok(mut program) => {
                 let file_name = uri.trim_start_matches("file://");
+                // Resolve imports for this file
+                let base_dir = PathBuf::from(file_name)
+                    .parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_else(|| PathBuf::from("."));
+                let mut resolver = ModuleResolver::new();
+                resolver.set_source_dir(base_dir.clone());
+                resolver.add_search_path(base_dir.clone());
+                if let Some(project_root) = find_project_root(&base_dir) {
+                    let src_dir = project_root.join("src");
+                    if src_dir.exists() && src_dir != base_dir {
+                        resolver.add_search_path(src_dir);
+                    }
+                }
+                if let Ok(cwd) = std::env::current_dir() {
+                    let std_path = cwd.join("std");
+                    if std_path.exists() {
+                        resolver.add_search_path(std_path);
+                    }
+                    let pkg_path = cwd.join("packages");
+                    if pkg_path.exists() {
+                        resolver.add_search_path(pkg_path);
+                    }
+                }
+                let local_std = base_dir.join("std");
+                if local_std.exists() {
+                    resolver.add_search_path(local_std);
+                }
+                let local_pkg = base_dir.join("packages");
+                if local_pkg.exists() {
+                    resolver.add_search_path(local_pkg);
+                }
+                if let Some(project_root) = find_project_root(&base_dir) {
+                    let lock_path = project_root.join("ky.lock");
+                    if let Ok(lock) = LockFile::read(&lock_path) {
+                        for entry in &lock.packages {
+                            let src_dir = package_src_dir(&entry.name, &entry.version);
+                            if src_dir.exists() {
+                                resolver.add_search_path(src_dir);
+                            }
+                        }
+                    }
+                    if let Ok(entries) = std::fs::read_dir(crate::package::cache::cache_root()) {
+                        for entry in entries.flatten() {
+                            let src_dir = entry.path().join("src");
+                            if src_dir.exists() {
+                                resolver.add_search_path(src_dir);
+                            }
+                        }
+                    }
+                }
+                // Resolve all imports in the program
+                let mut import_decls: Vec<(usize, Vec<Decl>)> = Vec::new();
+                let mut seen_modules: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for (i, decl) in program.declarations.iter().enumerate() {
+                    match decl {
+                        Decl::Import(imp) => {
+                            if seen_modules.insert(imp.module_name.clone()) {
+                                if let Ok(module) = resolver.resolve_import(&imp.module_name, imp.relative) {
+                                    import_decls.push((i, module.program.declarations.clone()));
+                                }
+                            }
+                        }
+                        Decl::FromImport(fi) => {
+                            if seen_modules.insert(fi.module_name.clone()) {
+                                if let Ok(module) = resolver.resolve_import(&fi.module_name, fi.relative) {
+                                    let mut selected = Vec::new();
+                                    for name in &fi.imported_names {
+                                        if let Ok(decl) = resolver.get_imported_declaration(&fi.module_name, name, fi.relative) {
+                                            selected.push(decl);
+                                        }
+                                    }
+                                    import_decls.push((i, selected));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                // Inject resolved declarations after their import statement
+                for (idx, decls) in import_decls.into_iter().rev() {
+                    if !decls.is_empty() {
+                        let mut rest = program.declarations.split_off(idx + 1);
+                        program.declarations.extend(decls);
+                        program.declarations.append(&mut rest);
+                    }
+                }
+                // Now run semantic analysis with imports resolved
                 let mut source_map = kyc_core::source_map::SourceMap::new();
                 let _file_id = source_map.add(file_name.to_string(), source);
                 let mut analyzer = kyc_semantic::analyzer::SemanticAnalyzer::new()
