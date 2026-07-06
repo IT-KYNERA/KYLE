@@ -370,7 +370,6 @@ Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-langua
 
 | Bug | Docs ref | Síntoma | Location |
 |-----|----------|---------|----------|
-| `ptr = 0 as ptr` type mismatch | types.md | "expected 'ptr', found 'ptr'" | type_checker.rs:551 |
 | `static fn` syntax error | functions.md | "expected LParen, found Static" | parser.rs |
 | `Calc.double()` not found | functions.md | "undefined symbol 'double'" | lower.rs o scope.rs |
 | `char = 'a'` type mismatch | types.md | "expected 'char', found 'i32'" | type_checker.rs |
@@ -378,6 +377,9 @@ Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-langua
 | `1 \| 2` or-pattern | pattern-matching.md | No implementado | parser.rs |
 | `-> Type` return syntax | error-handling.md | "expected type name, found Arrow" | parser.rs |
 | `ok(v)`/`error(e)` result | error-handling.md | "expected pattern, found OkKw" | parser.rs |
+| `T?` optional type | types.md | Type mismatch 'str' expects 1 arg, got 2 | type_checker.rs |
+| `char` type literal `'a'` | types.md | expected 'char', found 'i32' | type_checker.rs |
+| `none` in docs | lexical-structure.md | El keyword es `None` (capital N), no `none` | docs.md |
 
 ## Documentation Map
 
