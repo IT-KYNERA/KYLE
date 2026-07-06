@@ -676,6 +676,7 @@ impl Optimizer {
                         // and causing double-free when both src and dest are freed.
                         used.contains(dest) || move_locals.contains(src)
                     }
+                    MirInst::Store { value: MirValue::Param(_), .. } => true,
                     MirInst::Store { dest, .. } => used.contains(dest),
                     MirInst::Alloca { dest, .. } => used.contains(dest) || stored.contains(dest),
                     _ => true,

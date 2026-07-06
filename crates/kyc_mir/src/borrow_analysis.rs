@@ -260,6 +260,39 @@ impl BorrowAnalysis {
             })
             .collect();
 
+        // Track locals that hold borrowed references from list/dict get operations.
+        // ky_list_get returns a pointer INTO the list's internal buffer — NOT an owned
+        // value. Freeing these would corrupt the list and cause use-after-free.
+        let get_results_raw: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::Call { dest, name, .. } = inst {
+                    if name == "ky_list_get" || name == "ky_dict_get" {
+                        return *dest;
+                    }
+                }
+                None
+            })
+            .collect();
+        let list_get_results: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::Cast { dest, value, .. } = inst {
+                    if let MirValue::Local(src) = value {
+                        if get_results_raw.contains(src) {
+                            return Some(*dest);
+                        }
+                    }
+                }
+                if let MirInst::Call { dest, name, .. } = inst {
+                    if name == "ky_list_get" || name == "ky_dict_get" {
+                        return *dest;
+                    }
+                }
+                None
+            })
+            .collect();
+
         // Track Load source locals: when a Load creates an alias for a move-type
         // (like str), the source holds the same pointer as the alias. We must not
         // free the source if an alias still holds its pointer.
@@ -318,6 +351,7 @@ impl BorrowAnalysis {
                             && !load_sources.contains(l)
                             && !string_literal_locals.contains(l)
                             && !field_loaded.contains(l)
+                            && !list_get_results.contains(l)
                         {
                             to_insert.push((block_idx, *l));
                         }
@@ -505,11 +539,44 @@ fn check_alive(
 
     fn find_move_locals(&self, func: &MirFunction) -> BTreeSet<usize> {
         let mut move_locals = BTreeSet::new();
+        // Collect list_get/dict_get result locals — these are borrowed references
+        // into the list/dict internal buffer, NOT owned values. Never free them.
+        let get_results: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::Call { dest, name, .. } = inst {
+                    if name == "ky_list_get" || name == "ky_dict_get" {
+                        return *dest;
+                    }
+                }
+                None
+            })
+            .collect();
+        // Also track Cast destinations from list_get results — these are str/struct
+        // temps that hold the (casted) borrowed reference. Must NOT be freed.
+        let cast_from_get: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::Cast { dest, value, .. } = inst {
+                    if let MirValue::Local(src) = value {
+                        if get_results.contains(src) {
+                            return Some(*dest);
+                        }
+                    }
+                }
+                None
+            })
+            .collect();
+        let exclude: BTreeSet<usize> = get_results.union(&cast_from_get).cloned().collect();
         for block in &func.basic_blocks {
             for inst in &block.insts {
                 if let MirInst::Alloca { dest, name, type_ } = inst {
                     // Skip string constants (global string refs — not heap-allocated)
                     if name.starts_with("_lit_const") {
+                        continue;
+                    }
+                    // Skip list_get/dict_get results and their casts (borrowed, not owned)
+                    if exclude.contains(dest) {
                         continue;
                     }
                     if is_move_type(type_) {
