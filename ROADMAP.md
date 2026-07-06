@@ -502,7 +502,7 @@ Features identificadas en los benchmarks que Kyle necesita para ser competitivo 
 
 | Feature | Importancia | Dependencia | ETA |
 |---------|-------------|-------------|-----|
-| **SIMD intrinsics** (AVX, NEON) | ⭐⭐⭐⭐⭐ | Codegen + runtime | 📅 Fase 19 |
+| **Native Arrays `[T; N]`** | ⭐⭐⭐⭐⭐ | Parser + typeck + MIR + codegen | 🚀 **En progreso** |
 | **Threads + Concurrency** | ⭐⭐⭐⭐⭐ | Runtime | 📅 Fase D |
 | **Async/Await en Kyle** | ⭐⭐⭐⭐ | Runtime + compiler | 📅 Fase D |
 | **HashMap completo** (String→any) | ⭐⭐⭐⭐ | Runtime | 📅 Fase C |
@@ -515,5 +515,16 @@ Features identificadas en los benchmarks que Kyle necesita para ser competitivo 
 | **Cache Miss / IPC profiling** | ⭐⭐ | Toolchain | 📅 Futuro |
 | **Arena/Pool allocators** | ⭐⭐ | Runtime | 📅 Futuro |
 | **Vectorization control** (LLVM) | ⭐⭐ | Compiler | 📅 Futuro |
+| **Zero-cost Array/List/Dict syntax** | ⭐⭐⭐⭐⭐ | Parser + typeck + MIR | 🚀 **En progreso** |
+
+## Cambios de sintaxis (v0.6)
+
+| Antes | Después | Tipo |
+|-------|---------|------|
+| `[1, 2, 3]` | `[1, 2, 3]` | Array (antes era list, ahora es array nativo) |
+| `[1, 2, 3]` | `{1, 2, 3}` | List (cambia de `[]` a `{}`) |
+| `list<T>` | `{T}` | List type (antes `[T]`, ahora `{T}`) |
+| — | `[T; N]` | Array type (nuevo) |
+| `{"key": val}` | `{key: val}` | Dict literal (se puede omitir quotes) |
 
 Ver `BENCHMARK.md` para resultados completos.

@@ -25,3 +25,4 @@ csharp_bench*
 fib_cs
 concat_cs
 primes_cs
+prime_cs

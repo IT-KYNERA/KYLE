@@ -50,7 +50,7 @@ x + 1            # x is still usable
 
 ## Clone
 
-For non-Copy types (str, list, dict):
+For non-Copy types (str, {T}, dict):
 
 ```ky
 a = "hello"

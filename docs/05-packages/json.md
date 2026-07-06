@@ -86,7 +86,7 @@ app = Router()
 
 app.post("/users", (req, res):
     user = req.body<User>()
-    res.json({ "created": true, "id": 1 }, 201)
+    res.json({created: true, id: 1}, 201)
 )
 
 app.get("/users/{id:i32}", (req, res):
@@ -103,5 +103,5 @@ app.get("/users/{id:i32}", (req, res):
 |---------|-------------|
 | `serialize(val)` | Cualquier `final class` → JSON string |
 | `deserialize<T>(str)` | JSON string → clase `T` |
-| `stringify(dict)` | Dict → JSON string (legacy) |
-| `parse(str)` | JSON string → dict (legacy) |
+| `stringify(dict)` | `{K: V}` → JSON string (legacy) |
+| `parse(str)` | JSON string → `{K: V}` (legacy) |

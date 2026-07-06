@@ -57,14 +57,32 @@ fn consume(^data: str):
     println(data)
 ```
 
-### List: `[T]`
+### Array: `[T; N]`
 
-Dynamic array of type `T`.
+Array nativo, stack inline, tamaño fijo conocido en compile-time. Acceso vía GEP + load/store — **cero runtime calls**.
 
 ```ky
-numbers = [1, 2, 3]
+numbers = [1, 2, 3]           # → [i32; 3]
+numbers = [person1, person2]  # → [Person; 2]
+
+matrix: [[i32; 3]; 3] = [     # anidado
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1]
+]
+
+first = numbers[0]             # GEP + load (nativo)
+numbers[0] = 42                # GEP + store (nativo)
+```
+
+### List: `{T}`
+
+Lista dinámica, heap, redimensionable. Usa `ky_list_*` runtime.
+
+```ky
+numbers = {1, 2, 3}            # → {i32}
 numbers.push(4)
-first = numbers[0]
+first = numbers[0]             # ky_list_get
 ```
 
 ### Tuple: `(T1, T2, ...)`
@@ -120,7 +138,8 @@ contract Comparable:
 ```ky
 x = 42          # i32
 y: i64 = 42     # explicit i64
-z = [1, 2, 3]   # List<i32>
+z = [1, 2, 3]   # [i32; 3]
+z2 = {1, 2, 3}  # {i32}
 ```
 
 ## Type casting
@@ -153,10 +172,15 @@ t.name     # "User"
 t.kind     # "struct"
 t.size     # 12 (suma de campos)
 
-t = type<list<i32> >()
-t.name     # "list<i32>"
+t = type<{i32}>()
+t.name     # "{i32}"
 t.kind     # "list"
 t.size     # 8 (handle)
+
+t = type<[i32; 3]>()
+t.name     # "[i32; 3]"
+t.kind     # "array"
+t.size     # 12 (3 * 4 bytes)
 ```
 
 ### `.type()` — método en cualquier valor
@@ -180,7 +204,7 @@ t.kind     # "struct"
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `name` | `str` | Nombre del tipo (`"i32"`, `"User"`, `"list<i32>"`, etc.) |
+| `name` | `str` | Nombre del tipo (`"i32"`, `"User"`, `"{i32}"`, `"[i32; 3]"`, etc.) |
 | `kind` | `str` | Categoría: `"primitive"`, `"struct"`, `"list"`, `"dict"`, `"ptr"`, `"array"` |
 | `size` | `i32` | Tamaño en bytes |
 
@@ -198,13 +222,14 @@ t.kind     # "struct"
 | `char` | `"char"` | `"primitive"` | 4 |
 | `str` | `"str"` | `"primitive"` | 8 |
 | `ptr` | `"ptr"` | `"ptr"` | 8 |
-| `list<T>` | `"list<T>"` | `"list"` | 8 |
-| `dict<K,V>` | `"dict<K,V>"` | `"dict"` | 8 |
+| `{T}` | `"{T}"` | `"list"` | 8 |
+| `[T; N]` | `"[T; N]"` | `"array"` | N × size(T) |
+| `{K: V}` | `"{K: V}"` | `"dict"` | 8 |
 | `User` (class) | `"User"` | `"struct"` | suma campos |
 | `fn(...) T` | `"fn"` | `"function"` | 8 |
 
 > **Nota:** `type<T>()` es resuelto en compilación, no tiene overhead en runtime.
-> Para tipos genéricos anidados usa espacios: `type<list<i32> >()` no `type<list<i32>>()`.
+> Para tipos genéricos anidados usa espacios: `type<{i32}>()` no `type<{i32}>()`.
 
 ---
 
@@ -245,30 +270,39 @@ Disponibles en cualquier tipo numérico (`i32`, `i64`, `f32`, `f64`, `bool`, `st
 
 ### Collection methods
 
-En listas:
+En listas `{T}`:
 
 | Método | Descripción | Ejemplo |
 |--------|-------------|---------|
-| `list.len()` | Cantidad de elementos | `[1,2,3].len()` → `3` |
-| `list.push(val)` | Agregar al final | `[1].push(2)` → `[1,2]` |
-| `list.pop()` | Quitar y retornar último | `[1,2,3].pop()` → `3` |
-| `list.add(val)` | Sinónimo de push | |
-| `list.contains(val)` | Contiene valor? | `[1,2].contains(2)` → `1` |
-| `list.sum()` | Suma de elementos | |
-| `list.product()` | Producto de elementos | |
-| `list.max()` | Valor máximo | |
-| `list.min()` | Valor mínimo | |
-| `list.reverse()` | Invertir lista | |
-| `list.map(fn)` | Aplicar función a c/e | |
-| `list.filter(fn)` | Filtrar elementos | |
+| `lst.len()` | Cantidad de elementos | `{1,2,3}.len()` → `3` |
+| `lst.push(val)` | Agregar al final | `{1}.push(2)` → `{1,2}` |
+| `lst.pop()` | Quitar y retornar último | `{1,2,3}.pop()` → `3` |
+| `lst.add(val)` | Sinónimo de push | |
+| `lst.contains(val)` | Contiene valor? | `{1,2}.contains(2)` → `1` |
+| `lst.sum()` | Suma de elementos | |
+| `lst.product()` | Producto de elementos | |
+| `lst.max()` | Valor máximo | |
+| `lst.min()` | Valor mínimo | |
+| `lst.reverse()` | Invertir lista | |
+| `lst.map(fn)` | Aplicar función a c/e | |
+| `lst.filter(fn)` | Filtrar elementos | |
 
-En diccionarios:
+En arrays `[T; N]`:
+
+| Método | Descripción |
+|--------|-------------|
+| `arr.len()` | Cantidad de elementos (compile-time) |
+| `arr[i]` | Leer elemento (GEP + load) |
+| `arr[i] = val` | Escribir elemento (GEP + store) |
+
+En diccionarios `{K: V}`:
 
 | Método | Descripción |
 |--------|-------------|
 | `dict.len()` | Cantidad de entradas |
 | `dict[key]` | Obtener valor por clave |
 | `dict[key] = val` | Asignar valor por clave |
+| `dict.key` | Obtener valor por clave identifier (azúcar) |
 
 ### Char methods
 

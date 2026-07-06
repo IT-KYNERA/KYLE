@@ -1,18 +1,15 @@
 fn main() {
-    let n = 1_000_000;
+    let n = 3_000_000;
+    let mut sieve = vec![false; n as usize + 1];
     let mut count = 0;
     for i in 2..=n {
-        let mut is_prime = true;
-        let mut j = 2;
-        while j * j <= i {
-            if i % j == 0 {
-                is_prime = false;
-                break;
-            }
-            j += 1;
-        }
-        if is_prime {
+        if !sieve[i as usize] {
             count += 1;
+            let mut j = i + i;
+            while j <= n {
+                sieve[j as usize] = true;
+                j += i;
+            }
         }
     }
     println!("Primes: {}", count);

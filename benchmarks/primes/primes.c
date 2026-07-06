@@ -1,19 +1,20 @@
 #include <stdio.h>
-#include <time.h>
+#include <stdlib.h>
+#include <string.h>
 
 int main() {
-    int n = 1000000;
+    int n = 3000000;
+    char *sieve = calloc(n + 1, 1);
+    if (!sieve) return 1;
     int count = 0;
     for (int i = 2; i <= n; i++) {
-        int is_prime = 1;
-        for (int j = 2; j * j <= i; j++) {
-            if (i % j == 0) {
-                is_prime = 0;
-                break;
-            }
+        if (!sieve[i]) {
+            count++;
+            for (int j = i + i; j <= n; j += i)
+                sieve[j] = 1;
         }
-        if (is_prime) count++;
     }
     printf("Primes: %d\n", count);
+    free(sieve);
     return 0;
 }

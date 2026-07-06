@@ -64,7 +64,7 @@ rows = pool.query("SELECT * FROM users WHERE age > $1", [18])
 ### Insert/Update/Delete (Execute)
 
 ```kyle
-n = pool.execute("INSERT INTO users (name, age) VALUES ($1, $2)", ["Ana", 30])
+n = pool.execute("INSERT INTO users (name, age) VALUES ($1, $2)", {"Ana", 30})
 print(n)   # número de filas afectadas
 ```
 
@@ -73,8 +73,8 @@ print(n)   # número de filas afectadas
 ```kyle
 conn = pool.get_conn()
 conn.begin()
-conn.execute("UPDATE users SET age = $1 WHERE id = $2", [25, 1])
-conn.execute("UPDATE users SET age = $1 WHERE id = $2", [30, 2])
+conn.execute("UPDATE users SET age = $1 WHERE id = $2", {25, 1})
+conn.execute("UPDATE users SET age = $1 WHERE id = $2", {30, 2})
 conn.commit()
 # conn.rollback() si algo sale mal
 conn.close()

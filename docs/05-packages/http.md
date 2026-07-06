@@ -113,7 +113,7 @@ from http.server import Router
 app = Router()
 
 app.get("/health", (req, res):
-    res.json({ "status": "ok" })
+    res.json({status: "ok"})
 )
 
 app.listen(8080)
@@ -124,12 +124,12 @@ app.listen(8080)
 ```kyle
 app.get("/users/{id}", (req, res):
     id = req.param("id")         # str
-    res.json({ "user": id })
+    res.json({user: id})
 )
 
 app.get("/users/{id:i32}", (req, res):
     id = req.param("id")         # i32 — parseado automático
-    res.json({ "user": id })
+    res.json({user: id})
 )
 ```
 
@@ -318,7 +318,7 @@ final class WebSocket:
     fn send(text: str)           # enviar mensaje texto
     fn send(data: bytes)         # enviar datos binarios
     fn broadcast(msg: str)       # enviar a todos los conectados
-    fn broadcast(msg: str, except: list<WebSocket>)  # a todos menos uno
+    fn broadcast(msg: str, except: {WebSocket})  # a todos menos uno
     fn close()                   # cerrar conexión
     fn on(event: str, handler)   # registrar evento
 ```

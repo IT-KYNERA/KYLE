@@ -1,17 +1,19 @@
-# Kyle — Sieve of Eratosthenes
 fn main() i32:
-    n := 1000000
-    count: &i32 = 0
-    i: &i32 = 2
+    n := 3000000
+    sieve := []
+    i: &i64 = 0
     while i <= n:
-        is_prime: &i32 = 1
-        j: &i32 = 2
-        while j * j <= i:
-            if i % j == 0:
-                is_prime = 0
-            j = j + 1
-        if is_prime == 1:
-            count = count + 1
+        sieve.push(0)
         i = i + 1
-    println("Primes: {count}")
+    count: &i32 = 0
+    i2: &i64 = 2
+    while i2 <= n:
+        if sieve[i2] == 0:
+            count = count + 1
+            j: &i64 = i2 + i2
+            while j <= n:
+                sieve[j] = 1
+                j = j + i2
+        i2 = i2 + 1
+    println("Primes: " + str(count))
     0

@@ -28,10 +28,10 @@ fn process_config(path: str) str!:
 final class Request:
     url: str
     method: &str
-    headers: &[str]
+    headers: &{str}
 
 fn main():
-    req = Request { url: "https://api.example.com", method: "GET", headers: [] }
+    req = Request { url: "https://api.example.com", method: "GET", headers: {} }
     req.method = "POST"
     req.headers.push("Content-Type: application/json")
 ```
@@ -39,7 +39,7 @@ fn main():
 ## Iterate with index
 
 ```ky
-items = [10, 20, 30]
+items = [10, 20, 30]   # array
 for i in 0..len(items):
     println("items[{i}] = {items[i]}")
 ```

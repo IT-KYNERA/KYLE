@@ -4,7 +4,7 @@
 
 ```ky
 final class Stack<T>:
-    items: [T]
+    items: {T}                # lista dinámica interna
 
     fn push(this, item: T):
         this.items.push(item)
@@ -16,7 +16,7 @@ final class Stack<T>:
 ## Usage
 
 ```ky
-int_stack = Stack<i32> { items: [] }
+int_stack = Stack<i32> { items: {} }
 int_stack.push(5)
 ```
 

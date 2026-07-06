@@ -41,7 +41,7 @@ while i < 10:
 for i in 0..10:         # range
     println(i)
 
-for i in my_list:       # list iteration
+for i in my_list:       # list/array iteration
     println(i)
 
 for i in 0..=5:         # inclusive range

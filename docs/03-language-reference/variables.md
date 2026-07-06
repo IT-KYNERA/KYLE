@@ -52,6 +52,6 @@ if true:
 point = (10, 20)
 (x, y) = point      # x=10, y=20
 
-list = [1, 2, 3]
-(first, second) = list
+lst = {1, 2, 3}
+(first, second) = lst
 ```

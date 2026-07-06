@@ -87,7 +87,7 @@ name = "json"
 version = "0.1.0"
 checksum = ""
 source = "registry"
-dependencies = []
+dependencies = {}
 ```
 
 ## Local file registry
