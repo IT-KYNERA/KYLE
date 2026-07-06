@@ -6452,7 +6452,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "substr" => Some(MirType::Str),
         "eq_str" => Some(MirType::I32),
         "json_parse" => Some(MirType::Dict(Box::new(MirType::Str), Box::new(MirType::I64))),
-        "json_stringify" => Some(MirType::Str),
+        "json_stringify" | "json_stringify_str" => Some(MirType::Str),
         "serialize" => Some(MirType::Str),
         "ky_struct_to_json" => Some(MirType::Str),
         "type" => Some(MirType::Struct("TypeInfo".to_string(), vec![

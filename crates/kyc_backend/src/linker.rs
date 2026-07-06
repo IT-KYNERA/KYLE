@@ -64,6 +64,25 @@ impl Linker {
         // On macOS, link CoreFoundation (needed by chrono/iana-time-zone)
         // Check at runtime (not compile-time) so cross-compiled binary works
         if std::env::consts::OS == "macos" {
+            // Detect deployment target to match the compiled runtime .o files
+            let ver = std::env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| {
+                std::process::Command::new("sw_vers")
+                    .arg("-productVersion")
+                    .output()
+                    .ok()
+                    .and_then(|o| if o.status.success() {
+                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                        // Take major.minor only (e.g. "26.5.1" → "26.5")
+                        let parts: Vec<&str> = s.split('.').collect();
+                        if parts.len() >= 2 {
+                            Some(format!("{}.{}", parts[0], parts[1]))
+                        } else { None }
+                    } else { None })
+                    .unwrap_or_else(|| "26.0".to_string())
+            });
+            if !ver.is_empty() {
+                cmd.arg(format!("-mmacosx-version-min={}", ver));
+            }
             cmd.arg("-framework").arg("CoreFoundation");
             // Common Homebrew library paths
             let homebrew_paths = [

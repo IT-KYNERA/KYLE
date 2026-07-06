@@ -106,6 +106,31 @@ pub extern "C" fn ky_clone_dict(dict: *mut std::ffi::c_void) -> *mut std::ffi::c
     Box::into_raw(cloned) as *mut std::ffi::c_void
 }
 
+/// Serialize a dict to JSON treating all values as string pointers.
+/// Each value is a pointer to a null-terminated string that gets dereferenced.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_json_stringify_str(dict: *mut std::ffi::c_void) -> *mut u8 {
+    if dict.is_null() {
+        return std::ptr::null_mut();
+    }
+    let map = unsafe { &*(dict as *const HashMap<String, i64>) };
+    let mut result = String::from('{');
+    for (i, (key, val)) in map.iter().enumerate() {
+        if i > 0 { result.push(','); }
+        // val is a pointer to a null-terminated string
+        let v = *val;
+        let s = if v != 0 {
+            unsafe { std::ffi::CStr::from_ptr(v as *const i8) }
+                .to_str().unwrap_or("")
+        } else { "" };
+        result.push_str(&format!("\"{}\":\"{}\"", key, s));
+    }
+    result.push('}');
+    let c_str = CString::new(result).unwrap_or_default();
+    let ptr = c_str.into_bytes_with_nul().leak().as_mut_ptr();
+    ptr
+}
+
 /// Serialize a `final class` struct to JSON.
 /// `ptr` points to the struct in memory.
 /// `descriptor` is a null-terminated C string like "name:str,age:i32,active:bool"

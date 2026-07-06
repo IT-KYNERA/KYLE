@@ -68,12 +68,22 @@ final class Res:
     fd: i32
     sent: i32
 
-    fn json(data: str, code: i32):
+    fn json_str(data: str, code: i32):
         st = status_text(code)
         resp = "HTTP/1.1 " + str(code) + " " + st + "\r\n"
         resp = resp + "Content-Type: application/json\r\n"
         resp = resp + "Content-Length: " + str(len(data)) + "\r\n"
         resp = resp + "Connection: close\r\n\r\n" + data
+        ky_tcp_write(this.fd, resp as ptr, len(resp))
+        this.sent = 1
+
+    fn json(data: {str: str}, code: i32):
+        st = status_text(code)
+        data_str = json_stringify_str(data)
+        resp = "HTTP/1.1 " + str(code) + " " + st + "\r\n"
+        resp = resp + "Content-Type: application/json\r\n"
+        resp = resp + "Content-Length: " + str(len(data_str)) + "\r\n"
+        resp = resp + "Connection: close\r\n\r\n" + data_str
         ky_tcp_write(this.fd, resp as ptr, len(resp))
         this.sent = 1
 

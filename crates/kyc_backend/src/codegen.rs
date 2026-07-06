@@ -1458,6 +1458,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_json_stringify", ft, None);
         }
+        // ptr kl_json_stringify_str(ptr) — serialize {str:str} dict to JSON
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_json_stringify_str", ft, None);
+        }
         // ptr kl_clone_str(ptr) — deep-copy a heap-allocated string
         {
             let params = [ptr_ty.into()];
@@ -2137,7 +2143,8 @@ impl<'ctx> Codegen<'ctx> {
                                 "list_set" => "ky_list_set",
                                 "list_len" => "ky_list_len",
                                 "json_parse" => "ky_json_parse",
-                                "json_stringify" => "ky_json_stringify",
+"json_stringify" => "ky_json_stringify",
+                                 "json_stringify_str" => "ky_json_stringify_str",
                                 "serialize" => "ky_struct_to_json",
                                 "assert" => "ky_assert",
                                 "assert_eq" => "ky_assert_eq",
