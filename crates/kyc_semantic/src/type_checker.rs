@@ -80,8 +80,6 @@ impl TypeChecker {
             "list_push" => Some(2),
             "list_pop" | "list_len" => Some(1),
             "ceil" | "floor" | "round" => Some(1),
-            "list_push" => Some(2),
-            "list_len" | "list_pop" => Some(1),
             _ => None,
         }
     }

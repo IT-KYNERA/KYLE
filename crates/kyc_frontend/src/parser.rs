@@ -1139,7 +1139,7 @@ impl Parser {
                         Expr::Closure { params, body: Box::new(body_expr), span: self.span_from(start) }
                     } else if self.at_identifier() {
                         // Closure with return type: (params) RetType: body
-                        let saved2 = self.pos;
+                        let _saved2 = self.pos;
                         let _ret_type = self.eat_identifier();
                         if self.at(TokenKind::Colon) {
                             self.advance(); // consume ':'
@@ -1188,7 +1188,7 @@ impl Parser {
                 } else {
                     // Lookahead: después del primer elemento, ¿hay : o ,/}?
                     let saved = self.pos;
-                    let first = self.parse_expr()?;
+                    let _first = self.parse_expr()?;
                     if self.at(TokenKind::Colon) {
                         // {key: val, ...} → DICT
                         self.pos = saved;

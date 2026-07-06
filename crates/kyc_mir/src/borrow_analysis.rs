@@ -580,7 +580,7 @@ mod tests {
         assert!(is_move_type(&MirType::Str));
         assert!(is_move_type(&MirType::List(Box::new(MirType::I32))));
         assert!(!is_move_type(&MirType::Struct("Point".to_string(), vec![])));
-        assert!(is_move_type(&MirType::Array(Box::new(MirType::I32))));
+        assert!(is_move_type(&MirType::Array(Box::new(MirType::I32), 0)));
     }
 
     #[test]
