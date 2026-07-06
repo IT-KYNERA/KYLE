@@ -80,6 +80,8 @@ impl TypeChecker {
             "list_push" => Some(2),
             "list_pop" | "list_len" => Some(1),
             "ceil" | "floor" | "round" => Some(1),
+            "ky_spawn_thread" => Some(2),
+            "ky_join_thread" => Some(1),
             _ => None,
         }
     }
@@ -824,6 +826,7 @@ impl TypeChecker {
                                 "ky_json_to_struct" => Type::I32,
                                 "ky_ptr_read_i32" => Type::I32,
                                 "ky_ptr_read_ptr" => Type::Ptr,
+                                "ky_spawn_thread" | "ky_join_thread" => Type::I64,
                                 "error" => Type::Option(Box::new(Type::Void)),
                                 _ => *ft.return_,
                             }

@@ -2520,6 +2520,14 @@ impl Lowerer {
                 } else if let Some(const_expr) = self.const_values.borrow().get(name) {
                     // Inline module-level constant value
                     ctx = self.lower_expr(ctx, const_expr);
+                } else if self.function_decls.borrow().contains_key(name) {
+                    // Function name used as value (e.g. worker as ptr)
+                    let ptr_type = MirType::Ptr(Box::new(MirType::I8));
+                    let dest = ctx.alloc_local("_fnaddr", ptr_type);
+                    ctx.current_block.insts.push(MirInst::FnAddr {
+                        dest,
+                        name: name.clone(),
+                    });
                 }
                 ctx
             }
@@ -6460,6 +6468,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("kind".into(), MirType::Str),
             ("size".into(), MirType::I32),
         ])),
+        "ky_spawn_thread" | "ky_join_thread" => Some(MirType::I64),
         "error" => Some(MirType::Struct("__result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),

@@ -1434,6 +1434,18 @@ impl<'ctx> Codegen<'ctx> {
             let ft = void_ty.fn_type(&[], false);
             self.module.add_function("ky_yield", ft, None);
         }
+        // i64 kl_spawn_thread(ptr, i64)  — spawn dedicated OS thread
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_spawn_thread", ft, None);
+        }
+        // i64 kl_join_thread(i64)  — join thread, return result
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_join_thread", ft, None);
+        }
         // i32 kl_dict_contains(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
