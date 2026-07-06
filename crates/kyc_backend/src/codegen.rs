@@ -1110,6 +1110,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_ptr_read_ptr", ft, None);
         }
+        // void ky_ptr_write_i32(ptr, i32) — write i32 to memory
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = self.context.void_type().fn_type(&params, false);
+            self.module.add_function("ky_ptr_write_i32", ft, None);
+        }
         // i32 ky_tcp_close(i32) — close socket
         {
             let params = [i32_ty.into()];

@@ -105,6 +105,13 @@ pub extern "C" fn ky_ptr_read_ptr(ptr: *const u8) -> *mut u8 {
     unsafe { *(ptr as *const *mut u8) }
 }
 
+/// Write i32 to memory.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_ptr_write_i32(ptr: *mut u8, val: i32) {
+    if ptr.is_null() { return; }
+    unsafe { *(ptr as *mut i32) = val; }
+}
+
 /// Close a socket. Returns 0 on success.
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_tcp_close(fd: i32) -> i32 {

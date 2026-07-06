@@ -1,19 +1,22 @@
+# Kyle — Sieve with heap memory (ky_alloc + ptr access)
+extern fn ky_alloc(size: i64) ptr
+extern fn ky_free(ptr)
+extern fn ky_ptr_read_i32(ptr) i32
+extern fn ky_ptr_write_i32(ptr, i32)
+
 fn main() i32:
-    n := 100000
-    sieve: [i32; 100001] = []
-    i: &i64 = 0
-    while i <= n:
-        sieve[i] = 0
-        i = i + 1
+    n := 3000000
+    buf := ky_alloc(n * 4 + 4)
     count: &i32 = 0
     i2: &i64 = 2
     while i2 <= n:
-        if sieve[i2] == 0:
+        if ky_ptr_read_i32(buf + i2 * 4) == 0:
             count = count + 1
             j: &i64 = i2 + i2
             while j <= n:
-                sieve[j] = 1
+                ky_ptr_write_i32(buf + j * 4, 1)
                 j = j + i2
         i2 = i2 + 1
-    println(str(count))
+    println("Primes: " + str(count))
+    ky_free(buf)
     0

@@ -1304,10 +1304,14 @@ impl Lowerer {
                     && matches!(&var_type, MirType::Struct(n, _) if n.starts_with("Option__"));
                 let local = ctx.alloc_local(&v.name, var_type);
                 if let Some(vl) = val_local {
-                    ctx.current_block.insts.push(MirInst::Store {
-                        dest: local,
-                        value: MirValue::Local(vl),
-                    });
+                    // Skip store for empty array literal to avoid type mismatch in LLVM
+                    let is_empty_array = matches!(v.value.as_ref(), Expr::Array { elements, .. } if elements.is_empty());
+                    if !is_empty_array || !matches!(ctx.local_types.get(&local), Some(MirType::Array(_, _))) {
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: local,
+                            value: MirValue::Local(vl),
+                        });
+                    }
                 }
                 if is_option_none {
                     // Auto-initialize Option<T> with None (disc = 0)
