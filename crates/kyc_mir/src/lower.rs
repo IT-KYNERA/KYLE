@@ -4747,7 +4747,47 @@ impl Lowerer {
                     return ctx;
                 }
 
-                ctx = self.lower_expr(ctx, value);
+                // For struct field assignment with empty Dict {} but field is List, create list instead
+                if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
+                    if let Expr::Identifier { name, .. } = object.as_ref() {
+                        if let Some(&obj_local) = ctx.locals.get(name) {
+                            let obj_type = ctx.local_types.get(&obj_local).cloned();
+                            if let Some(MirType::Struct(_, fields)) = &obj_type {
+                                let backing = format!("_{}", property);
+                                let field_idx = fields.iter().position(|(fname, _)| fname == property.as_str())
+                                    .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
+                                if let Some(fi) = field_idx {
+                                    if let Some((_, MirType::List(inner))) = fields.get(fi) {
+                                        if matches!(value.as_ref(), Expr::Dictionary { entries, .. } if entries.is_empty()) {
+                                            let obj_ty = obj_type.clone().unwrap();
+                                            let handle = ctx.alloc_local("_listv", MirType::List(inner.clone()));
+                                            ctx.current_block.insts.push(MirInst::Call {
+                                                dest: Some(handle),
+                                                name: "ky_list_new".to_string(),
+                                                args: vec![],
+                                            });
+                                            let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
+                                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                                dest: field_ptr,
+                                                ptr: obj_local,
+                                                field_index: fi,
+                                                struct_type: Box::new(obj_ty),
+                                            });
+                                            ctx.current_block.insts.push(MirInst::Store {
+                                                dest: field_ptr,
+                                                value: MirValue::Local(handle),
+                                            });
+                                            return ctx;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let adjusted_value = value;
+
+                ctx = self.lower_expr(ctx, adjusted_value);
                 let val_local = ctx.next_local - 1;
                 if let Expr::Identifier { name, .. } = target.as_ref() {
                     let local = if let Some(existing) = ctx.locals.get(name) {
@@ -4801,6 +4841,29 @@ impl Lowerer {
                             let field_idx = fields.iter().position(|(fname, _)| fname == property)
                                 .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
                             if let Some(field_idx) = field_idx {
+                                // If the field is a List type but value is empty Dict {}, create List instead
+                                if let Some((_, MirType::List(inner))) = fields.get(field_idx) {
+                                    if matches!(value.as_ref(), Expr::Dictionary { entries, .. } if entries.is_empty()) {
+                                        let handle = ctx.alloc_local("_listv", MirType::List(inner.clone()));
+                                        ctx.current_block.insts.push(MirInst::Call {
+                                            dest: Some(handle),
+                                            name: "ky_list_new".to_string(),
+                                            args: vec![],
+                                        });
+                                        let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
+                                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                                            dest: field_ptr,
+                                            ptr: obj_ptr,
+                                            field_index: field_idx,
+                                            struct_type: Box::new(obj_type.unwrap()),
+                                        });
+                                        ctx.current_block.insts.push(MirInst::Store {
+                                            dest: field_ptr,
+                                            value: MirValue::Local(handle),
+                                        });
+                                        return ctx;
+                                    }
+                                }
                                 let field_ptr = ctx.alloc_local("_fieldptr", MirType::I64);
                                 ctx.current_block.insts.push(MirInst::FieldPtr {
                                     dest: field_ptr,
