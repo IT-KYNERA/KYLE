@@ -1266,6 +1266,38 @@ impl Parser {
                     if self.at(TokenKind::Greater) {
                         self.advance();
                         let start = self.pos;
+                        if self.at(TokenKind::LParen) {
+                            self.advance();
+                            let mut arguments = Vec::new();
+                            while !self.at(TokenKind::RParen) && !self.at(TokenKind::Eof) {
+                                arguments.push(self.parse_expr()?);
+                                if self.at(TokenKind::Comma) { self.advance(); }
+                            }
+                            self.expect(TokenKind::RParen)?;
+                            expr = Expr::FunctionCall {
+                                target: Box::new(expr), arguments, type_args, span: self.span_from(start),
+                            };
+                            continue;
+                        }
+                        if self.at(TokenKind::LBrace) {
+                            self.advance();
+                            let mut fields = Vec::new();
+                            while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                                let key = self.eat_identifier();
+                                self.expect(TokenKind::Colon)?;
+                                let value = self.parse_expr()?;
+                                fields.push((key, value));
+                                if self.at(TokenKind::Comma) { self.advance(); }
+                            }
+                            self.expect(TokenKind::RBrace)?;
+                            expr = Expr::StructLiteral {
+                                struct_name: if let Expr::Identifier { name, .. } = &expr { name.clone() } else { String::new() },
+                                type_args, fields, span: self.span_from(start),
+                            };
+                            continue;
+                        }
+                        // After <T> without ( or { — push back and let normal postfix handle
+                        self.pos = saved;
                     } else if self.at(TokenKind::GreaterGreater) {
                         self.advance();
                         let start = self.pos;
