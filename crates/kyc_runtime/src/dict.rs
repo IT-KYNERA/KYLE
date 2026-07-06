@@ -120,7 +120,7 @@ pub extern "C" fn ky_json_stringify_str(dict: *mut std::ffi::c_void) -> *mut u8 
         // val is a pointer to a null-terminated string
         let v = *val;
         let s = if v != 0 {
-            unsafe { std::ffi::CStr::from_ptr(v as *const i8) }
+            unsafe { std::ffi::CStr::from_ptr(v as *const std::ffi::c_char) }
                 .to_str().unwrap_or("")
         } else { "" };
         result.push_str(&format!("\"{}\":\"{}\"", key, s));
@@ -243,7 +243,7 @@ pub extern "C" fn ky_json_to_struct(json: *const u8, descriptor: *const u8, out:
     let json_str = match json_cstr.to_str() {
         Ok(s) => {
             // Debug: print first 50 chars
-            let preview: String = s.chars().take(50).collect();
+            let _preview: String = s.chars().take(50).collect();
             // Actually, for stdout debugging use eprintln
             s.trim().to_string()
         }

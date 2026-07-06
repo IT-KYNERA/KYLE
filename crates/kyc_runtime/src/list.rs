@@ -125,10 +125,8 @@ pub extern "C" fn ky_range(count: i64) -> *mut KlList {
     if list.is_null() {
         return std::ptr::null_mut();
     }
-    unsafe {
-        for i in 0..count {
-            ky_list_push(list, i);
-        }
+    for i in 0..count {
+        ky_list_push(list, i);
     }
     list
 }
@@ -140,10 +138,8 @@ pub extern "C" fn ky_range_two(start: i64, end: i64) -> *mut KlList {
     if list.is_null() {
         return std::ptr::null_mut();
     }
-    unsafe {
-        for i in start..end {
-            ky_list_push(list, i);
-        }
+    for i in start..end {
+        ky_list_push(list, i);
     }
     list
 }

@@ -1,5 +1,3 @@
-use std::io::Write;
-
 fn write_stdout(buf: &[u8]) {
     use std::io::Write;
     let mut stdout = std::io::stdout();
