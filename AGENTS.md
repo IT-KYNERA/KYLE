@@ -190,6 +190,33 @@ LLVM 18.1 required.
 
 ---
 
+## How to publish a new release
+
+1. **Update version** in `Cargo.toml` (workspace root), `install.sh` (`VERSION=`), `vscode-ky/install-extension.sh` (`TAG=`), and `vscode-ky/package.json` (`"version"`)
+2. **Build release binary**: `cargo build --release --bin ky`
+3. **Update package tarballs**: `cd packages/<name> && tar czf ../../docs/packages/<name>/0.1.0/download.tar.gz ky.toml src/`
+4. **Git commit + push** all changes to `main`
+5. **Compress binary**: `gzip -c target/release/ky > /tmp/ky_release.gz`
+6. **Create GitHub Release + upload assets**:
+
+```bash
+gh release create v0.X.X \
+  --title "Kyle v0.X.X" \
+  --notes "Description of changes" \
+  "/tmp/ky_release.gz#ky_release.gz" \
+  "vscode-ky/ky-0.X.X.vsix#ky-extension.vsix"
+```
+
+7. **Push the tag**: `git push origin v0.X.X`
+8. **Verify** download + install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
+ky new api /tmp/test_release && cd /tmp/test_release && ky check && ky build
+```
+
+---
+
 ## What NOT to Do
 
 1. **Do not guess syntax** — check `docs/03-language-reference/` first
@@ -202,4 +229,20 @@ LLVM 18.1 required.
 
 ---
 
-*Version: v0.5.0 · Last updated: 2026-07-03 — Fases 1-17 completadas, Phase 0 (FFI) ✅, packages iniciados, Phase A (runtime en Kyle) en progreso*
+*Version: v0.5.2 · Last updated: 2026-07-06 — Fases 1-17 completadas, Phase 0 (FFI) ✅, packages iniciados, Phase A (runtime en Kyle) en progreso*
+
+---
+
+## Documentation Map
+
+Toda la documentación del lenguaje está en [`docs/`](docs/README.md):
+
+| Para saber... | Ir a... |
+|---------------|---------|
+| Sintaxis del lenguaje (completa) | `docs/03-language-reference/` (15 archivos) |
+| Referencia rápida (keywords, operadores) | `docs/06-reference/` |
+| Documentación del compilador (flags, CLI) | `docs/04-platform/` |
+| Standard library (builtins) | `docs/04-platform/standard-library/` |
+| Paquetes oficiales (http, json, sqlite) | `docs/05-packages/` |
+| Benchmarks y rendimiento | `benchmarks/` + `ROADMAP.md` |
+| Arquitectura del compilador | `docs/07-engineering/`
