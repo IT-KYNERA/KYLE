@@ -1,10 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "KL",
+  "name": "Kyle",
   "scopeName": "source.ky",
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
+    { "include": "#link_directive" },
     { "include": "#char_literals" },
     { "include": "#numbers" },
     { "include": "#attributes" },
@@ -12,6 +13,7 @@
     { "include": "#enum_def" },
     { "include": "#contract_def" },
     { "include": "#type_alias" },
+    { "include": "#extern_decl" },
     { "include": "#function_def" },
     { "include": "#import_path" },
     { "include": "#constructor_call" },
@@ -20,13 +22,13 @@
     { "include": "#keywords_operator" },
     { "include": "#keywords_other" },
     { "include": "#types_primitive" },
+    { "include": "#types_complex" },
     { "include": "#types_special" },
     { "include": "#builtins" },
     { "include": "#constants" },
     { "include": "#operators" },
     { "include": "#variable_decl" },
-    { "include": "#property_access" },
-    { "include": "#mutable_var" }
+    { "include": "#property_access" }
   ],
   "repository": {
     "comments": {
@@ -42,6 +44,7 @@
       "patterns": [
         { "name": "constant.character.escape.ky", "match": "\\\\[nrt0\"'\\\\]" },
         { "name": "constant.character.escape.ky", "match": "\\\\x[0-9a-fA-F]{2}" },
+        { "name": "constant.character.escape.ky", "match": "\\\\u\\{[0-9a-fA-F]+\\}" },
         { "name": "constant.character.escape.ky", "match": "\\\\u[0-9a-fA-F]{4}" },
         { "include": "#interpolation" }
       ]
@@ -61,6 +64,10 @@
         { "include": "#operators" }
       ]
     },
+    "link_directive": {
+      "name": "keyword.control.link.ky",
+      "match": "^@link\\s+\"(.*?)\""
+    },
     "char_literals": {
       "name": "string.quoted.single.ky",
       "begin": "'",
@@ -72,23 +79,24 @@
     },
     "numbers": {
       "name": "constant.numeric.ky",
-      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|\\d[\\d_]*(\\.\\d[\\d_]*)?([eE][+-]?\\d+)?)\\b"
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|\\d[\\d_]*(\\.[\\d_]*)?([eE][+-]?\\d+)?)[iIlLfF]?(?:8|16|32|64)?\\b"
     },
     "keywords_control": {
       "name": "keyword.control.ky",
-      "match": "\\b(if|elif|else|while|for|in|match|return|break|continue|loop|defer|guard|unsafe|async|await|pass)\\b"
+      "match": "\\b(if|elif|else|while|for|in|match|return|break|continue|loop|defer|guard|unsafe|async|await|pass|empty)\\b"
     },
     "keywords_declaration": {
       "patterns": [
         { "name": "keyword.declaration.struct.ky", "match": "\\bfinal\\s+class\\b" },
         { "name": "keyword.declaration.class.ky", "match": "\\babstract\\s+class\\b" },
-        { "name": "keyword.declaration.enum.ky", "match": "\\bstruct\\b" },
+        { "name": "keyword.declaration.enum.ky", "match": "\\benum\\b" },
         { "name": "keyword.declaration.contract.ky", "match": "\\bcontract\\b" },
         { "name": "keyword.declaration.import.ky", "match": "\\bimport\\b" },
         { "name": "keyword.declaration.from.ky", "match": "\\bfrom\\b" },
         { "name": "keyword.declaration.as.ky", "match": "\\bas\\b" },
         { "name": "keyword.declaration.type.ky", "match": "\\btype\\b" },
         { "name": "keyword.declaration.new.ky", "match": "\\bnew\\b" },
+        { "name": "keyword.declaration.extern.ky", "match": "\\bextern\\b" },
         { "name": "storage.modifier.ky", "match": "\\b(static|override|const|abstract)\\b" }
       ]
     },
@@ -104,17 +112,26 @@
     },
     "types_primitive": {
       "name": "storage.type.ky",
-      "match": "\\b(i32|i64|f32|f64|bool|str|char|void|any|ptr)\\b"
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|str|char|void|any|ptr)\\b"
+    },
+    "types_complex": {
+      "patterns": [
+        { "name": "storage.type.array.ky", "match": "\\[[A-Za-z_][A-Za-z0-9_]*\\s*;\\s*\\d+\\]" },
+        { "name": "storage.type.list.ky", "match": "\\{[A-Za-z_][A-Za-z0-9_]*\\}" },
+        { "name": "storage.type.dict.ky", "match": "\\{[A-Za-z_][A-Za-z0-9_]*\\s*:\\s*[A-Za-z_][A-Za-z0-9_]*\\}" },
+        { "name": "storage.type.generic.ky", "match": "[A-Za-z_][A-Za-z0-9_]*<[A-Za-z_][A-Za-z0-9_]*>" },
+        { "name": "keyword.operator.move.ky", "match": "\\^[A-Za-z_][A-Za-z0-9_]*" }
+      ]
     },
     "types_special": {
       "patterns": [
-        { "name": "storage.type.optional.ky", "match": "\\b([A-Z][a-zA-Z0-9_]*)\\?\\b" },
-        { "name": "storage.type.error.ky", "match": "\\b([A-Z][a-zA-Z0-9_]*)\\!\\b" }
+        { "name": "storage.type.optional.ky", "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\?\\b" },
+        { "name": "storage.type.error.ky", "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\!\\b" }
       ]
     },
     "builtins": {
       "name": "support.function.ky",
-      "match": "\\b(print|println|print_err|len|int|float|bool|assert|assert_eq|assert_ne|range|clone)\\b"
+      "match": "\\b(print|println|print_err|len|int|float|bool|str|assert|assert_eq|assert_ne|range|clone|input|open|read_str|write_str|close|sleep|now|char_at|ord|substr|contains|to_upper|to_lower|trim|replace|is_digit|is_alpha|is_alnum|is_whitespace|is_upper|is_lower|json_parse|json_stringify|stringify|serialize|deserialize|error|type|to_str|to_int|to_float|to_bool|push|pop|add|sum|product|max|min|reverse|map|filter|collect|extend|clear)\\b"
     },
     "constants": {
       "name": "variable.other.constant.ky",
@@ -130,7 +147,7 @@
         { "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)" },
         { "match": "(<<|>>)" },
         { "match": "(&&|\\|\\|)" },
-        { "match": "(\\+|-|\\*|/|%|&|\\^|~|=|<|>|!)" }
+        { "match": "(\\+|\\-|\\*|/|%|&|\\^|~|=|<|>|!)" }
       ]
     },
     "class_def": {
@@ -193,18 +210,40 @@
         }
       ]
     },
+    "extern_decl": {
+      "patterns": [
+        {
+          "begin": "\\b(extern)\\s+(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "keyword.declaration.extern.ky" },
+            "2": { "name": "keyword.declaration.fn.ky" },
+            "3": { "name": "entity.name.function.ky" }
+          },
+          "end": "(?=:|\n)",
+          "patterns": [
+            { "include": "#types_primitive" },
+            { "match": "<", "name": "punctuation.bracket.ky" },
+            { "match": ">", "name": "punctuation.bracket.ky" },
+            { "match": ",", "name": "punctuation.separator.ky" },
+            { "match": "\\(", "name": "punctuation.bracket.round.ky" },
+            { "match": "\\)", "name": "punctuation.bracket.round.ky" }
+          ]
+        }
+      ]
+    },
     "function_def": {
       "patterns": [
         {
-          "begin": "(?:(const|async|abstract)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "begin": "(?:(const|async|abstract|static)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
             "1": { "name": "storage.modifier.ky" },
-            "2": { "name": "keyword.declaration.ky" },
+            "2": { "name": "keyword.declaration.fn.ky" },
             "3": { "name": "entity.name.function.ky" }
           },
           "end": "(?=:|\n|{)",
           "patterns": [
             { "include": "#types_primitive" },
+            { "include": "#types_complex" },
             { "include": "#types_special" },
             { "match": "<", "name": "punctuation.bracket.ky" },
             { "match": ">", "name": "punctuation.bracket.ky" },
@@ -260,10 +299,6 @@
         { "name": "variable.other.mutable.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*:\\s*&)" },
         { "name": "variable.other.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*=)" }
       ]
-    },
-    "mutable_var": {
-      "name": "variable.other.mutable.ky",
-      "match": "([a-z_][a-zA-Z0-9_]*)(?=\\s*:(\\s*[A-Za-z_][A-Za-z0-9_]*\\s*)?:=)"
     }
   }
 }

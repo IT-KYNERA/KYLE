@@ -204,15 +204,50 @@
     "body": "(${1:x}, ${2:y}) := ${3:pair}",
     "description": "Mutable destructuring assignment"
   },
+  "Array literal": {
+    "prefix": "arr",
+    "body": "[${1:1}, ${2:2}, ${3:3}]",
+    "description": "Native array literal [T; N]"
+  },
+  "Array type": {
+    "prefix": "arrtype",
+    "body": "[${1:i32}; ${2:3}]",
+    "description": "Fixed-size array type [T; N]"
+  },
   "List literal": {
     "prefix": "list",
-    "body": "[${1:1}, ${2:2}, ${3:3}]",
-    "description": "List literal"
+    "body": "{${1:1}, ${2:2}, ${3:3}}",
+    "description": "List literal (dynamic)"
   },
-  "Dict literal": {
+  "List type": {
+    "prefix": "listtype",
+    "body": "{${1:i32}}",
+    "description": "Dynamic list type {T}"
+  },
+  "Dict literal (quoted)": {
     "prefix": "dict",
     "body": "{\"${1:key}\": ${2:value}}",
-    "description": "Dict literal"
+    "description": "Dict literal with quoted keys"
+  },
+  "Dict literal (unquoted)": {
+    "prefix": "dictid",
+    "body": "{${1:key}: ${2:value}}",
+    "description": "Dict literal with unquoted identifier keys"
+  },
+  "Dict type": {
+    "prefix": "dicttype",
+    "body": "{${1:str}: ${2:i64}}",
+    "description": "Dict type {K: V}"
+  },
+  "Extern fn": {
+    "prefix": "extern",
+    "body": "extern fn ${1:name}(${2:params}) ${3:type}",
+    "description": "Declare an external FFI function"
+  },
+  "Link directive": {
+    "prefix": "link",
+    "body": "@link \"${1:c}\"",
+    "description": "Link with a native library"
   },
   "Assert": {
     "prefix": "assert",

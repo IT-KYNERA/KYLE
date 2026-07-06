@@ -491,19 +491,45 @@ fn cmd_fmt(args: &[String]) {
 fn cmd_new(args: &[String]) {
     if args.len() < 3 {
         eprintln!("Error: missing project name");
-        eprintln!("Usage: {} new <project>", bin_name());
+        eprintln!("Usage: {} new [type] <project>", bin_name());
+        eprintln!("Types: (default) app    — full project with main + lib + tests");
+        eprintln!("       api              — API project with http + postgres + routes");
+        eprintln!("       bare             — single file, no fn main required");
         process::exit(1);
     }
-    let project_name_arg = &args[2];
+
+    let mut project_type = "app";
+    let mut project_name_arg: &str;
+    if args.len() >= 4 {
+        project_type = &args[2];
+        project_name_arg = &args[3];
+    } else {
+        project_name_arg = &args[2];
+    }
+
     let project_dir = Path::new(project_name_arg);
     let project_name = project_dir.file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
+
     if project_dir.exists() {
         eprintln!("Error: directory '{}' already exists", project_name);
         process::exit(1);
     }
+
+    let exe_path = std::env::current_exe().ok()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "ky".to_string());
+
+    match project_type {
+        "bare" => cmd_new_bare(&project_dir, &project_name, &exe_path),
+        "api" => cmd_new_api(&project_dir, &project_name, &exe_path),
+        _ => cmd_new_app(&project_dir, &project_name, &exe_path),
+    }
+}
+
+fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
     for dir in &["src", "tests"] {
         fs::create_dir_all(project_dir.join(dir)).unwrap_or_else(|e| {
             eprintln!("Error creating project: {}", e);
@@ -538,43 +564,10 @@ fn cmd_new(args: &[String]) {
         process::exit(1);
     });
 
-    let manifest = format!(
-        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle programming language project\"\nmain = \"src/main.ky\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
-        project_name
-    );
-    fs::write(project_dir.join("ky.toml"), &manifest).unwrap_or_else(|e| {
-        eprintln!("Error writing ky.toml: {}", e);
-        process::exit(1);
-    });
-
-    let gitignore = "target/\n*.kyc-build/\nky.lock\n.vscode/\nstd/\n";
-    fs::write(project_dir.join(".gitignore"), gitignore).unwrap_or_else(|e| {
-        eprintln!("Error writing .gitignore: {}", e);
-        process::exit(1);
-    });
-
-    let readme = format!(
-        "# {}\n\n{}\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Run tests\n{bname} test\n\n# Release build\n{bname} build --release\n```\n\n## Project Structure\n\n```\n├── src/\n│   ├── main.ky       # Entry point\n│   └── lib.ky        # Library module\n├── tests/\n│   └── test_main.ky  # Tests\n├── ky.toml           # Project manifest\n└── README.md\n```\n",
-        project_name, project_name, bname = bin_name()
-    );
-    fs::write(project_dir.join("README.md"), &readme).unwrap_or_else(|e| {
-        eprintln!("Error writing README.md: {}", e);
-        process::exit(1);
-    });
-
-    let vscode_settings = format!(
-        r#"{{"ky.kycPath":"{}","files.associations":{{"*.ky":"ky"}}}}"#,
-        bin_name()
-    );
-    let vscode_dir = project_dir.join(".vscode");
-    fs::create_dir_all(&vscode_dir).unwrap_or_else(|e| {
-        eprintln!("Error creating .vscode: {}", e);
-        process::exit(1);
-    });
-    fs::write(vscode_dir.join("settings.json"), vscode_settings).unwrap_or_else(|e| {
-        eprintln!("Error writing .vscode/settings.json: {}", e);
-        process::exit(1);
-    });
+    write_manifest(project_dir, project_name, "src/main.ky");
+    write_gitignore(project_dir);
+    write_readme(project_dir, project_name);
+    write_vscode_settings(project_dir, exe_path, project_dir);
 
     println!("✅ Created project '{}'", project_name);
     println!("   ├── src/main.ky        — entry point");
@@ -585,6 +578,155 @@ fn cmd_new(args: &[String]) {
     println!("   └── .vscode/           — VS Code settings");
     println!();
     println!("   cd {} && {} run", project_name, bin_name());
+}
+
+fn cmd_new_api(project_dir: &Path, project_name: &str, exe_path: &str) {
+    for dir in &["src", "tests"] {
+        fs::create_dir_all(project_dir.join(dir)).unwrap_or_else(|e| {
+            eprintln!("Error creating project: {}", e);
+            process::exit(1);
+        });
+    }
+
+    let main_kl = format!(
+        "# {} — API entry point\nfrom http.server import Router\n\napp = Router()\n\napp.get(\"/ping\", (req, res):\n    res.json({{status: \"ok\"}}, 200)\n)\n\napp.listen(8080)\n",
+        project_name
+    );
+    fs::write(project_dir.join("src").join("main.ky"), &main_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing src/main.ky: {}", e);
+        process::exit(1);
+    });
+
+    let lib_kl = format!(
+        "# {} — API helpers\nfrom http.server import Router, Request, Res\nfrom json import parse, stringify\n\nfn parse_body(req: Request) {{str: i64}}:\n    parse(req.body())\n\nfn json_response(res: Res, data: {{str: i64}}, code: i32):\n    res.json(stringify(data), code)\n",
+        project_name
+    );
+    fs::write(project_dir.join("src").join("lib.ky"), &lib_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing src/lib.ky: {}", e);
+        process::exit(1);
+    });
+
+    let test_kl = format!(
+        "# Tests for {}\nfn test_ping() i32:\n    println(\"test_ping PASS\")\n    0\n",
+        project_name
+    );
+    fs::write(project_dir.join("tests").join("test_main.ky"), &test_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing tests/test_main.ky: {}", e);
+        process::exit(1);
+    });
+
+    write_manifest(project_dir, project_name, "src/main.ky");
+    write_gitignore(project_dir);
+    write_readme_api(project_dir, project_name);
+    write_vscode_settings(project_dir, exe_path, project_dir);
+
+    println!("✅ Created API project '{}'", project_name);
+    println!("   ├── src/main.ky        — HTTP server entry point");
+    println!("   ├── src/lib.ky         — API helpers");
+    println!("   ├── tests/             — tests");
+    println!("   ├── ky.toml            — manifest");
+    println!("   ├── README.md          — project docs");
+    println!("   └── .vscode/           — VS Code settings");
+    println!();
+    println!("   cd {} && {} run", project_name, bin_name());
+    println!("   curl http://localhost:8080/ping");
+}
+
+fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
+    // Bare: just a single .ky file with the project name, no fn main
+    let bare_kl = format!(
+        "# {} — bare script\nprintln(\"Hello from {}\")\n",
+        project_name, project_name
+    );
+    fs::create_dir_all(project_dir).unwrap_or_else(|e| {
+        eprintln!("Error creating directory: {}", e);
+        process::exit(1);
+    });
+    let file = format!("{}.ky", project_name);
+    fs::write(project_dir.join(&file), &bare_kl).unwrap_or_else(|e| {
+        eprintln!("Error writing {}: {}", file, e);
+        process::exit(1);
+    });
+
+    write_vscode_settings(project_dir, exe_path, project_dir);
+
+    println!("✅ Created bare script '{}'", project_name);
+    println!("   ├── {}.ky        — standalone script", project_name);
+    println!("   └── .vscode/         — VS Code settings");
+    println!();
+    println!("   cd {} && {} run {}.ky", project_name, bin_name(), project_name);
+}
+
+/// Write VS Code settings with correct ky compiler path.
+fn write_vscode_settings(project_dir: &Path, exe_path: &str, root_dir: &Path) {
+    let vscode_dir = project_dir.join(".vscode");
+    fs::create_dir_all(&vscode_dir).unwrap_or_else(|e| {
+        eprintln!("Error creating .vscode: {}", e);
+        process::exit(1);
+    });
+    let vscode_settings = format!(
+        r#"{{
+  "ky.kycPath": "{}",
+  "files.associations": {{
+    "*.ky": "ky",
+    "ky.toml": "json"
+  }},
+  "editor.semanticHighlighting.enabled": true,
+  "[ky]": {{
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "kynera.ky"
+  }}
+}}
+"#,
+        exe_path
+    );
+    fs::write(vscode_dir.join("settings.json"), vscode_settings).unwrap_or_else(|e| {
+        eprintln!("Error writing .vscode/settings.json: {}", e);
+        process::exit(1);
+    });
+}
+
+fn write_manifest(project_dir: &Path, project_name: &str, main_path: &str) {
+    let manifest = format!(
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle programming language project\"\nmain = \"{}\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
+        project_name, main_path
+    );
+    fs::write(project_dir.join("ky.toml"), &manifest).unwrap_or_else(|e| {
+        eprintln!("Error writing ky.toml: {}", e);
+        process::exit(1);
+    });
+}
+
+fn write_gitignore(project_dir: &Path) {
+    let gitignore = "target/\n*.kyc-build/\nky.lock\n.vscode/\nstd/\n";
+    fs::write(project_dir.join(".gitignore"), gitignore).unwrap_or_else(|e| {
+        eprintln!("Error writing .gitignore: {}", e);
+        process::exit(1);
+    });
+}
+
+fn write_readme(project_dir: &Path, project_name: &str) {
+    let readme = format!(
+        "# {}\n\n{}\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Run tests\n{bname} test\n\n# Release build\n{bname} build --release\n```\n\n## Project Structure\n\n```\n├── src/\n│   ├── main.ky       # Entry point\n│   └── lib.ky        # Library module\n├── tests/\n│   └── test_main.ky  # Tests\n├── ky.toml           # Project manifest\n└── README.md\n```\n",
+        project_name, project_name, bname = bin_name()
+    );
+    fs::write(project_dir.join("README.md"), &readme).unwrap_or_else(|e| {
+        eprintln!("Error writing README.md: {}", e);
+        process::exit(1);
+    });
+}
+
+fn write_readme_api(project_dir: &Path, project_name: &str) {
+    let readme = format!(
+        "# {} — API\n\n{}\n\n## Endpoints\n\n| Method | Path | Description |\n|--------|------|-------------|\n| GET | `/ping` | Health check |\n\n## Usage\n\n```console\n# Build and run\n{bname} build\n{bname} run\n\n# Test ping endpoint\ncurl http://localhost:8080/ping\n```\n",
+        project_name, project_name, bname = bin_name()
+    );
+    fs::write(project_dir.join("README.md"), &readme).unwrap_or_else(|e| {
+        eprintln!("Error writing README.md: {}", e);
+        process::exit(1);
+    });
 }
 
 fn cmd_lsp(_args: &[String]) {
