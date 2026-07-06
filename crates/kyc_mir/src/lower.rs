@@ -4706,7 +4706,6 @@ impl Lowerer {
                 ctx
             }
             Expr::Assignment { target, value, .. } => {
-                eprintln!("DEBUG: Expr::Assignment target={:?}", target);
 
                 // Handle list[index] = value → kl_list_set
                 // Handle dict[key] = value → kl_dict_set
@@ -4789,7 +4788,6 @@ impl Lowerer {
                 // For struct field assignment with empty Dict {} but field is List, create list instead
                 if let Expr::PropertyAccess { object, property, .. } = target.as_ref() {
                     if let Expr::Identifier { name, .. } = object.as_ref() {
-                        eprintln!("DEBUG: found this={}, property={}, checking fields...", name, property);
                         if let Some(&obj_local) = ctx.locals.get(name) {
                             let obj_type = ctx.local_types.get(&obj_local).cloned();
                             if let Some(MirType::Struct(_, fields)) = &obj_type {

@@ -87,9 +87,9 @@ final class Res:
         this.sent = 1
 
 final class Router:
-    rmethods: &{i32}
-    rpatterns: &{str}
-    rhandlers: &{ptr}
+    rmethods: {i32}
+    rpatterns: {str}
+    rhandlers: {ptr}
 
     Router(port: i32 = 8080):
         this.rmethods = {}

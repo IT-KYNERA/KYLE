@@ -594,7 +594,7 @@ fn cmd_new_api(project_dir: &Path, project_name: &str, exe_path: &str) {
     });
 
     let main_kl = format!(
-        "# {} — API entry point\nfrom http.server import Router\n\napp = Router()\n\napp.get(\"/ping\", (req, res):\n    res.json({{status: \"ok\"}}, 200)\n)\n\napp.listen(8080)\n",
+        "# {} — API entry point\nfrom http.server import Router\n\napp = Router()\n\napp.get(\"/ping\", (req, res):\n    res.json(\"{{\\\"status\\\": \\\"ok\\\"}}\", 200)\n)\n\napp.listen(8080)\n",
         project_name
     );
     fs::write(project_dir.join("src").join("main.ky"), &main_kl).unwrap_or_else(|e| {
