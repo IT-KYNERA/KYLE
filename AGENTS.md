@@ -192,28 +192,139 @@ LLVM 18.1 required.
 
 ## How to publish a new release
 
-1. **Update version** in `Cargo.toml` (workspace root), `install.sh` (`VERSION=`), `vscode-ky/install-extension.sh` (`TAG=`), and `vscode-ky/package.json` (`"version"`)
-2. **Build release binary**: `cargo build --release --bin ky`
-3. **Update package tarballs**: `cd packages/<name> && tar czf ../../docs/packages/<name>/0.1.0/download.tar.gz ky.toml src/`
-4. **Git commit + push** all changes to `main`
-5. **Compress binary**: `gzip -c target/release/ky > /tmp/ky_release.gz`
-6. **Create GitHub Release + upload assets**:
+### 1. Pre-flight checklist
+
+Before releasing, verify:
+- [ ] `cargo test --workspace` — all tests pass
+- [ ] `ky check benchmarks/primes/primes.ky` — no errors
+- [ ] `ky run examples/hello.ky` — works correctly
+- [ ] GitHub Actions CI is green (build + test)
+
+### 2. Update versions
+
+Update the version in ALL of these files (search for the old version string):
+
+| File | Field | Example |
+|------|-------|---------|
+| `Cargo.toml` | `version = "0.X.X"` | `version = "0.5.2"` |
+| `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.5.2` |
+| `install.sh` | `VERSION="v0.X.X"` | `VERSION="v0.5.2"` |
+| `vscode-ky/install-extension.sh` | `TAG="v0.X.X"` | `TAG="v0.5.2"` |
+| `vscode-ky/package.json` | `"version": "0.X.X"` | `"version": "0.5.2"` |
+
+### 3. Build release binary
 
 ```bash
+# Full build (all crates, includes runtime)
+cargo build --release --bin ky
+
+# Verify version
+./target/release/ky --version    # must show v0.X.X
+```
+
+### 4. Rebuild package tarballs (if packages changed)
+
+If you modified any package source (`packages/<name>/src/`), rebuild its tarball:
+
+```bash
+for pkg in http json sqlite; do
+    if [ -d "packages/$pkg" ]; then
+        cd packages/$pkg
+        tar czf ../../docs/packages/$pkg/0.1.0/download.tar.gz ky.toml src/
+        cd ../..
+    fi
+done
+```
+
+Verify the tarball includes all necessary files:
+```bash
+tar tzf docs/packages/http/0.1.0/download.tar.gz
+# Should show: ky.toml  src/  src/lib.ky  src/server.ky  src/websocket.ky
+```
+
+### 5. Rebuild VS Code extension
+
+```bash
+cd vscode-ky
+npx @vscode/vsce package --out ky-0.X.X.vsix
+cd ..
+```
+
+### 6. Commit and push
+
+```bash
+git add -A
+git commit -m "Release v0.X.X: description of changes"
+git push origin main
+```
+
+### 7. Create GitHub Release
+
+```bash
+# Compress the binary (MUST be named ky.gz — install.sh downloads this exact name)
+gzip -c target/release/ky > /tmp/ky.gz
+
+# Create the release
 gh release create v0.X.X \
   --title "Kyle v0.X.X" \
-  --notes "Description of changes" \
-  "/tmp/ky_release.gz#ky_release.gz" \
-  "vscode-ky/ky-0.X.X.vsix#ky-extension.vsix"
+  --notes "## Changes
+
+- Bullet list of changes
+" \
+  "/tmp/ky.gz" \
+  "vscode-ky/ky-0.X.X.vsix"
 ```
 
-7. **Push the tag**: `git push origin v0.X.X`
-8. **Verify** download + install:
+**Important:** The binary MUST be uploaded as `ky.gz` (the filename on disk, NOT with `#label`). The install script downloads `https://.../releases/download/v0.X.X/ky.gz`. If you use `#label.gz`, GitHub renames the file and the download will 404.
+
+### 8. Push the tag
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
-ky new api /tmp/test_release && cd /tmp/test_release && ky check && ky build
+git fetch --tags origin
+git tag v0.X.X
+git push origin v0.X.X
 ```
+
+### 9. Verify the release
+
+```bash
+# Simulate a clean install
+cd /tmp && rm -rf verify_release
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
+
+# Add to PATH and test
+export PATH="$HOME/.ky/bin:$PATH"
+
+# Version check
+ky --version                     # → must show v0.X.X
+
+# App project
+ky new app /tmp/verify_release_app
+cd /tmp/verify_release_app
+ky check
+ky build
+
+# API project (tests package registry)
+ky new api /tmp/verify_release_api
+cd /tmp/verify_release_api
+ky check                         # → must resolve deps, no errors
+ky build
+
+# Bare script
+ky new bare /tmp/verify_release_bare
+cd /tmp/verify_release_bare
+ky run *.ky                      # → must print "Hello from ..."
+
+# Cleanup
+rm -rf /tmp/verify_release_*
+```
+
+### 10. If something fails
+
+- **Download 404**: The asset filename doesn't match install.sh. Upload again with the exact filename.
+- **Wrong version shown**: Binary wasn't rebuilt after Cargo.toml update. Run `cargo clean -p kyc_cli && cargo build --release --bin ky`.
+- **Package not found**: Tarball wasn't rebuilt or Pages is stale. Rebuild tarball and push again.
+- **Tests fail locally**: Fix tests, recommit, rebuild.
 
 ---
 
@@ -229,7 +340,7 @@ ky new api /tmp/test_release && cd /tmp/test_release && ky check && ky build
 
 ---
 
-*Version: v0.5.2 · Last updated: 2026-07-06 — Fases 1-17 completadas, Phase 0 (FFI) ✅, packages iniciados, Phase A (runtime en Kyle) en progreso*
+*Version: v0.5.2 · Last updated: 2026-07-06 — Ver `AGENTS.md` > "How to publish a new release" para proceso completo de release.*
 
 ---
 
