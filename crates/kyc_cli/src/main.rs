@@ -180,7 +180,11 @@ fn cmd_build(args: &[String]) {
         }
         return;
     }
-    // Single-file mode
+    // Single-file mode: also resolve project dependencies if in a project
+    if let Some(project_root) = find_project_root(&std::env::current_dir().unwrap()) {
+        resolve_and_check(&project_root);
+    }
+
     let file = file_arg.unwrap();
     let file_idx = args.iter().position(|a| a == file).unwrap();
     let source = load_source(args, file_idx);
@@ -242,7 +246,11 @@ fn cmd_run(args: &[String]) {
         }
         return;
     }
-    // Single-file mode
+    // Single-file mode: also resolve project dependencies if in a project
+    if let Some(project_root) = find_project_root(&std::env::current_dir().unwrap()) {
+        resolve_and_check(&project_root);
+    }
+
     let file = file_arg.unwrap();
     let file_idx = args.iter().position(|a| a == file).unwrap();
     let source = load_source(args, file_idx);
@@ -302,7 +310,11 @@ fn cmd_check(args: &[String]) {
         }
         return;
     }
-    // Single-file mode
+    // Single-file mode: also resolve project dependencies if in a project
+    if let Some(project_root) = find_project_root(&std::env::current_dir().unwrap()) {
+        resolve_and_check(&project_root);
+    }
+
     let source = load_source(args, 2);
     let file = &args[2];
     match kyc_driver::pipeline::Pipeline::check_source(&source, file) {
@@ -590,7 +602,7 @@ fn cmd_new_api(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
 
-    write_manifest(project_dir, project_name, "src/main.ky");
+    write_manifest_with_deps(project_dir, project_name, "src/main.ky", &["http", "json"]);
     write_gitignore(project_dir);
     write_vscode_settings(project_dir, exe_path);
 
@@ -662,9 +674,18 @@ fn write_vscode_settings(project_dir: &Path, exe_path: &str) {
 }
 
 fn write_manifest(project_dir: &Path, project_name: &str, main_path: &str) {
+    write_manifest_with_deps(project_dir, project_name, main_path, &[])
+}
+
+fn write_manifest_with_deps(project_dir: &Path, project_name: &str, main_path: &str, deps: &[&str]) {
+    let deps_str = if deps.is_empty() {
+        String::new()
+    } else {
+        deps.iter().map(|d| format!("{} = \"*\"", d)).collect::<Vec<_>>().join("\n") + "\n"
+    };
     let manifest = format!(
-        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle language project\"\nmain = \"{}\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n",
-        project_name, main_path
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\nauthors = [\"You <you@example.com>\"]\nlicense = \"MIT\"\ndescription = \"A Kyle language project\"\nmain = \"{}\"\n\n[compiler]\noptimization = \"O2\"\ntarget = \"native\"\n\n[dependencies]\n{}",
+        project_name, main_path, deps_str
     );
     fs::write(project_dir.join("ky.toml"), &manifest).unwrap_or_else(|e| {
         eprintln!("Error writing ky.toml: {}", e);

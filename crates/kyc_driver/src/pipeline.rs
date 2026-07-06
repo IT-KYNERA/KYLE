@@ -69,6 +69,18 @@ impl Pipeline {
             resolver.add_search_path(local_pkg);
         }
 
+        // Fallback: add compiler's built-in packages directory if reachable
+        // (for development: packages/ is relative to the ky binary)
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(exe_dir) = exe.parent() {
+                // Try exe_dir/../packages/ (dev layout)
+                let dev_pkg = exe_dir.join("../packages");
+                if dev_pkg.exists() {
+                    resolver.add_search_path(dev_pkg);
+                }
+            }
+        }
+
         // Add package cache search paths from lock file and cache
         if let Some(project_root) = find_project_root(&base_dir) {
             let lock_path = project_root.join("ky.lock");

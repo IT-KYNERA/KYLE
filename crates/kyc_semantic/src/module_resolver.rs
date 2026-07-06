@@ -134,6 +134,11 @@ impl ModuleResolver {
                         }
                     }
                 }
+                // Fallback: try <module>/lib.ky for unified packages
+                let lib_fallback = search_path.join(&path_str).with_extension("ky").parent().unwrap().join("lib.ky");
+                if lib_fallback.exists() {
+                    return Ok(lib_fallback);
+                }
             }
         }
         Err(format!("module '{}' not found in search paths", module_name))
