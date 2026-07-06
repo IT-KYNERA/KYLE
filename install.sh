@@ -2,7 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="v0.5.1"
+VERSION="v0.5.2"
 
 # --- Uninstall mode ---
 if [ "${1:-}" = "uninstall" ]; then
@@ -26,7 +26,7 @@ fi
 echo "Downloading Kyle $VERSION..."
 
 # Download compressed binary from GitHub Releases
-curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky.gz" -o "/tmp/ky.gz"
+curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky_release.gz" -o "/tmp/ky.gz"
 gunzip -f "/tmp/ky.gz"
 chmod +x "/tmp/ky"
 
