@@ -87,14 +87,14 @@ final class Res:
         this.sent = 1
 
 final class Router:
-    rmethods: &[i32]
-    rpatterns: &[str]
-    rhandlers: &[ptr]
+    rmethods: &{i32}
+    rpatterns: &{str}
+    rhandlers: &{ptr}
 
     Router(port: i32 = 8080):
-        this.rmethods = []
-        this.rpatterns = []
-        this.rhandlers = []
+        this.rmethods = {}
+        this.rpatterns = {}
+        this.rhandlers = {}
 
     fn get(path: str, handler: ptr):
         this.rmethods.push(M_GET)
