@@ -1446,6 +1446,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_join_thread", ft, None);
         }
+        // i64 kl_parallel_for(ptr, i64, i64)  — parallel for loop
+        {
+            let params = [ptr_ty.into(), i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_parallel_for", ft, None);
+        }
         // i32 kl_dict_contains(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];

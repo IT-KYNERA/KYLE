@@ -78,7 +78,7 @@ impl SymbolTable {
             "ceil", "floor", "round",
             "push", "list_len", "list_get", "list_set", "list_pop",
 
-            "ky_spawn_thread", "ky_join_thread",
+            "ky_spawn_thread", "ky_join_thread", "ky_parallel_for",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {
