@@ -1,6 +1,6 @@
 # Types
 
-## Primitive types
+## Primitive types [x]
 
 | Type | Size | Description |
 |------|------|-------------|
@@ -15,19 +15,22 @@
 | `str` | pointer | Heap-allocated immutable string |
 | `ptr` | 8 bytes | Raw pointer (FFI, unsafe) |
 
+**Bug:** `char = 'a'` type mismatch ("expected 'char', found 'i32'"). Usar `i32` como workaround.
+
 ## Compound types
 
-### Optional: `T?`
+### Optional: `T?` [ ]
 
-Sugar for `Option<T>`. A value that is either `T` or `none`.
+Sugar for `Option<T>`. A value that is either `T` o `None`.
 
 ```ky
-name: str? = none
+name: str? = None
 if value = get_name():
     println(value)
 ```
+**Bug:** `str?` causa type mismatch "'str' expects 1 argument(s), got 2". No funciona.
 
-### Fallible: `T!`
+### Fallible: `T!` [ ]
 
 Sugar for `Result<T, Error>`. A value that is either `T` or an error.
 
@@ -38,7 +41,7 @@ fn divide(a: i32, b: i32) i32!:
     a / b
 ```
 
-### Mutable: `&T`
+### Mutable: `&T` [x]
 
 Marks a variable, parameter, or field as mutable.
 
@@ -48,7 +51,7 @@ fn increment(x: &i32):
     x = x + 1
 ```
 
-### Move: `^T`
+### Move: `^T` [x]
 
 Parameter with ownership transfer.
 
@@ -57,7 +60,7 @@ fn consume(^data: str):
     println(data)
 ```
 
-### Array: `[T; N]`
+### Array: `[T; N]` [x]
 
 Array nativo, stack inline, tamaño fijo conocido en compile-time. Acceso vía GEP + load/store — **cero runtime calls**.
 
@@ -75,7 +78,7 @@ first = numbers[0]             # GEP + load (nativo)
 numbers[0] = 42                # GEP + store (nativo)
 ```
 
-### List: `{T}`
+### List: `{T}` [x]
 
 Lista dinámica, heap, redimensionable. Usa `ky_list_*` runtime.
 
@@ -85,7 +88,7 @@ numbers.push(4)
 first = numbers[0]             # ky_list_get
 ```
 
-### Tuple: `(T1, T2, ...)`
+### Tuple: `(T1, T2, ...)` [x]
 
 Fixed-size heterogeneous collection.
 

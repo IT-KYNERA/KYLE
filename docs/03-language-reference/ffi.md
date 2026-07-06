@@ -1,4 +1,6 @@
-# FFI — Foreign Function Interface
+# FFI
+
+**Status:** [x] `@link "c"`, `extern fn` declarations, `ptr` type for raw pointers. — Foreign Function Interface
 
 **Status:** Under development
 

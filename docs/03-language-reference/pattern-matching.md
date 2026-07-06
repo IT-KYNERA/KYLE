@@ -1,5 +1,7 @@
 # Pattern Matching
 
+**Status:** [x] Basic match with `_:` and literal patterns. [ ] `1|2` or-pattern. [ ] `..=` range pattern.
+
 ## Match statement
 
 ```ky

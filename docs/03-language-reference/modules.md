@@ -1,5 +1,7 @@
 # Modules
 
+**Status:** [x] `from X import Y`, `import X`, relative `~X` imports (with packages installed).
+
 ## Module definition
 
 A module is a `.ky` file. The module name is the filename without extension.

@@ -1,4 +1,6 @@
-# Ownership and Borrowing
+# Ownership
+
+**Status:** [x] `^T` move semantics, `&T` mutable ref, default borrow-by-default. and Borrowing
 
 Kyle uses borrow semantics by default. Parameters are borrowed, not moved, unless `^T` is used.
 

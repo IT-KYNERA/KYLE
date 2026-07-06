@@ -1,5 +1,7 @@
 # Enums
 
+**Status:** [x] Enum variants, match with `Enum.Variant`, `_:` catch-all.
+
 Enums are tagged unions (discriminated unions).
 
 ## Declaration

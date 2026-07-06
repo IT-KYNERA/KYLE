@@ -1,5 +1,7 @@
 # Expressions
 
+**Status:** [x] All expression types work (arithmetic, bitwise, comparison, logical, as casts, ranges, ternary).
+
 ## Binary operators
 
 | Category | Operators |

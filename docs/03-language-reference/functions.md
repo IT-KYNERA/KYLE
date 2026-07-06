@@ -1,5 +1,7 @@
 # Functions
 
+**Status:** [x] Basic fn, params, return, default params. [ ] `static fn` syntax error. [ ] `Calc.method()` undefined symbol.
+
 ## Declaration
 
 ```ky

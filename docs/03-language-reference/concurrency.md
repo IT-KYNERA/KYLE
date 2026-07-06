@@ -1,5 +1,7 @@
 # Concurrency & Parallel Execution
 
+**Status:** [x] `async fn` with 1 param, `async:` block, `await`, `ky_parallel_for`, `ky_spawn_thread`/`ky_join_thread`.
+
 Kyle tiene un **thread pool** global que usa todos los cores (`available_parallelism()`).
 Workers configurables con `KL_WORKERS`.
 

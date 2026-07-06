@@ -2,6 +2,8 @@
 
 Formal specification of the Kyle programming language.
 
+Status: 10/15 completos [x], 5 con bugs [ ]. Cada doc tiene su status al inicio.
+
 | Document | Description |
 |-----------|-------------|
 | [lexical-structure.md](lexical-structure.md) | File format, indentation, comments, identifiers |

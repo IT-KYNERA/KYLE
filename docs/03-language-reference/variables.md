@@ -1,6 +1,6 @@
 # Variables
 
-## Declaration
+## Declaration [x]
 
 Variables are declared with `name = value`. No `let`, `var`, or `const` keywords.
 
@@ -9,7 +9,7 @@ name = "Ana"        # immutable (default)
 age: &i32 = 25      # mutable with &T
 ```
 
-## Constants
+## Constants [x]
 
 Compile-time constants use `:=`. UPPER_CASE naming by convention.
 
@@ -18,7 +18,7 @@ VERSION := "1.0.0"
 MAX_SIZE := 1024
 ```
 
-## Mutability
+## Mutability [x]
 
 | Form | Mutability |
 |-------|-------------|
@@ -34,7 +34,7 @@ z = &5             # mutable (sugar)
 y = y + 1          # reassignment allowed
 ```
 
-## Scope
+## Scope [x]
 
 Variables are block-scoped. Each indentation level creates a new scope.
 
@@ -46,7 +46,7 @@ if true:
 # y is not accessible here
 ```
 
-## Destructuring
+## Destructuring [x]
 
 ```ky
 point = (10, 20)
@@ -55,3 +55,4 @@ point = (10, 20)
 lst = {1, 2, 3}
 (first, second) = lst
 ```
+Nota: destructuring de listas da punteros (valores raw i64), no funciona para tipos reference como lista/string.

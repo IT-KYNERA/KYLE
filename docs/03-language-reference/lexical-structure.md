@@ -1,10 +1,10 @@
 # Lexical Structure
 
-## Source file format
+## Source file format [x]
 
 Kyle source files use **UTF-8** encoding. File extension: `.ky`.
 
-## Indentation
+## Indentation [x]
 
 Indentation defines block structure. **4 spaces** per level.
 
@@ -15,14 +15,15 @@ fn main() i32:
         x + 1
 ```
 
-## Comments
+## Comments [x]
 
 ```ky
 # Line comment
 ## Doc comment (appears before declarations)
 ```
+Note: no `/* */` block comments.
 
-## Identifiers
+## Identifiers [x]
 
 Identifiers start with a letter or underscore, followed by letters, digits, or underscores.
 
@@ -33,7 +34,7 @@ __name      # private
 foo123      # digits allowed
 ```
 
-## Keywords
+## Keywords [x]
 
 ```
 fn         class       final       abstract    enum
@@ -41,11 +42,13 @@ contract   struct      type        if          elif
 else       while       for         in          match
 return     break       continue    defer       guard
 unsafe     async       await       const       static
-true       false       none        and         or
+true       false       None        and         or
 not        is          as          this        super
 ```
 
-## Operators
+**Bug:** docs dicen `none` pero el keyword real es `None` (mayuscula). Corregido arriba.
+
+## Operators [x]
 
 | Symbol | Description |
 |---------|-------------|
@@ -58,7 +61,7 @@ not        is          as          this        super
 | `=` `+=` `-=` `*=` `/=` `%=` | Assignment |
 | `is` `as` | Type test and cast |
 
-## Literals
+## Literals [x]
 
 ```ky
 42          # integer decimal
@@ -68,10 +71,10 @@ not        is          as          this        super
 "hello"     # string
 true        # boolean
 false
-none        # null value
+None        # null value (None con mayuscula)
 ```
 
-## Integer literal types
+## Integer literal types [x]
 
 The default type for integer literals is `i32`. Values exceeding `i32` range are inferred as `i64`.
 

@@ -1,5 +1,7 @@
 # Classes
 
+**Status:** [x] final class, struct literal, methods, constructors, `Class :: Parent` inheritance.
+
 ## final class
 
 Lightweight struct with fields. No inheritance.

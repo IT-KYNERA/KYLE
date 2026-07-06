@@ -1,5 +1,7 @@
 # Generics
 
+**Status:** [x] `class Box<T>`, `fn identity<T>`, `identity<i32>(42)`, `Box<i32> {value:7}`.
+
 ## Generic classes
 
 ```ky

@@ -1,5 +1,7 @@
 # Error Handling
 
+**Status:** [x] `return -1` style error handling. [ ] `-> Type` return arrow syntax. [ ] `ok(v)`/`error(e)` result match.
+
 ## Fallible type: `T!`
 
 `T!` is sugar for `Result<T, Error>`. Functions that can fail return `T!`.

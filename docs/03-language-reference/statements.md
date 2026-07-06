@@ -1,5 +1,7 @@
 # Statements
 
+**Status:** [x] if/elif/else, while, for-in range, match, return, break, continue, defer, guard.
+
 ## Expression statement
 
 ```ky
