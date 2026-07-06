@@ -503,9 +503,12 @@ impl<'ctx> Codegen<'ctx> {
                                     self.builder.build_store(gep.into_pointer_value(), val)
                                         .map_err(|e| format!("sfst2: {}", e))?;
                                 }
-                            } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                             } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                 self.builder.build_store(ptr, val)
                                     .map_err(|e| format!("ssast: {}", e))?;
+                                // Also track in block_vals so ssa_read! can find it for Call args
+                                block_vals[bi].insert(*value, val);
+                                alloca_current.insert(*dest, val);
                             } else {
                                 // Promoted alloca: track in global map AND block_vals
                                 alloca_current.insert(*dest, val);
@@ -2758,8 +2761,7 @@ impl<'ctx> Codegen<'ctx> {
             else { self.builder.build_signed_int_to_float(self.to_int_value(v), self.context.f64_type(), "").unwrap() }
         };
         let to_int = |v: BasicValueEnum<'ctx>| -> inkwell::values::IntValue<'ctx> {
-            if let BasicValueEnum::IntValue(i) = v { i }
-            else { self.context.i32_type().const_zero() }
+            self.to_int_value(v)
         };
         let l_is_float = matches!(l, BasicValueEnum::FloatValue(_));
         let r_is_float = matches!(r, BasicValueEnum::FloatValue(_));

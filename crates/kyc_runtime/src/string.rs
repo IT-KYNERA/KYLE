@@ -383,7 +383,11 @@ pub extern "C" fn ky_substr(s: *const u8, start: i64, count: i64) -> *const u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_clone_str(s: *const u8) -> *const u8 {
     if s.is_null() {
-        return std::ptr::null();
+        // Return empty string instead of null to avoid crashes downstream
+        let buf = crate::ky_alloc(1);
+        if buf.is_null() { return std::ptr::null(); }
+        unsafe { *buf = 0; }
+        return buf;
     }
     let len = ky_strlen(s);
     let buf = crate::ky_alloc((len + 1) as i64);

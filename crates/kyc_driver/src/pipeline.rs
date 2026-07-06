@@ -359,8 +359,8 @@ impl Pipeline {
 
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "ky_module");
-        // SSA codegen disabled temporarily (bug: ptr variables resolve to null)
-        // Use non-SSA path which is correct and stable.
+        // SSA codegen disabled — bugs with ptr/str propagation (null values)
+        // Will be re-enabled after proper fix to resolve_mir! and Store tracking.
         codegen.compile(&mir.module)?;
 
         // Ensure artifact directory exists
