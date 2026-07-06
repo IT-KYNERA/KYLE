@@ -62,7 +62,8 @@ impl Linker {
         }
 
         // On macOS, link CoreFoundation (needed by chrono/iana-time-zone)
-        if cfg!(target_os = "macos") {
+        // Check at runtime (not compile-time) so cross-compiled binary works
+        if std::env::consts::OS == "macos" {
             cmd.arg("-framework").arg("CoreFoundation");
             // Common Homebrew library paths
             let homebrew_paths = [
