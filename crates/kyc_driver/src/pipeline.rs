@@ -359,15 +359,9 @@ impl Pipeline {
 
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "ky_module");
-        if optimization == OptimizationLevel::Aggressive {
-            if let Err(e) = codegen.compile_with_ssa(&mir.module) {
-                eprintln!("SSA codegen error (falling back to non-SSA): {}", e);
-                codegen = Codegen::new(&context, "ky_module");
-                codegen.compile(&mir.module)?;
-            }
-        } else {
-            codegen.compile(&mir.module)?;
-        }
+        // SSA codegen disabled temporarily (bug: ptr variables resolve to null)
+        // Use non-SSA path which is correct and stable.
+        codegen.compile(&mir.module)?;
 
         // Ensure artifact directory exists
         std::fs::create_dir_all(artifact_dir)
