@@ -21,7 +21,7 @@ fn divide(a: i32, b: i32) i32!:
 fn main() i32:
     r = divide(10, 2)
     mr = match r:
-        ok(v): "ok: " + v.to_str()
+        ok(v): "ok: " + v.toStr()
         error(e): "err: " + e
     println(mr)
     0

@@ -14,13 +14,13 @@ Built-in globales. No necesita import.
 json = serialize(user)
 
 # JSON string → Clase (con <T> genérico)
-user = deserialize<User>(json_str)
+user = deserialize<User>(jsonStr)
 
 # Dict → JSON (legacy)
 text = stringify(data)
 
 # JSON → Dict
-data = parse(json_str)
+data = parse(jsonStr)
 ```
 
 ---
@@ -45,8 +45,8 @@ Auto-detecta los campos. Sin descriptor manual.
 ## 3. JSON → Clase (`deserialize<T>`)
 
 ```kyle
-json_str = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
-user = deserialize<User>(json_str)
+jsonStr = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
+user = deserialize<User>(jsonStr)
 print(user.name)   # "Ana"
 print(user.age)    # 30
 ```
@@ -90,7 +90,7 @@ app.post("/users", (req, res):
 )
 
 app.get("/users/{id:i32}", (req, res):
-    user = find_user(req.param("id"))
+    user = findUser(req.param("id"))
     res.json(user)
 )
 ```

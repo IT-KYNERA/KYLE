@@ -6,14 +6,14 @@ Kyle has a built-in test framework using the `#[test]` attribute.
 
 ```ky
 #[test]
-fn test_addition():
+fn testAddition():
     result = 2 + 2
     assert(result == 4)
 
 #[test]
-fn test_string():
-    assert_eq("hello", "hello")
-    assert_ne("hello", "world")
+fn testString():
+    assertEq("hello", "hello")
+    assertNe("hello", "world")
 ```
 
 ## Assertions
@@ -21,9 +21,9 @@ fn test_string():
 | Function | Description |
 |----------|-------------|
 | `assert(condition)` | Assert condition is true |
-| `assert_eq(a, b)` | Assert a == b |
-| `assert_ne(a, b)` | Assert a != b |
-| `assert_str(a, b)` | Assert string equality |
+| `assertEq(a, b)` | Assert a == b |
+| `assertNe(a, b)` | Assert a != b |
+| `assertStr(a, b)` | Assert string equality |
 
 ## Running tests
 
@@ -41,8 +41,8 @@ my-project/
 ├── src/
 │   └── main.ky
 └── tests/
-    ├── test_unit.ky
-    └── test_integration.ky
+    ├── testUnit.ky
+    └── testIntegration.ky
 ```
 
 Each test function must:

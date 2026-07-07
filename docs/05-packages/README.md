@@ -34,7 +34,7 @@ app.get("/users/{id}", (req, res):
 
 app.post("/data", (req, res):
     body = req.body()                          # raw HTTP body
-    res.json_str(body, 200)                    # raw JSON string
+    res.jsonStr(body, 200)                    # raw JSON string
 )
 
 app.listen(8080)
@@ -45,7 +45,7 @@ app.listen(8080)
 | Método | Descripción |
 |--------|-------------|
 | `res.json(data: {str: str}, code)` | Serializa dict a JSON automáticamente |
-| `res.json_str(data: str, code)`    | Envía JSON string crudo |
+| `res.jsonStr(data: str, code)`    | Envía JSON string crudo |
 | `res.text(body: str, code)`        | Envía texto plano |
 
 ### Client
@@ -55,7 +55,7 @@ from http import Client
 
 client = Client(timeout=10)
 resp = client.get("https://api.example.com/users")
-print(resp.status_code, resp.body)
+print(resp.statusCode, resp.body)
 ```
 
 ---
@@ -71,7 +71,7 @@ data = parse('{"count": 42}')          # → {str: i64}
 s    = stringify({"count": 42})        # → '{"count":42}'
 ```
 
-**Nota:** `parse` devuelve `{str: i64}` (valores numéricos). Para `{str: str}` usa `json_stringify_str` (builtin global).
+**Nota:** `parse` devuelve `{str: i64}` (valores numéricos). Para `{str: str}` usa `jsonStringifyStr` (builtin global).
 
 ---
 

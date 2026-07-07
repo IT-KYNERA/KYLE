@@ -62,7 +62,7 @@ client = Client { timeout: 10 }
 
 # GET
 res = client.get("https://api.github.com/repos/IT-KYNERA/KYLE")
-if res.is_ok:
+if res.isOk:
     print(res.body)
 
 # POST con clase → JSON automático
@@ -86,11 +86,11 @@ res = client.delete(url)
 
 ```kyle
 final class Response:
-    status_code: i32
-    status_text: str
+    statusCode: i32
+    statusText: str
     body: str
-    is_ok: bool
-    elapsed_ms: i64
+    isOk: bool
+    elapsedMs: i64
 ```
 
 ### Auto-JSON
@@ -215,7 +215,7 @@ app.cors(
 
 ```kyle
 app.get("/users/{id:i32}", (req, res):
-    user = find_user(req.param("id"))
+    user = findUser(req.param("id"))
     if user == none:
         res.text("Not Found", 404)
     else:

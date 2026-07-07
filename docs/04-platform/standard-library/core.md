@@ -11,9 +11,9 @@ value = 42
 if val = value:
     println(val)       # 42
 
-result = value.unwrap_or(0)
-exists = value.is_some()
-missing = value.is_none()
+result = value.unwrapOr(0)
+exists = value.isSome()
+missing = value.isNone()
 ```
 
 ## Result

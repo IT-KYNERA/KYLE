@@ -120,7 +120,7 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 | 43 | `await` | — | ✅ | `await task` | |
 | 44 | `async:` block | — | ✅ | `t = async: ...` | |
 | 45 | `Future<T>` | Move | ❌ | `t: Future<str> = async: ...` | No existe. Async retorna i64 opaco |
-| 46 | `Channel<T>` | Move | 🔶 | `ky_channel_new/send/recv` | Runtime listo, falta tipo Kyle |
+| 46 | `channel<T>` | Move | 🔶 | `channel<i64>(16).send(42)` | Runtime listo, falta tipo Kyle |
 | 47 | `select` | — | ❌ | — | Multiplexor de canales |
 | 48 | `Mutex<T>` | Move | ❌ | `m: Mutex<i32>(0)` | Exclusión mutua |
 | 49 | `RwLock<T>` | Move | ❌ | — | Readers-writer lock |

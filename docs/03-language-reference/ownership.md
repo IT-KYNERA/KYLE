@@ -77,7 +77,7 @@ class Point:
     x: ^i32 = 0
     y: ^i32 = 0
 
-    fn move_to(nx: &i32, ny: &i32):
+    fn moveTo(nx: &i32, ny: &i32):
         x = nx      # campo directo, sin this.x
         y = ny
 

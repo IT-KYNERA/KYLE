@@ -77,10 +77,10 @@ Heap list dinámica.
 v = {1, 2, 3}                # → {i32}
 v.push(4)
 v.reserve(100)               # pre-asigna capacidad
-x = v[0]                     # ky_list_get
-v[0] = 99                    # ky_list_set
-v.pop()                      # ky_list_pop
-v.len()                      # ky_list_len
+x = v[0]                     # listGet (runtime)
+v[0] = 99                    # listSet (runtime)
+v.pop()                      # listPop (runtime)
+v.len()                      # listLen (runtime)
 ```
 
 ### Dict: `{K: V}` [x]
@@ -114,7 +114,7 @@ s.add(4)
 s.contains(1)                # → true
 s.remove(1)
 for val in s:
-    println(val.to_str())
+    println(val.toStr())
 ```
 
 ### Queue via list [ ]
@@ -163,7 +163,7 @@ first = s[0]                 # → 2
 
 ```ky
 name: str? = None
-if value = get_name():       # pattern matching
+if value = getName():       # pattern matching
     println(value)
 ```
 

@@ -46,39 +46,39 @@
 | `s.contains(sub)` | i32 | Contiene subcadena |
 | `s.replace(from, to)` | str | Reemplazar |
 | `s.substr(start, len)` | str | Subcadena |
-| `s.char_at(i)` | char | Carácter en índice |
-| `s.is_digit()` | i32 | Primer char es dígito? |
-| `s.is_alpha()` | i32 | Primer char es letra? |
-| `s.is_alnum()` | i32 | Primer char es alfanumérico? |
-| `s.is_whitespace()` | i32 | Primer char es espacio? |
-| `s.is_upper()` | i32 | Primer char es mayúscula? |
-| `s.is_lower()` | i32 | Primer char es minúscula? |
+| `s.charAt(i)` | char | Carácter en índice |
+| `s.isDigit()` | i32 | Primer char es dígito? |
+| `s.isAlpha()` | i32 | Primer char es letra? |
+| `s.isAlnum()` | i32 | Primer char es alfanumérico? |
+| `s.isWhitespace()` | i32 | Primer char es espacio? |
+| `s.isUpper()` | i32 | Primer char es mayúscula? |
+| `s.isLower()` | i32 | Primer char es minúscula? |
 
 ### Char methods
 
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `c.ord()` | i32 | Código ASCII |
-| `c.is_digit()` | i32 | Es dígito? |
-| `c.is_alpha()` | i32 | Es letra? |
-| `c.is_alnum()` | i32 | Es alfanumérico? |
-| `c.is_whitespace()` | i32 | Es espacio? |
-| `c.is_upper()` | i32 | Es mayúscula? |
-| `c.is_lower()` | i32 | Es minúscula? |
+| `c.isDigit()` | i32 | Es dígito? |
+| `c.isAlpha()` | i32 | Es letra? |
+| `c.isAlnum()` | i32 | Es alfanumérico? |
+| `c.isWhitespace()` | i32 | Es espacio? |
+| `c.isUpper()` | i32 | Es mayúscula? |
+| `c.isLower()` | i32 | Es minúscula? |
 
 ### Universal methods (disponibles en cualquier valor)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `val.to_str()` | str | Convertir a string |
-| `val.to_int()` | i32 | Convertir a entero |
-| `val.to_float()` | f64 | Convertir a flotante |
-| `val.to_bool()` | bool | Convertir a booleano |
+| `val.toStr()` | str | Convertir a string |
+| `val.toI32()` | i32 | Convertir a entero |
+| `val.toF64()` | f64 | Convertir a flotante |
+| `val.toBool()` | bool | Convertir a booleano |
 | `val.type()` | TypeInfo | Información del tipo (`.name`, `.kind`, `.size`) |
 
 ### Chaining
 
 ```ky
-result = "  Hello World  ".trim().upper().substr(0, 5)
+result = "  Hello World  ".trim().toUpper().substr(0, 5)
 # result = "HELLO"
 ```

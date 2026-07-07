@@ -1,6 +1,6 @@
 # Concurrency & Parallel Execution
 
-**Status:** [x] `async fn`, `async:` block, `await`, `ky_parallel_for`, threads.
+**Status:** [x] `async fn`, `async:` block, `await`, `parallelFor`, threads.
 [ ] `Future<T>`, `Channel<T>`, `select`, `Mutex<T>`, `Atomic*`, `Iterator`.
 
 ---

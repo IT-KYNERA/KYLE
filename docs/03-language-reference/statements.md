@@ -106,6 +106,6 @@ guard value = optional else:
 
 ```ky
 unsafe:
-    ptr = as_ptr(variable)
+    ptr = asPtr(variable)
     ptr[0] = 0xFF
 ```
