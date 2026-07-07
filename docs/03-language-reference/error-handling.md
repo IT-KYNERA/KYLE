@@ -1,10 +1,12 @@
 # Error Handling
 
-**Status:** [x] `return -1` style error handling. [ ] `-> Type` return arrow syntax. [ ] `ok(v)`/`error(e)` result match.
+**Status:** [x] `T!` fallible return type, `error(msg)`/`ok(val)` builtins, `ok(v)`/`error(e)` pattern match.
+
+Kyle sigue la filosofia de Rust: **no hay try/catch**. Los errores se manejan con tipos `Result` y pattern matching.
 
 ## Fallible type: `T!`
 
-`T!` is sugar for `Result<T, Error>`. Functions that can fail return `T!`.
+`T!` es sugar para `Result<T, str>`. Funciones que pueden fallar retornan `T!`.
 
 ```ky
 fn divide(a: i32, b: i32) i32!:
@@ -13,27 +15,16 @@ fn divide(a: i32, b: i32) i32!:
     a / b
 ```
 
-## Error propagation: `?`
-
-The `?` operator propagates errors automatically.
+## Handling errors with match
 
 ```ky
-fn process() str!:
-    data = read_file("config.txt") ?
-    parse_config(data) ?
-```
-
-If `read_file` returns an error, `process` returns that error immediately.
-
-## Handling errors
-
-```ky
-result = divide(10, 0) !
-
-if result:
-    println("result: {result}")
-else:
-    println("error: {result.error()}")
+fn main() i32:
+    r = divide(10, 2)
+    mr = match r:
+        ok(v): "ok: " + v.to_str()
+        error(e): "err: " + e
+    println(mr)
+    0
 ```
 
 ## Custom errors
