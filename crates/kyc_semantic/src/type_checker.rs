@@ -44,6 +44,7 @@ impl TypeChecker {
     fn target_name(target: &Expr) -> Option<&str> {
         match target {
             Expr::Identifier { name, .. } => Some(name.as_str()),
+            Expr::PropertyAccess { property, .. } => Some(property.as_str()),
             _ => None,
         }
     }
@@ -856,6 +857,12 @@ impl TypeChecker {
                                 "print" | "println" | "print_err"
                                 | "sleep" | "assert" | "assert_eq" | "assert_ne" | "assert_str" => Type::Void,
                                 "len" => Type::I32,
+                                "to_str" | "to_decimal" => Type::Str,
+                                "to_i32" | "to_i64" | "to_i16" | "to_i8" => Type::I32,
+                                "to_u32" | "to_u64" | "to_u16" | "to_u8" => Type::I32,
+                                "to_f64" | "to_f32" => Type::F64,
+                                "to_char" => Type::Char,
+                                "to_bool" => Type::Bool,
                                 "input" => Type::Str,
                                 "range" => Type::List(Box::new(Type::I32)),
                                 "ceil" | "floor" | "round" => Type::F64,
@@ -915,6 +922,16 @@ impl TypeChecker {
                                     }
                                 }
                             }
+                            // Conversion methods called as v.to_str() etc.
+                            match property.as_str() {
+                                "to_str" | "to_decimal" => return Type::Str,
+                                "to_i32" | "to_i64" | "to_i16" | "to_i8" => return Type::I32,
+                                "to_u32" | "to_u64" | "to_u16" | "to_u8" => return Type::I32,
+                                "to_f64" | "to_f32" => return Type::F64,
+                                "to_char" => return Type::Char,
+                                "to_bool" => return Type::Bool,
+                                _ => {}
+                            }
                         }
                         Type::I32
                     }
@@ -947,6 +964,17 @@ impl TypeChecker {
                     }
                 }
                 let obj_type = self.infer_expr(object);
+                // Conversion methods: return the target type
+                match property.as_str() {
+                    "to_str" => return Type::Str,
+                    "to_i32" | "to_i64" | "to_i16" | "to_i8" => return Type::I32,
+                    "to_u32" | "to_u64" | "to_u16" | "to_u8" => return Type::I32,
+                    "to_f64" | "to_f32" => return Type::F64,
+                    "to_char" => return Type::Char,
+                    "to_bool" => return Type::Bool,
+                    "to_decimal" => return Type::Str,
+                    _ => {}
+                }
                 // Detect enum variant construction: Option.None, Option.Some
                 if let Type::Named(name) = &obj_type {
                     if let Some(sym) = self.symbols.lookup(name) {

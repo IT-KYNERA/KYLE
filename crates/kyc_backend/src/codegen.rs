@@ -2420,6 +2420,15 @@ impl<'ctx> Codegen<'ctx> {
                                     let result = if src_width == 1 && dst_width > 1 {
                                         self.builder.build_int_z_extend(*int_val, *t, "")
                                             .map_err(|e| format!("zext: {}", e))?
+                                    } else if dst_width == 1 && src_width > 1 {
+                                        // Int → Bool: compare with zero, not truncate
+                                        let zero = self.context.i32_type().const_zero();
+                                        let widened = if src_width < 32 {
+                                            self.builder.build_int_z_extend(*int_val, self.context.i32_type(), "_widen")
+                                                .map_err(|e| format!("widen: {}", e))?
+                                        } else { *int_val };
+                                        self.builder.build_int_compare(inkwell::IntPredicate::NE, widened, zero, "_tobool")
+                                            .map_err(|e| format!("tobool: {}", e))?
                                     } else {
                                         self.builder.build_int_cast(*int_val, *t, "")
                                             .map_err(|e| format!("cast: {}", e))?
