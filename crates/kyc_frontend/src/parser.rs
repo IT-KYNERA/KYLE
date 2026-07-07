@@ -1351,6 +1351,17 @@ impl Parser {
             } else if self.at(TokenKind::Dot) {
                 let start = self.pos;
                 self.advance();
+                // Tuple index access: .0, .1, .2 (digit after dot) → PropertyAccess {"0"}
+                if self.current().map_or(false, |t| matches!(t.kind, TokenKind::Integer(_))) {
+                    if let Ok(tok) = self.current() {
+                        if let TokenKind::Integer(s) = &tok.kind {
+                            let property = s.clone();
+                            self.advance();
+                            expr = Expr::PropertyAccess { object: Box::new(expr), property, span: self.span_from(start) };
+                            continue;
+                        }
+                    }
+                }
                 let property = self.eat_identifier();
                 expr = Expr::PropertyAccess { object: Box::new(expr), property, span: self.span_from(start) };
             } else if self.at(TokenKind::QuestionDot) {
