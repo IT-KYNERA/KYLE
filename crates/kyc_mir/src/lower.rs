@@ -2417,17 +2417,20 @@ impl Lowerer {
             Stmt::TypedVariable(v) => {
                 ctx = self.lower_expr(ctx, &v.value);
                 let val_local = ctx.next_local - 1;
-                let inferred_type = ctx.local_types.get(&val_local).cloned();
+                let val_type = ctx.local_types.get(&val_local).cloned().unwrap_or(MirType::I32);
                 let var_type = v.type_.as_ref()
                     .map(|t| ast_type_to_mir(t, Some(&ctx.struct_defs)))
-                    .or(inferred_type)
-                    .unwrap_or(MirType::I32);
-                let local = ctx.alloc_local(&v.name, var_type);
+                    .unwrap_or(val_type.clone());
+                let store_val = if val_type != var_type {
+                    let cast = ctx.alloc_local("_tcast", var_type.clone());
+                    ctx.current_block.insts.push(MirInst::Cast { dest: cast, value: MirValue::Local(val_local), to_type: var_type.clone() });
+                    MirValue::Local(cast)
+                } else {
+                    MirValue::Local(val_local)
+                };
+                let local = ctx.alloc_local(&v.name, var_type.clone());
                 ctx.locals.insert(v.name.clone(), local);
-                ctx.current_block.insts.push(MirInst::Store {
-                    dest: local,
-                    value: MirValue::Local(val_local),
-                });
+                ctx.current_block.insts.push(MirInst::Store { dest: local, value: store_val });
                 ctx
             }
         }
