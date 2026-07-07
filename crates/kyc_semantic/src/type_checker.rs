@@ -53,7 +53,6 @@ impl TypeChecker {
         match name {
             "print" | "println" | "print_err" => Some(1),
 
-            "str" | "int" | "float" | "bool" => Some(1),
             "len" => Some(1),
             "input" => Some(0),
             "open" => Some(2),
@@ -857,10 +856,6 @@ impl TypeChecker {
                                 "print" | "println" | "print_err"
                                 | "sleep" | "assert" | "assert_eq" | "assert_ne" | "assert_str" => Type::Void,
                                 "len" => Type::I32,
-                                "str" => Type::Str,
-                                "int" => Type::I32,
-                                "float" => Type::F64,
-                                "bool" => Type::Bool,
                                 "input" => Type::Str,
                                 "range" => Type::List(Box::new(Type::I32)),
                                 "ceil" | "floor" | "round" => Type::F64,

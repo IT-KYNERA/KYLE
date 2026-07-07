@@ -4273,49 +4273,7 @@ impl Lowerer {
                 }
 
                 // Special case: str() built-in — convert number to string
-                if name == "str" && arguments.len() == 1 {
-                    ctx = self.lower_expr(ctx, &arguments[0]);
-                    let arg_local = ctx.next_local - 1;
-                    let arg_type = ctx.local_types.get(&arg_local).cloned().unwrap_or(MirType::I32);
-                    if matches!(arg_type, MirType::F32 | MirType::F64) {
-                        // Call kl_f64_to_str(arg) → returns string pointer
-                        // First cast f32 to f64 if needed
-                        let f64_local = if matches!(arg_type, MirType::F32) {
-                            let c = ctx.alloc_local("_f64cast", MirType::F64);
-                            ctx.current_block.insts.push(MirInst::Cast {
-                                dest: c,
-                                value: MirValue::Local(arg_local),
-                                to_type: MirType::F64,
-                            });
-                            c
-                        } else {
-                            arg_local
-                        };
-                        let ptr_dest = ctx.alloc_local("_strptr", MirType::Str);
-                        ctx.current_block.insts.push(MirInst::Call {
-                            dest: Some(ptr_dest),
-                            name: "ky_f64_to_str".to_string(),
-                            args: vec![MirValue::Local(f64_local)],
-                        });
-                        ctx.string_locals.push(ptr_dest);
-                    } else {
-                        // Cast the argument from i32 to i64 (kl_i64_to_str expects i64)
-                        let cast_local = ctx.alloc_local("_cast64", MirType::I64);
-                        ctx.current_block.insts.push(MirInst::Cast {
-                            dest: cast_local,
-                            value: MirValue::Local(arg_local),
-                            to_type: MirType::I64,
-                        });
-                        let ptr_dest = ctx.alloc_local("_strptr", MirType::Str);
-                        ctx.current_block.insts.push(MirInst::Call {
-                            dest: Some(ptr_dest),
-                            name: "ky_i64_to_str".to_string(),
-                            args: vec![MirValue::Local(cast_local)],
-                        });
-                        ctx.string_locals.push(ptr_dest);
-                    }
-                    return ctx;
-                }
+                // Note: str(v) standalone conversion removed — use v.to_str() method instead
 
                 // Special case: substr(str, start, count) — substring extraction
                 if name == "substr" && arguments.len() == 3 {
@@ -6526,7 +6484,7 @@ fn is_string_builtin_name(name: &str) -> bool {
     matches!(name, "ky_strlen" | "ky_i64_to_str" | "ky_input" | "ky_concat"
         | "ky_str_to_upper" | "ky_str_to_lower" | "ky_str_trim" | "ky_str_replace"
         | "ky_read_str"
-        | "to_upper" | "to_lower" | "trim" | "replace" | "str" | "input" | "input_with_prompt" | "read_str")
+        | "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str")
 }
 
 /// Return the MIR type for known builtin functions, or None for generic functions.

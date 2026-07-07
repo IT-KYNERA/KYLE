@@ -68,7 +68,7 @@ impl SymbolTable {
         // Runtime built-in functions (resolved by type_checker, registered here
         // to avoid "undefined symbol" errors from the scope resolver).
         let runtime_fns = [
-            "print", "println", "print_err", "len", "str", "input", "range",
+            "print", "println", "print_err", "len", "input", "range",
             "json_parse", "json_stringify", "json_stringify_str", "serialize", "deserialize", "type",
             "ky_struct_to_json", "ky_json_to_struct",
             "ky_ptr_read_i32", "ky_ptr_read_ptr",
@@ -78,8 +78,6 @@ impl SymbolTable {
             "char_at", "is_digit", "is_alpha", "is_alnum", "is_whitespace", "is_upper", "is_lower",
             "ord",
             "error",
-            "int", "float", "bool",
-
             "ceil", "floor", "round",
             "push", "list_len", "list_get", "list_set", "list_pop",
 
