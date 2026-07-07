@@ -65,6 +65,7 @@ pub enum Pattern {
     Wildcard { span: Span },
     EnumVariant { enum_name: String, variant: String, args: Vec<Pattern>, span: Span },
     IsType { type_: AstType, span: Span },
+    Range { start: Literal, end: Literal, inclusive: bool, span: Span },
     Tuple { elements: Vec<Pattern>, span: Span },
     Or { patterns: Vec<Pattern>, span: Span },
 }
@@ -1095,6 +1096,10 @@ impl DisplayDepth for Pattern {
             Pattern::IsType { type_, .. } => {
                 write_indent(f, d)?;
                 writeln!(f, "Pattern::IsType \"{}\"", type_)
+            }
+            Pattern::Range { start, end, inclusive, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "Pattern::Range {}..{}{}", start, if *inclusive { "=" } else { "<" }, end)
             }
             Pattern::Or { patterns, .. } => {
                 write_indent(f, d)?;

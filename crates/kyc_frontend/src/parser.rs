@@ -1810,6 +1810,16 @@ impl Parser {
             }
         };
         self.advance();
+        // Check for range patterns: 1..=5 or 1..<5
+        if self.at(TokenKind::DotDotEquals) || self.at(TokenKind::DotDotLess) {
+            let inclusive = self.at(TokenKind::DotDotEquals);
+            self.advance();
+            let end = match &self.current()?.kind {
+                TokenKind::Integer(s) => { let n: i64 = s.parse().unwrap_or(0); self.advance(); Literal::Integer(n) }
+                _ => { return Err("expected integer literal after range".to_string()); }
+            };
+            return Ok(Pattern::Range { start: lit, end, inclusive, span: self.span_from(start) });
+        }
         Ok(Pattern::Literal {
             value: lit,
             span: self.span_from(start),

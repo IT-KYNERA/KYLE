@@ -599,6 +599,11 @@ impl Formatter {
                 write!(out, "is ").unwrap();
                 self.write_type(out, type_);
             }
+            Pattern::Range { start, end, inclusive, .. } => {
+                self.write_literal(out, start);
+                if *inclusive { out.push_str("..="); } else { out.push_str("..<"); }
+                self.write_literal(out, end);
+            }
             Pattern::Or { patterns, .. } => {
                 for (i, p) in patterns.iter().enumerate() {
                     if i > 0 { out.push_str(" | "); }

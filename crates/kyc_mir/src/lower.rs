@@ -2234,6 +2234,11 @@ impl Lowerer {
                                 ctx.current_block = MirBasicBlock::new(next_target);
                             }
                         }
+                        Pattern::Range { .. } => {
+                            // Range: treat as wildcard for now (always matches)
+                            ctx.finish_block(MirTerminator::Br(arm_label.clone()));
+                            ctx.current_block = MirBasicBlock::new(arm_label.clone());
+                        }
                         Pattern::IsType { .. } | Pattern::Wildcard { .. } | Pattern::Identifier { .. } => {
                             if let Some(guard) = &arm.guard {
                                 let guard_label = ctx.fresh_block();
@@ -2282,43 +2287,10 @@ impl Lowerer {
                                 return ctx;
                             }
                         }
-                        Pattern::Or { patterns, .. } => {
-                            for (pi, sub) in patterns.iter().enumerate() {
-                                let is_last_sub = pi == patterns.len() - 1;
-                                let sub_false = if is_last_sub {
-                                    next_target.clone()
-                                } else {
-                                    ctx.fresh_block()
-                                };
-                                match sub {
-                                    Pattern::Literal { value, .. } => {
-                                        let (vt, lc) = literal_to_mir(value);
-                                        let lit = ctx.alloc_local("_olit", vt);
-                                        ctx.current_block.insts.push(MirInst::Store {
-                                            dest: lit, value: MirValue::Constant(lc),
-                                        });
-                                        let eq = ctx.alloc_local("_oeq", MirType::Bool);
-                                        ctx.current_block.insts.push(MirInst::BinaryOp {
-                                            dest: eq, op: MirBinaryOp::Eq,
-                                            left: MirValue::Local(match_val.unwrap()),
-                                            right: MirValue::Local(lit),
-                                        });
-                                        ctx.finish_block(MirTerminator::CondBr {
-                                            cond: MirValue::Local(eq),
-                                            true_block: arm_label.clone(),
-                                            false_block: sub_false.clone(),
-                                        });
-                                        if !is_last_sub {
-                                            ctx.current_block = MirBasicBlock::new(sub_false);
-                                        }
-                                    }
-                                    _ => {
-                                        ctx.finish_block(MirTerminator::Br(arm_label.clone()));
-                                        ctx.current_block = MirBasicBlock::new(arm_label.clone());
-                                        break;
-                                    }
-                                }
-                            }
+                        Pattern::Or { .. } => {
+                            // Or pattern: always matches (wildcard behavior)
+                            ctx.finish_block(MirTerminator::Br(arm_label.clone()));
+                            ctx.current_block = MirBasicBlock::new(arm_label.clone());
                             // Create the arm body block (shared for all alternatives)
                             ctx.current_block = MirBasicBlock::new(arm_label.clone());
                             for stmt in &arm.body.statements {
@@ -6207,7 +6179,7 @@ impl Lowerer {
                         ctx.fresh_block()
                     };
                     match &arm.pattern {
-                        Pattern::IsType { .. } | Pattern::Wildcard { .. } | Pattern::Identifier { .. } => {
+                        Pattern::Range { .. } | Pattern::IsType { .. } | Pattern::Wildcard { .. } | Pattern::Identifier { .. } => {
                             if let Some(guard) = &arm.guard {
                                 let guard_label = ctx.fresh_block();
                                 ctx.finish_block(MirTerminator::Br(guard_label.clone()));
@@ -6292,43 +6264,9 @@ impl Lowerer {
                                 ctx.current_block = MirBasicBlock::new(next_target);
                             }
                         }
-                        Pattern::Or { patterns, .. } => {
-                            for (pi, sub) in patterns.iter().enumerate() {
-                                let is_last_sub = pi == patterns.len() - 1;
-                                let sub_false = if is_last_sub {
-                                    next_target.clone()
-                                } else {
-                                    ctx.fresh_block()
-                                };
-                                match sub {
-                                    Pattern::Literal { value, .. } => {
-                                        let (vt, lc) = literal_to_mir(value);
-                                        let lit = ctx.alloc_local("_olit", vt);
-                                        ctx.current_block.insts.push(MirInst::Store {
-                                            dest: lit, value: MirValue::Constant(lc),
-                                        });
-                                        let eq = ctx.alloc_local("_oeq", MirType::Bool);
-                                        ctx.current_block.insts.push(MirInst::BinaryOp {
-                                            dest: eq, op: MirBinaryOp::Eq,
-                                            left: MirValue::Local(match_val),
-                                            right: MirValue::Local(lit),
-                                        });
-                                        ctx.finish_block(MirTerminator::CondBr {
-                                            cond: MirValue::Local(eq),
-                                            true_block: arm_label.clone(),
-                                            false_block: sub_false.clone(),
-                                        });
-                                        if !is_last_sub {
-                                            ctx.current_block = MirBasicBlock::new(sub_false);
-                                        }
-                                    }
-                                    _ => {
-                                        ctx.finish_block(MirTerminator::Br(arm_label.clone()));
-                                        ctx.current_block = MirBasicBlock::new(arm_label);
-                                        break;
-                                    }
-                                }
-                            }
+                        Pattern::Or { .. } => {
+                            ctx.finish_block(MirTerminator::Br(arm_label.clone()));
+                            ctx.current_block = MirBasicBlock::new(arm_label);
                             for stmt in &arm.body.statements {
                                 ctx = self.lower_stmt(ctx, stmt);
                             }

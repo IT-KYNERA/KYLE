@@ -159,6 +159,7 @@ impl ScopeResolver {
                     self.bind_pattern(p);
                 }
             }
+            Pattern::Range { .. } => {} // range patterns don't bind names
             _ => {}
         }
     }

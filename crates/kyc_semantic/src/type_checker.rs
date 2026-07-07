@@ -398,6 +398,7 @@ impl TypeChecker {
                     self.bind_pattern(p, match_type);
                 }
             }
+            Pattern::Range { .. } => {} // range patterns checked via comparison
             _ => {}
         }
     }
