@@ -5,7 +5,7 @@
 # # ── String functions (read-only ptr) ── ALL ✅ ────────────────
 
 # fn ky_strlen(s: ptr) i32:
-#     len: &i32 = 0
+#     len: ^i32 = 0
 #     while s[len] as i8 != 0:
 #         len = len + 1
 #     len
@@ -35,7 +35,7 @@
 #     c as i32
 
 # fn ky_eq_str(a: ptr, b: ptr) i32:
-#     i: &i32 = 0
+#     i: ^i32 = 0
 #     while a[i] as i8 != 0 and b[i] as i8 != 0:
 #         if a[i] as i8 != b[i] as i8:
 #             return 0
@@ -44,9 +44,9 @@
 
 # fn ky_str_contains(haystack: ptr, needle: ptr) i32:
 #     if needle[0] as i8 == 0: return 1
-#     hi: &i32 = 0
+#     hi: ^i32 = 0
 #     while haystack[hi] as i8 != 0:
-#         ni: &i32 = 0
+#         ni: ^i32 = 0
 #         while needle[ni] as i8 != 0 and haystack[hi + ni] as i8 == needle[ni] as i8:
 #             ni = ni + 1
 #         if needle[ni] as i8 == 0:
@@ -57,9 +57,9 @@
 # # ── Numeric conversion ✅ ─────────────────────────────────────
 
 # fn ky_str_to_i64(s: ptr) i64:
-#     result: &i64 = 0
-#     neg: &i32 = 0
-#     i: &i32 = 0
+#     result: ^i64 = 0
+#     neg: ^i32 = 0
+#     i: ^i32 = 0
 #     if s[0] as i8 == 45:  # '-'
 #         neg = 1
 #         i = 1
@@ -73,8 +73,8 @@
 # # ── Pure math ✅ ─────────────────────────────────────────────
 
 # fn ky_pow(base: i64, exp: i64) i64:
-#     result: &i64 = 1
-#     i: &i64 = 0
+#     result: ^i64 = 1
+#     i: ^i64 = 0
 #     while i < exp:
 #         result = result * base
 #         i = i + 1

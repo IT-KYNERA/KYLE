@@ -1,7 +1,7 @@
-fn consume(^s: str):
+fn consume(s: str):
     println(s)
 
 fn main() i32:
     s = "hello"
-    consume(^s)
+    consume(s)
     0

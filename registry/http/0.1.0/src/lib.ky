@@ -40,7 +40,7 @@ final class Response:
 # ── Client ──
 
 final class Client:
-    timeout: &i32
+    timeout: ^i32
 
     Client(timeout: i32 = 30):
         if timeout <= 0:
@@ -68,8 +68,8 @@ final class Client:
 ZERO := 48
 
 fn parse_int(s: str) i32:
-    result: &i32 = 0
-    i: &i32 = 0
+    result: ^i32 = 0
+    i: ^i32 = 0
     while i < len(s):
         c = char_at(s, i)
         if c >= ZERO and c <= 57:
@@ -104,8 +104,8 @@ fn do_request(method: str, url: str, body: str) Response:
     headers_raw = read_file("/tmp/ky_headers.txt")
 
     sc = 0
-    hdr_mode: &i32 = 0
-    j: &i32 = 0
+    hdr_mode: ^i32 = 0
+    j: ^i32 = 0
     while j < len(headers_raw):
         c = char_at(headers_raw, j)
         if hdr_mode == 0:
@@ -127,7 +127,7 @@ fn do_request(method: str, url: str, body: str) Response:
         404: st = "Not Found"
         500: st = "Internal Server Error"
 
-    ms: &i64 = 0
+    ms: ^i64 = 0
     if len(raw) > 0:
         colon = 0
         while colon < len(raw) and char_at(raw, colon) != 58:

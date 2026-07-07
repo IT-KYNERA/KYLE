@@ -187,12 +187,12 @@ impl BorrowAnalysis {
                     }
                 }
                 MirInst::Call { dest, name, args } => {
-                    // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
-                    // (only `^` params on user-defined functions would consume)
-                    let moves_arg = is_move_func_from_map(name, func_map);
-                    for arg in args {
+                    // MOVE-BY-DEFAULT: args are consumed unless the param is Borrow/MutableBorrow
+                    let modes = func_map.get(name);
+                    for (i, arg) in args.iter().enumerate() {
                         if let MirValue::Local(l) = arg {
-                            if moves_arg {
+                            let is_borrow = modes.map_or(false, |m| i < m.len() && (m[i] == ParamMode::Borrow || m[i] == ParamMode::MutableBorrow));
+                            if !is_borrow {
                                 alive.remove(l);
                             }
                         }
@@ -297,6 +297,7 @@ impl BorrowAnalysis {
         // (like str), the source holds the same pointer as the alias. We must not
         // free the source if an alias still holds its pointer.
         let mut load_sources: BTreeSet<usize> = BTreeSet::new();
+        let mut load_map: HashMap<usize, usize> = HashMap::new();
         let mut field_loaded: BTreeSet<usize> = BTreeSet::new();
         // First pass: find all FieldPtr targets
         let field_ptrs: BTreeSet<usize> = func.basic_blocks.iter()
@@ -310,6 +311,7 @@ impl BorrowAnalysis {
                 if let MirInst::Load { dest, src } = inst {
                     if local_types.get(dest).map_or(false, |t| is_move_type(t)) {
                         load_sources.insert(*src);
+                        load_map.insert(*dest, *src);
                         // Values loaded from struct fields should NOT be freed (field still owns them)
                         if field_ptrs.contains(src) {
                             field_loaded.insert(*dest);
@@ -441,18 +443,17 @@ impl BorrowAnalysis {
                 }
             }
             MirInst::Call { dest, name, args } => {
-                // BORROW-BY-DEFAULT: args stay alive unless the fn consumes them
-                let moves_arg = is_move_func_from_map(name, func_map);
+                // MOVE-BY-DEFAULT: args are consumed unless the param is Borrow/MutableBorrow
+                let modes = func_map.get(name);
                 for (i, arg) in args.iter().enumerate() {
                     if let MirValue::Local(l) = arg {
-                        if moves_arg {
+                        let is_borrow = modes.map_or(false, |m| i < m.len() && (m[i] == ParamMode::Borrow || m[i] == ParamMode::MutableBorrow));
+                        if !is_borrow {
                             self.check_alive(*l, alive, local_names, local_types, "move");
                             if alive.contains(l) {
                                 alive.remove(l);
                             }
-                        }
-                        // MutableBorrow params: ensure the arg is alive (not already moved)
-                        if is_mut_borrow_param(name, i, func_map) {
+                        } else {
                             self.check_alive(*l, alive, local_names, local_types, "use");
                         }
                     }

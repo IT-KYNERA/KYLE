@@ -8,7 +8,7 @@ app = Router()
 app.get("/authors", (req, res):
     conn = postgres.connect(CONNSTR)
     q = conn.query("SELECT id, name, email FROM authors ORDER BY id")
-    i: &i32 = 0
+    i: ^i32 = 0
     json = "["
     while i < q.rows():
         if i > 0:

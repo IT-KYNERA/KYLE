@@ -54,14 +54,14 @@ fn ws_upgrade(client_fd: i32, raw_request: str) bool:
 fn extract_header(raw: str, name: str) str:
     lower = to_lower(raw)
     name_lower = to_lower(name)
-    pos: &i32 = 0
+    pos: ^i32 = 0
     while pos < len(lower):
         nl = 0
         while pos + nl < len(lower) and char_at(lower, pos + nl) != 10:
             nl = nl + 1
         line = substr(lower, pos, nl)
         trim_line = trim(line)
-        i: &i32 = 0
+        i: ^i32 = 0
         while i < len(trim_line) and char_at(trim_line, i) != 58:
             i = i + 1
         if i == len(name_lower) and substr(trim_line, 0, i) == name_lower:

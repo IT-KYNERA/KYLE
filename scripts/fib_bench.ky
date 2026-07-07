@@ -2,7 +2,7 @@
 fn is_prime(n: i32) bool:
     if n < 2:
         return false
-    i: &i32 = 2
+    i: ^i32 = 2
     while i * i <= n:
         if n % i == 0:
             return false
@@ -10,8 +10,8 @@ fn is_prime(n: i32) bool:
     true
 
 fn main() i32:
-    count: &i32 = 0
-    n: &i32 = 2
+    count: ^i32 = 0
+    n: ^i32 = 2
     while n < 3000000:
         if is_prime(n):
             count = count + 1

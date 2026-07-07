@@ -12,8 +12,8 @@ extern fn ky_bytes_from_hex(ptr) ptr
 extern fn ky_bytes_to_base64(ptr, size: i32) ptr
 
 final class bytes:
-    data: &ptr
-    size: &i32
+    data: ^ptr
+    size: ^i32
 
     static fn with_size(n: i32) bytes:
         raw = ky_bytes_new(n)

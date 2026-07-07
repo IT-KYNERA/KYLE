@@ -1,4 +1,5 @@
-fn consume(^s: str):
+# Test: move is default, no `^` needed
+fn consume(s: str):
     println(s)
 
 fn main() i32:

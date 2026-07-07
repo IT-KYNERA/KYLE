@@ -10,7 +10,7 @@ extern fn ky_regex_find(re: ptr, s: ptr) ptr
 extern fn ky_regex_replace(re: ptr, s: ptr, with: ptr) ptr
 
 final class regex:
-    re: &ptr
+    re: ^ptr
 
     static fn compile(pattern: str) regex:
         regex { re: ky_regex_new(pattern as ptr) }

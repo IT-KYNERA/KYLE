@@ -28,7 +28,7 @@ extern fn ky_datetime_from_ymdhms(year: i32, month: i32, day: i32, hour: i32, mi
 # ═══════════════════════════════════════
 
 final class datetime:
-    ms: &i64
+    ms: ^i64
 
     static fn now() datetime:
         m = ky_datetime_now()
@@ -82,7 +82,7 @@ final class datetime:
 # ═══════════════════════════════════════
 
 final class duration:
-    ms: &i64
+    ms: ^i64
 
     static fn from_millis(val: i64) duration:
         duration { ms: val }

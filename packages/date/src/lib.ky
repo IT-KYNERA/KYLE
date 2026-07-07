@@ -17,7 +17,7 @@ extern fn ky_date_add_days(packed: i32, days: i32) i32
 extern fn ky_date_format(packed: i32, fmt: ptr) ptr
 
 final class date:
-    packed: &i32
+    packed: ^i32
 
     static fn today() date:
         date { packed: ky_date_today() }
@@ -63,7 +63,7 @@ extern fn ky_time_minute(packed: i32) i32
 extern fn ky_time_second(packed: i32) i32
 
 final class time:
-    packed: &i32
+    packed: ^i32
 
     static fn now() time:
         time { packed: ky_time_now() }

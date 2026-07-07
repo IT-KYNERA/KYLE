@@ -20,7 +20,7 @@ fn pg_str(ptr: i64) str:
     (ky_clone_str(ptr) as i64 as ptr) as str
 
 final class postgres:
-    conn: &i64
+    conn: ^i64
 
     static fn connect(conninfo: str) postgres:
         c = PQconnectdb(conninfo as ptr)
@@ -46,12 +46,12 @@ final class postgres:
         pg_str(msg)
 
 final class row:
-    res: &i64
-    index: &i32
+    res: ^i64
+    index: ^i32
 
     fn get(self, name: str) str:
         cols = PQnfields(this.res)
-        i: &i32 = 0
+        i: ^i32 = 0
         while i < cols:
             cn = PQfname(this.res, i)
             if cn != 0:
@@ -63,8 +63,8 @@ final class row:
         ""
 
 final class result:
-    res: &i64
-    conn: &i64
+    res: ^i64
+    conn: ^i64
 
     fn rows(self) i32:
         PQntuples(this.res)

@@ -10,7 +10,7 @@ extern fn ky_uuid_v4() ptr
 extern fn ky_uuid_parse(ptr) ptr
 
 final class uuid:
-    data: &ptr
+    data: ^ptr
 
     static fn v4() uuid:
         uuid { data: ky_uuid_v4() }

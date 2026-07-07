@@ -9,7 +9,7 @@ extern fn ky_decimal_round(val: i64, decimals: i32) i64
 extern fn ky_decimal_truncate(val: i64) i64
 
 final class decimal:
-    val: &i64
+    val: ^i64
 
     static fn from_str(s: str) decimal:
         decimal { val: ky_decimal_from_str(s as ptr) }

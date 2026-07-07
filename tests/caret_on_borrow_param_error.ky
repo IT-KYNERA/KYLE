@@ -1,7 +1,5 @@
-fn print_len(s: str):
-    println(str(len(s)))
-
+# Test: `^` before expression without `&` should error
 fn main() i32:
-    s = "hello"
-    print_len(^s)
+    x = 42
+    println(^x)
     0
