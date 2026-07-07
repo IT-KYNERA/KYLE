@@ -3676,10 +3676,8 @@ impl Lowerer {
 
                     // === UNIVERSAL CONVERSION METHODS (.to_str, .to_int, etc.) ===
                     if property == "to_str" && arguments.is_empty() {
-                        // Convert any value to string: works via ky_i64_to_str or ky_clone_str
                         let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I32);
                         if id_type == MirType::Str {
-                            // Already a string — clone it
                             let result = ctx.alloc_local("_ts", MirType::Str);
                             ctx.string_locals.push(result);
                             ctx.current_block.insts.push(MirInst::Call {
@@ -3687,17 +3685,21 @@ impl Lowerer {
                                 args: vec![MirValue::Local(obj_local)],
                             });
                             return ctx;
+                        } else if matches!(id_type, MirType::F32 | MirType::F64) {
+                            let f64_local = if matches!(id_type, MirType::F32) {
+                                let c = ctx.alloc_local("_f64c", MirType::F64);
+                                ctx.current_block.insts.push(MirInst::Cast { dest: c, value: MirValue::Local(obj_local), to_type: MirType::F64 });
+                                MirValue::Local(c)
+                            } else { MirValue::Local(obj_local) };
+                            let result = ctx.alloc_local("_ts", MirType::Str);
+                            ctx.string_locals.push(result);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_f64_to_str".to_string(),
+                                args: vec![f64_local],
+                            });
+                            return ctx;
                         } else {
-                            // Convert to i64 first, then to string
-                            let i64_val = if matches!(id_type, MirType::I32 | MirType::I64) {
-                                let ext = ctx.alloc_local("_tv", MirType::I64);
-                                ctx.current_block.insts.push(MirInst::Cast {
-                                    dest: ext, value: MirValue::Local(obj_local), to_type: MirType::I64,
-                                });
-                                MirValue::Local(ext)
-                            } else {
-                                MirValue::Local(obj_local)
-                            };
+                            let i64_val = MirValue::Local(obj_local);
                             let result = ctx.alloc_local("_ts", MirType::Str);
                             ctx.string_locals.push(result);
                             ctx.current_block.insts.push(MirInst::Call {
@@ -3707,32 +3709,75 @@ impl Lowerer {
                             return ctx;
                         }
                     }
-                    if property == "to_int" && arguments.is_empty() {
-                        let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I32);
-                        if id_type == MirType::I32 {
-                            let result = ctx.alloc_local("_ti", MirType::I32);
-                            ctx.current_block.insts.push(MirInst::Load {
-                                dest: result, src: obj_local,
-                            });
-                            return ctx;
-                        }
-                        let result = ctx.alloc_local("_ti", MirType::I32);
-                        ctx.current_block.insts.push(MirInst::Cast {
-                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32,
-                        });
+                    // Type-specific conversion methods
+                    if property == "to_i32" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ti32", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32 });
                         return ctx;
                     }
-                    if property == "to_float" && arguments.is_empty() {
-                        let result = ctx.alloc_local("_tf", MirType::F64);
-                        ctx.current_block.insts.push(MirInst::Cast {
-                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::F64,
-                        });
+                    if property == "to_i64" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ti64", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I64 });
+                        return ctx;
+                    }
+                    if property == "to_i16" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ti16", MirType::I16);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I16 });
+                        return ctx;
+                    }
+                    if property == "to_i8" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_ti8", MirType::I8);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I8 });
+                        return ctx;
+                    }
+                    if property == "to_u32" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tu32", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32 });
+                        return ctx;
+                    }
+                    if property == "to_u64" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tu64", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I64 });
+                        return ctx;
+                    }
+                    if property == "to_u16" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tu16", MirType::I16);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I16 });
+                        return ctx;
+                    }
+                    if property == "to_u8" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tu8", MirType::I8);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I8 });
+                        return ctx;
+                    }
+                    if property == "to_f64" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tf64", MirType::F64);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::F64 });
+                        return ctx;
+                    }
+                    if property == "to_f32" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tf32", MirType::F32);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::F32 });
+                        return ctx;
+                    }
+                    if property == "to_char" && arguments.is_empty() {
+                        let result = ctx.alloc_local("_tch", MirType::Char);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::Char });
                         return ctx;
                     }
                     if property == "to_bool" && arguments.is_empty() {
                         let result = ctx.alloc_local("_tb", MirType::Bool);
-                        ctx.current_block.insts.push(MirInst::Cast {
-                            dest: result, value: MirValue::Local(obj_local), to_type: MirType::Bool,
+                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::Bool });
+                        return ctx;
+                    }
+                    if property == "to_decimal" && arguments.is_empty() {
+                        let i64_val = ctx.alloc_local("_td", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast { dest: i64_val, value: MirValue::Local(obj_local), to_type: MirType::I64 });
+                        let result = ctx.alloc_local("_tds", MirType::Str);
+                        ctx.string_locals.push(result);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_decimal_to_str".to_string(),
+                            args: vec![MirValue::Local(i64_val)],
                         });
                         return ctx;
                     }
