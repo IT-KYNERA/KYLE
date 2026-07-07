@@ -3955,6 +3955,25 @@ impl Lowerer {
                             });
                             return ctx;
                         }
+                        if property == "reserve" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let cap_val = ctx.next_local - 1;
+                            let cap_i64 = ctx.alloc_local("_cap64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: cap_i64,
+                                value: MirValue::Local(cap_val),
+                                to_type: MirType::I64,
+                            });
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: None,
+                                name: "ky_list_reserve".to_string(),
+                                args: vec![
+                                    MirValue::Local(obj_local),
+                                    MirValue::Local(cap_i64),
+                                ],
+                            });
+                            return ctx;
+                        }
                         if property == "push" || property == "add" {
                             for arg in arguments {
                                 ctx = self.lower_expr(ctx, arg);
@@ -5671,13 +5690,28 @@ impl Lowerer {
                 ctx
             }
             Expr::Index { target, index, .. } => {
-                ctx = self.lower_expr(ctx, target);
-                let target_val = ctx.next_local - 1;
-                // For array indexing, use the variable's alloca directly instead of the loaded value
-                let arr_ptr = if let Expr::Identifier { name, .. } = target.as_ref() {
-                    ctx.locals.get(name).copied().unwrap_or(target_val)
+                // For arrays, avoid lowering the target (which generates unnecessary whole-array Load)
+                let (target_val, arr_ptr, target_type) = if let Expr::Identifier { name, .. } = target.as_ref() {
+                    if let Some(&local) = ctx.locals.get(name) {
+                        let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
+                        // Only skip Load for arrays (zero-copy GEP). For other types, use normal expression lowering.
+                        if matches!(t, MirType::Array(_, _)) {
+                            // Use variable's alloca directly (no Load)
+                            (local, local, t)
+                        } else {
+                            ctx = self.lower_expr(ctx, target);
+                            let tv = ctx.next_local - 1;
+                            (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                        }
+                    } else {
+                        ctx = self.lower_expr(ctx, target);
+                        let tv = ctx.next_local - 1;
+                        (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                    }
                 } else {
-                    target_val
+                    ctx = self.lower_expr(ctx, target);
+                    let tv = ctx.next_local - 1;
+                    (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
                 };
                 ctx = self.lower_expr(ctx, index);
                 let index_val = ctx.next_local - 1;

@@ -58,6 +58,26 @@ fn grow(list: *mut KlList) {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ky_list_reserve(list: *mut KlList, capacity: i64) {
+    if list.is_null() || capacity <= 0 {
+        return;
+    }
+    unsafe {
+        if capacity > (*list).cap {
+            let new_cap = capacity;
+            let new_data = ky_alloc(new_cap * std::mem::size_of::<i64>() as i64) as *mut i64;
+            if new_data.is_null() {
+                return;
+            }
+            std::ptr::copy_nonoverlapping((*list).data, new_data, (*list).len as usize);
+            ky_free((*list).data as *mut u8);
+            (*list).data = new_data;
+            (*list).cap = new_cap;
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ky_list_push(list: *mut KlList, val: i64) {
     if list.is_null() {
         return;

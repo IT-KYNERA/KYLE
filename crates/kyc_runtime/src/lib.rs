@@ -25,7 +25,7 @@ pub use io::{ky_print, ky_println, ky_input, ky_input_with_prompt, ky_open, ky_r
 pub use string::{ky_i64_to_str, ky_f32_to_str, ky_str_to_i64, ky_strlen, ky_concat, ky_str_contains, ky_str_to_upper, ky_str_to_lower, ky_str_trim, ky_str_replace,
     ky_char_at, ky_is_digit, ky_is_alpha, ky_is_alnum, ky_is_whitespace, ky_is_upper, ky_is_lower, ky_ord, ky_substr, ky_eq_str, ky_from_cstr, ky_getenv, ky_setenv,
     ky_str_builder_new, ky_str_builder_append, ky_str_builder_to_str, ky_str_builder_free};
-pub use list::{ky_list_new, ky_list_free, ky_list_push, ky_list_pop, ky_list_get, ky_list_set, ky_list_len, ky_init_args};
+pub use list::{ky_list_new, ky_list_free, ky_list_push, ky_list_pop, ky_list_get, ky_list_set, ky_list_len, ky_list_reserve, ky_init_args};
 pub use async_::{ky_spawn_task, ky_await_task, ky_yield};
 pub use thread::{ky_spawn_thread, ky_join_thread};
 pub use channel::{ky_channel_new, ky_channel_send, ky_channel_recv, ky_channel_close, ky_channel_len, ky_channel_free};
