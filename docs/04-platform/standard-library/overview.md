@@ -11,4 +11,4 @@
 | `std.json` | JSON parsing and stringify |
 | `std.math` | Math functions (pow, sqrt, gcd, clamp) |
 | `std.time` | Time functions (timestamp, sleep, seconds_since) |
-| `std.testing` | Test assertions (assert.is_true, assert.eq, assert.ne) |
+| `std.testing` | Test assertions (assert, assert_eq, assert_ne) |

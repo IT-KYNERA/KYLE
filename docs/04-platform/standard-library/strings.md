@@ -2,10 +2,10 @@
 
 | Function | Description |
 |----------|-------------|
-| `str.starts_with(s, prefix)` | Check if string starts with prefix |
-| `str.ends_with(s, suffix)` | Check if string ends with suffix |
-| `str.capitalize(s)` | Capitalize first letter |
-| `str.repeat(s, count)` | Repeat string n times |
+| `starts_with(s, prefix)` | Check if string starts with prefix |
+| `ends_with(s, suffix)` | Check if string ends with suffix |
+| `capitalize(s)` | Capitalize first letter |
+| `repeat_str(s, count)` | Repeat string n times |
 
 ## str_builder — Efficient String Building
 
@@ -18,16 +18,16 @@ final class str_builder:
     data: ptr
 
     str_builder(capacity: i64 = 16):
-        data = ky_str_builder_new(capacity)
+        this.data = ky_str_builder_new(capacity)
     
     fn append(s: &str):
-        ky_str_builder_append(data, s as ptr, len(s))
+        ky_str_builder_append(this.data, s as ptr, len(s))
     
     fn to_str() str:
-        ky_str_builder_to_str(data)
+        ky_str_builder_to_str(this.data)
     
     fn free():
-        ky_str_builder_free(data)
+        ky_str_builder_free(this.data)
 ```
 
 ### Usage

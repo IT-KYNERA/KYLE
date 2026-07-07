@@ -324,9 +324,9 @@ See `docs/05-packages/registry.md` for full documentation.
 
 | Actual | Nuevo | Archivos |
 |--------|-------|----------|
-| `ky_parallel_for` | `parallel.for` | runtime, symbol_table, lowerer |
-| `ky_spawn_thread` | `thread.spawn` | runtime, symbol_table |
-| `ky_join_thread` | `thread.join` | runtime, symbol_table |
+| `ky_parallel_for` | `ky_parallel_for` (futuro: `parallel.for`) | runtime, symbol_table, lowerer |
+| `ky_spawn_thread` | `ky_spawn_thread` (futuro: `thread.spawn`) | runtime, symbol_table |
+| `ky_join_thread` | `ky_join_thread` (futuro: `thread.join`) | runtime, symbol_table |
 | `ky_str_builder_*` | `str_builder` clase | ✅ ya wrapper |
 | Funciones package | camelCase | packages/http/, packages/json/ |
 

@@ -1,6 +1,6 @@
 # Concurrency & Parallel Execution
 
-**Status:** [x] `async fn`, `async:` block, `await`, `parallel.for`, threads.
+**Status:** [x] `async fn`, `async:` block, `await`, `ky_parallel_for`, threads.
 [ ] `future<T>`, `channel<T>`, `select`, `mutex<T>`, `Atomic*`, `iterator`.
 
 ---
@@ -30,7 +30,7 @@ fn main() i32:
     0
 ```
 
-## parallel.for [x]
+## ky_parallel_for [x]
 
 ```ky
 fn heavy(n: i64) i64:
@@ -43,7 +43,7 @@ fn heavy(n: i64) i64:
 
 fn main() i32:
     fn_ptr = heavy as ptr
-    parallel.for(fn_ptr, 0, 8)
+    ky_parallel_for(fn_ptr, 0, 8)
     0
 ```
 
@@ -54,8 +54,8 @@ fn worker(n: i64) i64:
     n * 2
 
 fn main() i32:
-    h = thread.spawn(worker as ptr, 21)
-    r = thread.join(h)
+    h = ky_spawn_thread(worker as ptr, 21)
+    r = ky_join_thread(h)
     println(str(r))    # 42
     0
 ```
@@ -130,8 +130,8 @@ result = doubled.collect()     # → {i32}
 | `async fn` | ✅ | `async fn f(p: T) R:` |
 | `async:` block | ✅ | `t = async: ...` |
 | `await` | ✅ | `await task` |
-| `parallel.for` | 🔶 renombrar | `parallel.for(fn, 0, N)` |
-| threads | 🔶 renombrar | `thread.spawn` / `thread.join` |
+| `ky_parallel_for` | ✅ actual | `ky_parallel_for(fn, 0, N)` |
+| threads (actual) | ✅ | `ky_spawn_thread` / `ky_join_thread` |
 | `future<T>` | 📅 | `t: future<str> = async: ...` |
 | `channel<T>` | 📅 | `ch = channel<T>(n); ch.send(v); v = ch.recv()` |
 | `select` | 📅 | `select: &msg -> ch: ...` |

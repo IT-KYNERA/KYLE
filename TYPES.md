@@ -186,7 +186,7 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 
 | Prioridad | Área | Items |
 |-----------|------|-------|
-| **P0** | Renombrar existente | `ky_*` → namespaces (`parallel.for`, `thread.spawn`, `thread.join`) |
+| **P0** | Renombrar existente | `ky_*` → namespaces (`parallel.for`, `thread.spawn`, `thread.join`). Ver ROADMAP.md |
 | **P1** | Arreglar bugs | `u8-u64` codegen, `tuple` codegen, `char` type inference, `T?`/`T!` type checker |
 | **P2** | Hacer nativos tipos package | `date_time`, `duration`, `date`, `time`, `bytes`, `decimal`, `uuid`, `url`, `regex`, `env` |
 | **P3** | Tipos I/O nativos | `file`, `socket`, `path`, `json` |
