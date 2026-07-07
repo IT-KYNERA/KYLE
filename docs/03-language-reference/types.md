@@ -262,14 +262,26 @@ Kyle proporciona métodos integrados en tipos primitivos y compuestos.
 
 ### Number conversion methods
 
-Disponibles en cualquier tipo numérico (`i32`, `i64`, `f32`, `f64`, `bool`, `str`):
+Métodos específicos por tipo. Disponibles en cualquier valor numérico.
 
 | Método | Descripción | Ejemplo |
 |--------|-------------|---------|
-| `val.to_str()` | Convertir a string | `(42).to_str()` → `"42"` |
-| `val.to_int()` | Convertir a entero | `(3.14).to_int()` → `3` |
-| `val.to_float()` | Convertir a flotante | `(42).to_float()` → `42.0` |
-| `val.to_bool()` | Convertir a booleano | `(1).to_bool()` → `true` |
+| `val.to_i32()` | Convertir a i32 | `42.to_i32()` → `42` |
+| `val.to_i64()` | Convertir a i64 | `42.to_i64()` → `42` |
+| `val.to_i16()` | Convertir a i16 | `42.to_i16()` → `42` |
+| `val.to_i8()` | Convertir a i8 | `42.to_i8()` → `42` |
+| `val.to_u32()` | Convertir a u32 | `42.to_u32()` → `42` |
+| `val.to_u64()` | Convertir a u64 | `42.to_u64()` → `42` |
+| `val.to_u16()` | Convertir a u16 | `42.to_u16()` → `42` |
+| `val.to_u8()` | Convertir a u8 | `42.to_u8()` → `42` |
+| `val.to_f64()` | Convertir a f64 | `42.to_f64()` → `42.0` |
+| `val.to_f32()` | Convertir a f32 | `42.to_f32()` → `42.0` |
+| `val.to_char()` | Convertir a char (por código) | `65.to_char()` → `'A'` |
+| `val.to_bool()` | Convertir a booleano | `1.to_bool()` → `true` |
+| `val.to_str()` | Convertir a string | `42.to_str()` → `"42"` |
+| `val.to_decimal()` | Convertir a decimal string | `12345.to_decimal()` → `"123.45"` |
+
+**Nota:** `str()`, `int()`, `float()`, `bool()` como funciones sueltas fueron removidas. Usar los métodos `val.to_*()`.
 
 ### Collection methods
 
