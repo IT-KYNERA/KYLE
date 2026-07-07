@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::thread;
 
 type TaskFn = Box<dyn FnOnce() + Send>;
@@ -69,30 +69,41 @@ impl Drop for Executor {
 /// Spawn an async task on the global thread pool.
 /// `func` is a C-callable function pointer.
 /// `arg` is a pointer to a heap-allocated i64 array (first word = count, rest = args).
-/// Returns a handle (pointer to oneshot receiver).
+/// Returns a handle (pointer to Arc<Mutex<Option<i64>>>).
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_spawn_task(
     func: Option<unsafe extern "C" fn(i64) -> i64>,
     arg: i64,
 ) -> i64 {
-    let (tx, rx) = mpsc::channel::<i64>();
-    let handle = Box::into_raw(Box::new(rx)) as i64;
+    let result = Arc::new(Mutex::new(None::<i64>));
+    let result_clone = Arc::clone(&result);
 
     let exec = global_executor();
     exec.spawn(move || {
-        let result = func.map(|f| unsafe { f(arg) }).unwrap_or(0);
-        let _ = tx.send(result);
+        let val = func.map(|f| unsafe { f(arg) }).unwrap_or(0);
+        let mut lock = result_clone.lock().unwrap();
+        *lock = Some(val);
     });
 
-    handle
+    Arc::into_raw(result) as i64
 }
 
 /// Await a task: blocks until completion, returns the result.
+/// Safe to call multiple times (returns the same result each time).
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_await_task(handle: i64) -> i64 {
     if handle == 0 { return 0; }
-    let rx = unsafe { Box::from_raw(handle as *mut mpsc::Receiver<i64>) };
-    rx.recv().unwrap_or(0)
+    let result = unsafe { &*(handle as *const Mutex<Option<i64>>) };
+    let mut lock = result.lock().unwrap();
+    loop {
+        if let Some(val) = *lock {
+            // Keep value for subsequent awaits
+            return val;
+        }
+        drop(lock);
+        std::thread::yield_now();
+        lock = result.lock().unwrap();
+    }
 }
 
 /// Cooperative yield hint.

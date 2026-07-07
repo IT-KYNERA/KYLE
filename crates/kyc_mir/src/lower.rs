@@ -6560,6 +6560,8 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("size".into(), MirType::I32),
         ])),
         "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Some(MirType::I64),
+        "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Some(MirType::I64),
+        "ky_channel_close" => Some(MirType::Void),
         "error" => Some(MirType::Struct("__result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),

@@ -82,6 +82,8 @@ impl SymbolTable {
             "push", "list_len", "list_get", "list_set", "list_pop",
 
             "ky_spawn_thread", "ky_join_thread", "ky_parallel_for", "ok",
+            "ky_channel_new", "ky_channel_send", "ky_channel_recv",
+            "ky_channel_close", "ky_channel_len", "ky_channel_free",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {

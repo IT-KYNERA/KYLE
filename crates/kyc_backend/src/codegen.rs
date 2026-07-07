@@ -1452,6 +1452,42 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_parallel_for", ft, None);
         }
+        // i64 kl_channel_new(i64)  — create channel with capacity
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_new", ft, None);
+        }
+        // i64 kl_channel_send(i64, i64)  — send value to channel
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_send", ft, None);
+        }
+        // i64 kl_channel_recv(i64)  — receive from channel
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_recv", ft, None);
+        }
+        // void kl_channel_close(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_close", ft, None);
+        }
+        // i64 kl_channel_len(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_len", ft, None);
+        }
+        // void kl_channel_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_channel_free", ft, None);
+        }
         // i32 kl_dict_contains(ptr, ptr) — readonly
         {
             let params = [ptr_ty.into(), ptr_ty.into()];

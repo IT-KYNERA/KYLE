@@ -83,6 +83,12 @@ impl TypeChecker {
             "ky_spawn_thread" => Some(2),
             "ky_join_thread" => Some(1),
             "ky_parallel_for" => Some(3),
+            "ky_channel_new" => Some(1),
+            "ky_channel_send" => Some(2),
+            "ky_channel_recv" => Some(1),
+            "ky_channel_close" => Some(1),
+            "ky_channel_len" => Some(1),
+            "ky_channel_free" => Some(1),
             _ => None,
         }
     }
@@ -881,6 +887,8 @@ impl TypeChecker {
                                 "ky_ptr_read_i32" => Type::I32,
                                 "ky_ptr_read_ptr" => Type::Ptr,
                                 "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Type::I64,
+                                "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Type::I64,
+                                "ky_channel_close" => Type::Void,
                                 "error" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
                                 "ok" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
                                 _ => *ft.return_,

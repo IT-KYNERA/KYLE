@@ -147,3 +147,45 @@ impl<T> Clone for Channel<T> {
 
 unsafe impl<T: Send> Send for Channel<T> {}
 unsafe impl<T: Send> Sync for Channel<T> {}
+
+// --- C-compatible wrappers for Kyle FFI ---
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_new(capacity: i64) -> i64 {
+    let chan = Channel::<i64>::new(capacity as usize);
+    Box::into_raw(Box::new(chan)) as i64
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_send(chan_ptr: i64, val: i64) -> i64 {
+    let chan = unsafe { &*(chan_ptr as *const Channel::<i64>) };
+    match chan.send(val) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_recv(chan_ptr: i64) -> i64 {
+    let chan = unsafe { &*(chan_ptr as *const Channel::<i64>) };
+    chan.recv().unwrap_or(0)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_close(chan_ptr: i64) {
+    let chan = unsafe { &*(chan_ptr as *const Channel::<i64>) };
+    chan.close();
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_len(chan_ptr: i64) -> i64 {
+    let chan = unsafe { &*(chan_ptr as *const Channel::<i64>) };
+    chan.len() as i64
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_channel_free(chan_ptr: i64) {
+    if chan_ptr != 0 {
+        unsafe { drop(Box::from_raw(chan_ptr as *mut Channel::<i64>)); }
+    }
+}
