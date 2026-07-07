@@ -1,46 +1,36 @@
 # Concurrency & Parallel Execution
 
-**Status:** [x] `async fn` with 1 param, `async:` block, `await`, `ky_parallel_for`, `ky_spawn_thread`/`ky_join_thread`.
-
-Kyle tiene un **thread pool** global que usa todos los cores (`available_parallelism()`).
-Workers configurables con `KL_WORKERS`.
+**Status:** [x] `async fn`, `async:` block, `await`, `ky_parallel_for`, threads.
+[ ] `Future<T>`, `Channel<T>`, `select`, `Mutex<T>`, `Atomic*`, `Iterator`.
 
 ---
 
-## async fn — con parámetros
+## async fn / await [x]
 
 ```ky
 async fn double(n: i64) i64:
     n * 2
 
 fn main() i32:
-    task = double(21)       # spawn con parámetro
-    result = await task     # esperar resultado
-    println(str(result))    # 42
-    0
-```
-
-**Nota:** Soporta 1 parámetro `i64`. Múltiples params próximamente.
-
----
-
-## async: block
-
-```ky
-fn main() i32:
-    task = async:
-        sleep(100)
-        42            # tail expression
+    task = double(21)
     result = await task
     println(str(result))    # 42
     0
 ```
 
----
+## async: block [x]
 
-## Parallel For — ky_parallel_for(fn, start, end)
+```ky
+fn main() i32:
+    task = async:
+        sleep(100)
+        42
+    result = await task
+    println(str(result))    # 42
+    0
+```
 
-Ejecuta en paralelo usando todos los cores.
+## ky_parallel_for [x]
 
 ```ky
 fn heavy(n: i64) i64:
@@ -53,13 +43,11 @@ fn heavy(n: i64) i64:
 
 fn main() i32:
     fn_ptr = heavy as ptr
-    ky_parallel_for(fn_ptr, 0, 8)  # paralelo!
+    ky_parallel_for(fn_ptr, 0, 8)
     0
 ```
 
----
-
-## Threads con builtins
+## Threads [x]
 
 ```ky
 fn worker(n: i64) i64:
@@ -74,13 +62,80 @@ fn main() i32:
 
 ---
 
-## Todas las formas de paralelismo
+## Future: `Future<T>` [ ]
 
-| Forma | Uso | Descripción |
-|-------|-----|-------------|
-| `async fn` | `task = fn(); await task` | Thread pool con parámetros |
-| `async:` block | `task = async: ...` | Bloque multi-linea en thread pool |
-| `async expr` | `task = async expr()` | Single expression en thread pool |
-| `ky_parallel_for` | `ky_parallel_for(fn, 0, N)` | Data parallelism, todos los cores |
-| `ky_spawn_thread` | `h = ky_spawn_thread(f, a)` | Hilo dedicado del SO |
-| `ky_join_thread` | `r = ky_join_thread(h)` | Esperar resultado del hilo |
+```ky
+task: Future<str> = async:
+    "response"
+val = await task
+```
+
+## Channel: `Channel<T>` [ ]
+
+```ky
+ch: Channel<i32> = Channel(16)     # buffer 16
+ch.send(42)
+val = ch.recv()
+ch.len()
+ch.close()
+```
+
+## select [ ]
+
+```ky
+select:
+    &msg -> ch1:
+        println("got: " + msg)
+    &msg -> ch2:
+        println("got: " + msg)
+    after 1s:
+        println("timeout")
+```
+
+## Mutex: `Mutex<T>` [ ]
+
+```ky
+m: Mutex<i32> = Mutex(0)
+lock(m):
+    *val += 1                 # operación segura
+```
+
+## Atomic types [ ]
+
+```ky
+counter: AtomicI64 = AtomicI64(0)
+counter.fetch_add(1)
+counter.load()                # → 1
+
+flag: AtomicBool = AtomicBool(false)
+flag.store(true)
+flag.load()                   # → true
+```
+
+## Iterator [ ]
+
+```ky
+iter = list.iter()
+doubled = iter.map(fn(x): x * 2)
+filtered = iter.filter(fn(x): x > 5)
+result = doubled.collect()     # → {i32}
+```
+
+---
+
+## Resumen
+
+| Forma | Estado | Sintaxis |
+|-------|--------|----------|
+| `async fn` | ✅ | `async fn f(p: T) R:` |
+| `async:` block | ✅ | `t = async: ...` |
+| `await` | ✅ | `await task` |
+| `ky_parallel_for` | ✅ | `ky_parallel_for(fn, 0, N)` |
+| threads | ✅ | `ky_spawn_thread` / `ky_join_thread` |
+| `Future<T>` | 📅 | `t: Future<str> = async: ...` |
+| `Channel<T>` | 📅 | `ch = Channel<T>(n); ch.send(v); v = ch.recv()` |
+| `select` | 📅 | `select: &msg -> ch: ...` |
+| `Mutex<T>` | 📅 | `Mutex<T>(v); lock(m): *val += 1` |
+| `AtomicI64` | 📅 | `AtomicI64(v).fetch_add(1)` |
+| `AtomicBool` | 📅 | `AtomicBool(v).store(true)` |
+| `Iterator` | 📅 | `list.iter().map(fn).filter(fn).collect()` |
