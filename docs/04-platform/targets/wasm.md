@@ -34,7 +34,7 @@ ky build --target wasm32-unknown-unknown -O3 app.ky
 | Memoria lineal | ✅ |
 | Math (f32/f64) | ✅ |
 | Strings | ✅ |
-| File system | ❌ (no hay FS en WASM) |
+| file system | ❌ (no hay FS en WASM) |
 | Networking | ❌ (no hay sockets) |
 | Threads | ❌ |
 | Console/print | ❌ (requiere JS glue) |
@@ -68,7 +68,7 @@ div.appendChild(btn)
 ### Fetch (HTTP desde el browser)
 
 ```kyle
-from web import fetch, Response
+from web import fetch, response
 
 res = fetch("/api/users")
 if res.ok:

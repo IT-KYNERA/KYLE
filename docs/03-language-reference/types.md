@@ -77,10 +77,10 @@ Heap list dinámica.
 v = {1, 2, 3}                # → {i32}
 v.push(4)
 v.reserve(100)               # pre-asigna capacidad
-x = v[0]                     # listGet (runtime)
-v[0] = 99                    # listSet (runtime)
-v.pop()                      # listPop (runtime)
-v.len()                      # listLen (runtime)
+x = v[0]                     # list_get (runtime)
+v[0] = 99                    # list_set (runtime)
+v.pop()                      # list_pop (runtime)
+v.len()                      # list_len (runtime)
 ```
 
 ### Dict: `{K: V}` [x]
@@ -104,28 +104,28 @@ x = t.0                      # → 1
 y = t.1                      # → "hello"
 ```
 
-### Set: `Set<T>` [ ]
+### set: `set<T>` [ ]
 
-Hash set. Construcción vía `Set{...}` o constructor.
+Hash set. Construcción vía `set{...}` o constructor.
 
 ```ky
-s: Set<i32> = Set{1, 2, 3}   # set literal
+s: set<i32> = set{1, 2, 3}   # set literal
 s.add(4)
 s.contains(1)                # → true
 s.remove(1)
 for val in s:
-    println(val.toStr())
+    println(val.to_str())
 ```
 
 ### Queue via list [ ]
 
-No hay tipo `Queue<T>` dedicado. Usar `{T}` con `.push()` / `.popFirst()`:
+No hay tipo `Queue<T>` dedicado. Usar `{T}` con `.push()` / `.pop_first()`:
 
 ```ky
 q: {i32} = {}
 q.push(10)                   # enqueue
 q.push(20)
-val = q.popFirst()           # dequeue → 10 (FIFO)
+val = q.pop_first()           # dequeue → 10 (FIFO)
 q.len()
 ```
 
@@ -142,7 +142,7 @@ st.len()
 ```
 
 > **Decisión de diseño:** Stack y Queue no tienen tipos dedicados porque `{T}` ya soporta
-> todas las operaciones necesarias con métodos `.push()`, `.pop()`, `.popFirst()`.
+> todas las operaciones necesarias con métodos `.push()`, `.pop()`, `.pop_first()`.
 > Esto sigue el enfoque de Go y JavaScript, donde arrays/listas cubren ambos roles.
 
 ### Slice: `&[T]` [ ]
@@ -163,7 +163,7 @@ first = s[0]                 # → 2
 
 ```ky
 name: str? = None
-if value = getName():       # pattern matching
+if value = get_name():       # pattern matching
     println(value)
 ```
 
@@ -296,14 +296,14 @@ lock(m):
     *val += 1                 # operación segura
 ```
 
-### atomic: `atomicI64` / `atomicBool` [ ]
+### atomic: `atomic_i64` / `atomic_bool` [ ]
 
 ```ky
-counter: atomicI64 = atomicI64(0)
-counter.fetchAdd(1)
+counter: atomic_i64 = atomic_i64(0)
+counter.fetch_add(1)
 counter.load()                # → 1
 
-flag: atomicBool = atomicBool(false)
+flag: atomic_bool = atomic_bool(false)
 flag.store(true)
 flag.load()                   # → true
 ```
@@ -324,50 +324,50 @@ result = doubled.collect()     # → {i32}
 > Todos estos son nativos de Kyle (no requieren `from X import Y`).
 > Están disponibles globalmente como tipos built-in del lenguaje.
 
-### dateTime [ ]
+### date_time [ ]
 
 ```ky
-dt = dateTime.now()
-dt = dateTime.parse("2024-01-01T00:00:00")
-dt = dateTime.fromYmdhms(2024, 1, 1, 0, 0, 0)
+dt = date_time.now()
+dt = date_time.parse("2024-01-01T00:00:00")
+dt = date_time.from_ymdhms(2024, 1, 1, 0, 0, 0)
 year = dt.year()
 month = dt.month()
 day = dt.day()
 hour = dt.hour()
 minute = dt.minute()
 second = dt.second()
-dt2 = dt.addDays(7)
-dt3 = dt.addHours(3)
+dt2 = dt.add_days(7)
+dt3 = dt.add_hours(3)
 diff = dt.diff(dt2)
 ```
 
 ### duration [ ]
 
 ```ky
-d = duration.fromSecs(60)
-d = duration.fromMillis(1000)
-d = duration.fromHours(1)
-d = duration.fromDays(7)
-d.toStr()              # → "1h 0m 0s"
+d = duration.from_secs(60)
+d = duration.from_millis(1000)
+d = duration.from_hours(1)
+d = duration.from_days(7)
+d.to_str()              # → "1h 0m 0s"
 ```
 
 ### date [ ]
 
 ```ky
 d = date.today()
-d = date.fromYmd(2024, 1, 1)
+d = date.from_ymd(2024, 1, 1)
 d = date.parse("2024-01-01")
 year = d.year()
 month = d.month()
 weekday = d.weekday()
-d2 = d.addDays(7)
+d2 = d.add_days(7)
 ```
 
 ### time [ ]
 
 ```ky
 t = time.now()
-t = time.fromHms(12, 30, 0)
+t = time.from_hms(12, 30, 0)
 t = time.parse("12:30:00")
 hour = t.hour()
 minute = t.minute()
@@ -378,23 +378,23 @@ second = t.second()
 
 ```ky
 b = bytes.new(1024)
-b = bytes.fromHex("deadbeef")
-b = bytes.fromBase64("SGVsbG8=")
+b = bytes.from_hex("deadbeef")
+b = bytes.from_base64("SGVsbG8=")
 b.len()
 val = b.get(0)           # → byte
 b.set(0, 255)
 hex = b.hex()
-b64 = b.toBase64()
+b64 = b.to_base64()
 ```
 
 ### decimal [ ]
 
 ```ky
-d = decimal.fromStr("3.14")
-d = decimal.fromI64(314, 2)    # 3.14
+d = decimal.from_str("3.14")
+d = decimal.from_i64(314, 2)    # 3.14
 d.round(1)                       # → 3.1
 d.truncate()                     # → 3
-d.toStr()                       # → "3.14"
+d.to_str()                       # → "3.14"
 ```
 
 ### uuid [ ]
@@ -402,7 +402,7 @@ d.toStr()                       # → "3.14"
 ```ky
 id = uuid.v4()
 id = uuid.parse("550e8400-e29b-41d4-a716-446655440000")
-id.toStr()
+id.to_str()
 ```
 
 ### url [ ]
@@ -420,7 +420,7 @@ u.query()      # → "q=1"
 
 ```ky
 re = regex("[0-9]+")
-re.isMatch("abc123")       # → true
+re.is_match("abc123")       # → true
 m = re.find("abc123")       # → "123"
 result = re.replace("abc123", "X")  # → "abcX"
 ```
@@ -458,15 +458,15 @@ f.exists()                   # → true
 ### socket [ ]
 
 ```ky
-server = socket.tcpListen(8080)
+server = socket.tcp_listen(8080)
 client = server.accept()
 data = client.read(1024)
 client.write("HTTP/1.1 200 OK\r\n\r\n")
 client.close()
 server.close()
 
-# Client mode
-conn = socket.tcpConnect("example.com", 80)
+# client mode
+conn = socket.tcp_connect("example.com", 80)
 conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 resp = conn.read(4096)
 conn.close()
@@ -480,28 +480,28 @@ p.dirname()          # → "/home/user"
 p.basename()         # → "file.txt"
 p.extension()        # → ".txt"
 p.exists()           # → true
-p.isFile()           # → true
-p.isDir()            # → false
+p.is_file()           # → true
+p.is_dir()            # → false
 p.join("subdir")     # → "/home/user/file.txt/subdir"
 ```
 
-### bigInt [ ]
+### big_int [ ]
 
 ```ky
-n = bigInt("123456789012345678901234567890")
-n2 = bigInt.fromI64(42)
+n = big_int("123456789012345678901234567890")
+n2 = big_int.from_i64(42)
 n3 = n + n2
 n4 = n * n2
-n.toStr()
+n.to_str()
 ```
 
-### strBuilder [ ]
+### str_builder [ ]
 
 ```ky
-sb = strBuilder(50000)
+sb = str_builder(50000)
 sb.append("x", 1)
 sb.append("hello", 5)
-result = sb.toStr()
+result = sb.to_str()
 ```
 
 ---
@@ -511,8 +511,8 @@ result = sb.toStr()
 | Categoría | [x] Completo | [ ] Diseñado | ❌ No planeado |
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitives | 13 | 2 (`u8-u64` codegen, `never`) | 1 (`byte`) |
-| Compounds | 4 | 4 (tuple, Set, slice) | 2 (Queue, Stack — usar `{T}`) |
+| Compounds | 4 | 4 (tuple, set, slice) | 2 (Queue, Stack — usar `{T}`) |
 | Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
-| Specialized | 1 (strBuilder) | 14 (dateTime, duration, date, time, bytes, decimal, uuid, url, regex, env, json, file, socket, path) | 0 |
+| Specialized | 1 (str_builder) | 14 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, file, socket, path) | 0 |
 | **Total** | **22** | **31** | **3** |

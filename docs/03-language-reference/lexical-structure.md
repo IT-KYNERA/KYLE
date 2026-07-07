@@ -2,7 +2,7 @@
 
 ## Source file format [x]
 
-Kyle source files use **UTF-8** encoding. File extension: `.ky`.
+Kyle source files use **UTF-8** encoding. file extension: `.ky`.
 
 ## Indentation [x]
 

@@ -1,6 +1,6 @@
 # Generics
 
-**Status:** [x] `class Box<T>`, `fn identity<T>`, `identity<i32>(42)`, `Box<i32> {value:7}`.
+**Status:** [x] `class box<T>`, `fn identity<T>`, `identity<i32>(42)`, `box<i32> {value:7}`.
 
 ## Generic classes
 
@@ -32,7 +32,7 @@ fn identity<T>(value: T) T:
 ## Type parameter constraints
 
 ```ky
-class Box<T>:
+class box<T>:
     value: T
 ```
 

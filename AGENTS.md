@@ -136,7 +136,7 @@ El compilador busca módulos en este orden:
 4. `std/` del proyecto raíz (packages instalados vía `ky add`)
 5. Caché de packages (`~/.ky/cache/`)
 
-Esto significa que `from http.server import Router` resuelve a:
+Esto significa que `from http.server import router` resuelve a:
 - `packages/http/src/server.ky` (desarrollo)
 - `std/http/server.ky` (instalado)
 
@@ -204,7 +204,7 @@ Before releasing, verify:
 
 Update the version in ALL of these files (search for the old version string):
 
-| File | Field | Example |
+| file | Field | Example |
 |------|-------|---------|
 | `Cargo.toml` | `version = "0.X.X"` | `version = "0.5.2"` |
 | `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.5.3` |
@@ -358,7 +358,7 @@ Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-langua
 | 6 | [functions.md](docs/03-language-reference/functions.md) | [ ] | Default params sí. `static fn` syntax (expected LParen before Static). `Calc.double()` undefined symbol |
 | 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia. Sin `this` obligatorio |
 | 8 | [enums.md](docs/03-language-reference/enums.md) | [x] | Enum con variants, match con `Enum.Variant` |
-| 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class Box<T>`, `fn identity<T>`, `Box<T> {value: 7}`, `identity<i32>(42)` |
+| 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class box<T>`, `fn identity<T>`, `box<T> {value: 7}`, `identity<i32>(42)` |
 | 10 | [ownership.md](docs/03-language-reference/ownership.md) | [x] | `^` = mutable, `&` = borrow, move por defecto, borrow checker |
 | 11 | [pattern-matching.md](docs/03-language-reference/pattern-matching.md) | [ ] | `..=` range pattern no existe. `1 \| 2` or-pattern no funciona. Match básico con `_:` sí |
 | 12 | [error-handling.md](docs/03-language-reference/error-handling.md) | [ ] | `-> Type` syntax no existe. `ok(v)`/`error(e)` result match no funciona. `return -1` sí |

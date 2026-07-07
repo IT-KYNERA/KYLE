@@ -3,16 +3,16 @@
 | Function | Description |
 |----------|-------------|
 | `assert(condition)` | Assert condition is true |
-| `assertEq(a, b)` | Assert a == b |
-| `assertNe(a, b)` | Assert a != b |
-| `assertStr(a, b)` | Assert string equality |
+| `assert_eq(a, b)` | Assert a == b |
+| `assert_ne(a, b)` | Assert a != b |
+| `assert_str(a, b)` | Assert string equality |
 
 ## Usage
 
 ```ky
-from std.testing import assert, assertEq
+from std.testing import assert, assert_eq
 
 fn testAddition():
     result = 2 + 2
-    assertEq(result, 4)
+    assert_eq(result, 4)
 ```

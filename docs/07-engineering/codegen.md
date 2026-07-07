@@ -35,7 +35,7 @@ Each Kyle binary is linked with `libkyc_runtime.a`, which provides:
 - List operations (dynamic array)
 - Dict operations (hash map)
 - Async runtime (thread pool)
-- File I/O, JSON, time
+- file I/O, JSON, time
 
 ### Optimization passes (post-codegen)
 

@@ -1,13 +1,13 @@
-# sqlite — SQLite Database Bindings
+# sqlite — SQLite database Bindings
 
 **Status:** Planned
 
 ## API
 
 ```ky
-from sqlite import Database
+from sqlite import database
 
-db = Database.open("data.db")
+db = database.open("data.db")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")
 db.execute("INSERT INTO users VALUES (?, ?)", 1, "Ana")
 rows = db.query("SELECT * FROM users")

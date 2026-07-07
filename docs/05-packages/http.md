@@ -1,4 +1,4 @@
-# http — HTTP Client + Server + WebSocket
+# http — HTTP client + Server + websocket
 
 **Versión:** 6.0  
 **Estado:** Especificación (Cliente ✅, Server 🔜, WS 🔜)
@@ -7,15 +7,15 @@
 
 ## 1. Filosofía
 
-Un solo package para todo HTTP. Cliente, servidor y WebSocket comparten tipos.
+Un solo package para todo HTTP. Cliente, servidor y websocket comparten tipos.
 
 Nada de funciones globales. Todo se instancia.
 
 ```kyle
-from http.client import Client
-from http.server import Router
+from http.client import client
+from http.server import router
 from http.websocket import ws_upgrade, ws_read_text, ws_send_text
-from http import HttpStatus, HttpMethod, Header
+from http import http_status, http_method, header
 from json import serialize, deserialize
 ```
 
@@ -23,17 +23,17 @@ from json import serialize, deserialize
 
 ## 2. Tipos compartidos
 
-### HttpMethod
+### http_method
 
 ```kyle
-enum HttpMethod:
+enum http_method:
     GET | POST | PUT | DELETE | PATCH | HEAD | OPTIONS
 ```
 
-### HttpStatus
+### http_status
 
 ```kyle
-final class HttpStatus:
+final class http_status:
     code: i32
     text: str
 ```
@@ -41,10 +41,10 @@ final class HttpStatus:
 Constantes: `HttpStatusOk` (200), `HttpStatusCreated` (201),
 `HttpStatusNotFound` (404), `HttpStatusInternalServerError` (500)
 
-### Header
+### header
 
 ```kyle
-final class Header:
+final class header:
     name: str
     value: str
 ```
@@ -56,13 +56,13 @@ final class Header:
 ### Uso
 
 ```kyle
-from http.client import Client
+from http.client import client
 
-client = Client { timeout: 10 }
+client = client { timeout: 10 }
 
 # GET
 res = client.get("https://api.github.com/repos/IT-KYNERA/KYLE")
-if res.isOk:
+if res.is_ok:
     print(res.body)
 
 # POST con clase → JSON automático
@@ -82,15 +82,15 @@ res = client.patch(url, data)
 res = client.delete(url)
 ```
 
-### Response
+### response
 
 ```kyle
-final class Response:
-    statusCode: i32
-    statusText: str
+final class response:
+    status_code: i32
+    status_text: str
     body: str
-    isOk: bool
-    elapsedMs: i64
+    is_ok: bool
+    elapsed_ms: i64
 ```
 
 ### Auto-JSON
@@ -103,14 +103,14 @@ final class Response:
 
 ## 4. Servidor HTTP (`http.server`)
 
-El servidor usa un `Router` con handlers como closures, estilo Express.
+El servidor usa un `router` con handlers como closures, estilo Express.
 
 ### Uso básico
 
 ```kyle
-from http.server import Router
+from http.server import router
 
-app = Router()
+app = router()
 
 app.get("/health", (req, res):
     res.json({status: "ok"})
@@ -133,7 +133,7 @@ app.get("/users/{id:i32}", (req, res):
 )
 ```
 
-### Métodos del Router
+### Métodos del router
 
 | Método | Descripción |
 |--------|-------------|
@@ -144,11 +144,11 @@ app.get("/users/{id:i32}", (req, res):
 | `app.delete(path, handler)` | DELETE route |
 | `app.listen(port)` | Inicia servidor |
 
-### Request
+### request
 
 ```kyle
-final class Request:
-    method: HttpMethod
+final class request:
+    method: http_method
     path: str
     params: dict<str, str>      # path params: {id} → "42"
     query: dict<str, str>       # query: ?page=1
@@ -215,7 +215,7 @@ app.cors(
 
 ```kyle
 app.get("/users/{id:i32}", (req, res):
-    user = findUser(req.param("id"))
+    user = find_user(req.param("id"))
     if user == none:
         res.text("Not Found", 404)
     else:
@@ -226,7 +226,7 @@ app.get("/users/{id:i32}", (req, res):
 ### Ejemplo completo: API REST
 
 ```kyle
-from http.server import Router
+from http.server import router
 from json import deserialize
 
 final class User:
@@ -237,7 +237,7 @@ final class CreateUser:
     name: str
     age: i32
 
-app = Router()
+app = router()
 
 # Listar usuarios
 app.get("/users", (req, res):
@@ -264,16 +264,16 @@ app.listen(3000)
 
 ---
 
-## 5. WebSocket (`http.websocket`)
+## 5. websocket (`http.websocket`)
 
-WebSocket se maneja como una ruta más. El Router hace el upgrade automático.
+websocket se maneja como una ruta más. El router hace el upgrade automático.
 
 ### Echo server
 
 ```kyle
-from http.server import Router
+from http.server import router
 
-app = Router()
+app = router()
 
 app.ws("/echo", (ws):
     ws.on("message", (msg):
@@ -287,9 +287,9 @@ app.listen(8080)
 ### Chat server
 
 ```kyle
-from http.server import Router
+from http.server import router
 
-app = Router()
+app = router()
 
 app.ws("/chat", (ws):
     ws.on("message", (msg):
@@ -300,7 +300,7 @@ app.ws("/chat", (ws):
 app.listen(8080)
 ```
 
-### WebSocket handler
+### websocket handler
 
 ```kyle
 app.ws("/path", (ws):
@@ -311,14 +311,14 @@ app.ws("/path", (ws):
 )
 ```
 
-### WebSocket object
+### websocket object
 
 ```kyle
-final class WebSocket:
+final class websocket:
     fn send(text: str)           # enviar mensaje texto
     fn send(data: bytes)         # enviar datos binarios
     fn broadcast(msg: str)       # enviar a todos los conectados
-    fn broadcast(msg: str, except: {WebSocket})  # a todos menos uno
+    fn broadcast(msg: str, except: {websocket})  # a todos menos uno
     fn close()                   # cerrar conexión
     fn on(event: str, handler)   # registrar evento
 ```
@@ -331,8 +331,8 @@ final class WebSocket:
 |------|-------------|------------|--------|
 | 1 | Function pointers (closes como valores) | Compiler | ✅ |
 | 2 | JSON: serialize/deserialize<T> | Fase 1 | ✅ |
-| 3 | HTTP Client con auto-JSON | Fase 2 | ✅ |
-| 4 | **Router: rutas, path params, middleware** | Fase 1 + 3 | 🔜 |
-| 5 | WebSocket + SSE | Fase 4 | 🔜 |
+| 3 | HTTP client con auto-JSON | Fase 2 | ✅ |
+| 4 | **router: rutas, path params, middleware** | Fase 1 + 3 | 🔜 |
+| 5 | websocket + SSE | Fase 4 | 🔜 |
 | 6 | PostgreSQL package | — | 🔜 |
 | 7 | WASM target + ky-web | — | 🔜 |

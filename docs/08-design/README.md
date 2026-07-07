@@ -8,7 +8,7 @@ Architecture decisions and design proposals.
 |-----------|-------------|
 | [adr/0001-layered-architecture.md](adr/0001-layered-architecture.md) | Layered platform architecture |
 
-## RFC (Request for Comments)
+## RFC (request for Comments)
 
 | Document | Description |
 |-----------|-------------|

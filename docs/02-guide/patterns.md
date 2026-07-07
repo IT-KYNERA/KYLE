@@ -16,8 +16,8 @@ fn process():
 ## Early return with guard
 
 ```ky
-fn processConfig(path: str) str!:
-    guard content = readFile(path) else:
+fn process_config(path: str) str!:
+    guard content = read_file(path) else:
         return error("cannot read config")
     content
 ```
@@ -25,13 +25,13 @@ fn processConfig(path: str) str!:
 ## Builder pattern with mutable fields
 
 ```ky
-final class Request:
+final class request:
     url: str
     method: ^str
     headers: ^{str}
 
 fn main():
-    req = Request { url: "https://api.example.com", method: "GET", headers: {} }
+    req = request { url: "https://api.example.com", method: "GET", headers: {} }
     req.method = "POST"
     req.headers.push("Content-Type: application/json")
 ```
@@ -66,7 +66,7 @@ enum Optional:
     Some(i32)
     None
 
-fn unwrapOrDefault(v: Optional) i32:
+fn unwrap_or_default(v: Optional) i32:
     match v:
         Optional.Some(n):
             n

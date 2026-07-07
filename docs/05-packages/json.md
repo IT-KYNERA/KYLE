@@ -14,13 +14,13 @@ Built-in globales. No necesita import.
 json = serialize(user)
 
 # JSON string → Clase (con <T> genérico)
-user = deserialize<User>(jsonStr)
+user = deserialize<User>(json_str)
 
 # Dict → JSON (legacy)
 text = stringify(data)
 
 # JSON → Dict
-data = parse(jsonStr)
+data = parse(json_str)
 ```
 
 ---
@@ -45,8 +45,8 @@ Auto-detecta los campos. Sin descriptor manual.
 ## 3. JSON → Clase (`deserialize<T>`)
 
 ```kyle
-jsonStr = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
-user = deserialize<User>(jsonStr)
+json_str = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
+user = deserialize<User>(json_str)
 print(user.name)   # "Ana"
 print(user.age)    # 30
 ```
@@ -56,14 +56,14 @@ print(user.age)    # 30
 ## 4. En HTTP
 
 ```kyle
-from http.client import Client
+from http.client import client
 
 final class Todo:
     title: str
     body: str
     userId: i32
 
-client = Client { timeout: 10 }
+client = client { timeout: 10 }
 
 # POST con clase → auto-JSON
 data = Todo { title: "Kyle", body: "test", userId: 1 }
@@ -80,9 +80,9 @@ print(todo.title)
 ## 5. En el servidor
 
 ```kyle
-from http.server import Router
+from http.server import router
 
-app = Router()
+app = router()
 
 app.post("/users", (req, res):
     user = req.body<User>()
@@ -90,7 +90,7 @@ app.post("/users", (req, res):
 )
 
 app.get("/users/{id:i32}", (req, res):
-    user = findUser(req.param("id"))
+    user = find_user(req.param("id"))
     res.json(user)
 )
 ```

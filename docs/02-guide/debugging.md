@@ -25,7 +25,7 @@ lldb ./program
 The Kyle VS Code extension includes a DAP (Debug Adapter Protocol) implementation.
 
 1. Open your `.ky` file in VS Code
-2. Set breakpoints by clicking the gutter
+2. set breakpoints by clicking the gutter
 3. Press F5 or use the "Run and Debug" panel
 4. The extension compiles and runs the program in debug mode
 

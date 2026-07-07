@@ -162,7 +162,7 @@ Varias líneas con `@(...)`:
 Declaración en el componente:
 
 ```kyle
-slot Header
+slot header
 slot Content
 ```
 
@@ -170,9 +170,9 @@ Uso:
 
 ```xml
 <Card>
-    <Header>
+    <header>
         <Text value="Title" />
-    </Header>
+    </header>
     <Content>
         <Text value="Body" />
     </Content>

@@ -24,7 +24,7 @@ Kyle Language (compiler)
 
 The **compiler and runtime are complete** (Phases 1-17).  
 The **upper layers (Windowing → Applications) are aspirational — sin fecha estimada**.  
-El foco actual son **packages backend** (HTTP, SQLite, Postgres, WebSocket).
+El foco actual son **packages backend** (HTTP, SQLite, Postgres, websocket).
 
 ### Current crate structure
 
@@ -47,7 +47,7 @@ kyc_tools/         ✅ LSP, formatter, package manager
 |-------|------|---------|
 | `kyc_platform` | After Phase 0 | Platform API (FS, net, time, env) — Rust crate |
 | `kyc_platform_macos` | After Phase 0 | macOS platform adapter |
-| `kyc_platform_linux` | Future | Linux platform adapter |
+| `kyc_platform_linux` | future | Linux platform adapter |
 | Various `ky-*` | After Phase 0 | Kyle packages (HTTP, SQLite, JSON, etc.) |
 | `kyc_graphics` | Aspiracional | Canvas, GPU rendering |
 | `kyc_ui` | Aspiracional | Widget library |
@@ -142,7 +142,7 @@ These use only arithmetic, raw pointers, and libc FFI. All doable with current K
 |----------|---------------|------------|
 | `ky_alloc/ky_free` | **Heap allocator** | Add `extern fn malloc(size: i64) ptr` ✅ already possible |
 | `ky_retain/ky_release` | **Atomic operations** | Needs LLVM `atomicrmw` instruction or `__sync_fetch_and_add` via extern |
-| `ky_iter_new/next/map/filter/free` (5) | **`Box::new` + function ptr transmute** | Use `extern fn malloc` for heap + manual vtable |
+| `ky_iter_new/next/map/filter/free` (5) | **`box::new` + function ptr transmute** | Use `extern fn malloc` for heap + manual vtable |
 | `ky_f64_to_str` | **f64 formatting** | Use `extern fn snprintf(buf, size, fmt, val)` from libc |
 | `ky_assert_eq/assert_ne` | **i64 error message formatting** | Use `ky_i64_to_str` (from ✅ group) |
 
@@ -188,7 +188,7 @@ These use only arithmetic, raw pointers, and libc FFI. All doable with current K
 ## Implementation Order
 
 ```
-AHORA → Backend Packages + WebSocket/WASM — ✅ ENFOQUE ACTUAL
+AHORA → Backend Packages + websocket/WASM — ✅ ENFOQUE ACTUAL
    ↓
       Runtime reescritura en Kyle — ⏸️ PAUSADA (hasta tener proyectos reales)
          ↓
@@ -205,9 +205,9 @@ AHORA → Backend Packages + WebSocket/WASM — ✅ ENFOQUE ACTUAL
 |------|-------------|------------|--------|
 | 1 | Function pointers (`fn()` como tipo de primera clase) | Compiler | ✅ |
 | 2 | `JsonValue` type + auto-serialize de `final class` | Union types | ✅ |
-| 3 | HTTP Client: `client.post(url, class)` auto-JSON | Fase 2 | ✅ |
+| 3 | HTTP client: `client.post(url, class)` auto-JSON | Fase 2 | ✅ |
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
-| 5 | WebSocket + SSE sobre Server | Fase 4 | 🔜 |
+| 5 | websocket + SSE sobre Server | Fase 4 | 🔜 |
 
 **Current state:** Packages work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completados (Kyle vs Rust vs C). Bugs recientes arreglados: constructor sin `fn`, `@link` propagation, `from X import a, b, c`, tuple destructuring, `close()` name conflict.
 
@@ -251,10 +251,10 @@ See `docs/05-packages/registry.md` for full documentation.
 | Feature | Ejemplo |
 |---------|---------|
 | Funciones importadas de módulos | `from http.server import send_json` ✅ |
-| Clases importadas de módulos | `from http.server import Router` ✅ |
+| Clases importadas de módulos | `from http.server import router` ✅ |
 | Struct return con strings | `fn json_res(data: str) Res: Res { body: data }` ✅ |
 | Generic function calls con `<T>` | `identity<i32>(42)`, `deserialize<LoginReq>(body)` ✅ |
-| Generic function/class decls con `<T>` | `fn identity<T>(x: T) T:`, `class Box<T>:` ✅ |
+| Generic function/class decls con `<T>` | `fn identity<T>(x: T) T:`, `class box<T>:` ✅ |
 | Type alias con `<T>` | `type Maybe<T> = T?` ✅ |
 | `serialize(val)` / `deserialize<T>(str)` | Builtin global ✅ |
 | Clases + métodos | `client.get(url)` ✅ |
@@ -264,7 +264,7 @@ See `docs/05-packages/registry.md` for full documentation.
 | **Implicit main** | `ky run app.ky` sin `fn main()` — código módulo ejecutado automáticamente ✅ |
 | **Closures multi-line** | `(req, client):\n    send_json(...)` con bloque indentado ✅ |
 | **Function pointers** | `handler as ptr`, llamado vía `fn_ptr(args)` con CallIndirect ✅ |
-| **Router HTTP alto nivel** | `app.get("/path", handler)` con `get` como método (keyword) ✅ |
+| **router HTTP alto nivel** | `app.get("/path", handler)` con `get` como método (keyword) ✅ |
 | **Packages sin std/** | `from http.server import ...` busca directamente en `packages/http/src/` ✅ |
 
 ### 🔜 En desarrollo
@@ -315,8 +315,8 @@ See `docs/05-packages/registry.md` for full documentation.
 | Regla | Ejemplos |
 |-------|----------|
 | Tipos 1 palabra | `regex`, `url`, `uuid`, `bytes`, `decimal`, `mutex`, `future`, `box` |
-| Tipos multi-palabra | `strBuilder`, `atomicI64`, `atomicBool`, `bigInt`, `dateTime` |
-| Funciones | `spawnThread`, `joinThread`, `parallelFor`, `fetchAdd`, `toStr` |
+| Tipos multi-palabra | `str_builder`, `atomic_i64`, `atomic_bool`, `big_int`, `date_time` |
+| Funciones | `spawn_thread`, `join_thread`, `parallel_for`, `fetch_add`, `to_str` |
 | Constructores tipo | `regex("[0-9]+")`, `box(42)`, `channel<i32>(16)` |
 | Constantes | `MAX_SIZE := 1024` (UPPER) |
 
@@ -324,9 +324,9 @@ See `docs/05-packages/registry.md` for full documentation.
 
 | Actual | Nuevo | Archivos |
 |--------|-------|----------|
-| `ky_parallel_for` | `parallelFor` | runtime, symbol_table, lowerer |
-| `ky_spawn_thread` | `spawnThread` | runtime, symbol_table |
-| `ky_join_thread` | `joinThread` | runtime, symbol_table |
+| `ky_parallel_for` | `parallel_for` | runtime, symbol_table, lowerer |
+| `ky_spawn_thread` | `spawn_thread` | runtime, symbol_table |
+| `ky_join_thread` | `join_thread` | runtime, symbol_table |
 | `ky_string_builder_*` | `ky_str_builder_*` | ✅ ya hecho |
 | Funciones package | camelCase | packages/http/, packages/json/ |
 
@@ -335,8 +335,8 @@ See `docs/05-packages/registry.md` for full documentation.
 | Tipo | Decisión | Razón |
 |------|----------|-------|
 | **Stack** | ❌ No hay tipo dedicado | `{T}` con `push()`/`pop()` ya es stack. Go y JS hacen lo mismo. |
-| **Queue** | ❌ No hay tipo dedicado | `{T}` con `push()`/`popFirst()` cubre FIFO. |
-| **Set** | ✅ Sí, tipo dedicado | Requiere hash set (sin duplicados, O(1) lookup). |
+| **Queue** | ❌ No hay tipo dedicado | `{T}` con `push()`/`pop_first()` cubre FIFO. |
+| **set** | ✅ Sí, tipo dedicado | Requiere hash set (sin duplicados, O(1) lookup). |
 
 ## ⚠️ Option<T> y Result<T,E> — ¿Qué significa?
 
@@ -559,13 +559,13 @@ Features identificadas en los benchmarks que Kyle necesita para ser competitivo 
 | **Async/Await en Kyle** | ⭐⭐⭐⭐ | Runtime + compiler | 📅 Fase D |
 | **HashMap completo** (String→any) | ⭐⭐⭐⭐ | Runtime | 📅 Fase C |
 | **Networking TCP/UDP** | ⭐⭐⭐⭐ | Runtime + packages | 📅 Fase 4-5 |
-| **WebSocket/SSE** | ⭐⭐⭐ | Packages | 📅 Fase 5 |
-| **Regex** | ⭐⭐⭐ | Package | 📅 Futuro |
+| **websocket/SSE** | ⭐⭐⭐ | Packages | 📅 Fase 5 |
+| **regex** | ⭐⭐⭐ | Package | 📅 Futuro |
 | **Crypto** | ⭐⭐⭐ | Package | 📅 Futuro |
 | **Compression** (gzip, brotli) | ⭐⭐⭐ | Package | 📅 Futuro |
 | **PGO** (Profile Guided Optimization) | ⭐⭐⭐ | Toolchain | 📅 Futuro |
 | **Cache Miss / IPC profiling** | ⭐⭐ | Toolchain | 📅 Futuro |
-| **Arena/Pool allocators** | ⭐⭐ | Runtime | 📅 Futuro |
+| **Arena/pool allocators** | ⭐⭐ | Runtime | 📅 Futuro |
 | **Vectorization control** (LLVM) | ⭐⭐ | Compiler | 📅 Futuro |
 | **Zero-cost Array/List/Dict syntax** | ⭐⭐⭐⭐⭐ | Parser + typeck + MIR | 🚀 **En progreso** |
 
@@ -608,7 +608,7 @@ Mejoras identificadas en benchmarks que cierran la brecha con C/Rust:
 | 1 | **Register alloc para `^i32`/`^i64`** — LLVM mem2reg no promueve allocas simples con múltiples BB. Solución: identificar `^i32`/`^i64` en codegen y emitir valores LLVM directo sin alloca | Fib (1.6× → 1.0×) | ⭐⭐⭐ | 1-2 días |
 | 2 | **`list.reserve(n)` + batch push** — `reserve(n)` pre-asigna capacidad (✅ implementado). Batch push reduce N FFI calls a 1 | Primes (2.7× → 1.5×) | ⭐⭐ | 1 día |
 | 3 | **Arrays `[T; N]` pass-by-reference** — Los arrays hoy son copy-by-value. `fn f(a: &[i64; N])` evitaría copiar 80KB en cada acceso. Necesita `&[T; N]` como tipo de parámetro | Matmul (7.8× → 1.0×) | ⭐⭐⭐⭐⭐ | 3-4 días |
-| 4 | **strBuilder inline hints** — Marcar `ky_str_builder_append` con atributos LLVM `inlinehint` para eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 día |
+| 4 | **str_builder inline hints** — Marcar `ky_str_builder_append` con atributos LLVM `inlinehint` para eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 día |
 
 ### Notas de implementación
 
@@ -653,27 +653,27 @@ Cada tipo package → integración nativa requiere:
 | `from datetime import duration` | `Duration` | ✅ en datetime.rs |
 | `from date import date` | `Date` | ✅ `kyc_runtime/src/date.rs` |
 | `from date import time` | `Time` | ✅ en date.rs |
-| `from bytes import bytes` | `Bytes` | ✅ `kyc_runtime/src/bytes.rs` |
-| `from decimal import decimal` | `Decimal` | ✅ `kyc_runtime/src/decimal.rs` |
-| `from uuid import uuid` | `Uuid` | ✅ `kyc_runtime/src/uuid.rs` |
-| `from url import url` | `Url` | ✅ `kyc_runtime/src/url.rs` |
-| `from regex import regex` | `Regex` | ✅ `kyc_runtime/src/regex.rs` |
+| `from bytes import bytes` | `bytes` | ✅ `kyc_runtime/src/bytes.rs` |
+| `from decimal import decimal` | `decimal` | ✅ `kyc_runtime/src/decimal.rs` |
+| `from uuid import uuid` | `uuid` | ✅ `kyc_runtime/src/uuid.rs` |
+| `from url import url` | `url` | ✅ `kyc_runtime/src/url.rs` |
+| `from regex import regex` | `regex` | ✅ `kyc_runtime/src/regex.rs` |
 | `ky_getenv`/`ky_setenv` | `Env` | ✅ `kyc_runtime/src/string.rs` |
 
 ### Fase 3: Tipos I/O nativos
 
 | Tipo | Estado | Necesita |
 |------|--------|----------|
-| `File` | ❌ fd i32 | `final class File` + métodos read/write/close/seek |
-| `Socket` | ❌ fd i32 | `final class Socket` + listen/accept/connect |
-| `Path` | ❌ str | `final class Path` + join/dirname/basename/exists |
-| `Json` | ❌ functions | `final class Json` + parse/stringify methods |
+| `file` | ❌ fd i32 | `final class file` + métodos read/write/close/seek |
+| `socket` | ❌ fd i32 | `final class socket` + listen/accept/connect |
+| `path` | ❌ str | `final class path` + join/dirname/basename/exists |
+| `json` | ❌ functions | `final class json` + parse/stringify methods |
 
 ### Fase 4: Colecciones faltantes
 
 | Tipo | Estado | Notas |
 |------|--------|-------|
-| `Set<T>` | 🔶 | Type enum existe. Falta: parser, MirType, runtime hash set |
+| `set<T>` | 🔶 | Type enum existe. Falta: parser, MirType, runtime hash set |
 | `Queue<T>` | ❌ | FIFO. Runtime simple (ring buffer) |
 | `Stack<T>` | ❌ | LIFO. `{T}` con push/pop ya es stack |
 | `slice` | ❌ | Vista de array existente `&[T]`. Necesario para pasar arrays sin copiar |
@@ -682,21 +682,21 @@ Cada tipo package → integración nativa requiere:
 
 | Tipo | Estado | Notas |
 |------|--------|-------|
-| `Channel<T>` | 🔶 | Runtime listo. Falta tipo Kyle genérico |
-| `Mutex<T>` | ❌ | Para threads. Runtime Rust ya tiene |
+| `channel<T>` | 🔶 | Runtime listo. Falta tipo Kyle genérico |
+| `mutex<T>` | ❌ | Para threads. Runtime Rust ya tiene |
 | `AtomicI64` / `AtomicBool` | ❌ | Operaciones lock-free |
-| `Future<T>` | ❌ | Handle tipado para async |
-| `Iterator` | 🔶 | KlIter existe en runtime. Falta tipo Kyle |
+| `future<T>` | ❌ | Handle tipado para async |
+| `iterator` | 🔶 | KlIter existe en runtime. Falta tipo Kyle |
 | `select` | ❌ | Multiplexor de canales |
 
 ### Fase 6: Smart pointers
 
 | Tipo | Notas |
 |------|-------|
-| `Box<T>` | Heap pointer simple. Ya existe `ky_alloc` para raw |
-| `Rc<T>` | Single-thread reference counting |
-| `Arc<T>` | Multi-thread atomic refcount |
-| `Weak<T>` | Weak reference (evita ciclos Rc/Arc) |
+| `box<T>` | Heap pointer simple. Ya existe `ky_alloc` para raw |
+| `rc<T>` | Single-thread reference counting |
+| `arc<T>` | Multi-thread atomic refcount |
+| `weak<T>` | weak reference (evita ciclos rc/arc) |
 
 ---
 
@@ -705,8 +705,8 @@ Cada tipo package → integración nativa requiere:
 | Categoría | Completado | En progreso | Pendiente |
 |-----------|:----------:|:-----------:|:---------:|
 | Primitivos | 10/17 | 4 (u8-u64) | 3 (byte, void, never) |
-| Compuestos | 9/15 | 1 (tuple) | 5 (Set, Queue, Stack, Deque, LinkedList) |
-| Ownership | 3/7 | 0 | 4 (Box, Rc, Arc, Weak) |
-| Concurrencia | 3/13 | 2 (Channel, Iterator) | 8 (Future, select, Mutex, RwLock, Atomic*2, Barrier, Condvar) |
-| Especializados nativos | 0/15 | 10 (migrar de packages) | 5 (File, Socket, Path, Json, BigInt) |
+| Compuestos | 9/15 | 1 (tuple) | 5 (set, Queue, Stack, Deque, LinkedList) |
+| Ownership | 3/7 | 0 | 4 (box, rc, arc, weak) |
+| Concurrencia | 3/13 | 2 (channel, iterator) | 8 (future, select, mutex, RwLock, Atomic*2, Barrier, Condvar) |
+| Especializados nativos | 0/15 | 10 (migrar de packages) | 5 (file, socket, path, json, big_int) |
 | **Total** | **~25** | **~17** | **~25** |

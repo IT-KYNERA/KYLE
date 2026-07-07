@@ -61,10 +61,10 @@ Machine: Darwin macbook.local 25.5.0 Darwin Kernel Version 25.5.0: Mon Apr 27 20
 | Async/Await | Runtime existe, no expuesto | 📅 Fase D |
 | TCP/UDP/HTTP Server | Packages en desarrollo | 📅 Fase 4-5 |
 | HashMap avanzado | Dict → i64 limitado | 📅 Fase C |
-| Regex/Crypto/Compression | No existen packages | 📅 Futuro |
+| regex/Crypto/Compression | No existen packages | 📅 Futuro |
 | PGO | No implementado en toolchain | 📅 Futuro |
 | Cache Miss, IPC, Branch Miss | Requiere perf (Linux) | 📅 Futuro |
-| WebSocket/SSE | No implementado | 📅 Fase 5 |
+| websocket/SSE | No implementado | 📅 Fase 5 |
 | LLVM Vectorization control | Kyle no expone atributos | 📅 Futuro |
-| Arena/Pool allocators | No implementados | 📅 Futuro |
+| Arena/pool allocators | No implementados | 📅 Futuro |
 

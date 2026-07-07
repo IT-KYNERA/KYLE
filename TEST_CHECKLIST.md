@@ -129,14 +129,14 @@
 ### 3.4 Testing UI
 - [ ] Open Testing panel → discovers `#[test]` functions
 - [ ] Click "Run Tests" → runs all tests, shows PASS/FAIL
-- [ ] File watcher: create new `#[test]` → appears in Testing panel
+- [ ] file watcher: create new `#[test]` → appears in Testing panel
 - [ ] Debug profile for tests works (launches with debugger)
 
 ### 3.5 Debugger
 - [ ] F5 → launches debug configuration picker
 - [ ] Select "KL: Launch" → compiles and runs the program
 - [ ] Output appears in Debug Console
-- [ ] Set breakpoint → debugger pauses (requires runtime support)
+- [ ] set breakpoint → debugger pauses (requires runtime support)
 
 ### 3.6 Snippets
 - [ ] Type `fn` → snippet for function declaration

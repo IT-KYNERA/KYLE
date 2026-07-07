@@ -6,7 +6,7 @@ Status: 12/15 completos [x], 3 con bugs [ ] (static fn, patterns range, error-ha
 
 | Document | Description |
 |-----------|-------------|
-| [lexical-structure.md](lexical-structure.md) | File format, indentation, comments, identifiers |
+| [lexical-structure.md](lexical-structure.md) | file format, indentation, comments, identifiers |
 | [types.md](types.md) | Type system: primitive, compound, user-defined |
 | [variables.md](variables.md) | Variable declaration, constants, mutability |
 | [expressions.md](expressions.md) | All expression forms |

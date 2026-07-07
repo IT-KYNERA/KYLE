@@ -22,7 +22,7 @@ Syntax highlighting, LSP integration, snippets, debugging, and language support 
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `kl.klcPath` | `"kl"` | Path to the Kyle compiler binary |
+| `kl.klcPath` | `"kl"` | path to the Kyle compiler binary |
 | `kl.semanticHighlighting` | `true` | Enable semantic highlighting |
 
 ## Commands

@@ -27,7 +27,7 @@ Or install from the VS Code Marketplace: search "Kyle Language Support".
 
 | Setting | Description |
 |---------|-------------|
-| `ky.kycPath` | Path to `ky` binary (auto-detected) |
+| `ky.kycPath` | path to `ky` binary (auto-detected) |
 | `ky.semanticHighlighting` | Enable experimental semantic highlighting |
 
 ## Binary search order

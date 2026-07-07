@@ -1,7 +1,7 @@
 # Concurrency & Parallel Execution
 
-**Status:** [x] `async fn`, `async:` block, `await`, `parallelFor`, threads.
-[ ] `Future<T>`, `Channel<T>`, `select`, `Mutex<T>`, `Atomic*`, `Iterator`.
+**Status:** [x] `async fn`, `async:` block, `await`, `parallel_for`, threads.
+[ ] `future<T>`, `channel<T>`, `select`, `mutex<T>`, `Atomic*`, `iterator`.
 
 ---
 
@@ -30,7 +30,7 @@ fn main() i32:
     0
 ```
 
-## parallelFor [x]
+## parallel_for [x]
 
 ```ky
 fn heavy(n: i64) i64:
@@ -43,7 +43,7 @@ fn heavy(n: i64) i64:
 
 fn main() i32:
     fn_ptr = heavy as ptr
-    parallelFor(fn_ptr, 0, 8)
+    parallel_for(fn_ptr, 0, 8)
     0
 ```
 
@@ -54,26 +54,26 @@ fn worker(n: i64) i64:
     n * 2
 
 fn main() i32:
-    h = spawnThread(worker as ptr, 21)
-    r = joinThread(h)
+    h = spawn_thread(worker as ptr, 21)
+    r = join_thread(h)
     println(str(r))    # 42
     0
 ```
 
 ---
 
-## Future: `Future<T>` [ ]
+## future: `future<T>` [ ]
 
 ```ky
-task: Future<str> = async:
+task: future<str> = async:
     "response"
 val = await task
 ```
 
-## Channel: `Channel<T>` [ ]
+## channel: `channel<T>` [ ]
 
 ```ky
-ch: Channel<i32> = Channel(16)     # buffer 16
+ch: channel<i32> = channel(16)     # buffer 16
 ch.send(42)
 val = ch.recv()
 ch.len()
@@ -92,10 +92,10 @@ select:
         println("timeout")
 ```
 
-## Mutex: `Mutex<T>` [ ]
+## mutex: `mutex<T>` [ ]
 
 ```ky
-m: Mutex<i32> = Mutex(0)
+m: mutex<i32> = mutex(0)
 lock(m):
     *val += 1                 # operación segura
 ```
@@ -112,7 +112,7 @@ flag.store(true)
 flag.load()                   # → true
 ```
 
-## Iterator [ ]
+## iterator [ ]
 
 ```ky
 iter = list.iter()
@@ -130,12 +130,12 @@ result = doubled.collect()     # → {i32}
 | `async fn` | ✅ | `async fn f(p: T) R:` |
 | `async:` block | ✅ | `t = async: ...` |
 | `await` | ✅ | `await task` |
-| `parallelFor` | 🔶 renombrar | `parallelFor(fn, 0, N)` |
-| threads | 🔶 renombrar | `spawnThread` / `joinThread` |
+| `parallel_for` | 🔶 renombrar | `parallel_for(fn, 0, N)` |
+| threads | 🔶 renombrar | `spawn_thread` / `join_thread` |
 | `future<T>` | 📅 | `t: future<str> = async: ...` |
 | `channel<T>` | 📅 | `ch = channel<T>(n); ch.send(v); v = ch.recv()` |
 | `select` | 📅 | `select: &msg -> ch: ...` |
 | `mutex<T>` | 📅 | `mutex<T>(v); lock(m): *val += 1` |
-| `atomicI64` | 📅 | `atomicI64(v).fetchAdd(1)` |
-| `atomicBool` | 📅 | `atomicBool(v).store(true)` |
+| `atomic_i64` | 📅 | `atomic_i64(v).fetch_add(1)` |
+| `atomic_bool` | 📅 | `atomic_bool(v).store(true)` |
 | `iterator` | 📅 | `list.iter().map(fn).filter(fn).collect()` |

@@ -12,8 +12,8 @@ fn testAddition():
 
 #[test]
 fn testString():
-    assertEq("hello", "hello")
-    assertNe("hello", "world")
+    assert_eq("hello", "hello")
+    assert_ne("hello", "world")
 ```
 
 ## Assertions
@@ -21,9 +21,9 @@ fn testString():
 | Function | Description |
 |----------|-------------|
 | `assert(condition)` | Assert condition is true |
-| `assertEq(a, b)` | Assert a == b |
-| `assertNe(a, b)` | Assert a != b |
-| `assertStr(a, b)` | Assert string equality |
+| `assert_eq(a, b)` | Assert a == b |
+| `assert_ne(a, b)` | Assert a != b |
+| `assert_str(a, b)` | Assert string equality |
 
 ## Running tests
 

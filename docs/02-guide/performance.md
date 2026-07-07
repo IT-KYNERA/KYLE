@@ -59,12 +59,12 @@ fn main(args: [str]) i32:
 
 ```ky
 #[test]
-fn benchSum():
+fn bench_sum():
     total: ^i64 = 0
     start = timestamp()
     for i in 0..10000000:
         total = total + i
-    elapsed = secondsSince(start)
+    elapsed = seconds_since(start)
     println("sum={total} time={elapsed}s")
 ```
 
