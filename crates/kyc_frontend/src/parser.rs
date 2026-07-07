@@ -396,6 +396,10 @@ impl Parser {
         self.expect(TokenKind::LParen)?;
         let params = self.parse_params()?;
         self.expect(TokenKind::RParen)?;
+        // Support both `fn name() Type:` and `fn name() -> Type:` syntax
+        if self.at(TokenKind::Arrow) {
+            self.advance();
+        }
         let return_type = if self.at(TokenKind::Colon)
             || self.at(TokenKind::Newline) || self.at(TokenKind::Dedent) || self.at(TokenKind::Eof)
         {
