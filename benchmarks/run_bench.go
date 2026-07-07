@@ -46,6 +46,7 @@ func main() {
 		{"C primes",     exec.Command("./primes/primes_c")},
 		{"Rust primes",  exec.Command("./primes/primes_rs")},
 		{"Go primes",    exec.Command("./primes/primes_go")},
+		{"Kyle primes",  exec.Command("primes/primes_ky")},
 
 		{"C matmul",     exec.Command("./matmul/matmul_c")},
 		{"Rust matmul",  exec.Command("./matmul/matmul_rs")},

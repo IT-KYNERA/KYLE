@@ -1,9 +1,9 @@
-# Kyle — Sieve of Eratosthenes (native list)
+# Kyle — Sieve of Eratosthenes via native list {i32}
 fn main() i32:
     n := 3000000
     sieve: {i32} = {0}
     i: &i32 = 0
-    while i <= n:
+    while i < n:
         sieve.push(0)
         i = i + 1
     count: &i32 = 0
