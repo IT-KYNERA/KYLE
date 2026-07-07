@@ -195,6 +195,11 @@ fn desugar_expr(expr: &Expr) -> Expr {
             property: property.clone(),
             span: span.clone(),
         },
+        Expr::ArrayRepeat { value, count, span } => Expr::ArrayRepeat {
+            value: Box::new(desugar_expr(value)),
+            count: Box::new(desugar_expr(count)),
+            span: span.clone(),
+        },
         Expr::List { elements, span } => Expr::List {
             elements: elements.iter().map(desugar_expr).collect(),
             span: span.clone(),

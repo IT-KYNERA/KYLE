@@ -1,4 +1,101 @@
 use core::ptr;
+use std::alloc::{alloc, dealloc, realloc, Layout};
+
+#[repr(C)]
+pub struct strBuilder {
+    data: *mut u8,
+    len: i64,
+    cap: i64,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_builder_new(capacity: i64) -> *mut strBuilder {
+    let cap = if capacity < 16 { 16i64 } else { capacity };
+    let layout = Layout::from_size_align(
+        cap as usize,
+        16,
+    ).unwrap_or_else(|_| Layout::from_size_align(16, 16).unwrap());
+    let data = unsafe { alloc(layout) };
+    if data.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe { *data = 0; }
+    let builder = Box::into_raw(Box::new(strBuilder {
+        data,
+        len: 0,
+        cap,
+    }));
+    builder
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_builder_append(
+    builder: *mut strBuilder,
+    data: *const u8,
+    len: i64,
+) {
+    if builder.is_null() || data.is_null() || len <= 0 {
+        return;
+    }
+    let b = unsafe { &mut *builder };
+    let new_len = b.len + len;
+    if new_len > b.cap {
+        let mut new_cap = b.cap * 2;
+        while new_cap < new_len {
+            new_cap *= 2;
+        }
+        let layout = Layout::from_size_align(b.cap as usize, 16)
+            .unwrap_or_else(|_| Layout::from_size_align(16, 16).unwrap());
+        let new_data = unsafe { realloc(b.data, layout, new_cap as usize) };
+        if new_data.is_null() {
+            return;
+        }
+        b.data = new_data;
+        b.cap = new_cap;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(data, b.data.add(b.len as usize), len as usize);
+        *b.data.add(new_len as usize) = 0;
+    }
+    b.len = new_len;
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_builder_to_str(builder: *const strBuilder) -> *mut u8 {
+    if builder.is_null() {
+        return std::ptr::null_mut();
+    }
+    let b = unsafe { &*builder };
+    if b.len == 0 {
+        let buf = crate::ky_alloc(1);
+        if !buf.is_null() {
+            unsafe { *buf = 0; }
+        }
+        return buf;
+    }
+    let buf = crate::ky_alloc(b.len + 1);
+    if buf.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(b.data, buf, b.len as usize);
+        *buf.add(b.len as usize) = 0;
+    }
+    buf
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_builder_free(builder: *mut strBuilder) {
+    if builder.is_null() {
+        return;
+    }
+    let b = unsafe { Box::from_raw(builder) };
+    if !b.data.is_null() {
+        let layout = Layout::from_size_align(b.cap as usize, 16)
+            .unwrap_or_else(|_| Layout::from_size_align(16, 16).unwrap());
+        unsafe { dealloc(b.data, layout); }
+    }
+}
 
 /// Convert f32 to string (via integer formatting — fptosi result).
 #[unsafe(no_mangle)]

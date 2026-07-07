@@ -5,7 +5,7 @@
 int main() {
     char *s = strdup("");
     size_t len = 0;
-    for (int i = 0; i < 50000; i++) {
+    for (int i = 0; i < 500000; i++) {
         len++;
         s = realloc(s, len + 1);
         s[len - 1] = 'x';

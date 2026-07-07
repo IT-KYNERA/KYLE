@@ -1,22 +1,20 @@
-# Kyle — Sieve with heap memory (ky_alloc + ptr access)
-extern fn ky_alloc(size: i64) ptr
-extern fn ky_free(ptr)
-extern fn ky_ptr_read_i32(ptr) i32
-extern fn ky_ptr_write_i32(ptr, i32)
-
+# Kyle — Sieve of Eratosthenes (native list)
 fn main() i32:
     n := 3000000
-    buf := ky_alloc(n * 4 + 4)
+    sieve: {i32} = {0}
+    i: &i32 = 0
+    while i <= n:
+        sieve.push(0)
+        i = i + 1
     count: &i32 = 0
-    i2: &i64 = 2
+    i2: &i32 = 2
     while i2 <= n:
-        if ky_ptr_read_i32(buf + i2 * 4) == 0:
+        if sieve[i2] == 0:
             count = count + 1
-            j: &i64 = i2 + i2
+            j: &i32 = i2 + i2
             while j <= n:
-                ky_ptr_write_i32(buf + j * 4, 1)
+                sieve[j] = 1
                 j = j + i2
         i2 = i2 + 1
-    println("Primes: " + str(count))
-    ky_free(buf)
+    println("Primes: " + count.to_str())
     0

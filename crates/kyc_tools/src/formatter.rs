@@ -720,6 +720,13 @@ impl Formatter {
                 }
                 out.push(']');
             }
+            Expr::ArrayRepeat { value, count, .. } => {
+                out.push('[');
+                self.write_expr(out, value);
+                out.push_str("; ");
+                self.write_expr(out, count);
+                out.push(']');
+            }
             Expr::List { elements, .. } => {
                 out.push('{');
                 for (i, e) in elements.iter().enumerate() {
@@ -937,6 +944,7 @@ fn expr_span(expr: &Expr) -> kyc_core::span::Span {
         Expr::Index { span, .. } => *span,
         Expr::List { span, .. } => *span,
         Expr::Array { span, .. } => *span,
+        Expr::ArrayRepeat { span, .. } => *span,
         Expr::Dictionary { span, .. } => *span,
         Expr::Tuple { span, .. } => *span,
         Expr::Closure { span, .. } => *span,

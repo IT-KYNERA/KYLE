@@ -435,6 +435,11 @@ pub enum Expr {
         elements: Vec<Expr>,
         span: Span,
     },
+    ArrayRepeat {
+        value: Box<Expr>,
+        count: Box<Expr>,
+        span: Span,
+    },
     List {
         elements: Vec<Expr>,
         span: Span,
@@ -1166,6 +1171,12 @@ impl DisplayDepth for Expr {
                     elem.fmt_depth(f, d + 1)?;
                 }
                 Ok(())
+            }
+            Expr::ArrayRepeat { value, count, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "ArrayRepeat")?;
+                value.fmt_depth(f, d + 1)?;
+                count.fmt_depth(f, d + 1)
             }
             Expr::List { elements, .. } => {
                 write_indent(f, d)?;

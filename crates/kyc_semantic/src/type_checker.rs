@@ -308,6 +308,10 @@ impl TypeChecker {
             Expr::List { elements, .. } => {
                 for e in elements { self.check_const_expr(e, context); }
             }
+            Expr::ArrayRepeat { value, count, .. } => {
+                self.check_const_expr(value, context);
+                self.check_const_expr(count, context);
+            }
             _ => {
                 self.reporter.report(
                     Diagnostic::error(ErrorCode::E0001, format!("unsupported expression in constant '{}'", context))
@@ -1002,6 +1006,38 @@ impl TypeChecker {
             Expr::Array { elements, .. } => {
                 for e in elements { self.infer_expr(e); }
                 Type::Array(Box::new(Type::I32), elements.len())
+            }
+            Expr::ArrayRepeat { value, count, .. } => {
+                let val_type = self.infer_expr(value);
+                let cnt_type = self.infer_expr(count);
+                let size = if let Type::I32 = cnt_type {
+                    // count must be a compile-time constant i32; runtime value will produce correct array size
+                    0
+                } else if let Type::I64 = cnt_type {
+                    0
+                } else {
+                    self.reporter.report(
+                        Diagnostic::error(ErrorCode::E0001, "array repeat count must be an integer")
+                    );
+                    0
+                };
+                let element_type = match val_type {
+                    Type::I32 => Type::I32,
+                    Type::I64 => Type::I64,
+                    Type::I16 => Type::I16,
+                    Type::I8 => Type::I8,
+                    Type::U32 => Type::U32,
+                    Type::U64 => Type::U64,
+                    Type::U16 => Type::U16,
+                    Type::U8 => Type::U8,
+                    Type::F32 => Type::F32,
+                    Type::F64 => Type::F64,
+                    Type::Bool => Type::Bool,
+                    Type::Char => Type::Char,
+                    Type::Str => Type::Str,
+                    other => other,
+                };
+                Type::Array(Box::new(element_type), size)
             }
             Expr::Dictionary { entries, .. } => {
                 if entries.is_empty() { return Type::Dict(Box::new(Type::Str), Box::new(Type::I32)); }

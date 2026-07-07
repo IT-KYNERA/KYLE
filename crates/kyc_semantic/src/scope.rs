@@ -304,6 +304,10 @@ impl ScopeResolver {
             Expr::Array { elements, .. } => {
                 for e in elements { self.resolve_expr(e); }
             }
+            Expr::ArrayRepeat { value, count, .. } => {
+                self.resolve_expr(value);
+                self.resolve_expr(count);
+            }
             Expr::Dictionary { entries, .. } => {
                 for (_, v) in entries { self.resolve_expr(v); }
             }
