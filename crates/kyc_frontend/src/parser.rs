@@ -1751,8 +1751,30 @@ impl Parser {
             let type_ = self.parse_type()?;
             return Ok(Pattern::IsType { type_, span: self.span_from(start) });
         }
+        // Check for ok(v) pattern (keyword)
+        if self.at(TokenKind::OkKw) {
+            let start = self.pos;
+            self.advance();
+            self.expect(TokenKind::LParen)?;
+            let inner = self.parse_pattern()?;
+            self.expect(TokenKind::RParen)?;
+            return Ok(Pattern::EnumVariant {
+                enum_name: "Result".to_string(), variant: "Ok".to_string(),
+                args: vec![inner], span: self.span_from(start),
+            });
+        }
         if self.at_identifier() {
             let name = self.eat_identifier();
+            // Check for error(e) pattern (identifier "error" followed by LParen)
+            if name == "error" && self.at(TokenKind::LParen) {
+                self.advance();
+                let inner = self.parse_pattern()?;
+                self.expect(TokenKind::RParen)?;
+                return Ok(Pattern::EnumVariant {
+                    enum_name: "Result".to_string(), variant: "Err".to_string(),
+                    args: vec![inner], span: self.span_from(start),
+                });
+            }
             // Check for enum variant pattern: Option.Some(v)
             if self.at(TokenKind::Dot) {
                 self.advance();

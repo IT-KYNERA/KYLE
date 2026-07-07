@@ -2117,6 +2117,12 @@ impl Lowerer {
                             }
                         }
                         Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                            // Special case: ok(v)/error(e) for Result patterns — treat as wildcard
+                            if enum_name == "Result" {
+                                ctx.finish_block(MirTerminator::Br(arm_label.clone()));
+                                ctx.current_block = MirBasicBlock::new(arm_label.clone());
+                                return ctx;
+                            }
                             // Look up variant index from enum_variants map
                             let ev_map = self.enum_variants.borrow();
                             let variant_idx = ev_map.get(enum_name)
@@ -6284,6 +6290,24 @@ impl Lowerer {
                             }
                         }
                         Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                            if enum_name == "Result" {
+                                for stmt in &arm.body.statements {
+                                    ctx = self.lower_stmt(ctx, stmt);
+                                }
+                                let last_val = ctx.next_local - 1;
+                                let last_type = ctx.local_types.get(&last_val).cloned().unwrap_or(MirType::I64);
+                                arm_types.push(last_type.clone());
+                                ctx.local_types.insert(result_local, last_type);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: result_local,
+                                    value: MirValue::Local(last_val),
+                                });
+                                ctx.finish_block(MirTerminator::Br(merge_block.clone()));
+                                if !is_last {
+                                    ctx.current_block = MirBasicBlock::new(next_target);
+                                }
+                                continue;
+                            }
                             let ev_map = self.enum_variants.borrow();
                             let variant_idx = ev_map.get(enum_name)
                                 .and_then(|m| m.get(variant))

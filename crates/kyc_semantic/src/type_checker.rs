@@ -362,6 +362,32 @@ impl TypeChecker {
                     Symbol::new_var(name.clone(), inferred, false));
             }
             Pattern::EnumVariant { enum_name, variant, args, .. } => {
+                // Special case: ok(v) / error(e) for Result<T, E> patterns
+                if enum_name == "Result" {
+                    if let Some(mt) = match_type {
+                        if let Type::Generic(name, params) = mt {
+                            if name == "Result" && params.len() >= 1 {
+                                let ok_type = &params[0]; // T in Result<T, E>
+                                if variant == "Ok" {
+                                    for arg in args { self.bind_pattern(arg, Some(ok_type)); }
+                                } else {
+                                    let err_type = if params.len() >= 2 { &params[1] } else { &Type::Str };
+                                    for arg in args { self.bind_pattern(arg, Some(err_type)); }
+                                }
+                                return;
+                            }
+                        }
+                        // Also handle Type::Error(inner) which represents T!
+                        if let Type::Error(inner) = mt {
+                            if variant == "Ok" {
+                                for arg in args { self.bind_pattern(arg, Some(inner)); }
+                            } else {
+                                for arg in args { self.bind_pattern(arg, Some(&Type::Str)); }
+                            }
+                            return;
+                        }
+                    }
+                }
                 // Look up the enum and variant to get actual payload types
                 if let Some(sym) = self.symbols.lookup(enum_name) {
                     if let SymKind::Enum(edef) = &sym.kind {
@@ -415,9 +441,14 @@ impl TypeChecker {
             Stmt::Return(e) => {
                 if let Some(e) = e {
                     let expr_type = self.infer_expr(e);
+                    // Skip return type check for ok()/error() — they unify with Result<T,E>
+                    let is_result_like = matches!(&expr_type, Type::Option(_));
+                    let is_result_call = if let Expr::FunctionCall { target, .. } = e.as_ref() {
+                        Self::target_name(target).map_or(false, |n| n == "ok" || n == "error" || n == "None")
+                    } else { false };
                     if let Some(ref fn_name) = self.current_fn {
                         if let Some(expected) = self.fn_return_types.get(fn_name) {
-                            if &expr_type != expected && *expected != Type::Void {
+                            if &expr_type != expected && *expected != Type::Void && !is_result_call {
                                 self.reporter.report(
                                     Diagnostic::error(ErrorCode::E0001,
                                         format!("expected return type '{}', found '{}'",
@@ -848,7 +879,8 @@ impl TypeChecker {
                                 "ky_ptr_read_i32" => Type::I32,
                                 "ky_ptr_read_ptr" => Type::Ptr,
                                 "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Type::I64,
-                                "error" => Type::Option(Box::new(Type::Void)),
+                                "error" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
+                                "ok" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
                                 _ => *ft.return_,
                             }
                         } else {

@@ -56,6 +56,11 @@ impl SymbolTable {
             ("u8", Type::U8), ("u16", Type::U16), ("u32", Type::U32), ("u64", Type::U64),
             ("f32", Type::F32), ("f64", Type::F64),
             ("bool", Type::Bool), ("char", Type::Char), ("str", Type::Str), ("void", Type::Void),
+            ("ptr", Type::Ptr),
+            ("Result", Type::Object(vec![
+                ("disc".to_string(), Type::I32),
+                ("payload".to_string(), Type::I64),
+            ])),
         ];
         for (name, ty) in &builtin_types {
             self.type_defs.insert(name.to_string(), ty.clone());
@@ -78,7 +83,7 @@ impl SymbolTable {
             "ceil", "floor", "round",
             "push", "list_len", "list_get", "list_set", "list_pop",
 
-            "ky_spawn_thread", "ky_join_thread", "ky_parallel_for",
+            "ky_spawn_thread", "ky_join_thread", "ky_parallel_for", "ok",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {
