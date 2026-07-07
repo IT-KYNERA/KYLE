@@ -178,7 +178,7 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 | 74 | `async fn(...) T` | ✅ | `async fn fetch(url: &str) str:` |
 | 75 | Closure | 🔶 | `(x: i32): x * 2` |
 | 76 | `static fn` | ⚠️ | Bug en parser (espera LParen antes de Static) |
-| 77 | `str_builder` | 🔜 | `ky_str_builder_new()` (solo FFI, no tipo Kyle) |
+| 77 | `str_builder` | 🔜 | `str_builder(50000).append("x")` (clase nativa) |
 
 ---
 
@@ -186,7 +186,7 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 
 | Prioridad | Área | Items |
 |-----------|------|-------|
-| **P0** | Renombrar existente | `ky_parallel_for`→`parallel_for`, `ky_spawn_thread`→`spawn_thread`, `ky_join_thread`→`join_thread`, funciones package→camelCase |
+| **P0** | Renombrar existente | `ky_*` → namespaces (`parallel.for`, `thread.spawn`, `thread.join`) |
 | **P1** | Arreglar bugs | `u8-u64` codegen, `tuple` codegen, `char` type inference, `T?`/`T!` type checker |
 | **P2** | Hacer nativos tipos package | `date_time`, `duration`, `date`, `time`, `bytes`, `decimal`, `uuid`, `url`, `regex`, `env` |
 | **P3** | Tipos I/O nativos | `file`, `socket`, `path`, `json` |

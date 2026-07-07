@@ -324,10 +324,10 @@ See `docs/05-packages/registry.md` for full documentation.
 
 | Actual | Nuevo | Archivos |
 |--------|-------|----------|
-| `ky_parallel_for` | `parallel_for` | runtime, symbol_table, lowerer |
-| `ky_spawn_thread` | `spawn_thread` | runtime, symbol_table |
-| `ky_join_thread` | `join_thread` | runtime, symbol_table |
-| `ky_string_builder_*` | `ky_str_builder_*` | ✅ ya hecho |
+| `ky_parallel_for` | `parallel.for` | runtime, symbol_table, lowerer |
+| `ky_spawn_thread` | `thread.spawn` | runtime, symbol_table |
+| `ky_join_thread` | `thread.join` | runtime, symbol_table |
+| `ky_str_builder_*` | `str_builder` clase | ✅ ya wrapper |
 | Funciones package | camelCase | packages/http/, packages/json/ |
 
 ### Decisión: Stack y Queue no son tipos dedicados
@@ -608,7 +608,7 @@ Mejoras identificadas en benchmarks que cierran la brecha con C/Rust:
 | 1 | **Register alloc para `^i32`/`^i64`** — LLVM mem2reg no promueve allocas simples con múltiples BB. Solución: identificar `^i32`/`^i64` en codegen y emitir valores LLVM directo sin alloca | Fib (1.6× → 1.0×) | ⭐⭐⭐ | 1-2 días |
 | 2 | **`list.reserve(n)` + batch push** — `reserve(n)` pre-asigna capacidad (✅ implementado). Batch push reduce N FFI calls a 1 | Primes (2.7× → 1.5×) | ⭐⭐ | 1 día |
 | 3 | **Arrays `[T; N]` pass-by-reference** — Los arrays hoy son copy-by-value. `fn f(a: &[i64; N])` evitaría copiar 80KB en cada acceso. Necesita `&[T; N]` como tipo de parámetro | Matmul (7.8× → 1.0×) | ⭐⭐⭐⭐⭐ | 3-4 días |
-| 4 | **str_builder inline hints** — Marcar `ky_str_builder_append` con atributos LLVM `inlinehint` para eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 día |
+| 4 | **str_builder inline hints** — Marcar append con inlinehint para eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 día |
 
 ### Notas de implementación
 

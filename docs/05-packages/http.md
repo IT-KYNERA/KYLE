@@ -38,8 +38,11 @@ final class http_status:
     text: str
 ```
 
-Constantes: `http_status_ok` (200), `http_status_created` (201),
-`http_status_not_found` (404), `http_status_internal_server_error` (500)
+Constantes via módulo `status`:
+- `status.ok()` → 200
+- `status.created()` → 201
+- `status.not_found()` → 404
+- `status.internal_server_error()` → 500
 
 ### header
 

@@ -499,8 +499,8 @@ n.to_str()
 
 ```ky
 sb = str_builder(50000)
-sb.append("x", 1)
-sb.append("hello", 5)
+sb.append("x")
+sb.append("hello")
 result = sb.to_str()
 ```
 
