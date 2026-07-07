@@ -1,0 +1,15 @@
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.AssemblyInfoInputs.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.AssemblyInfo.cs
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.csproj.CoreCompileInputs.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.sourcelink.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/bin/Release/net10.0/concat
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/bin/Release/net10.0/concat.deps.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/bin/Release/net10.0/concat.runtimeconfig.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/bin/Release/net10.0/concat.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/bin/Release/net10.0/concat.pdb
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/refint/concat.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.pdb
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/concat.genruntimeconfig.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/concat/obj/Release/net10.0/ref/concat.dll

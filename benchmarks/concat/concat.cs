@@ -1,11 +1,11 @@
 using System;
+using System.Text;
 
 class Concat {
     static void Main() {
-        string s = "";
-        for (int i = 0; i < 50000; i++) {
-            s = s + "x";
-        }
-        Console.WriteLine(s.Length);
+        var sb = new StringBuilder(500000);
+        for (int i = 0; i < 500000; i++)
+            sb.Append('x');
+        Console.WriteLine(sb.Length);
     }
 }

@@ -78,6 +78,18 @@ first = numbers[0]             # GEP + load (nativo)
 numbers[0] = 42                # GEP + store (nativo)
 ```
 
+### Array repeat: `[val; N]` [x]
+
+Creación de arrays con valor repetido. `N` debe ser un literal entero (constante en compile-time para el tamaño del array).
+
+```ky
+zeros = [0; 100]               # → [i32; 100], todos 0
+ones = [1 as i64; 10000]       # → [i64; 10000], todos 1
+floats = [0.0; 50]             # → [f64; 50], todos 0.0
+```
+
+> **Nota:** Los arrays son **copy-by-value**. Para arrays grandes (>1000 elementos), cada acceso por `arr[i]` copia el array completo a un temporal. Para esos casos, usa `{T}` (listas) que tienen semántica de puntero.
+
 ### List: `{T}` [x]
 
 Lista dinámica, heap, redimensionable. Usa `ky_list_*` runtime.

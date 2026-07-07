@@ -1,0 +1,15 @@
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.AssemblyInfoInputs.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.AssemblyInfo.cs
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.csproj.CoreCompileInputs.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.sourcelink.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/bin/Release/net10.0/fib
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/bin/Release/net10.0/fib.deps.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/bin/Release/net10.0/fib.runtimeconfig.json
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/bin/Release/net10.0/fib.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/bin/Release/net10.0/fib.pdb
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/refint/fib.dll
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.pdb
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/fib.genruntimeconfig.cache
+/Users/kynera/HCA/KYNERA/kl/benchmarks/fib/obj/Release/net10.0/ref/fib.dll
