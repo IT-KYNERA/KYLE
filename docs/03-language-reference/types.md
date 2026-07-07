@@ -55,23 +55,63 @@ fn divide(a: i32, b: i32) i32!:
     a / b
 ```
 
-### Mutable: `&T` [x]
+### Mutable: `^T` [ ]
 
-Marks a variable, parameter, or field as mutable.
+Marks a variable, parameter, or field as mutable. `^` es semántico — cero overhead.
 
 ```ky
-count: &i32 = 0
-fn increment(x: &i32):
+count: ^i32 = 0
+fn increment(x: ^&i32):   # ^& = mutable borrow
     x = x + 1
 ```
 
-### Move: `^T` [x]
+### Borrow: `&T` [ ]
 
-Parameter with ownership transfer.
+Referencia (préstamo) que no transfiere ownership.
 
 ```ky
-fn consume(^data: str):
-    println(data)
+fn read(s: &str):          # parámetro: borrow
+    println(s)
+
+fn main():
+    s = "hola"
+    read(&s)                # s prestado, sigue vivo
+    println(s)               # ✅ s usable
+```
+
+### Mutable borrow: `^&T` [ ]
+
+Compone `^` (mutable) + `&` (borrow):
+
+```ky
+fn fill(buf: ^&str):
+    buf = "datos"
+
+fn main():
+    buf: ^str = ""
+    fill(^&buf)
+    println(buf)             # "datos"
+```
+
+### Move por defecto [ ]
+
+Por defecto, `y = x` mueve ownership para tipos no-Copy.
+
+```ky
+s = "hola"
+t = s          # MOVE: s inválido después
+println(s)     # ERROR
+t = s.clone()  # COPY explícita
+```
+
+### Copy types [ ]
+
+Tipos numéricos se copian automáticamente. `y = x` deja ambos vivos.
+
+```ky
+x = 42
+y = x          # COPY: ambos vivos
+x + 1          # ✅ x usable
 ```
 
 ### Array: `[T; N]` [x]

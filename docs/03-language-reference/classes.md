@@ -68,7 +68,7 @@ abstract class Shape:
 ```ky
 final class Config:
     name: str
-    port: &i32          # mutable field
+    port: ^i32          # mutable field
 
 config = Config { name: "server", port: 8080 }
 config.port = 9090      # allowed

@@ -44,8 +44,8 @@ Ejecuta en paralelo usando todos los cores.
 
 ```ky
 fn heavy(n: i64) i64:
-    s: &i64 = 0
-    j: &i64 = 0
+    s: ^i64 = 0
+    j: ^i64 = 0
     while j < 10000000:
         s = s + (n * j) % 1000
         j = j + 1

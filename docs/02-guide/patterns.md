@@ -27,8 +27,8 @@ fn process_config(path: str) str!:
 ```ky
 final class Request:
     url: str
-    method: &str
-    headers: &{str}
+    method: ^str
+    headers: ^{str}
 
 fn main():
     req = Request { url: "https://api.example.com", method: "GET", headers: {} }

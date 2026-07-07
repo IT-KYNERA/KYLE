@@ -31,7 +31,7 @@ else:
 ## While
 
 ```ky
-i: &i32 = 0
+i: ^i32 = 0
 while i < 10:
     println(i)
     i = i + 1

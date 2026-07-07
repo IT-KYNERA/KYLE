@@ -13,18 +13,19 @@ fn add(a: i32, b: i32) i32:
 
 | Mode | Syntax | Semantics |
 |------|--------|-----------|
-| Borrow (default) | `s: str` | Immutable borrow |
-| Mutable borrow | `s: &str` | Mutable borrow |
-| Move | `^s: str` | Ownership transfer |
+| Move (default) | `s: str` | Ownership transfer (caller pierde) |
+| Borrow | `s: &str` | Immutable reference (caller presta) |
+| Mutable borrow | `s: ^&str` | Mutable reference |
+| Copy | `s: i32` | Copia (tipos Copy, caller retiene) |
 
 ```ky
-fn read(s: str):          # borrow
+fn read(s: &str):          # borrow
     println(s)
 
-fn append(s: &str):       # mutable
+fn append(s: ^&str):       # mutable borrow
     s = s + "!"
 
-fn consume(^s: str):      # move
+fn consume(s: str):        # move (default)
     println(s)
 ```
 

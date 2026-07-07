@@ -23,5 +23,5 @@ Welcome to the official documentation for the Kyle programming language.
 - `this` = instance reference
 - `T?` = optional type (`Option<T>`)
 - `T!` = fallible type (`Result<T, Error>`)
-- `&T` = mutable type
+- `^T` = mutable type, `&T` = borrow
 - `^T` = move type (ownership transfer)

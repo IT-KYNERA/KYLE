@@ -5,8 +5,8 @@
 Variables are declared with `name = value`. No `let`, `var`, or `const` keywords.
 
 ```ky
-name = "Ana"        # immutable (default)
-age: &i32 = 25      # mutable with &T
+name = "Ana"        # immutable (default), OWNED (str es Move)
+age: ^i32 = 25      # mutable with ^T
 ```
 
 ## Constants [x]
@@ -20,18 +20,21 @@ MAX_SIZE := 1024
 
 ## Mutability [x]
 
-| Form | Mutability |
-|-------|-------------|
-| `x = value` | Immutable |
-| `x: &T = value` | Mutable |
-| `x = &value` | Mutable (sugar) |
+| Form | Mutability | Ownership |
+|------|------------|-----------|
+| `x = value` | Immutable | Copy o Move según tipo |
+| `x: ^T = value` | Mutable | Ídem |
+| Copy types | — | `y = x` copia (ambos vivos) |
+| Move types | — | `y = x` mueve (x inválido) |
 
 ```ky
-x = 5              # immutable
-y: &i32 = 5        # mutable
-z = &5             # mutable (sugar)
-
+x = 5              # immutable, COPY (i32)
+y: ^i32 = 5        # mutable, COPY
 y = y + 1          # reassignment allowed
+
+s = "hola"         # immutable, MOVE (str)
+t = s              # MOVE: s inválido después
+t = s.clone()      # COPY explícita: ambos vivos
 ```
 
 ## Scope [x]
