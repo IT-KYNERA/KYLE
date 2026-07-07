@@ -1551,7 +1551,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::F32 => self.context.f32_type().as_basic_type_enum(),
             MirType::F64 => self.context.f64_type().as_basic_type_enum(),
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
-            MirType::Char => self.context.i8_type().as_basic_type_enum(),
+            MirType::Char => self.context.i32_type().as_basic_type_enum(),
             MirType::Str => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::List(_) | MirType::Dict(_, _) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Void => self.context.i32_type().as_basic_type_enum(),

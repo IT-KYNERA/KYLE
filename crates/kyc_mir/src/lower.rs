@@ -13,7 +13,7 @@ fn literal_to_mir(value: &Literal) -> (MirType, MirConstant) {
         Literal::Float(n) => (MirType::F64, MirConstant::F64(*n)),
         Literal::String(s) => (MirType::Str, MirConstant::String(s.clone())),
         Literal::Boolean(b) => (MirType::Bool, MirConstant::Bool(*b)),
-        Literal::Char(c) => (MirType::Char, MirConstant::I32(*c)),
+                    Literal::Char(c) => (MirType::Char, MirConstant::I32(*c)),
         Literal::None => (MirType::I32, MirConstant::Void),
         Literal::Null => (MirType::Ptr(Box::new(MirType::Void)), MirConstant::Null),
     }
