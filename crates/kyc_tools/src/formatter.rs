@@ -819,6 +819,7 @@ impl Formatter {
                 out.push('"');
             }
             Literal::Boolean(b) => out.push_str(if *b { "true" } else { "false" }),
+            Literal::Char(c) => out.push_str(&format!("'{}'", char::from_u32(*c as u32).unwrap_or('\0'))),
             Literal::None => out.push_str("None"),
             Literal::Null => out.push_str("null"),
         }

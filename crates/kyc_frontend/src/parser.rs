@@ -1101,9 +1101,9 @@ impl Parser {
                 Expr::Literal { value: Literal::Null, span: self.span_from(start) }
             }
             TokenKind::Char(s) => {
-                let val = s.chars().next().unwrap_or('\0') as u8 as i64;
+                let val = s.chars().next().unwrap_or('\0') as u8 as i32;
                 self.advance();
-                Expr::Literal { value: Literal::Integer(val), span: self.span_from(start) }
+                Expr::Literal { value: Literal::Char(val), span: self.span_from(start) }
             }
             TokenKind::Identifier(name) => {
                 let val = name.clone();

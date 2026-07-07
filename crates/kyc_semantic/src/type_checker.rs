@@ -507,6 +507,7 @@ impl TypeChecker {
                 Literal::Float(_) => Type::F64,
                 Literal::String(_) => Type::Str,
                 Literal::Boolean(_) => Type::Bool,
+                Literal::Char(_) => Type::Char,
                 Literal::None => Type::Option(Box::new(Type::Void)),
                 Literal::Null => Type::Ptr,
             },

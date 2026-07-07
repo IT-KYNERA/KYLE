@@ -1381,6 +1381,7 @@ impl LanguageServer {
                 Literal::Float(_) => Some("f64".to_string()),
                 Literal::String(_) => Some("str".to_string()),
                 Literal::Boolean(_) => Some("bool".to_string()),
+                Literal::Char(_) => Some("char".to_string()),
                 Literal::None => None,
                 Literal::Null => Some("ptr".to_string()),
             },

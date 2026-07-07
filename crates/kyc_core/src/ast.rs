@@ -16,6 +16,7 @@ pub enum Literal {
     Float(f64),
     String(String),
     Boolean(bool),
+    Char(i32),
     None,
     Null,
 }
@@ -1323,6 +1324,7 @@ impl fmt::Display for Literal {
             Literal::Float(n) => write!(f, "{}", n),
             Literal::String(s) => write!(f, "\"{}\"", s),
             Literal::Boolean(b) => write!(f, "{}", b),
+            Literal::Char(c) => write!(f, "'{}'", char::from_u32(*c as u32).unwrap_or('\0')),
             Literal::None => write!(f, "None"),
             Literal::Null => write!(f, "null"),
         }

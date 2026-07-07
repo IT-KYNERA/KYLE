@@ -105,6 +105,7 @@ impl Type {
             crate::ast::Literal::Float(_) => Type::F64,
             crate::ast::Literal::String(_) => Type::Str,
             crate::ast::Literal::Boolean(_) => Type::Bool,
+            crate::ast::Literal::Char(_) => Type::Char,
             crate::ast::Literal::None => Type::Option(Box::new(Type::TypeVar(0))),
             crate::ast::Literal::Null => Type::Ptr,
         }
