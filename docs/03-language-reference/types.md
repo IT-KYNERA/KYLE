@@ -1,5 +1,19 @@
 # Types
 
+## Copy vs Move semantics [ ]
+
+| Semántica | Tipos |
+|-----------|-------|
+| **Copy** (automático en `y = x`) | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` |
+| **Move** (ownership transfer en `y = x`) | `str`, `{T}`, `{K:V}`, `[T; N]`, classes, structs, enums |
+
+Reglas:
+- `x = 42; y = x` → ambos vivos (Copy)
+- `s = "hola"; t = s` → `s` inválido (Move)
+- `t = s.clone()` → ambos vivos (copia explícita para tipos Move)
+
+Ver `ownership.md` para detalle completo.
+
 ## Primitive types [x]
 
 | Type | Size | Description |
@@ -12,7 +26,7 @@
 | `f64` | 8 bytes | 64-bit floating point |
 | `bool` | 1 byte | `true` or `false` |
 | `char` | 4 bytes | Unicode code point |
-| `str` | pointer | Heap-allocated immutable string |
+| `str` | pointer | Heap-allocated immutable string. **Move semantics** |
 | `ptr` | 8 bytes | Raw pointer (FFI, unsafe) |
 
 **Bug:** `char = 'a'` type mismatch ("expected 'char', found 'i32'"). Usar `i32` como workaround.
@@ -61,6 +75,8 @@ fn consume(^data: str):
 ```
 
 ### Array: `[T; N]` [x]
+
+**Semántica:** Move
 
 Array nativo, stack inline, tamaño fijo conocido en compile-time. Acceso vía GEP + load/store — **cero runtime calls**.
 

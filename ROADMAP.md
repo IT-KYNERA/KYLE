@@ -524,7 +524,23 @@ Features identificadas en los benchmarks que Kyle necesita para ser competitivo 
 | `[1, 2, 3]` | `[1, 2, 3]` | Array (antes era list, ahora es array nativo) |
 | `[1, 2, 3]` | `{1, 2, 3}` | List (cambia de `[]` a `{}`) |
 | `list<T>` | `{T}` | List type (antes `[T]`, ahora `{T}`) |
-| — | `[T; N]` | Array type (nuevo) |
+| — | `[T; N]` | Array type (nuevo, repite valor) |
 | `{"key": val}` | `{key: val}` | Dict literal (se puede omitir quotes) |
+| `fn f(^s: str)` = move | `y = x` = move por defecto | Ownership: move implícito |
+| `y = x` = borrow | `fn f(s: &str)` = borrow | Ownership: `&` es borrow |
+| `x: &T = v` = mutable | `x: ^T = v` = mutable | Ownership: `^` es mutable |
+| `fn f(&s: str)` no existe | `fn f(s: ^&str)` = mut borrow | Ownership: `^&` compone |
 
-Ver `BENCHMARK.md` para resultados completos.
+### Nuevo modelo de ownership
+
+| Sintaxis | Significado | Ejemplo |
+|----------|-------------|---------|
+| `x = v` | Variable inmutable (default) | `x = 42` |
+| `x: ^T = v` | Variable mutable | `x: ^str = "hola"` |
+| `y = x` | **MOVE** (no-Copy) | `t = s` → `s` inválido |
+| `y = x.clone()` | **COPY** explícita | `t = s.clone()` → ambos vivos |
+| `f(x)` | MOVE (owned) | `print(s)` → `s` se mueve |
+| `f(&x)` | BORROW | `print(&s)` → `s` prestado |
+| `f(^&x)` | MUT BORROW | `append(^&s)` → `s` prestado mutable |
+
+Ver `docs/03-language-reference/ownership.md` para especificación completa.

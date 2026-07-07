@@ -25,7 +25,7 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 |------|--------|
 | **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
 | **Syntax** | ✅ **Complete** — Generics, ranges, match, op overloading, is, ptr, for-else, static fn, ** |
-| **Borrow checker** | ✅ **Complete** — `&T` mutable, `^T` move, field mutability |
+| **Borrow checker** | 🔶 **v0.6 redesign** — `^` = mutable, `&` = borrow, move por defecto. Ver `docs/03-language-reference/ownership.md` |
 | **Tooling** | ✅ **Complete** — LSP, VS Code ext, formatter, test framework, package manager |
 | **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** — Pure Kyle FFI to C libraries |
 | **Runtime in Kyle** | 🔶 **Phase A in progress** — 18/88 functions rewritten in pure Kyle |
@@ -332,7 +332,7 @@ rm -rf /tmp/verify_release_*
 
 1. **Do not guess syntax** — check `docs/03-language-reference/` first
 2. **Do not add new syntax features** without checking the docs
-3. **Do not reintroduce `mut`, `let`, `var`, `const`** — use `&T` or `:=`
+3. **Do not reintroduce `mut`, `let`, `var`, `const`** — use `^T` or `:=`
 4. **Do not reintroduce `Option<T>` as public syntax** — use `T?`
 5. **Do not use `struct`** — use `final class`
 6. **Do not write C/C++ code** — the compiler and runtime are pure Rust
@@ -351,15 +351,15 @@ Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-langua
 | # | Documento | Status | Notas |
 |---|-----------|--------|-------|
 | 1 | [lexical-structure.md](docs/03-language-reference/lexical-structure.md) | [x] | Keywords, literales, comentarios `#`, escapes `\n \t \r \0`. `\u{XXXX}` unicode no expandido. No hay `/* */` |
-| 2 | [variables.md](docs/03-language-reference/variables.md) | [x] | `:=` const, `&T` mutable, `^T` move |
+| 2 | [variables.md](docs/03-language-reference/variables.md) | [x] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
 | 3 | [types.md](docs/03-language-reference/types.md) | [ ] | `ptr = 0 as ptr` type mismatch (bug #2). `char = 'a'` mismatch. `{str: i64}` con literal `1` inferido como i32 |
 | 4 | [expressions.md](docs/03-language-reference/expressions.md) | [x] | Aritmética, comparaciones, bitwise, `as` casts, rangos `..` |
 | 5 | [statements.md](docs/03-language-reference/statements.md) | [x] | if/elif/else, while, for-in range, match, return |
 | 6 | [functions.md](docs/03-language-reference/functions.md) | [ ] | Default params sí. `static fn` syntax (expected LParen before Static). `Calc.double()` undefined symbol |
-| 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia |
+| 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia. Sin `this` obligatorio |
 | 8 | [enums.md](docs/03-language-reference/enums.md) | [x] | Enum con variants, match con `Enum.Variant` |
 | 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class Box<T>`, `fn identity<T>`, `Box<T> {value: 7}`, `identity<i32>(42)` |
-| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [x] | `^T` move semantics, `&T` mutable ref, default borrow-by-default |
+| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [ ] | **v0.6 redesign**: `^` = mutable, `&` = borrow, move por defecto |
 | 11 | [pattern-matching.md](docs/03-language-reference/pattern-matching.md) | [ ] | `..=` range pattern no existe. `1 \| 2` or-pattern no funciona. Match básico con `_:` sí |
 | 12 | [error-handling.md](docs/03-language-reference/error-handling.md) | [ ] | `-> Type` syntax no existe. `ok(v)`/`error(e)` result match no funciona. `return -1` sí |
 | 13 | [modules.md](docs/03-language-reference/modules.md) | [x] | `from X import Y` funciona (con packages instalados). `import X` funciona |
