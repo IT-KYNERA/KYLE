@@ -2808,16 +2808,29 @@ impl Lowerer {
                 // Handle assignment: target = value
                 if matches!(operator, BinaryOp::Assign) {
                     if let Expr::Index { target: index_target, index, .. } = left.as_ref() {
-                        ctx = self.lower_expr(ctx, index_target);
-                        let target_val = ctx.next_local - 1;
-                        let arr_ptr = if let Expr::Identifier { name, .. } = index_target.as_ref() {
-                            ctx.locals.get(name).copied().unwrap_or(target_val)
+                        // For arrays, use variable alloca directly (skip whole-array Load)
+                        let (target_val, arr_ptr, target_type) = if let Expr::Identifier { name, .. } = index_target.as_ref() {
+                            if let Some(&local) = ctx.locals.get(name) {
+                                let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
+                                if matches!(t, MirType::Array(_, _)) {
+                                    (local, local, Some(t))
+                                } else {
+                                    ctx = self.lower_expr(ctx, index_target);
+                                    let tv = ctx.next_local - 1;
+                                    (tv, tv, ctx.local_types.get(&tv).cloned())
+                                }
+                            } else {
+                                ctx = self.lower_expr(ctx, index_target);
+                                let tv = ctx.next_local - 1;
+                                (tv, tv, ctx.local_types.get(&tv).cloned())
+                            }
                         } else {
-                            target_val
+                            ctx = self.lower_expr(ctx, index_target);
+                            let tv = ctx.next_local - 1;
+                            (tv, tv, ctx.local_types.get(&tv).cloned())
                         };
                         ctx = self.lower_expr(ctx, index);
                         let idx_val = ctx.next_local - 1;
-                        let target_type = ctx.local_types.get(&target_val).cloned();
                         // Array set: arr[i] = val → ArrayElemPtr + Store
                         if matches!(&target_type, Some(MirType::Array(_, _))) {
                             ctx = self.lower_expr(ctx, right);
@@ -2978,16 +2991,27 @@ impl Lowerer {
                     ctx = self.lower_expr(ctx, right);
                     let val_local = ctx.next_local - 1;
                     if let Expr::Index { target: list_expr, index, .. } = left.as_ref() {
-                        // array[index] = value or list[index] = value or dict[key] = value
-                        ctx = self.lower_expr(ctx, list_expr);
-                        let target_val = ctx.next_local - 1;
-                        // For array writes, use the variable's alloca directly instead of the loaded value
-                        let arr_ptr = if let Expr::Identifier { name, .. } = list_expr.as_ref() {
-                            ctx.locals.get(name).copied().unwrap_or(target_val)
+                        // For arrays, use variable alloca directly (skip whole-array Load)
+                        let (target_val, arr_ptr, target_type) = if let Expr::Identifier { name, .. } = list_expr.as_ref() {
+                            if let Some(&local) = ctx.locals.get(name) {
+                                let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
+                                if matches!(t, MirType::Array(_, _)) {
+                                    (local, local, t)
+                                } else {
+                                    ctx = self.lower_expr(ctx, list_expr);
+                                    let tv = ctx.next_local - 1;
+                                    (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                                }
+                            } else {
+                                ctx = self.lower_expr(ctx, list_expr);
+                                let tv = ctx.next_local - 1;
+                                (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                            }
                         } else {
-                            target_val
+                            ctx = self.lower_expr(ctx, list_expr);
+                            let tv = ctx.next_local - 1;
+                            (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
                         };
-                        let target_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I32);
                         ctx = self.lower_expr(ctx, index);
                         let idx_val = ctx.next_local - 1;
                         ctx = self.lower_expr(ctx, right);
@@ -4939,14 +4963,27 @@ impl Lowerer {
                 // Handle list[index] = value → kl_list_set
                 // Handle dict[key] = value → kl_dict_set
                 if let Expr::Index { target: list_expr, index, .. } = target.as_ref() {
-                    ctx = self.lower_expr(ctx, list_expr);
-                    let target_val = ctx.next_local - 1;
-                    let arr_ptr = if let Expr::Identifier { name, .. } = list_expr.as_ref() {
-                        ctx.locals.get(name).copied().unwrap_or(target_val)
+                    // For arrays, use variable alloca directly (skip whole-array Load)
+                    let (target_val, arr_ptr, target_type) = if let Expr::Identifier { name, .. } = list_expr.as_ref() {
+                        if let Some(&local) = ctx.locals.get(name) {
+                            let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
+                            if matches!(t, MirType::Array(_, _)) {
+                                (local, local, t)
+                            } else {
+                                ctx = self.lower_expr(ctx, list_expr);
+                                let tv = ctx.next_local - 1;
+                                (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                            }
+                        } else {
+                            ctx = self.lower_expr(ctx, list_expr);
+                            let tv = ctx.next_local - 1;
+                            (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                        }
                     } else {
-                        target_val
+                        ctx = self.lower_expr(ctx, list_expr);
+                        let tv = ctx.next_local - 1;
+                        (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
                     };
-                    let target_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I32);
                     ctx = self.lower_expr(ctx, index);
                     let idx_val = ctx.next_local - 1;
                     ctx = self.lower_expr(ctx, value);
