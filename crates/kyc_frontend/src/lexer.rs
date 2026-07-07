@@ -192,12 +192,13 @@ impl Lexer {
                     Some(TokenKind::Walrus)   // := — now used for constants
                 } else if self.current() == ':' {
                     // `::` is always two separate colon tokens (inheritance separator)
-                    let col1 = self.make_token(TokenKind::Colon, &Position {
+                    // Return first colon now, push second colon to pending
+                    let col2 = self.make_token(TokenKind::Colon, &Position {
                         line: self.line,
-                        column: self.column.saturating_sub(1),
-                        offset: self.pos - 1,
+                        column: self.column,
+                        offset: self.pos,
                     });
-                    self.pending_tokens.push(col1);
+                    self.pending_tokens.push(col2);
                     Some(TokenKind::Colon)
                 } else {
                     Some(TokenKind::Colon)
