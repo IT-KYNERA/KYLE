@@ -34,10 +34,10 @@ pub enum AstType {
     Error { inner: Box<AstType>, span: Span },
     Dict { key: Box<AstType>, value: Box<AstType>, span: Span },
     FnPtr { params: Vec<AstType>, return_: Box<AstType>, span: Span },
-    /// `&T` — mutable reference type (for mutable vars, params, fields)
+    /// `^T` — mutable type (for mutable vars, params, fields)
     Mutable { inner: Box<AstType>, span: Span },
-    /// `^T` — move/ownership transfer type (for params)
-    Move { inner: Box<AstType>, span: Span },
+    /// `&T` — borrow type
+    Borrow { inner: Box<AstType>, span: Span },
     /// `[T; N]` — fixed-size native array type
     Array { inner: Box<AstType>, size: usize, span: Span },
     /// `ptr` — raw pointer type (for FFI/unsafe)
@@ -46,12 +46,12 @@ pub enum AstType {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ParamMode {
-    /// `s: T` — borrowed immutably (default)
-    Borrow,
-    /// `s: &T` — borrowed mutably
-    MutableBorrow,
-    /// `^s: T` — ownership transfer
+    /// `s: T` — owned (move by default, except Copy types)
     Move,
+    /// `s: &T` — borrowed immutably
+    Borrow,
+    /// `s: ^&T` — borrowed mutably
+    MutableBorrow,
 }
 
 // ---------------------------------------------------------------------------
@@ -519,14 +519,10 @@ pub enum Expr {
         arms: Vec<MatchArm>,
         span: Span,
     },
-    /// `&expr` — mutable reference at call site (coercion for `&T` params)
-    MutableRef {
+    /// `&expr` — borrow expression (call site)
+    BorrowRef {
         expression: Box<Expr>,
-        span: Span,
-    },
-    /// `^expr` — ownership transfer at call site (for `^T` params)
-    MoveExpr {
-        expression: Box<Expr>,
+        mutable: bool,
         span: Span,
     },
     /// `left ?? right` — default operator (returns left if not none, else right)
@@ -726,8 +722,8 @@ impl DisplayDepth for Parameter {
         }
         match self.mode {
             ParamMode::Move => write!(f, " move")?,
+            ParamMode::Borrow => write!(f, " borrow")?,
             ParamMode::MutableBorrow => write!(f, " mut")?,
-            ParamMode::Borrow => {},
         }
         if let Some(default) = &self.default {
             writeln!(f)?;
@@ -1313,14 +1309,10 @@ impl DisplayDepth for Expr {
                 }
                 Ok(())
             }
-            Expr::MutableRef { expression, .. } => {
+            Expr::BorrowRef { expression, mutable, .. } => {
                 write_indent(f, d)?;
-                writeln!(f, "MutableRef")?;
-                expression.fmt_depth(f, d + 1)
-            }
-            Expr::MoveExpr { expression, .. } => {
-                write_indent(f, d)?;
-                writeln!(f, "MoveExpr")?;
+                if *mutable { writeln!(f, "MutBorrowRef")?; }
+                else { writeln!(f, "BorrowRef")?; }
                 expression.fmt_depth(f, d + 1)
             }
             Expr::NullCoalesce { left, right, .. } => {
@@ -1371,8 +1363,8 @@ impl fmt::Display for AstType {
                 }
                 write!(f, ") -> {}", return_)
             }
-            AstType::Mutable { inner, .. } => write!(f, "&{}", inner),
-            AstType::Move { inner, .. } => write!(f, "^{}", inner),
+            AstType::Mutable { inner, .. } => write!(f, "^{}", inner),
+            AstType::Borrow { inner, .. } => write!(f, "&{}", inner),
             AstType::Array { inner, size, .. } => write!(f, "[{}; {}]", inner, size),
             AstType::Ptr { .. } => write!(f, "ptr"),
         }

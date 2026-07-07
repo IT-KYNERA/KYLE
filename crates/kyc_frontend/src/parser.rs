@@ -613,7 +613,7 @@ impl Parser {
                             name: "this".into(),
                             type_: this_type,
                             default: None, variadic: false,
-                            mode: ParamMode::Borrow, span: method.span,
+                            mode: ParamMode::MutableBorrow, span: method.span,
                         });
                     }
                 }
@@ -755,13 +755,18 @@ impl Parser {
             } else {
                 AstType::Primitive { name: "i64".into(), span: self.span_from(param_start) }
             };
-            // Determine param mode from type prefix and ^ prefix
+            // Determine param mode from type prefix
             let mode = if is_move {
                 ParamMode::Move
-            } else if matches!(type_, AstType::Mutable { .. }) {
-                ParamMode::MutableBorrow
-            } else {
+            } else if matches!(type_, AstType::Borrow { .. }) {
                 ParamMode::Borrow
+            } else {
+                let is_mut_borrow = match &type_ {
+                    AstType::Mutable { inner, .. } => matches!(inner.as_ref(), AstType::Borrow { .. }),
+                    _ => false,
+                };
+                if is_mut_borrow { ParamMode::MutableBorrow }
+                else { ParamMode::Move }
             };
             let default = if self.at(TokenKind::Equals) {
                 self.advance();
@@ -799,17 +804,17 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<AstType, String> {
         let start = self.pos;
-        // Handle `&T` — mutable reference type
+        // Handle `&T` — borrow type
         if self.at(TokenKind::Ampersand) {
             self.advance();
             let inner = self.parse_type()?;
-            return Ok(AstType::Mutable { inner: Box::new(inner), span: self.span_from(start) });
+            return Ok(AstType::Borrow { inner: Box::new(inner), span: self.span_from(start) });
         }
-        // Handle `^T` — move type
+        // Handle `^T` — mutable type
         if self.at(TokenKind::Caret) {
             self.advance();
             let inner = self.parse_type()?;
-            return Ok(AstType::Move { inner: Box::new(inner), span: self.span_from(start) });
+            return Ok(AstType::Mutable { inner: Box::new(inner), span: self.span_from(start) });
         }
         // Handle list shorthand: [T] → List<T>
         if self.at(TokenKind::LBracket) {
@@ -1042,17 +1047,22 @@ impl Parser {
             self.advance();
             return Ok(Expr::Await { expression: Box::new(self.parse_primary()?), span: self.span_from(start) });
         }
-        // `&expr` — mutable reference at call site (coercion for &T params)
+        // `&expr` — borrow reference at call site
         if self.at(TokenKind::Ampersand) {
             let start = self.pos;
             self.advance();
-            return Ok(Expr::MutableRef { expression: Box::new(self.parse_primary()?), span: self.span_from(start) });
+            return Ok(Expr::BorrowRef { expression: Box::new(self.parse_primary()?), mutable: false, span: self.span_from(start) });
         }
-        // `^expr` — ownership transfer at call site (for ^T params)
+        // `^expr` — mutable prefix (only valid before &)
         if self.at(TokenKind::Caret) {
             let start = self.pos;
             self.advance();
-            return Ok(Expr::MoveExpr { expression: Box::new(self.parse_primary()?), span: self.span_from(start) });
+            // `^&` — mutable borrow
+            if self.at(TokenKind::Ampersand) {
+                self.advance();
+                return Ok(Expr::BorrowRef { expression: Box::new(self.parse_primary()?), mutable: true, span: self.span_from(start) });
+            }
+            return Err("`^` before expression requires `&` (use `^&x` for mutable borrow)".to_string());
         }
         self.parse_primary()
     }

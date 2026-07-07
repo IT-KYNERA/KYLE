@@ -38,7 +38,7 @@ fn desugar_variable_decl(v: &VariableDecl) -> VariableDecl {
     let mut is_mutable = v.is_mutable;
     let mut value = desugar_expr(&v.value);
     // `x = &expr` sugar → mutable variable, unwrap the &expr
-    if let Expr::MutableRef { expression, .. } = &value {
+    if let Expr::BorrowRef { expression, .. } = &value {
         is_mutable = true;
         value = *expression.clone();
     }
@@ -325,7 +325,7 @@ fn desugar_type(t: &AstType) -> AstType {
             inner: Box::new(desugar_type(inner)),
             span: span.clone(),
         },
-        AstType::Move { inner, span } => AstType::Move {
+        AstType::Borrow { inner, span } => AstType::Borrow {
             inner: Box::new(desugar_type(inner)),
             span: span.clone(),
         },

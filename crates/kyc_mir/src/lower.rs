@@ -572,7 +572,7 @@ impl Lowerer {
                                     params: vec![Parameter {
                                         name: "this".into(),
                                         type_: AstType::User { name: c.name.clone(), span: p.span },
-                                        default: None, variadic: false, mode: ParamMode::Borrow, span: p.span,
+                                        default: None, variadic: false, mode: ParamMode::Move, span: p.span,
                                     }],
                                     return_type: Some(p.type_.clone()),
                                     is_async: false, is_const: false, is_static: false, is_abstract: false, is_extern: false, is_test: false,
@@ -594,12 +594,12 @@ impl Lowerer {
                                         Parameter {
                                             name: "this".into(),
                                             type_: AstType::User { name: c.name.clone(), span: p.span },
-                                            default: None, variadic: false, mode: ParamMode::Borrow, span: p.span,
+                                            default: None, variadic: false, mode: ParamMode::Move, span: p.span,
                                         },
                                         Parameter {
                                             name: set_param.clone(),
                                             type_: p.type_.clone(),
-                                            default: None, variadic: false, mode: ParamMode::Borrow, span: p.span,
+                                            default: None, variadic: false, mode: ParamMode::Move, span: p.span,
                                         },
                                     ],
                                     return_type: Some(void_type),
@@ -1213,7 +1213,7 @@ impl Lowerer {
                 params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
             }
             mir_func.params = params;
-            let mut param_modes = vec![ParamMode::Borrow];
+            let mut param_modes = vec![ParamMode::Move];
             param_modes.extend(m.params.iter().enumerate().filter(|(i, p)| !(*i == 0 && (p.name == "this" || p.name == "self"))).map(|(_, p)| p.mode));
             mir_func.param_modes = param_modes;
         }
@@ -4569,7 +4569,7 @@ impl Lowerer {
                             let arg = &arguments[i];
                             // &T (MutableBorrow) params: pass address of local directly
                             if param.mode == ParamMode::MutableBorrow {
-                                if let Expr::MutableRef { expression, .. } = arg {
+                                if let Expr::BorrowRef { expression, .. } = arg {
                                     if let Expr::Identifier { name, .. } = expression.as_ref() {
                                         if let Some(&local) = ctx.locals.get(name) {
                                             args.push(MirValue::Local(local));
@@ -4602,7 +4602,7 @@ impl Lowerer {
                 } else {
                     for arg in arguments {
                         // &x: pass address of local directly (codegen handles MutableBorrow lookup)
-                        if let Expr::MutableRef { expression, .. } = arg {
+                        if let Expr::BorrowRef { expression, .. } = arg {
                             if let Expr::Identifier { name, .. } = expression.as_ref() {
                                 if let Some(&local) = ctx.locals.get(name) {
                                     args.push(MirValue::Local(local));
@@ -6593,7 +6593,7 @@ impl Lowerer {
                 });
                 ctx
             }
-            Expr::MutableRef { expression, .. } => self.lower_expr(ctx, expression),
+            Expr::BorrowRef { expression, .. } => self.lower_expr(ctx, expression),
             Expr::NullCoalesce { left, right, .. } => {
                 // Lower left expression (Option<T>)
                 ctx = self.lower_expr(ctx, left);
@@ -6697,7 +6697,6 @@ impl Lowerer {
                 });
                 ctx
             }
-            Expr::MoveExpr { expression, .. } => self.lower_expr(ctx, expression),
         }
     }
 }
@@ -7282,8 +7281,14 @@ fn substitute_ast_type(ast: &AstType, subst: &std::collections::HashMap<String, 
                 span: *span,
             }
         }
-        AstType::Move { inner, span } => {
-            AstType::Move {
+        AstType::Borrow { inner, span } => {
+            AstType::Borrow {
+                inner: Box::new(substitute_ast_type(inner, subst)),
+                span: *span,
+            }
+        }
+        AstType::Borrow { inner, span } => {
+            AstType::Borrow {
                 inner: Box::new(substitute_ast_type(inner, subst)),
                 span: *span,
             }
@@ -7495,8 +7500,8 @@ fn ast_type_to_mir_with_subst(
             ("payload".to_string(), MirType::I64),
         ]),
         AstType::FnPtr { .. } => MirType::Ptr(Box::new(MirType::Void)),
-        AstType::Mutable { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
-        AstType::Move { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
+        AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
+        AstType::Borrow { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
         AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir_with_subst(inner, struct_defs, subst)), *size),
     }
@@ -7657,8 +7662,7 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
             ("payload".to_string(), MirType::I64),
         ]),
         AstType::FnPtr { .. } => MirType::Ptr(Box::new(MirType::Void)),
-        AstType::Mutable { inner, .. } => ast_type_to_mir(inner, struct_defs),
-        AstType::Move { inner, .. } => ast_type_to_mir(inner, struct_defs),
+        AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => ast_type_to_mir(inner, struct_defs),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
         AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir(inner, struct_defs)), *size),
     }

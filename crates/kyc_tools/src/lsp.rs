@@ -1367,7 +1367,7 @@ impl LanguageServer {
             AstType::Error { inner, .. } => Self::ast_type_name(inner),
             AstType::Dict { .. } => "dict".to_string(),
             AstType::FnPtr { .. } => "fn_ptr".to_string(),
-            AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => Self::ast_type_name(inner),
+            AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Self::ast_type_name(inner),
             AstType::Ptr { .. } => "ptr".to_string(),
             AstType::Array { inner, .. } => format!("[{}]", Self::ast_type_name(inner)),
         }
@@ -1608,8 +1608,8 @@ impl LanguageServer {
                 let args: Vec<String> = params.iter().map(Self::fmt_ast_type).collect();
                 format!("fn({}) {}", args.join(", "), Self::fmt_ast_type(return_))
             }
-            AstType::Mutable { inner, .. } => format!("&{}", Self::fmt_ast_type(inner)),
-            AstType::Move { inner, .. } => format!("^{}", Self::fmt_ast_type(inner)),
+            AstType::Mutable { inner, .. } => format!("^{}", Self::fmt_ast_type(inner)),
+            AstType::Borrow { inner, .. } => format!("&{}", Self::fmt_ast_type(inner)),
             AstType::Ptr { .. } => "ptr".to_string(),
             AstType::Array { inner, size, .. } => format!("[{}; {}]", Self::fmt_ast_type(inner), size),
         }
@@ -2464,7 +2464,7 @@ impl LanguageServer {
                 }
                 Self::walk_semantic_type(return_, tokens, symbols);
             }
-            AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => {
+            AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => {
                 Self::walk_semantic_type(inner, tokens, symbols);
             }
             AstType::Ptr { .. } => {}

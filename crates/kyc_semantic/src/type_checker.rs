@@ -819,40 +819,25 @@ impl TypeChecker {
                             if let Some(sym) = self.symbols.lookup(name) {
                                 if let SymKind::Function(fdecl) = &sym.kind {
                                     for (i, (arg, param)) in arguments.iter().zip(fdecl.params.iter()).enumerate() {
-                                        let has_move = matches!(arg, Expr::MoveExpr { .. });
-                                        let has_ref = matches!(arg, Expr::MutableRef { .. });
-                                        // Check if argument is an identifier that resolves to a mutable variable
-                                        let var_is_mutable = match arg {
-                                            Expr::Identifier { name, .. } => {
-                                                self.symbols.lookup(name).map_or(false, |s| {
-                                                    matches!(s.kind, SymKind::Variable { is_mutable: true, .. })
-                                                })
-                                            }
-                                            _ => false,
-                                        };
+                                        let has_borrow = matches!(arg, Expr::BorrowRef { mutable: false, .. });
+                                        let has_mut_borrow = matches!(arg, Expr::BorrowRef { mutable: true, .. });
                                         match param.mode {
-                                            ParamMode::Move if !has_move => {
+                                            ParamMode::Borrow if !has_borrow => {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
-                                                        format!("argument {} to '{}' requires '^' (ownership transfer), got plain value", i + 1, name))
+                                                        format!("argument {} to '{}' requires '&' (borrow), got plain value", i + 1, name))
                                                 );
                                             }
-                                            ParamMode::Borrow if has_move => {
+                                            ParamMode::MutableBorrow if !has_mut_borrow => {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
-                                                        format!("argument {} to '{}' uses '^' but parameter is not a move parameter", i + 1, name))
+                                                        format!("argument {} to '{}' requires '^&' (mutable borrow), got plain value or '&'", i + 1, name))
                                                 );
                                             }
-                                            ParamMode::MutableBorrow if !has_ref && !var_is_mutable => {
+                                            ParamMode::Move if has_borrow || has_mut_borrow => {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
-                                                        format!("argument {} to '{}' requires '&' (mutable reference), got plain value", i + 1, name))
-                                                );
-                                            }
-                                            ParamMode::Borrow if has_ref => {
-                                                self.reporter.report(
-                                                    Diagnostic::error(ErrorCode::E0001,
-                                                        format!("argument {} to '{}' uses '&' but parameter is not a mutable borrow parameter", i + 1, name))
+                                                        format!("argument {} to '{}' cannot use '&' or '^&' with move parameter (ownership expected)", i + 1, name))
                                                 );
                                             }
                                             _ => {}
@@ -1152,7 +1137,7 @@ impl TypeChecker {
                 }
                 then_type
             }
-            Expr::MutableRef { expression, .. } => self.infer_expr(expression),
+            Expr::BorrowRef { expression, .. } => self.infer_expr(expression),
             Expr::NullCoalesce { left, right, span } => {
                 let left_type = self.infer_expr(left);
                 let right_type = self.infer_expr(right);
@@ -1181,7 +1166,6 @@ impl TypeChecker {
                     right_type
                 }
             }
-            Expr::MoveExpr { expression, .. } => self.infer_expr(expression),
             Expr::MatchExpr { expression, arms, span } => {
                 let scrutinee_type = self.infer_expr(expression);
                 let mut arm_types = Vec::new();
@@ -1265,7 +1249,7 @@ impl TypeChecker {
                     fallible: false,
                 })
             }
-            AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => {
+            AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } | AstType::Mutable { inner, .. } => {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,

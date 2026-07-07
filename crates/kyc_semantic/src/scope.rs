@@ -356,12 +356,11 @@ impl ScopeResolver {
                 self.resolve_expr(then_expr);
                 self.resolve_expr(else_expr);
             }
-            Expr::MutableRef { expression, .. } => self.resolve_expr(expression),
+            Expr::BorrowRef { expression, .. } => self.resolve_expr(expression),
             Expr::NullCoalesce { left, right, .. } => {
                 self.resolve_expr(left);
                 self.resolve_expr(right);
             }
-            Expr::MoveExpr { expression, .. } => self.resolve_expr(expression),
             Expr::MatchExpr { expression, arms, .. } => {
                 self.resolve_expr(expression);
                 for arm in arms {
@@ -416,7 +415,7 @@ impl ScopeResolver {
                     fallible: false,
                 })
             }
-            AstType::Mutable { inner, .. } | AstType::Move { inner, .. } => {
+            AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,

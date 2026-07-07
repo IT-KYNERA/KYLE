@@ -185,11 +185,11 @@ impl Formatter {
                 self.write_type(out, return_);
             }
             AstType::Mutable { inner, .. } => {
-                out.push('&');
+                out.push('^');
                 self.write_type(out, inner);
             }
-            AstType::Move { inner, .. } => {
-                out.push('^');
+            AstType::Borrow { inner, .. } => {
+                out.push('&');
                 self.write_type(out, inner);
             }
             AstType::Ptr { .. } => {
@@ -815,9 +815,8 @@ impl Formatter {
                 out.push_str("loop:\n");
                 self.write_block(out, body, 1);
             }
-            Expr::MutableRef { expression, .. } => self.write_expr(out, expression),
+            Expr::BorrowRef { expression, .. } => self.write_expr(out, expression),
             Expr::NullCoalesce { left, right, .. } => self.write_expr(out, left),
-            Expr::MoveExpr { expression, .. } => self.write_expr(out, expression),
         }
     }
 
@@ -958,8 +957,7 @@ fn expr_span(expr: &Expr) -> kyc_core::span::Span {
         Expr::StringInterp { span, .. } => *span,
         Expr::Ternary { span, .. } => *span,
         Expr::MatchExpr { span, .. } => *span,
-        Expr::MutableRef { span, .. } => *span,
+        Expr::BorrowRef { span, .. } => *span,
         Expr::NullCoalesce { span, .. } => *span,
-        Expr::MoveExpr { span, .. } => *span,
     }
 }

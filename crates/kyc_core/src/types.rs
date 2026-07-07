@@ -61,8 +61,7 @@ impl Type {
             AstType::Array { inner, size, .. } => {
                 Type::Array(Box::new(Type::from_ast_type(inner)), *size)
             }
-            AstType::Mutable { inner, .. } => Type::from_ast_type(inner),
-            AstType::Move { inner, .. } => Type::from_ast_type(inner),
+            AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Type::from_ast_type(inner),
             AstType::Ptr { .. } => Type::Ptr,
         }
     }
