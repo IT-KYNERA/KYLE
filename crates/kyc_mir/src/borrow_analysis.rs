@@ -93,13 +93,14 @@ impl BorrowAnalysis {
     /// A local is alive entering a block only if it's alive at the exit of ALL predecessors.
     /// Compute alive_in for each block using forward dataflow with intersection at joins.
     /// Uses a pure processing function that does NOT check aliveness (no error reporting).
-    fn compute_alive_in(
+    fn compute_alive_in<'a>(
         &self,
         func: &MirFunction,
         move_locals: &BTreeSet<usize>,
         local_types: &HashMap<usize, MirType>,
         param_locals: &BTreeSet<usize>,
         func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
+        load_map: &HashMap<usize, usize>,
     ) -> Vec<BTreeSet<usize>> {
         let n = func.basic_blocks.len();
         let preds = Self::build_preds(func);
@@ -141,7 +142,7 @@ impl BorrowAnalysis {
 
             // Compute alive_out by processing instructions (no error checking)
             let mut alive = alive_in[b].clone();
-            Self::compute_alive_out(block, &mut alive, move_locals, func_map);
+            Self::compute_alive_out(block, &mut alive, move_locals, func_map, load_map);
             let new_out = alive;
 
             if new_out != alive_out[b] {
@@ -165,6 +166,7 @@ impl BorrowAnalysis {
         alive: &mut BTreeSet<usize>,
         move_locals: &BTreeSet<usize>,
         func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
+        load_map: &HashMap<usize, usize>,
     ) {
         for inst in &block.insts {
             match inst {
@@ -181,6 +183,12 @@ impl BorrowAnalysis {
                 MirInst::Store { dest, value } => {
                     if let MirValue::Local(src) = value {
                         alive.remove(src);
+                        // Also mark the original source of a Load alias as consumed, if still alive
+                        if let Some(&orig) = load_map.get(src) {
+                            if alive.contains(&orig) {
+                                alive.remove(&orig);
+                            }
+                        }
                     }
                     if move_locals.contains(dest) {
                         alive.insert(*dest);
@@ -194,6 +202,12 @@ impl BorrowAnalysis {
                             let is_borrow = modes.map_or(false, |m| i < m.len() && (m[i] == ParamMode::Borrow || m[i] == ParamMode::MutableBorrow));
                             if !is_borrow {
                                 alive.remove(l);
+                                // Also mark the original source of a Load alias as consumed, if still alive
+                                if let Some(&orig) = load_map.get(l) {
+                                    if alive.contains(&orig) {
+                                        alive.remove(&orig);
+                                    }
+                                }
                             }
                         }
                     }
@@ -321,7 +335,7 @@ impl BorrowAnalysis {
             }
         }
 
-        let alive_in = self.compute_alive_in(func, &move_locals, &local_types, &param_locals, func_map);
+        let alive_in = self.compute_alive_in(func, &move_locals, &local_types, &param_locals, func_map, &load_map);
 
         let mut to_insert: Vec<(usize, usize)> = Vec::new();
 
@@ -333,7 +347,7 @@ impl BorrowAnalysis {
             };
 
             for inst in &block.insts {
-                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types, func_map);
+                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types, func_map, &load_map);
             }
 
             // Handle terminator
@@ -406,6 +420,7 @@ impl BorrowAnalysis {
         local_names: &HashMap<usize, String>,
         local_types: &HashMap<usize, MirType>,
         func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
+        load_map: &HashMap<usize, usize>,
     ) {
         match inst {
             MirInst::Alloca { dest, type_, .. } => {
@@ -437,6 +452,13 @@ impl BorrowAnalysis {
                     if alive.contains(src) {
                         alive.remove(src);
                     }
+                    // Also mark the original source of a Load alias as consumed, if still alive
+                    if let Some(&orig) = load_map.get(src) {
+                        if alive.contains(&orig) {
+                            self.check_alive(orig, alive, local_names, local_types, "move");
+                            alive.remove(&orig);
+                        }
+                    }
                 }
                 if move_locals.contains(dest) {
                     alive.insert(*dest);
@@ -452,6 +474,13 @@ impl BorrowAnalysis {
                             self.check_alive(*l, alive, local_names, local_types, "move");
                             if alive.contains(l) {
                                 alive.remove(l);
+                            }
+                            // Also mark the original source of a Load alias as consumed, if still alive
+                            if let Some(&orig) = load_map.get(l) {
+                                if alive.contains(&orig) {
+                                    self.check_alive(orig, alive, local_names, local_types, "move");
+                                    alive.remove(&orig);
+                                }
                             }
                         } else {
                             self.check_alive(*l, alive, local_names, local_types, "use");
