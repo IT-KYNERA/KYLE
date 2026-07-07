@@ -77,11 +77,11 @@ a.len()     # 5.0
 ## Static methods
 
 ```ky
-class MathUtils:
+class math_utils:
     static fn square(x: i32) i32:
         x * x
 
-MathUtils.square(5)    # 25
+math_utils.square(5)    # 25
 ```
 
 ## Operator overloading

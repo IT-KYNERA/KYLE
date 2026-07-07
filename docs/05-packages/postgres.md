@@ -32,7 +32,7 @@ for row in rows:
 
 ```kyle
 # pool (recomendado) — reusa conexiones
-pool = pool.new(conn_string, maxSize=10)
+pool = pool.new(conn_string, max_size=10)
 
 # Connection directa (una sola)
 conn = pool.get_conn()

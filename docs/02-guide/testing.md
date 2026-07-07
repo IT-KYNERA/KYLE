@@ -6,12 +6,12 @@ Kyle has a built-in test framework using the `#[test]` attribute.
 
 ```ky
 #[test]
-fn testAddition():
+fn test_addition():
     result = 2 + 2
     assert(result == 4)
 
 #[test]
-fn testString():
+fn test_string():
     assert_eq("hello", "hello")
     assert_ne("hello", "world")
 ```
@@ -41,8 +41,8 @@ my-project/
 ├── src/
 │   └── main.ky
 └── tests/
-    ├── testUnit.ky
-    └── testIntegration.ky
+    ├── test_unit.ky
+    └── test_integration.ky
 ```
 
 Each test function must:

@@ -131,9 +131,9 @@ Varias líneas con `@(...)`:
 ```xml
 <Button click=@login />
 
-<TextField change=@onChange />
+<TextField change=@on_change />
 
-<TextField input=@onInput />
+<TextField input=@on_input />
 ```
 
 ---
@@ -186,12 +186,12 @@ Las páginas no admiten slots.
 ## 14. Ciclo de vida
 
 ```kyle
-fn onCreate(): ...
-fn onInit(): ...
-fn onReady(): ...
-fn onRender(): ...
-fn onRendered(): ...
-fn onDispose(): ...
+fn on_create(): ...
+fn on_init(): ...
+fn on_ready(): ...
+fn on_render(): ...
+fn on_rendered(): ...
+fn on_dispose(): ...
 ```
 
 ---
@@ -239,8 +239,8 @@ Uso:
 
 ```kyle
 tpl<Button> Primary:
-    style = PrimaryStyle
-    animation = PrimaryAnimation
+    style = primary_style
+    animation = primary_animation
     cursor = pointer
     ripple = true
 ```

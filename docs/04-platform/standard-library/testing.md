@@ -12,7 +12,7 @@
 ```ky
 from std.testing import assert, assert_eq
 
-fn testAddition():
+fn test_addition():
     result = 2 + 2
     assert_eq(result, 4)
 ```

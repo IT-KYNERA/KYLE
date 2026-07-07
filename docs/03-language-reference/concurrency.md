@@ -103,11 +103,11 @@ lock(m):
 ## Atomic types [ ]
 
 ```ky
-counter: AtomicI64 = AtomicI64(0)
+counter: atomic_i64 = atomic_i64(0)
 counter.fetch_add(1)
 counter.load()                # → 1
 
-flag: AtomicBool = AtomicBool(false)
+flag: atomic_bool = atomic_bool(false)
 flag.store(true)
 flag.load()                   # → true
 ```

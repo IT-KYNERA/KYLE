@@ -61,12 +61,12 @@ from http.client import client
 final class Todo:
     title: str
     body: str
-    userId: i32
+    user_id: i32
 
 client = client { timeout: 10 }
 
 # POST con clase → auto-JSON
-data = Todo { title: "Kyle", body: "test", userId: 1 }
+data = Todo { title: "Kyle", body: "test", user_id: 1 }
 res = client.post(url, data)
 
 # GET + deserializar

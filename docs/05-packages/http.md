@@ -38,8 +38,8 @@ final class http_status:
     text: str
 ```
 
-Constantes: `HttpStatusOk` (200), `HttpStatusCreated` (201),
-`HttpStatusNotFound` (404), `HttpStatusInternalServerError` (500)
+Constantes: `http_status_ok` (200), `http_status_created` (201),
+`http_status_not_found` (404), `http_status_internal_server_error` (500)
 
 ### header
 
@@ -233,7 +233,7 @@ final class User:
     name: str
     age: i32
 
-final class CreateUser:
+final class create_user:
     name: str
     age: i32
 
@@ -255,7 +255,7 @@ app.get("/users/{id:i32}", (req, res):
 
 # Crear usuario
 app.post("/users", (req, res):
-    data = req.body<CreateUser>()
+    data = req.body<create_user>()
     res.json({ "created": true, "name": data.name }, 201)
 )
 

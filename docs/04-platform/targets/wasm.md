@@ -54,15 +54,15 @@ from web import document, console, fetch
 ```kyle
 from web import document
 
-div = document.getElementById("app")
-div.textContent = "Hola desde Kyle!"
+div = document.get_element_by_id("app")
+div.text_content = "Hola desde Kyle!"
 
 # Crear elementos
-btn = document.createElement("button")
-btn.textContent = "Click me"
+btn = document.create_element("button")
+btn.text_content = "Click me"
 btn.onclick = (event):
     console.log("clicked!")
-div.appendChild(btn)
+div.append_child(btn)
 ```
 
 ### Fetch (HTTP desde el browser)
@@ -91,15 +91,15 @@ console.error("something went wrong")
 ```kyle
 from web import document, canvas
 
-canvas = document.getElementById("game")
+canvas = document.get_element_by_id("game")
 ctx = canvas.getContext("2d")
 
-ctx.fillStyle = "red"
-ctx.fillRect(10, 10, 100, 50)
+ctx.fill_style = "red"
+ctx.fill_rect(10, 10, 100, 50)
 
-ctx.fillStyle = "blue"
+ctx.fill_style = "blue"
 ctx.font = "20px sans-serif"
-ctx.fillText("Kyle!", 20, 80)
+ctx.fill_text("Kyle!", 20, 80)
 ```
 
 ---
@@ -111,7 +111,7 @@ packages/web/
 ├── ky.toml
 └── src/
     ├── lib.ky          # Exportaciones principales
-    ├── dom.ky          # DOM API (getElementById, createElement, etc.)
+    ├── dom.ky          # DOM API (get_element_by_id, create_element, etc.)
     ├── fetch.ky        # Fetch API
     ├── canvas.ky       # Canvas 2D
     ├── console.ky      # Console API

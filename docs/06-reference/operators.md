@@ -74,7 +74,7 @@
 | `val.to_i32()` | i32 | Convertir a entero |
 | `val.to_f64()` | f64 | Convertir a flotante |
 | `val.to_bool()` | bool | Convertir a booleano |
-| `val.type()` | TypeInfo | Información del tipo (`.name`, `.kind`, `.size`) |
+| `val.type()` | `type_info` | Información del tipo (`.name`, `.kind`, `.size`) |
 
 ### Chaining
 
