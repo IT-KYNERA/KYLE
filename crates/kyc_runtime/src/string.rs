@@ -1,5 +1,12 @@
 use core::ptr;
 
+/// Convert f32 to string via integer (fptosi then format).
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_f32_to_str(val: i64) -> *const u8 {
+    // val is the result of fptosi (float to int), just format it
+    ky_i64_to_str(val)
+}
+
 /// Convert an i64 to its string representation.
 /// Returns a heap-allocated null-terminated C string.
 /// Caller must free with ky_free.
