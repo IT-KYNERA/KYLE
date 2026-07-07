@@ -30,7 +30,7 @@ fn main() i32:
     0
 ```
 
-## ky_parallel_for [x]
+## parallelFor [x]
 
 ```ky
 fn heavy(n: i64) i64:
@@ -43,7 +43,7 @@ fn heavy(n: i64) i64:
 
 fn main() i32:
     fn_ptr = heavy as ptr
-    ky_parallel_for(fn_ptr, 0, 8)
+    parallelFor(fn_ptr, 0, 8)
     0
 ```
 
@@ -54,8 +54,8 @@ fn worker(n: i64) i64:
     n * 2
 
 fn main() i32:
-    h = ky_spawn_thread(worker as ptr, 21)
-    r = ky_join_thread(h)
+    h = spawnThread(worker as ptr, 21)
+    r = joinThread(h)
     println(str(r))    # 42
     0
 ```
@@ -130,12 +130,12 @@ result = doubled.collect()     # → {i32}
 | `async fn` | ✅ | `async fn f(p: T) R:` |
 | `async:` block | ✅ | `t = async: ...` |
 | `await` | ✅ | `await task` |
-| `ky_parallel_for` | ✅ | `ky_parallel_for(fn, 0, N)` |
-| threads | ✅ | `ky_spawn_thread` / `ky_join_thread` |
-| `Future<T>` | 📅 | `t: Future<str> = async: ...` |
-| `Channel<T>` | 📅 | `ch = Channel<T>(n); ch.send(v); v = ch.recv()` |
+| `parallelFor` | 🔶 renombrar | `parallelFor(fn, 0, N)` |
+| threads | 🔶 renombrar | `spawnThread` / `joinThread` |
+| `future<T>` | 📅 | `t: future<str> = async: ...` |
+| `channel<T>` | 📅 | `ch = channel<T>(n); ch.send(v); v = ch.recv()` |
 | `select` | 📅 | `select: &msg -> ch: ...` |
-| `Mutex<T>` | 📅 | `Mutex<T>(v); lock(m): *val += 1` |
-| `AtomicI64` | 📅 | `AtomicI64(v).fetch_add(1)` |
-| `AtomicBool` | 📅 | `AtomicBool(v).store(true)` |
-| `Iterator` | 📅 | `list.iter().map(fn).filter(fn).collect()` |
+| `mutex<T>` | 📅 | `mutex<T>(v); lock(m): *val += 1` |
+| `atomicI64` | 📅 | `atomicI64(v).fetchAdd(1)` |
+| `atomicBool` | 📅 | `atomicBool(v).store(true)` |
+| `iterator` | 📅 | `list.iter().map(fn).filter(fn).collect()` |

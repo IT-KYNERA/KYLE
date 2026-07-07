@@ -117,29 +117,33 @@ for val in s:
     println(val.to_str())
 ```
 
-### Queue: `Queue<T>` [ ]
+### Queue via list [ ]
 
-FIFO queue. Constructor vía `Queue{}`.
+No hay tipo `Queue<T>` dedicado. Usar `{T}` con `.push()` / `.popFirst()`:
 
 ```ky
-q: Queue<i32> = Queue{}
+q: {i32} = {}
 q.push(10)                   # enqueue
 q.push(20)
-val = q.pop()                # dequeue → 10 (FIFO)
+val = q.popFirst()           # dequeue → 10 (FIFO)
 q.len()
 ```
 
-### Stack: `Stack<T>` [ ]
+### Stack via list [ ]
 
-LIFO stack. Constructor vía `Stack{}`.
+No hay tipo `Stack<T>` dedicado. Usar `{T}` con `.push()` / `.pop()` — ya funciona:
 
 ```ky
-st: Stack<i32> = Stack{}
+st: {i32} = {}
 st.push(10)                  # push
 st.push(20)
 val = st.pop()               # → 20 (LIFO)
 st.len()
 ```
+
+> **Decisión de diseño:** Stack y Queue no tienen tipos dedicados porque `{T}` ya soporta
+> todas las operaciones necesarias con métodos `.push()`, `.pop()`, `.popFirst()`.
+> Esto sigue el enfoque de Go y JavaScript, donde arrays/listas cubren ambos roles.
 
 ### Slice: `&[T]` [ ]
 
@@ -212,31 +216,31 @@ fn main():
     println(buf)         # "datos"
 ```
 
-### Box: `Box<T>` [ ]
+### box: `box<T>` [ ]
 
 Heap allocation explícita.
 
 ```ky
-b: Box<i32> = Box(42)
+b: box<i32> = box(42)
 *b = *b + 1              # deref + mutate
 ```
 
-### Rc: `Rc<T>` [ ]
+### rc: `rc<T>` [ ]
 
 Reference counting (single-thread).
 
 ```ky
-rc: Rc<str> = Rc("hello")
-rc2 = rc.clone()          # incrementa refcount
-println(*rc)               # deref
+r: rc<str> = rc("hello")
+r2 = r.clone()          # incrementa refcount
+println(*r)               # deref
 ```
 
-### Arc: `Arc<T>` [ ]
+### arc: `arc<T>` [ ]
 
 Atomic reference counting (multi-thread).
 
 ```ky
-arc: Arc<i64> = Arc(0)
+a: arc<i64> = arc(0)
 ```
 
 ---
@@ -254,18 +258,18 @@ fn main():
     result = await task
 ```
 
-### Future: `Future<T>` [ ]
+### future: `future<T>` [ ]
 
 ```ky
-task: Future<str> = async:
+task: future<str> = async:
     "result"
 val = await task
 ```
 
-### Channel: `Channel<T>` [ ]
+### channel: `channel<T>` [ ]
 
 ```ky
-ch: Channel<i32> = Channel(16)     # buffer 16
+ch: channel<i32> = channel(16)     # buffer 16
 ch.send(42)
 val = ch.recv()
 ch.len()
@@ -284,27 +288,27 @@ select:
         println("timeout")
 ```
 
-### Mutex: `Mutex<T>` [ ]
+### mutex: `mutex<T>` [ ]
 
 ```ky
-m: Mutex<i32> = Mutex(0)
+m: mutex<i32> = mutex(0)
 lock(m):
     *val += 1                 # operación segura
 ```
 
-### Atomic: `AtomicI64` / `AtomicBool` [ ]
+### atomic: `atomicI64` / `atomicBool` [ ]
 
 ```ky
-counter: AtomicI64 = AtomicI64(0)
-counter.fetch_add(1)
+counter: atomicI64 = atomicI64(0)
+counter.fetchAdd(1)
 counter.load()                # → 1
 
-flag: AtomicBool = AtomicBool(false)
+flag: atomicBool = atomicBool(false)
 flag.store(true)
 flag.load()                   # → true
 ```
 
-### Iterator [ ]
+### iterator [ ]
 
 ```ky
 iter = list.iter()
@@ -320,91 +324,91 @@ result = doubled.collect()     # → {i32}
 > Todos estos son nativos de Kyle (no requieren `from X import Y`).
 > Están disponibles globalmente como tipos built-in del lenguaje.
 
-### DateTime [ ]
+### dateTime [ ]
 
 ```ky
-dt = DateTime.now()
-dt = DateTime.parse("2024-01-01T00:00:00")
-dt = DateTime.from_ymdhms(2024, 1, 1, 0, 0, 0)
+dt = dateTime.now()
+dt = dateTime.parse("2024-01-01T00:00:00")
+dt = dateTime.fromYmdhms(2024, 1, 1, 0, 0, 0)
 year = dt.year()
 month = dt.month()
 day = dt.day()
 hour = dt.hour()
 minute = dt.minute()
 second = dt.second()
-dt2 = dt.add_days(7)
-dt3 = dt.add_hours(3)
+dt2 = dt.addDays(7)
+dt3 = dt.addHours(3)
 diff = dt.diff(dt2)
 ```
 
-### Duration [ ]
+### duration [ ]
 
 ```ky
-d = Duration.from_secs(60)
-d = Duration.from_millis(1000)
-d = Duration.from_hours(1)
-d = Duration.from_days(7)
-d.to_str()              # → "1h 0m 0s"
+d = duration.fromSecs(60)
+d = duration.fromMillis(1000)
+d = duration.fromHours(1)
+d = duration.fromDays(7)
+d.toStr()              # → "1h 0m 0s"
 ```
 
-### Date [ ]
+### date [ ]
 
 ```ky
-d = Date.today()
-d = Date.from_ymd(2024, 1, 1)
-d = Date.parse("2024-01-01")
+d = date.today()
+d = date.fromYmd(2024, 1, 1)
+d = date.parse("2024-01-01")
 year = d.year()
 month = d.month()
 weekday = d.weekday()
-d2 = d.add_days(7)
+d2 = d.addDays(7)
 ```
 
-### Time [ ]
+### time [ ]
 
 ```ky
-t = Time.now()
-t = Time.from_hms(12, 30, 0)
-t = Time.parse("12:30:00")
+t = time.now()
+t = time.fromHms(12, 30, 0)
+t = time.parse("12:30:00")
 hour = t.hour()
 minute = t.minute()
 second = t.second()
 ```
 
-### Bytes [ ]
+### bytes [ ]
 
 ```ky
-b = Bytes.new(1024)
-b = Bytes.from_hex("deadbeef")
-b = Bytes.from_base64("SGVsbG8=")
+b = bytes.new(1024)
+b = bytes.fromHex("deadbeef")
+b = bytes.fromBase64("SGVsbG8=")
 b.len()
 val = b.get(0)           # → byte
 b.set(0, 255)
 hex = b.hex()
-b64 = b.to_base64()
+b64 = b.toBase64()
 ```
 
-### Decimal [ ]
+### decimal [ ]
 
 ```ky
-d = Decimal.from_str("3.14")
-d = Decimal.from_i64(314, 2)    # 3.14
+d = decimal.fromStr("3.14")
+d = decimal.fromI64(314, 2)    # 3.14
 d.round(1)                       # → 3.1
 d.truncate()                     # → 3
-d.to_str()                       # → "3.14"
+d.toStr()                       # → "3.14"
 ```
 
-### Uuid [ ]
+### uuid [ ]
 
 ```ky
-id = Uuid.v4()
-id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
-id.to_str()
+id = uuid.v4()
+id = uuid.parse("550e8400-e29b-41d4-a716-446655440000")
+id.toStr()
 ```
 
-### Url [ ]
+### url [ ]
 
 ```ky
-u = Url.parse("https://user:pass@host:8080/path?q=1#frag")
+u = url.parse("https://user:pass@host:8080/path?q=1#frag")
 u.scheme()     # → "https"
 u.host()       # → "host"
 u.port()       # → 8080
@@ -412,49 +416,49 @@ u.path()       # → "/path"
 u.query()      # → "q=1"
 ```
 
-### Regex [ ]
+### regex [ ]
 
 ```ky
-re = Regex("[0-9]+")
-re.is_match("abc123")       # → true
+re = regex("[0-9]+")
+re.isMatch("abc123")       # → true
 m = re.find("abc123")       # → "123"
 result = re.replace("abc123", "X")  # → "abcX"
 ```
 
-### Env [ ]
+### env [ ]
 
 ```ky
 val = env("PATH")
 env("MY_VAR", "value")      # set
 ```
 
-### Json [ ]
+### json [ ]
 
 ```ky
-json = Json.parse('{"name": "Kyle", "age": 30}')
-name = json["name"]          # access field
-json["city"] = "NYC"         # set field
-str = json.stringify()        # serialize
-str = json.pretty()           # pretty-print
+j = json.parse('{"name": "Kyle", "age": 30}')
+name = j["name"]          # access field
+j["city"] = "NYC"         # set field
+str = j.stringify()        # serialize
+str = j.pretty()           # pretty-print
 ```
 
-### File [ ]
+### file [ ]
 
 ```ky
-f = File.open("/tmp/test.txt", "w")
+f = file.open("/tmp/test.txt", "w")
 f.write("hello world")
 f.close()
 
-f = File.open("/tmp/test.txt", "r")
+f = file.open("/tmp/test.txt", "r")
 content = f.read()           # → str
 f.close()
 f.exists()                   # → true
 ```
 
-### Socket [ ]
+### socket [ ]
 
 ```ky
-server = Socket.tcp_listen(8080)
+server = socket.tcpListen(8080)
 client = server.accept()
 data = client.read(1024)
 client.write("HTTP/1.1 200 OK\r\n\r\n")
@@ -462,33 +466,33 @@ client.close()
 server.close()
 
 # Client mode
-conn = Socket.tcp_connect("example.com", 80)
+conn = socket.tcpConnect("example.com", 80)
 conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 resp = conn.read(4096)
 conn.close()
 ```
 
-### Path [ ]
+### path [ ]
 
 ```ky
-p = Path("/home/user/file.txt")
+p = path("/home/user/file.txt")
 p.dirname()          # → "/home/user"
 p.basename()         # → "file.txt"
 p.extension()        # → ".txt"
 p.exists()           # → true
-p.is_file()          # → true
-p.is_dir()           # → false
+p.isFile()           # → true
+p.isDir()            # → false
 p.join("subdir")     # → "/home/user/file.txt/subdir"
 ```
 
-### BigInt [ ]
+### bigInt [ ]
 
 ```ky
-n = BigInt("123456789012345678901234567890")
-n2 = BigInt.from_i64(42)
+n = bigInt("123456789012345678901234567890")
+n2 = bigInt.fromI64(42)
 n3 = n + n2
 n4 = n * n2
-n.to_str()
+n.toStr()
 ```
 
 ### strBuilder [ ]
@@ -497,7 +501,7 @@ n.to_str()
 sb = strBuilder(50000)
 sb.append("x", 1)
 sb.append("hello", 5)
-result = sb.to_str()
+result = sb.toStr()
 ```
 
 ---
@@ -507,8 +511,8 @@ result = sb.to_str()
 | Categoría | [x] Completo | [ ] Diseñado | ❌ No planeado |
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitives | 13 | 2 (`u8-u64` codegen, `never`) | 1 (`byte`) |
-| Compounds | 4 | 6 (tuple, Set, Queue, Stack, slice) | 0 |
-| Ownership | 3 | 4 (Box, Rc, Arc, Weak) | 0 |
-| Concurrency | 1 (async/await) | 7 (Future, Channel, select, Mutex, Atomic, Iterator) | 0 |
-| Specialized | 1 (strBuilder) | 14 (DateTime, Duration, Date, Time, Bytes, Decimal, Uuid, Url, Regex, Env, Json, File, Socket, Path) | 0 |
-| Total | 22 | 33 | 1 |
+| Compounds | 4 | 4 (tuple, Set, slice) | 2 (Queue, Stack — usar `{T}`) |
+| Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
+| Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
+| Specialized | 1 (strBuilder) | 14 (dateTime, duration, date, time, bytes, decimal, uuid, url, regex, env, json, file, socket, path) | 0 |
+| **Total** | **22** | **31** | **3** |

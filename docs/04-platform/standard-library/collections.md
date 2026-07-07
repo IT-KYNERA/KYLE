@@ -1,10 +1,7 @@
 # Collections
 
-> **Lista:** `{T}` [x] — Dinámica, heap.
-> **Dict:** `{K: V}` [x] — Hash map.
-> **Set:** `Set<T>` [ ] — Hash set.
-> **Queue:** `Queue<T>` [ ] — FIFO.
-> **Stack:** `Stack<T>` [ ] — LIFO.
+> **Regla general:** `{T}` (list) cubre Stack y Queue vía métodos.
+> Tipos dedicados solo para `Set<T>` (hash set) y `{K:V}` (dict).
 
 ---
 
@@ -16,13 +13,17 @@ v.push(4)
 v.reserve(100)
 x = v[0]
 v[0] = 99
-v.pop()
+v.pop()          # LIFO: saca el último
+v.popFirst()     # FIFO: saca el primero
 v.len()
 v.contains(10)
 v.insert(1, 50)
-v.remove_at(2)
+v.removeAt(2)
 v.clear()
 ```
+
+**Como Stack:** `push()` + `pop()` (LIFO — ya funciona).
+**Como Queue:** `push()` + `popFirst()` (FIFO).
 
 ## Dict: `{K: V}` [x]
 
@@ -42,25 +43,5 @@ s.contains(1)    # → true
 s.remove(1)
 s.len()
 for val in s:
-    println(val.to_str())
-```
-
-## Queue: `Queue<T>` [ ]
-
-```ky
-q: Queue<i32> = Queue{}
-q.push(10)       # enqueue
-q.push(20)
-val = q.pop()    # dequeue → 10 (FIFO)
-q.len()
-```
-
-## Stack: `Stack<T>` [ ]
-
-```ky
-st: Stack<i32> = Stack{}
-st.push(10)
-st.push(20)
-val = st.pop()   # → 20 (LIFO)
-st.len()
+    println(val.toStr())
 ```

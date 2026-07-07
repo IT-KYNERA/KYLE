@@ -13,7 +13,9 @@
 
 ---
 
-## Convenciones de ownership
+## Convenciones del lenguaje
+
+### Ownership
 
 ```ky
 x = 1           # inmutable, COPY (i32)
@@ -28,6 +30,16 @@ fn f(x: ^&T)    # MUT BORROW param
 ```
 
 Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
+
+### Naming (camelCase)
+
+| Regla | Ejemplos |
+|-------|----------|
+| Tipos 1 palabra | `str`, `regex`, `url`, `uuid`, `bytes`, `mutex`, `future`, `box` |
+| Tipos multi-palabra | `strBuilder`, `atomicI64`, `atomicBool`, `bigInt`, `dateTime` |
+| Funciones | `spawnThread`, `joinThread`, `parallelFor`, `fetchAdd`, `toStr` |
+| Constructores tipo | `regex("[0-9]+")`, `box(42)`, `channel<i32>(16)` |
+| Constantes (UPPER) | `MAX_SIZE := 1024` |
 
 ---
 
@@ -127,21 +139,21 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 
 | # | Tipo | Ahora | Debe ser | Uso | Runtime |
 |---|------|-------|----------|-----|---------|
-| 55 | `DateTime` | 📦 `from datetime import datetime` | ✅ Nativo | `dt = DateTime.now()` | `chrono` crate ✅ |
-| 56 | `Duration` | 📦 `from datetime import duration` | ✅ Nativo | `d = Duration.from_secs(60)` | `chrono` ✅ |
-| 57 | `Date` | 📦 `from date import date` | ✅ Nativo | `d = Date.today()` | ✅ |
-| 58 | `Time` | 📦 `from date import time` | ✅ Nativo | `t = Time.now()` | ✅ |
-| 59 | `Bytes` | 📦 `from bytes import bytes` | ✅ Nativo | `b = Bytes.new(1024)` | ✅ |
-| 60 | `Decimal` | 📦 `from decimal import decimal` | ✅ Nativo | `d = Decimal.from_str("3.14")` | ✅ |
-| 61 | `Uuid` | 📦 `from uuid import uuid` | ✅ Nativo | `id = Uuid.v4()` | ✅ |
-| 62 | `Url` | 📦 `from url import url` | ✅ Nativo | `u = Url.parse("https://...")` | ✅ |
-| 63 | `Regex` | 📦 `from regex import regex` | ✅ Nativo | `re = Regex("[0-9]+")` | ✅ |
-| 64 | `Env` | 📋 `ky_getenv/setenv` | ✅ Nativo | `value = env("PATH")` | ✅ runtime |
-| 65 | `File` | ❌ fd i32 | ✅ Nativo | `f = File.open(path, "r")` | 🔶 parcial |
-| 66 | `Socket` | ❌ fd i32 | ✅ Nativo | `s = Socket.tcp_listen(8080)` | 🔶 parcial |
-| 67 | `Path` | ❌ str | ✅ Nativo | `p = Path("/a/b/c")` | ❌ |
-| 68 | `Json` | ❌ functions | ✅ Nativo | `Json.parse(str)` | ❌ |
-| 69 | `BigInt` | ❌ | ❌ | — | ❌ |
+| 55 | `dateTime` | 📦 `from datetime import datetime` | ✅ Nativo | `dt = dateTime.now()` | `chrono` crate ✅ |
+| 56 | `duration` | 📦 `from datetime import duration` | ✅ Nativo | `d = duration.fromSecs(60)` | `chrono` ✅ |
+| 57 | `date` | 📦 `from date import date` | ✅ Nativo | `d = date.today()` | ✅ |
+| 58 | `time` | 📦 `from date import time` | ✅ Nativo | `t = time.now()` | ✅ |
+| 59 | `bytes` | 📦 `from bytes import bytes` | ✅ Nativo | `b = bytes.new(1024)` | ✅ |
+| 60 | `decimal` | 📦 `from decimal import decimal` | ✅ Nativo | `d = decimal.fromStr("3.14")` | ✅ |
+| 61 | `uuid` | 📦 `from uuid import uuid` | ✅ Nativo | `id = uuid.v4()` | ✅ |
+| 62 | `url` | 📦 `from url import url` | ✅ Nativo | `u = url.parse("https://...")` | ✅ |
+| 63 | `regex` | 📦 `from regex import regex` | ✅ Nativo | `re = regex("[0-9]+")` | ✅ |
+| 64 | `env` | 📋 `ky_getenv/setenv` | ✅ Nativo | `value = env("PATH")` | ✅ runtime |
+| 65 | `file` | ❌ fd i32 | ✅ Nativo | `f = file.open(path, "r")` | 🔶 parcial |
+| 66 | `socket` | ❌ fd i32 | ✅ Nativo | `s = socket.tcpListen(8080)` | 🔶 parcial |
+| 67 | `path` | ❌ str | ✅ Nativo | `p = path("/a/b/c")` | ❌ |
+| 68 | `json` | ❌ functions | ✅ Nativo | `json.parse(str)` | ❌ |
+| 69 | `bigInt` | ❌ | ❌ | — | ❌ |
 | 70 | `Xml` | ❌ | ❌ | — | ❌ |
 | 71 | `Tensor` | ❌ | ❌ | — | ❌ |
 | 72 | `DataFrame` | ❌ | ❌ | — | ❌ |
@@ -174,13 +186,16 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 
 | Prioridad | Área | Items |
 |-----------|------|-------|
-| **P0** | Arreglar bugs | `u8-u64` codegen, `tuple` codegen, `char` type inference, `T?`/`T!` type checker |
-| **P1** | Hacer nativos tipos package | `DateTime`, `Duration`, `Date`, `Time`, `Bytes`, `Decimal`, `Uuid`, `Url`, `Regex`, `Env` |
-| **P2** | Tipos I/O nativos | `File`, `Socket`, `Path`, `Json` |
-| **P3** | Structuras datos faltantes | `Set<T>`, `Queue<T>`, `Stack<T>`, `slice` |
-| **P4** | Concurrencia nativa | `Channel<T>` typing, `Mutex<T>`, `Atomic*`, `Future<T>`, `Iterator` |
-| **P5** | Smart pointers | `Box<T>`, `Rc<T>`, `Arc<T>` |
-| **P6** | Avanzados | `BigInt`, `Deque`, `LinkedList` |
+| **P0** | Renombrar existente | `ky_parallel_for`→`parallelFor`, `ky_spawn_thread`→`spawnThread`, `ky_join_thread`→`joinThread`, funciones package→camelCase |
+| **P1** | Arreglar bugs | `u8-u64` codegen, `tuple` codegen, `char` type inference, `T?`/`T!` type checker |
+| **P2** | Hacer nativos tipos package | `dateTime`, `duration`, `date`, `time`, `bytes`, `decimal`, `uuid`, `url`, `regex`, `env` |
+| **P3** | Tipos I/O nativos | `file`, `socket`, `path`, `json` |
+| **P4** | Estructuras datos faltantes | `Set<T>`, `slice` |
+| **P5** | Concurrencia nativa | `channel<T>`, `mutex<T>`, `atomicI64`, `future<T>`, `iterator`, `select` |
+| **P6** | Smart pointers | `box<T>`, `rc<T>`, `arc<T>`, `weak<T>` |
+| **P7** | Avanzados | `bigInt`, `deque`, `linkedList` |
+
+> **Nota:** Queue y Stack NO tienen tipos dedicados. Usar `{T}` con `push()`/`pop()` (stack) o `push()`/`popFirst()` (queue).
 
 ## Optimizaciones futuras (postergadas)
 

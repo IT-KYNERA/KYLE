@@ -310,7 +310,35 @@ See `docs/05-packages/registry.md` for full documentation.
 | `regex` | Expresión regular | `regex.match()`, `regex.find()`, `regex.replace()` |
 | `duration` | Intervalo de tiempo | `duration.seconds()`, `duration.hours()`, `a + b` |
 
-### ⚠️ Option<T> y Result<T,E> — ¿Qué significa?
+### 🏷️ Convención de nombres (camelCase)
+
+| Regla | Ejemplos |
+|-------|----------|
+| Tipos 1 palabra | `regex`, `url`, `uuid`, `bytes`, `decimal`, `mutex`, `future`, `box` |
+| Tipos multi-palabra | `strBuilder`, `atomicI64`, `atomicBool`, `bigInt`, `dateTime` |
+| Funciones | `spawnThread`, `joinThread`, `parallelFor`, `fetchAdd`, `toStr` |
+| Constructores tipo | `regex("[0-9]+")`, `box(42)`, `channel<i32>(16)` |
+| Constantes | `MAX_SIZE := 1024` (UPPER) |
+
+### Nombres a renombrar (código existente)
+
+| Actual | Nuevo | Archivos |
+|--------|-------|----------|
+| `ky_parallel_for` | `parallelFor` | runtime, symbol_table, lowerer |
+| `ky_spawn_thread` | `spawnThread` | runtime, symbol_table |
+| `ky_join_thread` | `joinThread` | runtime, symbol_table |
+| `ky_string_builder_*` | `ky_str_builder_*` | ✅ ya hecho |
+| Funciones package | camelCase | packages/http/, packages/json/ |
+
+### Decisión: Stack y Queue no son tipos dedicados
+
+| Tipo | Decisión | Razón |
+|------|----------|-------|
+| **Stack** | ❌ No hay tipo dedicado | `{T}` con `push()`/`pop()` ya es stack. Go y JS hacen lo mismo. |
+| **Queue** | ❌ No hay tipo dedicado | `{T}` con `push()`/`popFirst()` cubre FIFO. |
+| **Set** | ✅ Sí, tipo dedicado | Requiere hash set (sin duplicados, O(1) lookup). |
+
+## ⚠️ Option<T> y Result<T,E> — ¿Qué significa?
 
 `Option<T>` (`T?`) y `Result<T, str>` (`T!`) existen como **enums genéricos** del compilador:
 
