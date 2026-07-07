@@ -568,3 +568,117 @@ Features identificadas en los benchmarks que Kyle necesita para ser competitivo 
 | `f(^&x)` | MUT BORROW | `append(^&s)` → `s` prestado mutable |
 
 Ver `docs/03-language-reference/ownership.md` para especificación completa.
+
+---
+
+## 📈 Optimizaciones futuras (postergadas)
+
+Mejoras identificadas en benchmarks que cierran la brecha con C/Rust:
+
+| # | Mejora | Benchmarks | Impacto estimado | Esfuerzo |
+|---|--------|-----------|-----------------|----------|
+| 1 | **Register alloc para `^i32`/`^i64`** — LLVM mem2reg no promueve allocas simples con múltiples BB. Solución: identificar `^i32`/`^i64` en codegen y emitir valores LLVM directo sin alloca | Fib (1.6× → 1.0×) | ⭐⭐⭐ | 1-2 días |
+| 2 | **`list.reserve(n)` + batch push** — `reserve(n)` pre-asigna capacidad (✅ implementado). Batch push reduce N FFI calls a 1 | Primes (2.7× → 1.5×) | ⭐⭐ | 1 día |
+| 3 | **Arrays `[T; N]` pass-by-reference** — Los arrays hoy son copy-by-value. `fn f(a: &[i64; N])` evitaría copiar 80KB en cada acceso. Necesita `&[T; N]` como tipo de parámetro | Matmul (7.8× → 1.0×) | ⭐⭐⭐⭐⭐ | 3-4 días |
+| 4 | **strBuilder inline hints** — Marcar `ky_str_builder_append` con atributos LLVM `inlinehint` para eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 día |
+
+### Notas de implementación
+
+**#3 Arrays pass-by-reference** es la mejora más importante (matmul es el benchmark más representativo de cómputo real). Hoy cada `a[i]` en `[i64; 10000]`:
+1. (innecesario) Load del array completo (80KB)
+2. GEP sobre el resultado
+3. Load del elemento
+
+Con pass-by-reference:
+1. GEP directo sobre el puntero al array original
+2. Load del elemento
+
+Requiere nuevo `MirType::Slice` o modificar `MirInst::ArrayElemPtr` para aceptar referencias.
+
+---
+
+## 📋 Plan de completitud de tipos
+
+Kyle debe tener **todos los tipos importantes como nativos** (no packages).
+Solo HTTP/Postgres/SQLite son packages. El resto es infraestructura base.
+
+### Fase 1: Arreglar bugs existentes
+
+| Bug | Archivos | Impacto |
+|-----|----------|---------|
+| `u8`/`u16`/`u32`/`u64` sin MirType ni codegen | `mir.rs`, `codegen.rs`, `lower.rs` | No se pueden declarar variables unsigned |
+| `tuple` sin MirType ni codegen | `mir.rs`, `codegen.rs` | Existe en parser pero no compila |
+| `char = 'a'` type mismatch | `type_checker.rs` | Bug conocido y documentado |
+| `T?` type mismatch con `str?` | `type_checker.rs` | `str?` causa "expects 1 arg, got 2" |
+| `T!` con `-> T!` syntax | `parser.rs`, `type_checker.rs` | Arrow syntax no funciona |
+
+### Fase 2: Migrar packages a nativos
+
+Cada tipo package → integración nativa requiere:
+1. Tipo Kyle (`final class`) directamente en runtime
+2. Builtins registrados en compilador (sin `extern fn` manuales)
+3. Sin `from X import Y` — disponibles globalmente
+
+| Package actual | Tipo nativo | Runtime status |
+|---------------|-------------|----------------|
+| `from datetime import datetime` | `DateTime` | ✅ `kyc_runtime/src/datetime.rs` |
+| `from datetime import duration` | `Duration` | ✅ en datetime.rs |
+| `from date import date` | `Date` | ✅ `kyc_runtime/src/date.rs` |
+| `from date import time` | `Time` | ✅ en date.rs |
+| `from bytes import bytes` | `Bytes` | ✅ `kyc_runtime/src/bytes.rs` |
+| `from decimal import decimal` | `Decimal` | ✅ `kyc_runtime/src/decimal.rs` |
+| `from uuid import uuid` | `Uuid` | ✅ `kyc_runtime/src/uuid.rs` |
+| `from url import url` | `Url` | ✅ `kyc_runtime/src/url.rs` |
+| `from regex import regex` | `Regex` | ✅ `kyc_runtime/src/regex.rs` |
+| `ky_getenv`/`ky_setenv` | `Env` | ✅ `kyc_runtime/src/string.rs` |
+
+### Fase 3: Tipos I/O nativos
+
+| Tipo | Estado | Necesita |
+|------|--------|----------|
+| `File` | ❌ fd i32 | `final class File` + métodos read/write/close/seek |
+| `Socket` | ❌ fd i32 | `final class Socket` + listen/accept/connect |
+| `Path` | ❌ str | `final class Path` + join/dirname/basename/exists |
+| `Json` | ❌ functions | `final class Json` + parse/stringify methods |
+
+### Fase 4: Colecciones faltantes
+
+| Tipo | Estado | Notas |
+|------|--------|-------|
+| `Set<T>` | 🔶 | Type enum existe. Falta: parser, MirType, runtime hash set |
+| `Queue<T>` | ❌ | FIFO. Runtime simple (ring buffer) |
+| `Stack<T>` | ❌ | LIFO. `{T}` con push/pop ya es stack |
+| `slice` | ❌ | Vista de array existente `&[T]`. Necesario para pasar arrays sin copiar |
+
+### Fase 5: Concurrencia nativa
+
+| Tipo | Estado | Notas |
+|------|--------|-------|
+| `Channel<T>` | 🔶 | Runtime listo. Falta tipo Kyle genérico |
+| `Mutex<T>` | ❌ | Para threads. Runtime Rust ya tiene |
+| `AtomicI64` / `AtomicBool` | ❌ | Operaciones lock-free |
+| `Future<T>` | ❌ | Handle tipado para async |
+| `Iterator` | 🔶 | KlIter existe en runtime. Falta tipo Kyle |
+| `select` | ❌ | Multiplexor de canales |
+
+### Fase 6: Smart pointers
+
+| Tipo | Notas |
+|------|-------|
+| `Box<T>` | Heap pointer simple. Ya existe `ky_alloc` para raw |
+| `Rc<T>` | Single-thread reference counting |
+| `Arc<T>` | Multi-thread atomic refcount |
+| `Weak<T>` | Weak reference (evita ciclos Rc/Arc) |
+
+---
+
+## Estado actual del lenguaje
+
+| Categoría | Completado | En progreso | Pendiente |
+|-----------|:----------:|:-----------:|:---------:|
+| Primitivos | 10/17 | 4 (u8-u64) | 3 (byte, void, never) |
+| Compuestos | 9/15 | 1 (tuple) | 5 (Set, Queue, Stack, Deque, LinkedList) |
+| Ownership | 3/7 | 0 | 4 (Box, Rc, Arc, Weak) |
+| Concurrencia | 3/13 | 2 (Channel, Iterator) | 8 (Future, select, Mutex, RwLock, Atomic*2, Barrier, Condvar) |
+| Especializados nativos | 0/15 | 10 (migrar de packages) | 5 (File, Socket, Path, Json, BigInt) |
+| **Total** | **~25** | **~17** | **~25** |
