@@ -2,7 +2,7 @@
 
 Formal specification of the Kyle programming language.
 
-Status: 10/15 completos [x], 5 con bugs [ ]. Cada doc tiene su status al inicio.
+Status: 12/15 completos [x], 3 con bugs [ ] (static fn, patterns range, error-handling). Cada doc tiene su status al inicio.
 
 | Document | Description |
 |-----------|-------------|

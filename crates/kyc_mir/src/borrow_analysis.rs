@@ -524,18 +524,21 @@ impl BorrowAnalysis {
                                 }
                             }
                             _ => {
-                                // MOVE (default)
-                                self.check_alive(*l, alive, local_names, local_types, "move");
-                                if alive.contains(l) {
-                                    alive.remove(l);
+                                // Builtins NOT in func_map: assume they DON'T consume Move args
+                                if modes.is_some() {
+                                    // MOVE (default for user-defined functions)
+                                    self.check_alive(*l, alive, local_names, local_types, "move");
+                                    if alive.contains(l) {
+                                        alive.remove(l);
+                                    }
+                                    let orig = *load_map.get(l).unwrap_or(l);
+                                    if alive.contains(&orig) && *l != orig {
+                                        self.check_alive(orig, alive, local_names, local_types, "move");
+                                        alive.remove(&orig);
+                                    }
+                                    // A move releases all borrows on the source
+                                    borrow_states.remove(&orig);
                                 }
-                                let orig = *load_map.get(l).unwrap_or(l);
-                                if alive.contains(&orig) && *l != orig {
-                                    self.check_alive(orig, alive, local_names, local_types, "move");
-                                    alive.remove(&orig);
-                                }
-                                // A move releases all borrows on the source
-                                borrow_states.remove(&orig);
                             }
                         }
                     }

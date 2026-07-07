@@ -31,7 +31,7 @@ extern fn ky_strlen(s: ptr) i32
 
 fn main() i32:
     sb := ky_str_builder_new(50000)
-    i: &i32 = 0
+    i: ^i32 = 0
     while i < 50000:
         ky_str_builder_append(sb, "x", 1)
         i = i + 1

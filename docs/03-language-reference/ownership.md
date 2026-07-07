@@ -1,6 +1,6 @@
 # Ownership
 
-**Status:** [ ] Propuesto para v0.6 — `^` = mutable, `&` = borrow, move por defecto.
+**Status:** [x] `^` = mutable, `&` = borrow, `^&` = mutable borrow, move por defecto. Borrow checker implementado.
 
 ## Reglas
 
@@ -88,13 +88,13 @@ class Point:
         poll_events(&this)   # autoreferencia con this
 ```
 
-## Borrow checker (implementación futura)
+## Borrow checker (implementado)
 
-El borrow checker validará:
+El borrow checker valida:
 
-1. **Use-after-move**: `y = x; println(x)` → error.
-2. **Dangling references**: `x = &y; drop(y); println(x)` → error.
-3. **Aliasing mutability**: `r1 = ^&x; r2 = &x` → error (uno mutable + otro inmutable).
+1. ✅ **Use-after-move**: `y = x; println(x)` → error.
+2. ✅ **Aliasing mutability**: `r1 = ^&x; r2 = &x` → error (uno mutable + otro inmutable).
+3. 🔶 **Dangling references**: `x = &y; drop(y); println(x)` — pendiente.
 
 ## Comparación con Rust
 

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("matmul")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b3f6c63648427c6c0cc2f76adba4d56f38aa4b0f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ba9f2d6f65cf293c460184acdcdcb22ed17d38be")]
 [assembly: System.Reflection.AssemblyProductAttribute("matmul")]
 [assembly: System.Reflection.AssemblyTitleAttribute("matmul")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

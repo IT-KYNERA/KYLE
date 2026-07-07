@@ -33,7 +33,7 @@
 - [ ] `ky fmt` (no args, in project dir) — formats all `src/*.ky` and `tests/*.ky`
 - [ ] `ky fmt src/` — formats all `.ky` in directory
 - [ ] Roundtrip idempotency: `ky fmt file.ky && ky fmt --check file.ky` passes
-- [ ] `&T` syntax preserved (mutable variables)
+- [ ] `^T` syntax preserved (mutable variables)
 - [ ] `:=` syntax preserved (compile-time constants)
 - [ ] `final class` preserved
 - [ ] `abstract class` preserved

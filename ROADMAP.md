@@ -66,14 +66,14 @@ kyc_tools/         ✅ LSP, formatter, package manager
 | 4 | Parser | ✅ |
 | 5 | HIR + desugaring | ✅ |
 | 6 | Semantic analysis (type checker, scope) | ✅ |
-| 7 | Borrow semantics (ownership, move, copy) | ✅ |
+| 7 | Borrow semantics (ownership, move, copy, borrow checker) | ✅ **v0.6** |
 | 8 | Backend release mode (LLVM, binary output) | ✅ |
 | 9 | Async scheduler V2 (thread pool) | ✅ |
 | 10 | Iterators — 17 list methods (map, filter, fold, etc.) | ✅ |
 | 11 | Package manager (registry, cache, lock, publish, login) | ✅ |
 | 12 | Tooling (LSP, VS Code extension, formatter, test framework) | ✅ |
 | 13 | Complete syntax (generics, ranges, match, operator overloading, is, ptr, for-else, static fn, **) | ✅ |
-| 14 | References and borrow checker (&T, ^T, field mutability) | ✅ |
+| 14 | References and borrow checker (`^T` mutable, `&T` borrow, `^&T` mut borrow, field mutability) | ✅ **v0.6** |
 | 15 | SSA form (mem2reg, phi nodes, GVN, dominator fix) | ✅ |
 | 16 | LLVM IR quality (nsw, TBAA, inbounds, readonly, noalias, noundef, !range, align, lifetime) | ✅ |
 | 17 | Optimization pipeline (O3, constant folding, alloca elimination, nsw verification) | ✅ |
@@ -496,61 +496,27 @@ diff <(ky-step1) <(ky-step2)  # bootstrap completado!
 
 ---
 
-## 🚀 Plan de ejecución v0.6 — Nuevo modelo ownership
+## ✅ Completado — v0.6 Nuevo modelo ownership
 
-### Fase 1: Parser — `^` como mutable, `&` como borrow
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| 1 | Parser: `^` mutable, `&` borrow, move default | ✅ |
+| 2 | Semantic: type inference para nuevo ownership | ✅ |
+| 3 | HIR + MIR: lowering con move por defecto | ✅ |
+| 4 | Borrow checker: use-after-move, one mut XOR many immut | ✅ |
+| 5 | Benchmarks/packages actualizados | ✅ |
+| 6 | `^T` move antiguo eliminado | ✅ |
 
-| Archivo | Cambio |
-|---------|--------|
-| `kyc_frontend/src/parser.rs` | `^T` en tipos → `AstType::Mutable { inner: T }`. `&T` en parámetros/expresiones → `AstType::Borrow { inner: T }`. `x: ^T = v` → `TypedVariable` con is_mutable. `f(&x)` → nuevo `Expr::Borrow` |
-| `kyc_core/src/ast.rs` | Nuevos variants: `AstType::Borrow`, `Expr::Borrow` |
+### Resumen de cambios v0.6
 
-### Fase 2: Semantic — inferir move vs borrow
-
-| Archivo | Cambio |
-|---------|--------|
-| `kyc_semantic/src/type_checker.rs` | `Expr::Borrow` → tipo `&T`. Variable `^T` → permitir reasignación. `y = x` con tipo Move → marcar `x` como moved |
-| `kyc_semantic/src/symbol_table.rs` | Registrar símbolos con ownership flag: `Owned`, `Borrowed`, `Moved` |
-| `kyc_semantic/src/scope.rs` | Detectar `x` en `y = x` → marcar para borrow check |
-
-### Fase 3: HIR + MIR — lower con nuevo ownership
-
-| Archivo | Cambio |
-|---------|--------|
-| `kyc_hir/src/lib.rs` | `Expr::Borrow` pass-through |
-| `kyc_mir/src/lower.rs` | `^T` variable → generar Alloca normal (cero cambio, `^` es semántico). `f(&x)` → generar Load (borrow, no move). `y = x` para Move types → sin Load extra (x pasa a `Moved`) |
-| `kyc_mir/src/mir.rs` | Nuevo `MirInst::Borrow { dest, src }` si necesario (para borrows explícitos) |
-
-### Fase 4: Borrow checker
-
-| Archivo | Cambio |
-|---------|--------|
-| `kyc_mir/src/borrow_analysis.rs` | Detectar use-after-move. Validar one mutable XOR many immutable. No dangling references |
-| `kyc_semantic/src/type_checker.rs` | Reportar errores: "use of moved value", "cannot borrow as mutable", "borrow after move" |
-
-### Fase 5: Actualizar benchmarks y ejemplos
-
-| Archivo | Cambio |
-|---------|--------|
-| `benchmarks/**/*.ky` | `&i32` → `^i32`. Eliminar `^s` en params (move es default). Agregar `&` donde sea borrow |
-| `examples/**/*.ky` | Ídem |
-| `packages/http/src/*.ky` | Ídem |
-
-### Fase 6: Eliminar `^T` como move explícito (obsoleto)
-
-El syntax `fn f(^s: str)` ya no es necesario porque move es default. Se elimina del parser.
-
-### Timeline estimado
-
-| Fase | Descripción | Esfuerzo |
-|------|-------------|----------|
-| 1 | Parser (`^` mutable, `&` borrow) | 1-2 días |
-| 2 | Semantic (type inference + ownership tracking) | 2-3 días |
-| 3 | HIR + MIR lowering | 1-2 días |
-| 4 | Borrow checker validación | 3-4 días |
-| 5 | Actualizar benchmarks/ejemplos | 1 día |
-| 6 | Eliminar `^T` move antiguo | 0.5 día |
-| **Total** | | **~10 días** |
+| Antes | Después |
+|-------|---------|
+| `y = x` = borrow | `y = x` = **move** |
+| `fn f(s: str)` = borrow | `fn f(s: str)` = **move** |
+| `fn f(^s: str)` = move | Eliminado (move es default) |
+| `fn f(&s: str)` = mutable | `fn f(s: &str)` = **borrow** |
+| `x: &T = val` = mutable | `x: ^T = val` = **mutable** |
+| `f(&x)` = mutable ref | `f(&x)` = **borrow**, `f(^&x)` = mutable borrow |
 
 ---
 

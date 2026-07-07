@@ -359,7 +359,7 @@ Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-langua
 | 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia. Sin `this` obligatorio |
 | 8 | [enums.md](docs/03-language-reference/enums.md) | [x] | Enum con variants, match con `Enum.Variant` |
 | 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class Box<T>`, `fn identity<T>`, `Box<T> {value: 7}`, `identity<i32>(42)` |
-| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [ ] | **v0.6 redesign**: `^` = mutable, `&` = borrow, move por defecto |
+| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [x] | `^` = mutable, `&` = borrow, move por defecto, borrow checker |
 | 11 | [pattern-matching.md](docs/03-language-reference/pattern-matching.md) | [ ] | `..=` range pattern no existe. `1 \| 2` or-pattern no funciona. Match básico con `_:` sí |
 | 12 | [error-handling.md](docs/03-language-reference/error-handling.md) | [ ] | `-> Type` syntax no existe. `ok(v)`/`error(e)` result match no funciona. `return -1` sí |
 | 13 | [modules.md](docs/03-language-reference/modules.md) | [x] | `from X import Y` funciona (con packages instalados). `import X` funciona |

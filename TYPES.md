@@ -97,9 +97,9 @@ Tipos Copy se duplican solos en asignación. Tipos Move transfieren ownership.
 
 | # | Tipo | Copy? | Estado | Cómo se usa | Notas |
 |---|------|-------|--------|-------------|-------|
-| 35 | `^T` (**nuevo**: mutable) | — | 🔶 | `x: ^str = "hola"` | Marca variable como mutable. `^` en tipo |
-| 36 | `&T` (**nuevo**: borrow) | ✅ Copy | 🔶 | `f(&x)` / `fn f(x: &str)` | Borrow inmutable. `&` en expr o param |
-| 37 | `^&T` (**nuevo**: mut borrow) | ✅ Copy | 🔶 | `f(^&x)` / `fn f(x: ^&str)` | Borrow mutable. Compone `^` + `&` |
+| 35 | `^T` (mutable) | — | ✅ | `x: ^str = "hola"` | Marca variable como mutable. `^` en tipo |
+| 36 | `&T` (borrow) | ✅ Copy | ✅ | `f(&x)` / `fn f(x: &str)` | Borrow inmutable. `&` en expr o param |
+| 37 | `^&T` (mut borrow) | ✅ Copy | ✅ | `f(^&x)` / `fn f(x: ^&str)` | Borrow mutable. Compone `^` + `&` |
 | 38 | `Box<T>` | 🚫 Move | ❌ | — | Heap allocation explícita |
 | 39 | `Rc<T>` | ✅ Copy | ❌ | — | Reference counting (single-thread) |
 | 40 | `Arc<T>` | ✅ Copy | ❌ | — | Atomic reference counting (multi-thread) |
@@ -238,7 +238,7 @@ counter.fetch_add(1)            # operación atómica
 
 | Prioridad | Área | Items |
 |-----------|------|-------|
-| **P0** | Ownership nuevo | `^` = mutable, `&` = borrow, move por defecto, borrow checker |
+| **P0** | Ownership nuevo | ✅ Completado en v0.6 — `^` = mutable, `&` = borrow, move por defecto, borrow checker |
 | **P1** | Integrar runtime | `DateTime`, `Duration`, `Uuid`, `Url`, `Regex`, `Bytes`, `Decimal` |
 | **P2** | Colecciones | `Set<T>`, `Queue<T>`, `Stack<T>` |
 | **P3** | Concurrencia | `Channel<T>` tipado, `Mutex<T>`, `Atomic*`, `select` |

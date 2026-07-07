@@ -14,7 +14,7 @@ One way to do each thing. No exceptions.
 
 ## 4. Zero-cost performance
 
-Borrow semantics by default, ownership via `^`. No GC, no implicit refcounting. You don't pay for what you don't use.
+Move by default, borrow via `&`, mutable via `^`. No GC, no implicit refcounting. You don't pay for what you don't use.
 
 ## 5. Syntactic consistency
 

@@ -1,6 +1,6 @@
 # Types
 
-## Copy vs Move semantics [ ]
+## Copy vs Move semantics [x]
 
 | Semántica | Tipos |
 |-----------|-------|
@@ -55,7 +55,7 @@ fn divide(a: i32, b: i32) i32!:
     a / b
 ```
 
-### Mutable: `^T` [ ]
+### Mutable: `^T` [x]
 
 Marks a variable, parameter, or field as mutable. `^` es semántico — cero overhead.
 
@@ -65,7 +65,7 @@ fn increment(x: ^&i32):   # ^& = mutable borrow
     x = x + 1
 ```
 
-### Borrow: `&T` [ ]
+### Borrow: `&T` [x]
 
 Referencia (préstamo) que no transfiere ownership.
 
@@ -79,7 +79,7 @@ fn main():
     println(s)               # ✅ s usable
 ```
 
-### Mutable borrow: `^&T` [ ]
+### Mutable borrow: `^&T` [x]
 
 Compone `^` (mutable) + `&` (borrow):
 
@@ -93,7 +93,7 @@ fn main():
     println(buf)             # "datos"
 ```
 
-### Move por defecto [ ]
+### Move por defecto [x]
 
 Por defecto, `y = x` mueve ownership para tipos no-Copy.
 
@@ -104,7 +104,7 @@ println(s)     # ERROR
 t = s.clone()  # COPY explícita
 ```
 
-### Copy types [ ]
+### Copy types [x]
 
 Tipos numéricos se copian automáticamente. `y = x` deja ambos vivos.
 
