@@ -2,9 +2,6 @@ use kyc_core::ast::ParamMode;
 /// Borrow/ownership analysis pass.
 ///
 /// Tracks move/borrow state for each value:
-/// - Parameters are borrowed by default (`s: T`)
-/// - `&T` params are mutably borrowed
-/// - `^T` params are moved
 /// - Copy types (primitives): passed by value, no tracking needed
 /// - Move types (heap-allocated): single owner, freed when scope exits
 ///
@@ -17,6 +14,13 @@ use kyc_core::ast::ParamMode;
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use crate::mir::*;
+
+#[derive(Clone, Copy, PartialEq)]
+enum BorrowState {
+    NotBorrowed,
+    ImmBorrowed(u32),
+    MutBorrowed,
+}
 
 pub struct BorrowAnalysis {
     errors: Vec<String>,
@@ -339,15 +343,21 @@ impl BorrowAnalysis {
 
         let mut to_insert: Vec<(usize, usize)> = Vec::new();
 
+        let mut borrow_states: HashMap<usize, BorrowState> = HashMap::new();
+
         for (block_idx, block) in func.basic_blocks.iter().enumerate() {
             let mut alive = if block_idx < alive_in.len() {
                 alive_in[block_idx].clone()
             } else {
                 BTreeSet::new()
             };
+            // Reset borrow states at block boundary (conservative: borrows don't cross blocks)
+            if block_idx > 0 {
+                borrow_states.clear();
+            }
 
             for inst in &block.insts {
-                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types, func_map, &load_map);
+                self.process_inst(inst, &mut alive, &move_locals, &local_names, &local_types, func_map, &load_map, &mut borrow_states);
             }
 
             // Handle terminator
@@ -421,6 +431,7 @@ impl BorrowAnalysis {
         local_types: &HashMap<usize, MirType>,
         func_map: &std::collections::HashMap<String, Vec<ParamMode>>,
         load_map: &HashMap<usize, usize>,
+        borrow_states: &mut HashMap<usize, BorrowState>,
     ) {
         match inst {
             MirInst::Alloca { dest, type_, .. } => {
@@ -469,21 +480,63 @@ impl BorrowAnalysis {
                 let modes = func_map.get(name);
                 for (i, arg) in args.iter().enumerate() {
                     if let MirValue::Local(l) = arg {
-                        let is_borrow = modes.map_or(false, |m| i < m.len() && (m[i] == ParamMode::Borrow || m[i] == ParamMode::MutableBorrow));
-                        if !is_borrow {
-                            self.check_alive(*l, alive, local_names, local_types, "move");
-                            if alive.contains(l) {
-                                alive.remove(l);
+                        let mode = modes.and_then(|m| m.get(i).copied());
+                        match mode {
+                            Some(ParamMode::Borrow) => {
+                                self.check_alive(*l, alive, local_names, local_types, "borrow");
+                                // Determine the original source: prefer load_map, fallback to arg itself
+                                let orig = *load_map.get(l).unwrap_or(l);
+                                let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
+                                match state {
+                                    BorrowState::MutBorrowed => {
+                                        self.errors.push(format!(
+                                            "cannot borrow `{}` immutably — it is already mutably borrowed",
+                                            local_names.get(&orig).cloned().unwrap_or_default()
+                                        ));
+                                    }
+                                    _ => {
+                                        let count = if let BorrowState::ImmBorrowed(c) = state { c + 1 } else { 1 };
+                                        borrow_states.insert(orig, BorrowState::ImmBorrowed(count));
+                                    }
+                                }
                             }
-                            // Also mark the original source of a Load alias as consumed, if still alive
-                            if let Some(&orig) = load_map.get(l) {
-                                if alive.contains(&orig) {
+                            Some(ParamMode::MutableBorrow) => {
+                                self.check_alive(*l, alive, local_names, local_types, "mut borrow");
+                                // Determine the original source
+                                let orig = *load_map.get(l).unwrap_or(l);
+                                let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
+                                match state {
+                                    BorrowState::NotBorrowed => {
+                                        borrow_states.insert(orig, BorrowState::MutBorrowed);
+                                    }
+                                    BorrowState::ImmBorrowed(c) => {
+                                        self.errors.push(format!(
+                                            "cannot mutably borrow `{}` — it is already borrowed immutably ({} borrows active)",
+                                            local_names.get(&orig).cloned().unwrap_or_default(), c
+                                        ));
+                                    }
+                                    BorrowState::MutBorrowed => {
+                                        self.errors.push(format!(
+                                            "cannot mutably borrow `{}` — it is already mutably borrowed",
+                                            local_names.get(&orig).cloned().unwrap_or_default()
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {
+                                // MOVE (default)
+                                self.check_alive(*l, alive, local_names, local_types, "move");
+                                if alive.contains(l) {
+                                    alive.remove(l);
+                                }
+                                let orig = *load_map.get(l).unwrap_or(l);
+                                if alive.contains(&orig) && *l != orig {
                                     self.check_alive(orig, alive, local_names, local_types, "move");
                                     alive.remove(&orig);
                                 }
+                                // A move releases all borrows on the source
+                                borrow_states.remove(&orig);
                             }
-                        } else {
-                            self.check_alive(*l, alive, local_names, local_types, "use");
                         }
                     }
                 }
