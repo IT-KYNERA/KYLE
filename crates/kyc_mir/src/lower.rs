@@ -3777,6 +3777,43 @@ impl Lowerer {
                         ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::Char });
                         return ctx;
                     }
+                    // Option<T> methods: is_some, is_none, unwrap
+                    if (property == "is_some" || property == "is_none") && arguments.is_empty() {
+                        // Option is stored as {disc: i32, payload: i64}
+                        let struct_type = MirType::Struct("__option".to_string(), vec![
+                            ("disc".to_string(), MirType::I32),
+                            ("payload".to_string(), MirType::I64),
+                        ]);
+                        let disc_ptr = ctx.alloc_local("_odp", MirType::Ptr(Box::new(MirType::I32)));
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: disc_ptr, ptr: obj_local, field_index: 0,
+                            struct_type: Box::new(struct_type),
+                        });
+                        let disc = ctx.alloc_local("_od", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Load { dest: disc, src: disc_ptr });
+                        let zero = ctx.alloc_local("_oz", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Store { dest: zero, value: MirValue::Constant(MirConstant::I32(0)) });
+                        let eq = ctx.alloc_local("_oe", MirType::Bool);
+                        ctx.current_block.insts.push(MirInst::BinaryOp {
+                            dest: eq, op: if property == "is_some" { MirBinaryOp::Neq } else { MirBinaryOp::Eq },
+                            left: MirValue::Local(disc), right: MirValue::Local(zero),
+                        });
+                        return ctx;
+                    }
+                    if property == "unwrap" && arguments.is_empty() {
+                        let struct_type = MirType::Struct("__option".to_string(), vec![
+                            ("disc".to_string(), MirType::I32),
+                            ("payload".to_string(), MirType::I64),
+                        ]);
+                        let payload_ptr = ctx.alloc_local("_opp", MirType::Ptr(Box::new(MirType::I64)));
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: payload_ptr, ptr: obj_local, field_index: 1,
+                            struct_type: Box::new(struct_type),
+                        });
+                        let payload = ctx.alloc_local("_op", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Load { dest: payload, src: payload_ptr });
+                        return ctx;
+                    }
                     if property == "to_bool" && arguments.is_empty() {
                         let result = ctx.alloc_local("_tb", MirType::Bool);
                         ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::Bool });
@@ -4982,33 +5019,49 @@ impl Lowerer {
                         ctx = self.lower_expr(ctx, value);
                         let tuple_local = ctx.next_local - 1;
                         let tuple_type = ctx.local_types.get(&tuple_local).cloned().unwrap_or(MirType::I32);
-                        if let MirType::Struct(ref _sname, ref fields) = tuple_type {
-                            for (i, target_elem) in target_elems.iter().enumerate() {
-                                if let Expr::Identifier { name, .. } = target_elem {
-                                    if i < fields.len() {
-                                        let field_type = fields[i].1.clone();
-                                        let fptr = ctx.alloc_local("_tfptr", MirType::I64);
-                                        ctx.current_block.insts.push(MirInst::FieldPtr {
-                                            dest: fptr,
-                                            ptr: tuple_local,
-                                            field_index: i,
-                                            struct_type: Box::new(tuple_type.clone()),
-                                        });
-                                        let val = ctx.alloc_local("_tval", field_type.clone());
-                                        ctx.current_block.insts.push(MirInst::Load {
-                                            dest: val,
-                                            src: fptr,
-                                        });
-                                        let local = ctx.alloc_local(name, field_type);
-                                        ctx.locals.insert(name.clone(), local);
-                                        ctx.current_block.insts.push(MirInst::Store {
-                                            dest: local,
-                                            value: MirValue::Local(val),
-                                        });
-                                    }
-                                }
-                            }
-                        }
+                         if let MirType::Struct(ref _sname, ref fields) = tuple_type {
+                             for (i, target_elem) in target_elems.iter().enumerate() {
+                                 if let Expr::Identifier { name, .. } = target_elem {
+                                     if i < fields.len() {
+                                         let field_type = fields[i].1.clone();
+                                         let fptr = ctx.alloc_local("_tfptr", MirType::I64);
+                                         ctx.current_block.insts.push(MirInst::FieldPtr {
+                                             dest: fptr, ptr: tuple_local, field_index: i,
+                                             struct_type: Box::new(tuple_type.clone()),
+                                         });
+                                         let val = ctx.alloc_local("_tval", field_type.clone());
+                                         ctx.current_block.insts.push(MirInst::Load { dest: val, src: fptr });
+                                         let local = ctx.alloc_local(name, field_type);
+                                         ctx.locals.insert(name.clone(), local);
+                                         ctx.current_block.insts.push(MirInst::Store { dest: local, value: MirValue::Local(val) });
+                                     }
+                                 }
+                             }
+                         }
+                         if let MirType::List(ref elem_type) = tuple_type {
+                             for (i, target_elem) in target_elems.iter().enumerate() {
+                                 if let Expr::Identifier { name, .. } = target_elem {
+                                     let idx_i64 = ctx.alloc_local("_ldi", MirType::I64);
+                                     ctx.current_block.insts.push(MirInst::Store {
+                                         dest: idx_i64, value: MirValue::Constant(MirConstant::I64(i as i64)),
+                                     });
+                                     let raw = ctx.alloc_local("_ldr", MirType::I64);
+                                     ctx.current_block.insts.push(MirInst::Call {
+                                         dest: Some(raw), name: "ky_list_get".to_string(),
+                                         args: vec![MirValue::Local(tuple_local), MirValue::Local(idx_i64)],
+                                     });
+                                     let field_type = elem_type.as_ref().clone();
+                                     let val = if field_type != MirType::I64 {
+                                         let cast = ctx.alloc_local("_ldc", field_type.clone());
+                                         ctx.current_block.insts.push(MirInst::Cast { dest: cast, value: MirValue::Local(raw), to_type: field_type.clone() });
+                                         cast
+                                     } else { raw };
+                                     let local = ctx.alloc_local(name, field_type.clone());
+                                     ctx.locals.insert(name.clone(), local);
+                                     ctx.current_block.insts.push(MirInst::Store { dest: local, value: MirValue::Local(val) });
+                                 }
+                             }
+                         }
                     }
                 }
                 ctx
