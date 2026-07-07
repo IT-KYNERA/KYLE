@@ -2240,8 +2240,8 @@ impl Lowerer {
                                 ctx.current_block = MirBasicBlock::new(next_target);
                             }
                         }
-                        Pattern::Range { .. } => {
-                            // Range: treat as wildcard for now (always matches)
+                        Pattern::Range { .. } | Pattern::Tuple { .. } => {
+                            // Range/Tuple: treat as wildcard for now (always matches)
                             ctx.finish_block(MirTerminator::Br(arm_label.clone()));
                             ctx.current_block = MirBasicBlock::new(arm_label.clone());
                         }
@@ -6188,7 +6188,7 @@ impl Lowerer {
                         ctx.fresh_block()
                     };
                     match &arm.pattern {
-                        Pattern::Range { .. } | Pattern::IsType { .. } | Pattern::Wildcard { .. } | Pattern::Identifier { .. } => {
+                        Pattern::Tuple { .. } | Pattern::Range { .. } | Pattern::IsType { .. } | Pattern::Wildcard { .. } | Pattern::Identifier { .. } => {
                             if let Some(guard) = &arm.guard {
                                 let guard_label = ctx.fresh_block();
                                 ctx.finish_block(MirTerminator::Br(guard_label.clone()));

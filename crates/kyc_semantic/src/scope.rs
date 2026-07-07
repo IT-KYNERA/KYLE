@@ -160,6 +160,11 @@ impl ScopeResolver {
                 }
             }
             Pattern::Range { .. } => {} // range patterns don't bind names
+            Pattern::Tuple { elements, .. } => {
+                for e in elements {
+                    self.bind_pattern(e);
+                }
+            }
             _ => {}
         }
     }
