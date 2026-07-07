@@ -2505,6 +2505,12 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("sitofp: {}", e))?
                                         .as_basic_value_enum()
                                 }
+                                (BasicValueEnum::FloatValue(float_val), BasicTypeEnum::FloatType(t)) => {
+                                    // Float → Float: fpext/fptrunc
+                                    self.builder.build_float_cast(*float_val, *t, "_ffcast")
+                                        .map_err(|e| format!("ffcast: {}", e))?
+                                        .as_basic_value_enum()
+                                }
                                 (BasicValueEnum::FloatValue(float_val), BasicTypeEnum::IntType(i)) => {
                                     // Float → Integer: fptosi
                                     self.builder.build_float_to_signed_int(*float_val, *i, "_fptosi")

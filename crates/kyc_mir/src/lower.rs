@@ -3688,34 +3688,26 @@ impl Lowerer {
                                 args: vec![MirValue::Local(obj_local)],
                             });
                             return ctx;
-                        } else if matches!(id_type, MirType::F32) {
-                            // F32 → i64 (bitcast) → ky_f32_to_str(i64) → str
-                            let i32_val = ctx.alloc_local("_f32i", MirType::I32);
-                            ctx.current_block.insts.push(MirInst::Cast { dest: i32_val, value: MirValue::Local(obj_local), to_type: MirType::I32 });
-                            let i64_val = ctx.alloc_local("_f32i64", MirType::I64);
-                            ctx.current_block.insts.push(MirInst::Cast { dest: i64_val, value: MirValue::Local(i32_val), to_type: MirType::I64 });
-                            let result = ctx.alloc_local("_ts", MirType::Str);
-                            ctx.string_locals.push(result);
-                            ctx.current_block.insts.push(MirInst::Call {
-                                dest: Some(result), name: "ky_f32_to_str".to_string(),
-                                args: vec![MirValue::Local(i64_val)],
-                            });
-                            return ctx;
-                        } else if id_type == MirType::F64 {
+                        } else if matches!(id_type, MirType::F32 | MirType::F64) {
+                            // F32/F64 → F64 → ky_f64_to_str(str)
+                            let f64_val = if id_type == MirType::F32 {
+                                let c = ctx.alloc_local("_f2f", MirType::F64);
+                                ctx.current_block.insts.push(MirInst::Cast { dest: c, value: MirValue::Local(obj_local), to_type: MirType::F64 });
+                                MirValue::Local(c)
+                            } else { MirValue::Local(obj_local) };
                             let result = ctx.alloc_local("_ts", MirType::Str);
                             ctx.string_locals.push(result);
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(result), name: "ky_f64_to_str".to_string(),
-                                args: vec![MirValue::Local(obj_local)],
+                                args: vec![f64_val],
                             });
                             return ctx;
                         } else {
-                            let i64_val = MirValue::Local(obj_local);
                             let result = ctx.alloc_local("_ts", MirType::Str);
                             ctx.string_locals.push(result);
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(result), name: "ky_i64_to_str".to_string(),
-                                args: vec![i64_val],
+                                args: vec![MirValue::Local(obj_local)],
                             });
                             return ctx;
                         }
