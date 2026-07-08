@@ -6,11 +6,11 @@
 ## Uso básico
 
 ```ky
-ch: i64 = ky_channel_new(16)      # canal con buffer de 16
-ky_channel_send(ch, 42)
-val: i64 = ky_channel_recv(ch)
-println(val.to_str())              # 42
-ky_channel_free(ch)
+ch: i64 = channel_new(16)       # canal con buffer de 16
+channel_send(ch, 42)
+val: i64 = channel_recv(ch)
+println(val.to_str())            # 42
+channel_free(ch)
 ```
 
 ## Productor-Consumidor
@@ -19,24 +19,24 @@ ky_channel_free(ch)
 fn productor(ch: i64):
     i: ^i64 = 0
     while i < 10:
-        ky_channel_send(ch, i)
+        channel_send(ch, i)
         i = i + 1
-    ky_channel_close(ch)
+    channel_close(ch)
 
 fn consumidor(ch: i64):
     loop:
-        val: i64 = ky_channel_recv(ch)
+        val: i64 = channel_recv(ch)
         if val == -1:    # señal de cierre
             break
         println(val.to_str())
 
 fn main() i32:
-    ch: i64 = ky_channel_new(16)
-    h1: i64 = ky_spawn_thread(productor as ptr, ch)
-    h2: i64 = ky_spawn_thread(consumidor as ptr, ch)
-    ky_join_thread(h1)
-    ky_join_thread(h2)
-    ky_channel_free(ch)
+    ch: i64 = channel_new(16)
+    h1: i64 = spawn_thread(productor as ptr, ch)
+    h2: i64 = spawn_thread(consumidor as ptr, ch)
+    join_thread(h1)
+    join_thread(h2)
+    channel_free(ch)
     0
 ```
 
@@ -44,12 +44,12 @@ fn main() i32:
 
 | Función | Descripción |
 |---------|-------------|
-| `ky_channel_new(capacity)` | Crear canal con buffer |
-| `ky_channel_send(ch, val)` | Enviar (bloquea si lleno) |
-| `ky_channel_recv(ch)` | Recibir (bloquea si vacío) |
-| `ky_channel_close(ch)` | Cerrar canal |
-| `ky_channel_len(ch)` | Elementos en buffer |
-| `ky_channel_free(ch)` | Liberar canal |
+| `channel_new(capacity)` | Crear canal con buffer |
+| `channel_send(ch, val)` | Enviar (bloquea si lleno) |
+| `channel_recv(ch)` | Recibir (bloquea si vacío) |
+| `channel_close(ch)` | Cerrar canal |
+| `channel_len(ch)` | Elementos en buffer |
+| `channel_free(ch)` | Liberar canal |
 
 ## Limitaciones actuales
 

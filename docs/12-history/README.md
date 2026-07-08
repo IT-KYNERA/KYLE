@@ -1,5 +1,9 @@
-# History
+# 12-history
 
-| Document | Description |
-|-----------|-------------|
-| [migration-guide.md](migration-guide.md) | Guide for migrating between versions |
+> Historial de versiones, guías de migración y features deprecadas.
+
+| Archivo | Descripción |
+|---------|-------------|
+| `changelog.md` | Registro de cambios por versión |
+| `migration-guides.md` | Guías para migrar entre versiones |
+| `deprecated.md` | Features deprecadas y eliminadas |

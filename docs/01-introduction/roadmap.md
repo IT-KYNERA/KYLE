@@ -91,7 +91,7 @@ Ejecutado en Apple M4 (ARM64). Compiladores: `clang -O3`, `rustc -O`, `ky build`
 | **Compile memory** | **7.0MB** | 18.9MB | 2.6MB | **2.7x vs Rust** |
 
 Kyle compite directamente con C y Rust en CPU-bound (primes, fib, mandelbrot).
-La brecha en strings se debe a que Kyle usa `ky_concat` (nueva alloc + copy en cada `+`).
+La brecha en strings se debe a que Kyle usa `str_concat` (nueva alloc + copy en cada `+`).
 Rust usa `String::push` que amplía el buffer existente.
 
 Kyle usa 2.7x menos RAM que Rust durante compilación (sin LTO).

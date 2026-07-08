@@ -1,7 +1,7 @@
 # Threads
 
 > Hilos del sistema operativo para paralelismo real.
-> Kyle expone hilos del SO mediante `ky_spawn_thread` / `ky_join_thread`.
+> Kyle expone hilos del SO mediante `spawn_thread` / `join_thread`.
 
 ## Uso básico
 
@@ -10,8 +10,8 @@ fn worker(n: i64) i64:
     n * 2
 
 fn main() i32:
-    h: i64 = ky_spawn_thread(worker as ptr, 21)
-    r: i64 = ky_join_thread(h)
+    h: i64 = spawn_thread(worker as ptr, 21)
+    r: i64 = join_thread(h)
     println(r.to_str())    # 42
     0
 ```
@@ -28,12 +28,12 @@ fn compute(n: i64) i64:
     result
 
 fn main() i32:
-    h1: i64 = ky_spawn_thread(compute as ptr, 1000000)
-    h2: i64 = ky_spawn_thread(compute as ptr, 2000000)
-    
-    r1: i64 = ky_join_thread(h1)
-    r2: i64 = ky_join_thread(h2)
-    
+    h1: i64 = spawn_thread(compute as ptr, 1000000)
+    h2: i64 = spawn_thread(compute as ptr, 2000000)
+
+    r1: i64 = join_thread(h1)
+    r2: i64 = join_thread(h2)
+
     println("total: " + (r1 + r2).to_str())
     0
 ```
@@ -42,8 +42,8 @@ fn main() i32:
 
 | Aspecto | Descripción |
 |---------|-------------|
-| Creación | `ky_spawn_thread(fn_ptr, arg)` |
-| Join | `ky_join_thread(handle)` bloquea hasta que termine |
+| Creación | `spawn_thread(fn_ptr, arg)` |
+| Join | `join_thread(handle)` bloquea hasta que termine |
 | Argumento | Un solo `i64` por hilo |
 | Retorno | `i64` desde cada hilo |
 | Stack | Stack dedicado por hilo (1 MB por defecto) |

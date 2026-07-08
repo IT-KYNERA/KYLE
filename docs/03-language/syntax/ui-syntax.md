@@ -36,9 +36,9 @@ El archivo `.ky` es opcional. Toda la lógica puede ir dentro del `.kyx`.
 ```kyle
 page("/login")
 
-<View>
-    <Text value="Login" />
-</View>
+<view>
+    <text value="Login" />
+</view>
 ```
 
 ---
@@ -46,9 +46,9 @@ page("/login")
 ## 4. Componente
 
 ```kyle
-<View>
-    <Text value="Hello" />
-</View>
+<view>
+    <text value="Hello" />
+</view>
 ```
 
 Sin `page(...)` → es un componente reutilizable.
@@ -60,7 +60,7 @@ Sin `page(...)` → es un componente reutilizable.
 Fragmentos pequeños con `@`:
 
 ```xml
-<Text value=@user.name />
+<text value=@user.name />
 ```
 
 Varias líneas con `@(...)`:
@@ -82,7 +82,7 @@ Varias líneas con `@(...)`:
 ```kyle
 @total = products.count
 
-<Text value=@total />
+<text value=@total />
 ```
 
 ---
@@ -91,14 +91,14 @@ Varias líneas con `@(...)`:
 
 ```xml
 @if(user.isAdmin):
-    <Button text="Delete" />
+    <button text="Delete" />
 ```
 
 ```xml
 @if(user.isAdmin):
-    <AdminPanel />
+    <admin_panel />
 @else:
-    <UserPanel />
+    <user_panel />
 ```
 
 ---
@@ -108,11 +108,11 @@ Varias líneas con `@(...)`:
 ```xml
 @match(state):
     Loading:
-        <Spinner />
+        <spinner />
     Success:
-        <Dashboard />
+        <dashboard />
     Error:
-        <ErrorView />
+        <error_view />
 ```
 
 ---
@@ -121,7 +121,7 @@ Varias líneas con `@(...)`:
 
 ```xml
 @for(product in products):
-    <ProductCard product=@product />
+    <product_card product=@product />
 ```
 
 ---
@@ -129,11 +129,11 @@ Varias líneas con `@(...)`:
 ## 10. Eventos
 
 ```xml
-<Button click=@login />
+<button click=@login />
 
-<TextField change=@on_change />
+<text_field change=@on_change />
 
-<TextField input=@on_input />
+<text_field input=@on_input />
 ```
 
 ---
@@ -141,7 +141,7 @@ Varias líneas con `@(...)`:
 ## 11. Binding
 
 ```xml
-<TextField bind=@email />
+<text_field bind=@email />
 ```
 
 ---
@@ -149,10 +149,10 @@ Varias líneas con `@(...)`:
 ## 12. Componentes hijos
 
 ```xml
-<Card>
-    <Text />
-    <Button />
-</Card>
+<card>
+    <text />
+    <button />
+</card>
 ```
 
 ---
@@ -169,14 +169,14 @@ slot Content
 Uso:
 
 ```xml
-<Card>
+<card>
     <header>
-        <Text value="Title" />
+        <text value="Title" />
     </header>
-    <Content>
-        <Text value="Body" />
-    </Content>
-</Card>
+    <content>
+        <text value="Body" />
+    </content>
+</card>
 ```
 
 Las páginas no admiten slots.
@@ -214,7 +214,7 @@ Canvas, Video, Audio, Map, Chart, WebView
 ## 16. Recursos (Style, Layout, Typography, Animation)
 
 ```kyle
-style<Button> Primary:
+style<button> Primary:
     background = theme.primary
     color = white
     radius = md
@@ -229,7 +229,7 @@ layout<Column> Center:
 Uso:
 
 ```xml
-<Button style=Primary />
+<button style=Primary />
 <Column layout=Center />
 ```
 
@@ -238,7 +238,7 @@ Uso:
 ## 17. Template
 
 ```kyle
-tpl<Button> Primary:
+tpl<button> Primary:
     style = primary_style
     animation = primary_animation
     cursor = pointer
@@ -248,7 +248,7 @@ tpl<Button> Primary:
 Uso:
 
 ```xml
-<Button tpl=Primary />
+<button tpl=Primary />
 ```
 
 ---
@@ -283,12 +283,12 @@ page("/login")
         print("login with " + email)
 )
 
-<View>
+<view>
     <Column layout=Center>
-        <Text value="Login" typography=Title />
-        <TextField bind=@email />
-        <PasswordField bind=@password />
-        <Button tpl=Primary text="Ingresar" click=@login />
+        <text value="Login" typography=Title />
+        <text_field bind=@email />
+        <password_field bind=@password />
+        <button tpl=Primary text="Ingresar" click=@login />
     </Column>
-</View>
+</view>
 ```
