@@ -1,36 +1,33 @@
-# Package Manager
+# Package Manager (Technical Reference)
 
-**Status:** Available
+> Documentación técnica del gestor de paquetes.
+> Para uso básico, ver `02-getting-started/package-manager.md`.
 
-## Commands
+## Comandos
 
-| Command | Description |
+| Comando | Descripción |
 |---------|-------------|
-| `ky add <dep>[@<ver>]` | Add a dependency |
-| `ky remove <dep>` | Remove a dependency |
-| `ky update` | Update lock file |
-| `ky publish` | Publish current package |
-| `ky login` | Login to package registry |
+| `ky add <pkg>` | Agregar dependencia |
+| `ky remove <pkg>` | Eliminar dependencia |
+| `ky install` | Instalar dependencias del proyecto |
+| `ky publish` | Publicar paquete en registry |
 
-## How it works
-
-1. Dependencies are declared in `ky.toml`
-2. `ky add` resolves versions, downloads packages, and writes `ky.lock`
-3. During compilation, packages' `src/` directories are added to the search path
-
-## Registry
-
-The default registry is `https://registry.kyle-lang.org/v1`. Override with `KL_REGISTRY` environment variable.
-
-## Package format
+## Formato del paquete
 
 ```
-package-name-1.0.0/
-├── ky.toml
-├── src/
-│   ├── lib.ky
-│   └── ...
-├── tests/
-├── README.md
-└── LICENSE
+package-name/
+├── ky.toml          # metadata del paquete
+└── src/
+    └── lib.ky       # código fuente
 ```
+
+## Registry URL
+
+```
+https://IT-KYNERA.github.io/KYLE/docs
+```
+
+## Ver también
+
+- `02-getting-started/package-manager.md` — Guía de uso
+- `08-ecosystem/registry.md` — Especificación del registry

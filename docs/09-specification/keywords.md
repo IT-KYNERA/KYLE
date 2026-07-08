@@ -1,3 +1,0 @@
-# Keywords
-
-> **Pendiente de contenido.**

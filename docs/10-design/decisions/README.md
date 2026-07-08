@@ -1,3 +1,0 @@
-# Decisions
-
-> **Pendiente de contenido.**

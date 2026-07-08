@@ -25,7 +25,7 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 |------|--------|
 | **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
 | **Syntax** | ✅ **Complete** — Generics, ranges, match, op overloading, is, ptr, for-else, static fn, ** |
-| **Borrow checker** | 🔶 **v0.6 redesign** — `^` = mutable, `&` = borrow, move por defecto. Ver `docs/03-language-reference/ownership.md` |
+| **Borrow checker** | 🔶 **v0.6 redesign** — `^` = mutable, `&` = borrow, move por defecto. Ver `docs/03-language/types/ownership.md` |
 | **Tooling** | ✅ **Complete** — LSP, VS Code ext, formatter, test framework, package manager |
 | **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** — Pure Kyle FFI to C libraries |
 | **Runtime in Kyle** | 🔶 **Phase A in progress** — 18/88 functions rewritten in pure Kyle |
@@ -43,9 +43,9 @@ See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 3. The docs are the **canonical source of truth** for all syntax
 
 **Key files to consult:**
-- `docs/03-language-reference/` — **Read this for ANY syntax question** (15 focused files)
-- `docs/06-reference/` — Quick lookup: keywords, operators, flags, CLI commands
-- `docs/04-platform/standard-library/` — Available built-in functions
+- `docs/03-language/` — **Read this for ANY syntax question** (8 subdirectories)
+- `docs/03-language/lexical/operators.md` — Quick lookup: keywords, operators
+- `docs/04-standard-library/` — Available built-in functions
 
 **This file (AGENTS.md) does NOT contain syntax reference.**
 Do not guess Kyle syntax — always check the docs.
@@ -89,10 +89,10 @@ ky/
 |---------|:-----:|---------|
 | [01-overview/](docs/01-overview/README.md) | 5 | Vision, philosophy, principles, layered architecture |
 | [02-guide/](docs/02-guide/README.md) | 7 | Tutorial: install, first program, testing, debugging, patterns, performance, CI/CD |
-| [03-language-reference/](docs/03-language-reference/README.md) | **15** | **Formal language specification** (read for ANY syntax question) |
-| [04-platform/](docs/04-platform/README.md) | 17 | Compiler CLI, build system, standard library (8 modules), tools, targets (WASM) |
+| [03-language/](docs/03-language/README.md) | **8 subdirectories** | **Formal language specification** (read for ANY syntax question) |
+| [04-standard-library/](docs/04-standard-library/README.md) | 22 | Standard library modules |
 | [05-packages/](docs/05-packages/README.md) | 4 | Official package specs: HTTP, JSON, SQLite, PostgreSQL |
-| [06-reference/](docs/06-reference/README.md) | 4 | Quick lookup: keywords, operators, flags, CLI commands |
+| [03-language/lexical/](docs/03-language/lexical/README.md) | 6 | Quick lookup: keywords, operators, tokens |
 | [07-engineering/](docs/07-engineering/README.md) | 5 | Compiler architecture, SSA, optimization pipeline, codegen |
 | [08-design/](docs/08-design/README.md) | 3 | ADRs, RFCs (architecture decisions, move semantics) |
 | [09-project/](docs/09-project/README.md) | 1 | Changelog |
@@ -102,9 +102,9 @@ ky/
 
 | You need... | Go to |
 |-------------|-------|
-| **ANY syntax question** | `docs/03-language-reference/` (15 focused files) |
-| Quick keyword/operator lookup | `docs/06-reference/` |
-| Compiler CLI flags | `docs/06-reference/cli-commands.md` + `docs/06-reference/compiler-flags.md` |
+| **ANY syntax question** | `docs/03-language/` (8 subdirectories) |
+| Quick keyword/operator lookup | `docs/03-language/lexical/` |
+| Compiler CLI flags | `docs/07-tools/compiler-cli.md` |
 | How to test | `docs/02-guide/testing.md` |
 | Standard library functions | `docs/04-platform/standard-library/overview.md` |
 | Package manager usage | `docs/05-packages/registry.md` |

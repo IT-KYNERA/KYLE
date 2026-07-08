@@ -1,3 +1,0 @@
-# Operators
-
-> **Pendiente de contenido.**

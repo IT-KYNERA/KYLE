@@ -1,3 +1,0 @@
-# Syntax
-
-> **Pendiente de contenido.**

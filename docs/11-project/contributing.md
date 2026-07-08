@@ -1,3 +1,0 @@
-# Contributing
-
-> **Pendiente de contenido.**
