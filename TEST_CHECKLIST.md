@@ -185,11 +185,11 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 68 | `y = x; println(x)` for str | Error: use-after-move | [ ] |
-| 69 | `f(x); println(x)` for str | Error: use-after-move via fn | [ ] |
-| 70 | `append(^&x); read(&x)` | Error: mut + immut borrow | [ ] |
-| 71 | `read(&x); read(&x)` | OK: multiple immut borrows | [ ] |
-| 72 | `f(&x); consume(x)` | OK: borrow then move | [ ] |
+| 68 | `y = x; println(x)` for str | Error: use-after-move | [x] |
+| 69 | `f(x); println(x)` for str | Error: use-after-move via fn | [x] |
+| 70 | `append(^&x); read(&x)` | Error: mut + immut borrow | [x] |
+| 71 | `read(&x); read(&x)` | OK: multiple immut borrows | [x] |
+| 72 | `f(&x); consume(x)` | OK: borrow then move | [x] |
 
 ---
 
@@ -201,7 +201,7 @@
 | 74 | `s.to_upper()` | Uppercase | [b] |
 | 75 | `s.to_lower()` | Lowercase | [b] |
 | 76 | `s.contains(sub)` | Contains substring | [x] |
-| 77 | `s.replace(a, b)` | Replace substring | [ ] |
+| 77 | `s.replace(a, b)` | Replace substring | [x] |
 | 78 | `s.substr(start, len)` | Substring | [x] |
 | 79 | `len(s)` | String length | [x] |
 
