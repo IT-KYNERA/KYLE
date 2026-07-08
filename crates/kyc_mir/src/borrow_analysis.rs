@@ -439,7 +439,9 @@ impl BorrowAnalysis {
                     alive.insert(*dest);
                 }
             }
-            MirInst::Load { dest, .. } => {
+            MirInst::Load { dest, src } => {
+                // Check that the source is alive (use-after-move detection)
+                self.check_alive(*src, alive, local_names, local_types, "read");
                 if move_locals.contains(dest) {
                     alive.insert(*dest);
                 }
