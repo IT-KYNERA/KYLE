@@ -8,34 +8,34 @@
 Source (.ky)
     │
     ▼
-[1] Lexer → Token stream
+[1]  Lexer → Token stream
     │
     ▼
-[2] Parser → AST (Abstract Syntax Tree)
+[2]  Parser → AST (Abstract Syntax Tree)
     │
     ▼
-[3] HIR → Desugared AST (High-Level IR)
+[3]  HIR → Desugared AST (High-Level IR)
     │
     ▼
-[4] Semantic Analysis → Typed AST (type checking, scope resolution)
+[4]  Semantic Analysis → Typed AST (type checking, scope)
     │
     ▼
-[5] MIR Lowering → Mid-Level IR
+[5]  MIR Lowering → Mid-Level IR
     │
     ▼
-[6] Borrow Analysis → Ownership validation
+[6]  MIR Optimization → Constant folding, dead code elim
     │
     ▼
-[7] SSA Construction → SSA form (phi nodes, GVN)
+[7]  Borrow Analysis → Ownership check + ky_free insertion
     │
     ▼
-[8] MIR Optimization → Constant folding, dead code elimination
+[8]  SSA Construction → Optional, disabled by default
     │
     ▼
-[9] LLVM Codegen → LLVM IR
+[9]  LLVM Codegen → LLVM IR
     │
     ▼
-[10] LLVM Optimization → O3 pipeline (mem2reg, GVN, LICM, inlining)
+[10] LLVM Optimization → O3 (mem2reg, GVN, LICM, inlining)
     │
     ▼
 [11] Object Emission → .o file
@@ -43,6 +43,8 @@ Source (.ky)
     ▼
 [12] Linking → Binary (linked with libkyc_runtime.a)
 ```
+
+> **Nota:** El pipeline real en `kyc_driver/src/pipeline.rs` ejecuta MIR Optimization ANTES que Borrow Analysis. SSA está deshabilitado por defecto (bugs con ptr/str propagation).
 
 ## Crate structure
 
@@ -55,7 +57,7 @@ Source (.ky)
 | `kyc_mir` | MIR lowering, borrow analysis, SSA, optimize | ~10,500 |
 | `kyc_backend` | LLVM codegen, linker | ~3,200 |
 | `kyc_driver` | Pipeline orchestration | ~570 |
-| `kyc_cli` | CLI binary (`ky`) | ~300 |
+| `kyc_cli` | CLI binary (`ky`) | ~1533 |
 | `kyc_runtime` | Runtime static library (memory, strings, lists, dicts) | ~3,500 |
 | `kyc_tools` | LSP server, formatter, package manager | ~5,000 |
 | `kyc_platform` | Platform API (FS, net, time) — en desarrollo | ~500 |
@@ -65,24 +67,32 @@ Source (.ky)
 El pipeline es orquestado por `kyc_driver::pipeline::Pipeline`, que coordina cada fase:
 
 ```rust
-// Simplified pipeline flow
-fn compile(source: &str) -> Result<MirOutput, String> {
-    let tokens = lexer::tokenize(source);      // [1] Lexer
-    let ast = parser::parse(tokens);            // [2] Parser
-    let hir = hir::desugar(ast);                // [3] HIR
-    let typed_ast = semantic::analyze(hir);     // [4] Semantic
-    let mir = mir::lower(typed_ast);            // [5] MIR
-    mir::borrow_analysis::run(&mut mir);        // [6] Borrow
-    mir::ssa::transform(&mut mir);              // [7] SSA
-    mir::optimize(&mut mir);                    // [8] MIR Opt
-    Ok(mir)
-}
-
-fn build(mir: MirOutput) -> Result<(), String> {
-    let llvm_ir = backend::codegen::generate(&mir);  // [9] LLVM
-    backend::optimize_module(&llvm_ir);              // [10] Opt
-    backend::emit_object(&llvm_ir);                  // [11] Object
-    backend::link(&object_files);                    // [12] Link
+// Simplified pipeline flow (from kyc_driver::pipeline)
+fn build_source(source: &str) -> Result<(), String> {
+    // 1-4: Lexer → Parser → HIR → Semantic
+    let checked = Self::check_source(source)?;
+    
+    // 5: MIR Lowering
+    let mut module = lowerer.lower_program(&checked.program);
+    
+    // 6: MIR Optimization
+    optimizer.optimize(&mut module);
+    
+    // 7: Borrow Analysis
+    borrow_analysis.run(&mut module);
+    
+    // 8: LLVM Codegen
+    let mut codegen = Codegen::new(&context, "ky_module");
+    codegen.compile(&module)?;
+    
+    // 9: LLVM Optimization
+    optimize_module(codegen.module(), optimization);
+    
+    // 10: Object Emission
+    emit_object(codegen.module(), &obj_path, optimization)?;
+    
+    // 11: Linking
+    linker.link(&[&obj_path], output_path, runtime_lib, release, &links)
 }
 ```
 

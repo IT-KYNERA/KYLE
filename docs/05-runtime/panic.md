@@ -1,36 +1,35 @@
 # Panic
 
 > Manejo de pánicos del runtime de Kyle.
-> Crate: `kyc_runtime/src/panic.rs` (6 líneas).
+> Crate: `kyc_runtime/src/panic.rs` (6 líneas, función: `ky_panic`).
 
 ## Responsabilidad
 
 El sistema de panic maneja errores fatales del runtime: division by zero,
 acceso fuera de bounds, null pointer dereference, etc.
 
-## Implementación actual
+## Implementación
 
 ```rust
-pub extern "C" fn ky_panic(msg: *const u8) {
-    panic!("Kyle panic: {}", unsafe { CStr::from_ptr(msg).to_str().unwrap_or("unknown") });
+pub fn ky_panic(message: &str) -> ! {
+    eprintln!("KL PANIC: {}", message);
+    std::process::abort();
 }
 ```
 
-Cuando ocurre un panic:
-
-1. El runtime imprime el mensaje de error
-2. Muestra un backtrace si está disponible
-3. Termina el proceso con código de error distinto de cero
+- Imprime el mensaje de error en stderr
+- Termina el proceso inmediatamente con `abort()` (no limpia recursos)
+- No hay stack trace ni recovery — es un error fatal
 
 ## Errores que causan panic
 
 | Condición | Mensaje |
 |-----------|---------|
-| Division by zero | `panic: division by zero` |
-| Index out of bounds | `panic: index out of bounds` |
-| Null pointer dereference | `panic: attempted to dereference null pointer` |
-| Assertion failed | `panic: assertion failed` |
-| Overflow | `panic: arithmetic overflow` |
+| Division by zero | `KL PANIC: division by zero` |
+| Index out of bounds | `KL PANIC: index out of bounds` |
+| Null pointer dereference | `KL PANIC: attempted to dereference null pointer` |
+| Assertion failed | `KL PANIC: assertion failed` |
+| Overflow | `KL PANIC: arithmetic overflow` |
 
 ## Integración con Result
 

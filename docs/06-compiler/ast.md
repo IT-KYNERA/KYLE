@@ -1,7 +1,7 @@
 # AST (Abstract Syntax Tree)
 
 > Representación estructurada del programa después del parsing.
-> Crate: `kyc_core/src/ast.rs` (~800 líneas).
+> Crate: `kyc_core/src/ast.rs` (~1372 líneas).
 
 ## Responsabilidad
 
@@ -33,21 +33,23 @@ Module
 
 ```rust
 pub enum AstType {
-    Primitive { name: String },       // i32, str, bool, etc.
-    User { name: String },             // user-defined type
-    Mutable { inner: Box<AstType> },   // ^T
-    Borrow { inner: Box<AstType> },    // &T
-    Generic { name: String, args: Vec<AstType> },  // Option<i32>
-    Array { inner: Box<AstType>, size: usize },     // [T; N]
-    List { inner: Box<AstType> },       // {T}
-    Dict { key, value },                // {K: V}
-    Optional { inner },                  // T?
-    Error { inner },                     // T!
-    FnPtr { params, return_ },           // fn(T) U
-    Ptr,                                 // ptr
-    Struct { fields },                   // struct literal type
+    Primitive { name: String, span: Span },
+    User { name: String, span: Span },
+    Generic { name: String, args: Vec<AstType>, span: Span },
+    Optional { inner: Box<AstType>, span: Span },    // T?
+    Error { inner: Box<AstType>, span: Span },        // T!
+    Dict { key: Box<AstType>, value: Box<AstType>, span: Span },  // {K: V}
+    FnPtr { params: Vec<AstType>, return_: Box<AstType>, span: Span },
+    Mutable { inner: Box<AstType>, span: Span },      // ^T
+    Borrow { inner: Box<AstType>, span: Span },       // &T
+    Array { inner: Box<AstType>, size: usize, span: Span },  // [T; N]
+    Ptr { span: Span },
 }
 ```
+
+> **Nota:** `{T}` (list) y `{K:V}` (dict) NO son `AstType` variants propios.
+> Se representan como `Generic { name: "list" }` / `Generic { name: "dict" }` en el AST.
+> Los structs literales tampoco tienen variant propia — se resuelven como tipos usuario.
 
 ## Span
 

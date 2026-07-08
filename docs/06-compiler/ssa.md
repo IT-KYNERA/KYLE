@@ -31,23 +31,23 @@ En puntos de join (if/else, while), se insertan nodos φ (phi) para combinar
 múltiples definiciones de una misma variable:
 
 ```rust
-pub enum SsaInst {
-    // Phi node: select value based on incoming block
-    Phi {
-        dest: usize,
-        incoming: Vec<(usize, usize)>,  // (block_id, value_local)
-        type_: MirType,
-    },
-    // Operations (same as MIR but simpler)
-    Add { dest: usize, left: usize, right: usize },
-    // ... etc
+pub struct PhiNode {
+    pub dest: usize,
+    pub incoming: Vec<(usize, usize)>,   // (block_id, value_local)
+    pub type_: MirType,
+}
+
+pub struct SsaBlock {
+    pub phis: Vec<PhiNode>,
+    pub insts: Vec<SsaInst>,
+    pub terminator: MirTerminator,
 }
 ```
 
 ## Algoritmo
 
 ```rust
-fn convert_to_ssa(func: &mut MirFunction) -> SsaFunction {
+pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
     // 1. Identify locals that need phi nodes (defined in multiple blocks)
     let phi_candidates = find_phi_candidates(func);
     

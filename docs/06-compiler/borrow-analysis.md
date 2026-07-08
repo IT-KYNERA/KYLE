@@ -16,7 +16,15 @@ El borrow analysis opera sobre el MIR para:
 
 ```rust
 pub fn is_move_type(t: &MirType) -> bool {
-    matches!(t, MirType::Str | MirType::List(_) | MirType::Struct(_, _) | MirType::Dict(_, _) | MirType::Array(_, _))
+    match t {
+        MirType::Str => true,
+        MirType::List(_) => true,
+        MirType::Dict(_, _) => true,
+        // Array y Struct NO son heap-allocated — son value types en stack.
+        // Struct fields (str, list) se trackean independientemente.
+        MirType::Struct(_, _) => false,
+        _ => false,
+    }
 }
 ```
 

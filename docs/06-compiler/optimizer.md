@@ -15,15 +15,16 @@ Opera antes de la generación de LLVM IR.
 Evalúa operaciones con operandos constantes en tiempo de compilación:
 
 ```rust
-fn constant_fold(inst: &MirInst) -> Option<MirConstant> {
-    match inst {
-        BinaryOp { op: Add, left: Constant(I32(a)), right: Constant(I32(b)) } => {
-            Some(I32(a.wrapping_add(*b)))
+fn constant_fold(&self, func: &mut MirFunction) {
+    for block in &mut func.basic_blocks {
+        for inst in &mut block.insts {
+            if let BinaryOp { left: Constant(a), right: Constant(b), op, dest, .. } = inst {
+                // Compute result at compile time
+                let result = eval_const_binary_op(op, a, b);
+                // Replace BinaryOp with a Store of the constant
+                block.insts.push(Store { dest: *dest, value: Constant(result) });
+            }
         }
-        BinaryOp { op: Mul, left: Constant(I64(a)), right: Constant(I64(b)) } => {
-            Some(I64(a.wrapping_mul(*b)))
-        }
-        // ... otros casos
     }
 }
 ```
@@ -41,11 +42,16 @@ x = 14
 Elimina instrucciones cuyo resultado nunca se usa:
 
 ```rust
-fn dead_code_elimination(block: &mut MirBasicBlock, used: &HashSet<usize>) {
-    block.insts.retain(|inst| {
-        let dest = inst_dest(inst);
-        dest.map_or(true, |d| used.contains(&d))
-    });
+fn dead_code_elim(&self, func: &mut MirFunction, move_locals: &HashSet<usize>) {
+    for block in &mut func.basic_blocks {
+        // Remove stores to dead locals
+        block.insts.retain(|inst| {
+            if let Store { dest, .. } = inst {
+                return move_locals.contains(dest);
+            }
+            true
+        });
+    }
 }
 ```
 

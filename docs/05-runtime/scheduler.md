@@ -7,35 +7,41 @@
 
 El scheduler gestiona la ejecución de tareas `async fn` y bloques `async:` mediante
 un thread pool global. Cada tarea se ejecuta en un hilo del pool y devuelve un
-resultado que se obtiene vía `await`.
+resultado i64 que se obtiene vía `await`.
 
 ## Thread Pool
 
 ```rust
+type TaskFn = Box<dyn FnOnce() + Send>;
+
 pub struct Executor {
+    running: Arc<AtomicBool>,
+    task_sender: mpsc::Sender<TaskFn>,
     workers: Vec<thread::JoinHandle<()>>,
-    sender: crossbeam_channel::Sender<BoxedJob>,
-    receiver: crossbeam_channel::Receiver<BoxedJob>,
 }
 ```
 
 - Pool global inicializado con `available_parallelism()` workers
 - Configurable vía variable de entorno `KL_WORKERS`
-- Comunicación mediante channels `crossbeam_channel`
+- Comunicación mediante `std::sync::mpsc` channel
 
 ## Funciones
 
 ### ky_spawn_task
 
 ```rust
-pub unsafe extern "C" fn ky_spawn_task(fn_ptr: usize, arg: i64) -> *mut Arc<Mutex<Option<i64>>>
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_spawn_task(
+    func: Option<unsafe extern "C" fn(i64) -> i64>,
+    arg: i64,
+) -> i64
 ```
 
-Spawnear una función asíncrona en el thread pool.
+Spawnear una función en el thread pool.
 
-- `fn_ptr`: puntero a la función a ejecutar
-- `arg`: argumento i64
-- Retorna: handle opaque para `ky_await_task`
+- `func`: puntero a función con C calling convention
+- `arg`: argumento i64 único
+- Retorna: handle i64 opaco para `ky_await_task` (un `Arc` convertido a i64)
 
 ```ky
 task = async: heavy_computation()
@@ -45,19 +51,21 @@ result = await task
 ### ky_await_task
 
 ```rust
-pub unsafe extern "C" fn ky_await_task(handle: *mut Arc<Mutex<Option<i64>>>) -> i64
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_await_task(handle: i64) -> i64
 ```
 
 Esperar el resultado de una tarea asíncrona.
 
+- `handle`: i64 devuelto por `ky_spawn_task`
 - Bloquea el hilo actual hasta que la tarea completa
-- Puede llamarse múltiples veces (el resultado se cachea)
 - Retorna: el valor i64 producido por la tarea
 
 ### ky_yield
 
 ```rust
-pub unsafe extern "C" fn ky_yield()
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_yield()
 ```
 
 Cede el paso al scheduler. Permite que otra tarea se ejecute.
@@ -65,29 +73,21 @@ Cede el paso al scheduler. Permite que otra tarea se ejecute.
 ## Task internals
 
 ```rust
-struct Task {
-    future: BoxedFuture<'static, i64>,
-    poll_state: PollState,
-    result: Option<i64>,
-}
-
-enum PollState {
-    Pending,
-    Ready(i64),
-    Panicked(String),
+pub struct Task<T> {
+    id: u64,
+    future: Arc<Mutex<BoxedFuture<T>>>,
 }
 ```
 
-## Inicialización
+Donde `BoxedFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>`.
 
-El scheduler se inicializa bajo demanda (lazy). La primera llamada a `ky_spawn_task`
+## Inicialización lazy
+
+El scheduler se inicializa bajo demanda. La primera llamada a `ky_spawn_task`
 crea el thread pool.
 
 ```rust
-fn ensure_executor() -> &'static Executor {
-    static EXECUTOR: OnceLock<Executor> = OnceLock::new();
-    EXECUTOR.get_or_init(|| Executor::new(worker_count()))
-}
+static EXECUTOR: OnceLock<Executor> = OnceLock::new();
 ```
 
 ## Configuración

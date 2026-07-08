@@ -14,13 +14,14 @@ mediante el borrow analysis del compilador, que inserta llamadas a `ky_free` aut
 ### ky_alloc
 
 ```rust
-pub unsafe extern "C" fn ky_alloc(size: i64) -> *mut u8
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_alloc(size: i64) -> *mut u8
 ```
 
 Asigna un bloque de memoria del heap del tamaño especificado.
 
 - Retorna un puntero al bloque asignado, o null si falla
-- La memoria NO está inicializada (puede contener basura)
+- La memoria incluye un header con refcount y tamaño
 - Equivalente a `malloc()` de C
 
 ```ky
@@ -31,7 +32,8 @@ buf = ky_alloc(1024)     # asigna 1024 bytes
 ### ky_free
 
 ```rust
-pub unsafe extern "C" fn ky_free(ptr: *mut u8)
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_free(ptr: *mut u8)
 ```
 
 Libera un bloque de memoria previamente asignado con `ky_alloc`.
@@ -48,15 +50,28 @@ ky_free(buf)              # libera memoria
 ### ky_retain / ky_release
 
 ```rust
-pub unsafe extern "C" fn ky_retain(ptr: *mut u8)
-pub unsafe extern "C" fn ky_release(ptr: *mut u8)
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_retain(ptr: *mut u8)
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_release(ptr: *mut u8)
 ```
 
 Sistema de reference counting para memoria compartida.
 
-- `ky_retain`: incrementa el contador de referencias
+- `ky_retain`: incrementa el contador de referencias atómico
 - `ky_release`: decrementa y libera si llega a 0
-- Usado internamente por estructuras que comparten ownership
+- Usa `AtomicI64` para el contador
+
+### Header
+
+Cada bloque de memoria tiene un header con:
+
+```rust
+struct Header {
+    strong: AtomicI64,   // reference count
+    size: i64,            // tamaño del bloque
+}
+```
 
 ## Integración con borrow analysis
 
@@ -64,16 +79,16 @@ El compilador (`borrow_analysis.rs`) determina automáticamente cuándo insertar
 
 ```rust
 // Generado por el compilador al final del scope
-ky_free(s_ptr)    # s sale de scope → liberar
-ky_list_free(lst) # lista sale de scope → liberar
-ky_dict_free(d)   # diccionario sale de scope → liberar
+ky_free(s_ptr)        # str sale de scope → liberar
+ky_list_free(lst)     # lista sale de scope → liberar (llama ky_free internamente)
+ky_dict_free(d)       # diccionario sale de scope → liberar
 ```
 
 Esto elimina la necesidad de `free()` manual o garbage collector.
 
 ## Estrategia de asignación
 
-- `ky_alloc` usa `malloc`/`calloc` del sistema (vía Rust `alloc`/`dealloc`)
+- `ky_alloc` usa `Layout::from_size_align` de Rust (que usa `malloc`/`free` del sistema)
 - Strings, listas y diccionarios usan `ky_alloc` internamente
 - El runtime NO tiene su propio pool/arena — delega en el asignador del sistema
 

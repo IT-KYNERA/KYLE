@@ -12,7 +12,7 @@ ubicados, indentación incorrecta, etc.
 ## Invocación
 
 ```rust
-fn parse(tokens: Vec<Token>) -> Result<Module, Vec<Diagnostic>>
+fn parse(&mut self) -> Result<Program, String>
 ```
 
 Devuelve un `Module` (AST completo) o una lista de errores de sintaxis.
@@ -104,10 +104,12 @@ Kyle usa un parser **recursive descent** con un token de lookahead.
 struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    errors: Vec<String>,
+    links: Vec<String>,
 }
 
 impl Parser {
-    fn parse_module(&mut self) -> Result<Module, String> { ... }
+    fn parse_program(&mut self) -> Result<Program, String> { ... }
     fn parse_decl(&mut self) -> Result<Decl, String> { ... }
     fn parse_stmt(&mut self) -> Result<Stmt, String> { ... }
     fn parse_expr(&mut self) -> Result<Expr, String> { ... }
