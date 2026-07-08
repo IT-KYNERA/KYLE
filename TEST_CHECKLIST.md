@@ -58,21 +58,21 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 18 | `x: i8 = 127` | Signed 8-bit | [ ] |
-| 19 | `x: i16 = 32767` | Signed 16-bit | [ ] |
-| 20 | `x: i32 = 2147483647` | Signed 32-bit | [ ] |
-| 21 | `x: i64 = 9223372036854775807` | Signed 64-bit | [ ] |
-| 22 | `x: u8 = 255` | Unsigned 8-bit | [ ] |
-| 23 | `x: u16 = 65535` | Unsigned 16-bit | [ ] |
-| 24 | `x: u32 = 4294967295` | Unsigned 32-bit | [ ] |
-| 25 | `x: u64 = 18446744073709551615` | Unsigned 64-bit | [ ] |
+| 18 | `x: i8 = 127` | Signed 8-bit | [x] |
+| 19 | `x: i16 = 32767` | Signed 16-bit | [x] |
+| 20 | `x: i32 = 2147483647` | Signed 32-bit | [x] |
+| 21 | `x: i64 = 9223372036854775807` | Signed 64-bit | [b] |
+| 22 | `x: u8 = 255` | Unsigned 8-bit | [b] |
+| 23 | `x: u16 = 65535` | Unsigned 16-bit | [b] |
+| 24 | `x: u32 = 4294967295` | Unsigned 32-bit | [b] |
+| 25 | `x: u64 = 18446744073709551615` | Unsigned 64-bit | [b] |
 
 ### Float types
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 26 | `x: f32 = 3.14` | 32-bit float | [ ] |
-| 27 | `x = 3.14` | Default f64 | [ ] |
+| 26 | `x: f32 = 3.14` | 32-bit float | [x] |
+| 27 | `x = 3.14` | Default f64 | [x] |
 
 ### Char
 
@@ -84,15 +84,15 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 29 | `b = true; println(b.to_str())` | Prints "true" | [ ] |
-| 30 | `if true: println("ok")` | Executes block | [ ] |
+| 29 | `b = true; println(b.to_str())` | Prints "true" | [x] |
+| 30 | `if true: println("ok")` | Executes block | [x] |
 
 ### Ptr
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 31 | `p = 0 as ptr` | Null pointer | [ ] |
-| 32 | `p = variable as ptr` | Address of variable | [ ] |
+| 31 | `p = 0 as ptr` | Null pointer | [b] |
+| 32 | `p = variable as ptr` | Address of variable | [b] |
 
 ---
 
@@ -138,10 +138,10 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 47 | `async fn f(n: i64) i64: n * 2; task = f(21); await task` | Async function | [ ] |
-| 48 | `task = async: 42; await task` | Async block | [ ] |
-| 49 | `ky_parallel_for(fn, 0, 8)` | Parallel for | [ ] |
-| 50 | `h = ky_spawn_thread(fn, arg); r = ky_join_thread(h)` | Threads | [ ] |
+| 47 | `async fn f(n: i64) i64: n * 2; task = f(21); await task` | Async function | [x] |
+| 48 | `task = async: 42; await task` | Async block | [x] |
+| 49 | `ky_parallel_for(fn, 0, 8)` | Parallel for | [x] |
+| 50 | `h = ky_spawn_thread(fn, arg); r = ky_join_thread(h)` | Threads | [x] |
 
 ---
 
@@ -149,22 +149,22 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 51 | `class Animal: ...` | Class declaration | [ ] |
-| 52 | `final class Point: ...` | Non-inheritable struct | [ ] |
-| 53 | `class Dog :: Animal:` | Simple inheritance | [ ] |
-| 54 | `contract Drawable: fn draw()` | Contract declaration | [ ] |
-| 55 | `class Circle :: Drawable: fn draw(): ...` | Implement contract | [ ] |
-| 56 | `enum Color: RED GREEN BLUE` | Enum with variants | [ ] |
-| 57 | `class Box<T>: ...` | Generic class | [ ] |
-| 58 | `fn identity<T>(x: T) T: x` | Generic function | [ ] |
-| 59 | `identity<i32>(42)` | Generic function call | [ ] |
+| 51 | `class Animal: ...` | Class declaration | [x] |
+| 52 | `final class Point: ...` | Non-inheritable struct | [x] |
+| 53 | `class Dog :: Animal:` | Simple inheritance | [x] |
+| 54 | `contract Drawable: fn draw()` | Contract declaration | [x] |
+| 55 | `class Circle :: Drawable: fn draw(): ...` | Implement contract | [x] |
+| 56 | `enum Color: RED GREEN BLUE` | Enum with variants | [x] |
+| 57 | `class Box<T>: ...` | Generic class | [x] |
+| 58 | `fn identity<T>(x: T) T: x` | Generic function | [x] |
+| 59 | `identity<i32>(42)` | Generic function call | [x] |
 
 ### Field access
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 60 | `this.x = nx` | Field access via this | [ ] |
-| 61 | `Point { x: 10, y: 20 }` | Struct literal | [ ] |
+| 60 | `this.x = nx` | Field access via this | [x] |
+| 61 | `Point { x: 10, y: 20 }` | Struct literal | [x] |
 
 ---
 
@@ -172,11 +172,11 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 62 | `name: str? = none` | Optional declaration | [ ] |
-| 63 | `match name: none: ... some(v): ...` | Pattern match option | [ ] |
-| 64 | `fn div(a,b) i32!:` | Fallible return | [ ] |
-| 65 | `return error("msg")` | Error return | [ ] |
-| 66 | `ok(val)` | Success return | [ ] |
+| 62 | `name: str? = none` | Optional declaration | [b] |
+| 63 | `match name: none: ... some(v): ...` | Pattern match option | [b] |
+| 64 | `fn div(a,b) i32!:` | Fallible return | [x] |
+| 65 | `return error("msg")` | Error return | [x] |
+| 66 | `ok(val)` | Success return | [b] |
 | 67 | `match res: ok(v): ... error(e): ...` | Pattern match result | [ ] |
 
 ---
@@ -197,13 +197,13 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 73 | `s.trim()` | Trim whitespace | [ ] |
-| 74 | `s.to_upper()` | Uppercase | [ ] |
-| 75 | `s.to_lower()` | Lowercase | [ ] |
-| 76 | `s.contains(sub)` | Contains substring | [ ] |
+| 73 | `s.trim()` | Trim whitespace | [x] |
+| 74 | `s.to_upper()` | Uppercase | [b] |
+| 75 | `s.to_lower()` | Lowercase | [b] |
+| 76 | `s.contains(sub)` | Contains substring | [x] |
 | 77 | `s.replace(a, b)` | Replace substring | [ ] |
-| 78 | `s.substr(start, len)` | Substring | [ ] |
-| 79 | `len(s)` | String length | [ ] |
+| 78 | `s.substr(start, len)` | Substring | [x] |
+| 79 | `len(s)` | String length | [x] |
 
 ---
 
@@ -211,10 +211,10 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 80 | `sb = str_builder(100)` | Create builder | [ ] |
-| 81 | `sb.append("x")` | Append string | [ ] |
-| 82 | `sb.to_str()` | Extract string | [ ] |
-| 83 | `sb.free()` | Free memory | [ ] |
+| 80 | `sb = str_builder(100)` | Create builder | [x] |
+| 81 | `sb.append("x")` | Append string | [x] |
+| 82 | `sb.to_str()` | Extract string | [x] |
+| 83 | `sb.free()` | Free memory | [x] |
 
 ---
 
@@ -222,10 +222,10 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 84 | `fn add(a, b) i32: a + b` | Function declaration | [ ] |
-| 85 | `fn greet(name: str = "world")` | Default parameter | [ ] |
-| 86 | `fn_ptr = add as ptr; fn_ptr(1, 2)` | Function pointer | [ ] |
-| 87 | `(x: i32): x * 2` | Closure | [ ] |
+| 84 | `fn add(a, b) i32: a + b` | Function declaration | [x] |
+| 85 | `fn greet(name: str = "world")` | Default parameter | [x] |
+| 86 | `fn_ptr = add as ptr; fn_ptr(1, 2)` | Function pointer | [x] |
+| 87 | `(x: i32): x * 2` | Closure | [x] |
 
 ---
 
@@ -233,14 +233,14 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 88 | `if x > 0: println("pos") elif x == 0: ... else: ...` | If/elif/else | [ ] |
-| 89 | `while i < 10: i = i + 1` | While loop | [ ] |
-| 90 | `for i in 0..10: println(i)` | For-in-range | [ ] |
-| 91 | `for val in list: println(val)` | For-in-list | [ ] |
-| 92 | `match x: 1: println("one") _: println("other")` | Match statement | [ ] |
-| 93 | `return value` | Return | [ ] |
-| 94 | `defer: close(f)` | Defer | [ ] |
-| 95 | `guard cond else: return` | Guard | [ ] |
+| 88 | `if x > 0: println("pos") elif x == 0: ... else: ...` | If/elif/else | [x] |
+| 89 | `while i < 10: i = i + 1` | While loop | [x] |
+| 90 | `for i in 0..10: println(i)` | For-in-range | [x] |
+| 91 | `for val in list: println(val)` | For-in-list | [x] |
+| 92 | `match x: 1: println("one") _: println("other")` | Match statement | [x] |
+| 93 | `return value` | Return | [x] |
+| 94 | `defer: close(f)` | Defer | [x] |
+| 95 | `guard cond else: return` | Guard | [x] |
 
 ---
 
