@@ -283,7 +283,7 @@ impl Lexer {
             "type" => TokenKind::Type,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
-            "None" => TokenKind::None,
+            "none" | "None" => TokenKind::None,
             "ok" => TokenKind::OkKw,
             "extern" => TokenKind::Extern,
             "import" => TokenKind::Import,

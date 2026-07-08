@@ -172,8 +172,8 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 62 | `name: str? = none` | Optional declaration | [b] |
-| 63 | `match name: none: ... some(v): ...` | Pattern match option | [b] |
+| 62 | `name: str? = none` | Optional declaration | [x] |
+| 63 | `match name: none: ... some(v): ...` | Pattern match option | [x] |
 | 64 | `fn div(a,b) i32!:` | Fallible return | [x] |
 | 65 | `return error("msg")` | Error return | [x] |
 | 66 | `ok(val)` | Success return | [b] |

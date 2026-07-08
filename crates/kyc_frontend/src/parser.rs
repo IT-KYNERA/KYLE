@@ -1128,6 +1128,10 @@ impl Parser {
                 self.advance();
                 Expr::Identifier { name: "type".to_string(), span: self.span_from(start) }
             }
+            TokenKind::OkKw => {
+                self.advance();
+                Expr::Identifier { name: "ok".to_string(), span: self.span_from(start) }
+            }
             TokenKind::LParen => {
                 let start = self.pos;
                 self.advance(); // consume '('
@@ -1789,6 +1793,16 @@ impl Parser {
         }
         if self.at_identifier() {
             let name = self.eat_identifier();
+            // Check for some(v) pattern (shorthand for Option.Some(v))
+            if name == "some" && self.at(TokenKind::LParen) {
+                self.advance();
+                let inner = self.parse_pattern()?;
+                self.expect(TokenKind::RParen)?;
+                return Ok(Pattern::EnumVariant {
+                    enum_name: "Option".to_string(), variant: "Some".to_string(),
+                    args: vec![inner], span: self.span_from(start),
+                });
+            }
             // Check for error(e) pattern (identifier "error" followed by LParen)
             if name == "error" && self.at(TokenKind::LParen) {
                 self.advance();

@@ -878,8 +878,15 @@ impl TypeChecker {
                                 "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Type::I64,
                                 "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Type::I64,
                                 "ky_channel_close" => Type::Void,
-                                "error" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
-                                "ok" => Type::Generic("Result".to_string(), vec![Type::TypeVar(0), Type::Str]),
+                                "ok" => {
+                                    if arguments.len() == 1 {
+                                        let arg_type = self.infer_expr(&arguments[0]);
+                                        Type::Generic("Result".to_string(), vec![arg_type, Type::Str])
+                                    } else {
+                                        Type::Generic("Result".to_string(), vec![Type::I32, Type::Str])
+                                    }
+                                }
+                                "error" => Type::Generic("Result".to_string(), vec![Type::Void, Type::Str]),
                                 _ => *ft.return_,
                             }
                         } else {
