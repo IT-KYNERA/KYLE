@@ -12,43 +12,43 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 1 | `x = 42` | Immutable i32, cannot reassign | [ ] |
-| 2 | `x: ^i32 = 0; x = x + 1` | Mutable i32, can reassign | [ ] |
-| 3 | `x: ^str = "hola"; x = "mundo"` | Mutable str, can reassign | [ ] |
+| 1 | `x = 42` | Immutable i32, cannot reassign | [x] |
+| 2 | `x: ^i32 = 0; x = x + 1` | Mutable i32, can reassign | [x] |
+| 3 | `x: ^str = "hola"; x = "mundo"` | Mutable str, can reassign | [x] |
 
 ### Move by default
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 4 | `s = "hola"; t = s; println(s)` | Error: use-after-move | [ ] |
-| 5 | `x = 42; y = x; println(x)` | Works (Copy type, i32) | [ ] |
-| 6 | `s = "hola"; t = s.clone(); println(s)` | Works (explicit clone) | [ ] |
+| 4 | `s = "hola"; t = s; println(s)` | Error: use-after-move | [x] |
+| 5 | `x = 42; y = x; println(x)` | Works (Copy type, i32) | [x] |
+| 6 | `s = "hola"; t = s.clone(); println(s)` | Works (explicit clone) | [x] |
 
 ### Borrow `&T`
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 7 | `fn read(s: &str): println(s)` | Function takes borrow | [ ] |
-| 8 | `read(&name); println(name)` | Caller retains ownership | [ ] |
-| 9 | `read(&name); read(&name)` | Multiple immutable borrows OK | [ ] |
+| 7 | `fn read(s: &str): println(s)` | Function takes borrow | [x] |
+| 8 | `read(&name); println(name)` | Caller retains ownership | [x] |
+| 9 | `read(&name); read(&name)` | Multiple immutable borrows OK | [x] |
 
 ### Mutable borrow `^&T`
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 10 | `fn append(s: ^&str): s = s + "!"` | Function takes mut borrow | [ ] |
-| 11 | `append(^&buf); println(buf)` | Caller sees mutation | [ ] |
-| 12 | `read(&x); append(^&x)` | Error: immut + mut borrow | [ ] |
-| 13 | `append(^&x); read(&x)` | Error: mut + immut borrow | [ ] |
-| 14 | `append(^&x); append(^&x)` | Error: mut + mut borrow | [ ] |
+| 10 | `fn append(s: ^&str): s = s + "!"` | Function takes mut borrow | [x] |
+| 11 | `append(^&buf); println(buf)` | Caller sees mutation | [x] |
+| 12 | `read(&x); append(^&x)` | Error: immut + mut borrow | [x] |
+| 13 | `append(^&x); read(&x)` | Error: mut + immut borrow | [x] |
+| 14 | `append(^&x); append(^&x)` | Error: mut + mut borrow | [x] |
 
 ### Move in function params
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 15 | `fn consume(s: str): println(s)` | Move param (default) | [ ] |
-| 16 | `consume(s); println("done")` | OK (s moved, no further use) | [ ] |
-| 17 | `consume(s); println(s)` | Error: use-after-move | [ ] |
+| 15 | `fn consume(s: str): println(s)` | Move param (default) | [x] |
+| 16 | `consume(s); println("done")` | OK (s moved, no further use) | [x] |
+| 17 | `consume(s); println(s)` | Error: use-after-move | [x] |
 
 ---
 
@@ -102,29 +102,29 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 33 | `v = {1, 2, 3}` | List literal | [ ] |
-| 34 | `v.push(4); println(v.len())` | 4 | [ ] |
-| 35 | `x = v[0]` | List get | [ ] |
-| 36 | `v[0] = 99` | List set | [ ] |
-| 37 | `x = v.pop()` | List pop | [ ] |
-| 38 | `v.reserve(100)` | Pre-allocate | [ ] |
+| 33 | `v = {1, 2, 3}` | List literal | [x] |
+| 34 | `v.push(4); println(v.len())` | 4 | [x] |
+| 35 | `x = v[0]` | List get | [x] |
+| 36 | `v[0] = 99` | List set | [x] |
+| 37 | `x = v.pop()` | List pop | [x] |
+| 38 | `v.reserve(100)` | Pre-allocate | [x] |
 
 ### Dict `{K: V}`
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 39 | `d = {"key": 42}` | Dict literal | [ ] |
-| 40 | `x = d["key"]` | Dict get | [ ] |
-| 41 | `d["key"] = 99` | Dict set | [ ] |
+| 39 | `d = {"key": 42}` | Dict literal | [x] |
+| 40 | `x = d["key"]` | Dict get | [x] |
+| 41 | `d["key"] = 99` | Dict set | [x] |
 
 ### Array `[T; N]`
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 42 | `a = [1, 2, 3]` | Array literal `[i32; 3]` | [ ] |
-| 43 | `a[0]` | GEP + load | [ ] |
-| 44 | `a[0] = 99` | GEP + store | [ ] |
-| 45 | `a = [0; 100]` | Array repeat | [ ] |
+| 42 | `a = [1, 2, 3]` | Array literal `[i32; 3]` | [x] |
+| 43 | `a[0]` | GEP + load | [x] |
+| 44 | `a[0] = 99` | GEP + store | [x] |
+| 45 | `a = [0; 100]` | Array repeat | [x] |
 
 ### Tuple
 
