@@ -1,30 +1,64 @@
-# Your First Program
+# Primer Programa
 
-Create a file named `hello.ky`:
+> Crear y ejecutar tu primer programa Kyle.
+
+## Hola Mundo
+
+Crear un archivo `hola.ky`:
 
 ```ky
 fn main() i32:
-    println("Hello, Kyle!")
+    println("Hola, Kyle!")
     0
 ```
 
-Run it:
+Ejecutar:
 
 ```bash
-ky run hello.ky
+ky run hola.ky
 ```
 
-## Explanation
+Salida:
 
-- `fn main() i32:` — Every program starts at `main`. It returns `i32` (exit code).
-- `println("Hello, Kyle!")` — Prints to stdout.
-- `0` — The last expression is the return value.
+```
+Hola, Kyle!
+```
 
-## Building
+## Explicación
 
-To compile without running:
+| Parte | Significado |
+|-------|-------------|
+| `fn main() i32:` | Punto de entrada del programa. Retorna `i32` (código de salida) |
+| `println(...)` | Función global para imprimir texto con salto de línea |
+| `0` | La última expresión es el retorno (código 0 = éxito) |
+
+## Compilar sin ejecutar
 
 ```bash
-ky build hello.ky
-./hello
+ky build hola.ky
+./hola               # ejecutar el binario
 ```
+
+## Variables
+
+```ky
+fn main() i32:
+    nombre: str = "Mundo"
+    println("Hola, " + nombre + "!")
+    0
+```
+
+## Entrada del usuario
+
+```ky
+fn main() i32:
+    nombre: str = input("¿Cómo te llamas? ")
+    println("Hola, " + nombre + "!")
+    0
+```
+
+## Ver también
+
+- `build.md` — Compilar proyectos
+- `project-layout.md` — Estructura de proyectos
+- `03-language/syntax/variables.md` — Variables en Kyle

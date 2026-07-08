@@ -1,39 +1,42 @@
 # Testing
 
-Kyle has a built-in test framework using the `#[test]` attribute.
+> Kyle tiene un framework de testing integrado con el atributo `#[test]`.
 
-## Writing tests
+## Escribir tests
 
 ```ky
+from testing import assert
+
 #[test]
 fn test_addition():
-    result = 2 + 2
-    assert(result == 4)
+    result: i32 = 2 + 2
+    assert.eq(result, 4)
 
 #[test]
 fn test_string():
-    assert_eq("hello", "hello")
-    assert_ne("hello", "world")
+    assert.eq("hello", "hello")
+    assert.ne("hello", "world")
+    assert.str_eq("hello", "hello")
 ```
 
-## Assertions
-
-| Function | Description |
-|----------|-------------|
-| `assert(condition)` | Assert condition is true |
-| `assert_eq(a, b)` | Assert a == b |
-| `assert_ne(a, b)` | Assert a != b |
-| `assert_str(a, b)` | Assert string equality |
-
-## Running tests
+## Ejecutar tests
 
 ```bash
 ky test
 ```
 
-This finds all `#[test]` functions in `tests/` directory, compiles and runs each one.
+Busca funciones `#[test]` en `tests/`, las compila y ejecuta.
 
-## Test project structure
+## Aserciones
+
+| Función | Descripción |
+|---------|-------------|
+| `assert.is_true(cond)` | Afirmar condición verdadera |
+| `assert.eq(a, b)` | Afirmar a == b |
+| `assert.ne(a, b)` | Afirmar a != b |
+| `assert.str_eq(a, b)` | Afirmar strings iguales |
+
+## Estructura del proyecto
 
 ```
 my-project/
@@ -45,7 +48,34 @@ my-project/
     └── test_integration.ky
 ```
 
-Each test function must:
-- Take no parameters
-- Return `i32` (0 for pass, non-zero for fail)
-- Use `assert` builtins for validation
+## Requisitos
+
+Cada función de test debe:
+- No tomar parámetros
+- Retornar `i32` (0 = pasa, !=0 = falla)
+- Usar funciones `assert` para validación
+
+## Ejemplo completo
+
+```ky
+from testing import assert
+
+fn sum_list(lst: {i32}) i32:
+    result: ^i32 = 0
+    for val in lst:
+        result = result + val
+    result
+
+#[test]
+fn test_sum_list():
+    assert.eq(sum_list({1, 2, 3}), 6)
+
+#[test]
+fn test_sum_empty():
+    assert.eq(sum_list({}), 0)
+```
+
+## Ver también
+
+- `04-standard-library/testing.md` — Documentación completa de testing
+- `project-layout.md` — Estructura de proyectos
