@@ -78,7 +78,7 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 28 | `c = 'a'; println(c.to_str())` | Should print "a" | [b] |
+| 28 | `c = 'a'; println(c.to_str())` | Should print "a" | [x] |
 
 ### Bool
 
@@ -130,7 +130,7 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 46 | `t = (1, "hello")` | Tuple literal | [b] |
+| 46 | `t = (1, "hello")` | Tuple literal | [x] |
 
 ---
 
@@ -176,7 +176,7 @@
 | 63 | `match name: none: ... some(v): ...` | Pattern match option | [x] |
 | 64 | `fn div(a,b) i32!:` | Fallible return | [x] |
 | 65 | `return error("msg")` | Error return | [x] |
-| 66 | `ok(val)` | Success return | [-] |
+| 66 | `ok(val)` | Success return | [x] |
 | 67 | `match res: ok(v): ... error(e): ...` | Pattern match result | [ ] |
 
 ---
@@ -198,8 +198,8 @@
 | # | Test | Expected | Result |
 |---|------|----------|--------|
 | 73 | `s.trim()` | Trim whitespace | [x] |
-| 74 | `s.to_upper()` | Uppercase | [b] |
-| 75 | `s.to_lower()` | Lowercase | [b] |
+| 74 | `s.to_upper()` | Uppercase | [x] |
+| 75 | `s.to_lower()` | Lowercase | [x] |
 | 76 | `s.contains(sub)` | Contains substring | [x] |
 | 77 | `s.replace(a, b)` | Replace substring | [x] |
 | 78 | `s.substr(start, len)` | Substring | [x] |

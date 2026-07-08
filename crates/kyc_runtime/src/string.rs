@@ -407,6 +407,22 @@ pub extern "C" fn ky_str_replace(ptr: *const u8, from: *const u8, to: *const u8)
 // Character operations
 // ---------------------------------------------------------------------------
 
+/// Convert a char (i8) to a single-character string.
+/// Returns a heap-allocated null-terminated C string.
+/// Caller must free with ky_free.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_char_to_str(c: i8) -> *const u8 {
+    let buf = crate::ky_alloc(2);
+    if buf.is_null() {
+        return std::ptr::null();
+    }
+    unsafe {
+        *buf = c as u8;
+        *buf.add(1) = 0;
+    }
+    buf
+}
+
 /// Return the byte at position `index` in string `ptr`, or 0 if out of bounds.
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_char_at(ptr: *const u8, index: i32) -> i8 {
