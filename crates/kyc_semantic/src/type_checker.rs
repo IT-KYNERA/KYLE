@@ -886,6 +886,14 @@ impl TypeChecker {
                                         Type::Generic("Result".to_string(), vec![Type::I32, Type::Str])
                                     }
                                 }
+                                "some" => {
+                                    if arguments.len() == 1 {
+                                        let arg_type = self.infer_expr(&arguments[0]);
+                                        Type::Option(Box::new(arg_type))
+                                    } else {
+                                        Type::Option(Box::new(Type::I32))
+                                    }
+                                }
                                 "error" => Type::Generic("Result".to_string(), vec![Type::Void, Type::Str]),
                                 _ => *ft.return_,
                             }

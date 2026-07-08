@@ -176,7 +176,7 @@
 | 63 | `match name: none: ... some(v): ...` | Pattern match option | [x] |
 | 64 | `fn div(a,b) i32!:` | Fallible return | [x] |
 | 65 | `return error("msg")` | Error return | [x] |
-| 66 | `ok(val)` | Success return | [b] |
+| 66 | `ok(val)` | Success return | [-] |
 | 67 | `match res: ok(v): ... error(e): ...` | Pattern match result | [ ] |
 
 ---
