@@ -6,13 +6,13 @@
 
 ```ky
 final class Stack<T>:
-    items: {T}                # lista dinámica interna
+ items: {T} # list dynamic interna
 
-    fn push(this, item: T):
-        this.items.push(item)
+ fn push(this, item: T):
+ this.items.push(item)
 
-    fn pop(this) T:
-        this.items.pop()
+ fn pop(this) T:
+ this.items.pop()
 ```
 
 ## Usage
@@ -26,14 +26,14 @@ int_stack.push(5)
 
 ```ky
 fn identity<T>(value: T) T:
-    value
+ value
 ```
 
 ## Type parameter constraints
 
 ```ky
 class box<T>:
-    value: T
+ value: T
 ```
 
-Generics support classes and structs with type parameters. Full monomorphization is performed at compile time.
+Generics support classis and structs with type parameters. Full monomorphization is performed at compile time.

@@ -1,3 +1,3 @@
 # Publishing
 
-> **Pendiente de contenido.**
+> **Pending content.**

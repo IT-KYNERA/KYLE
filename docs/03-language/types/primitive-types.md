@@ -1,28 +1,28 @@
 # Types
 
-> **Leyenda:** `[x]` = implementado y funcional. `[ ]` = diseñado pero no implementado.
-> La sintaxis mostrada es la sintaxis FINAL de Kyle. Lo que está `[ ]` aún no compila.
+> **Leyenda:** `[x]` = implemented y funcional. `[ ]` = disenado pero no implemented.
+> La syntax mostrada is syntax FINAL de Kyle. Lo que is `[ ]` aun no compila.
 
 ---
 
 ## Copy vs Move semantics [x]
 
-| Semántica | Tipos |
+| Semantics | Typis |
 |-----------|-------|
-| **Copy** (automático en `y = x`) | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` |
+| **Copy** (automatic en `y = x`) | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` |
 | **Move** (ownership transfer en `y = x`) | `str`, `{T}`, `{K:V}`, `[T; N]`, classes, structs, enums |
 
 ```ky
-x = 42; y = x          # ambos vivos (Copy)
-s = "hola"; t = s      # s inválido (Move)
-t = s.clone()          # ambos vivos (copia explícita)
+x = 42; y = x # ambos vivos (Copy)
+s = "hola"; t = s # s invalido (Move)
+t = s.clone() # ambos vivos (copia explicita)
 ```
 
-Ver `ownership.md` para detalle completo.
+Ver `ownership.md` for detail completo.
 
 ---
 
-## Primitive types [x]
+## Primitive typis [x]
 
 | Type | Copy? | Size | Description |
 |------|-------|------|-------------|
@@ -44,13 +44,13 @@ Ver `ownership.md` para detalle completo.
 | `never` | — | 0 | Diverging functions |
 
 ```ky
-x = 42               # i32
-x: i64 = 42          # i64 explícito
-x = 3.14             # f64
-b = true             # bool
-c = 'a'              # char (⚠️ bug: infiere como i32)
-s = "hello"          # str
-p = 0 as ptr         # ptr
+x = 42 # i32
+x: i64 = 42 # i64 explicito
+x = 3.14 # f64
+b = true # bool
+c = 'a' # char (⚠️ bug: infiere as i32)
+s = "hello" # str
+p = 0 as ptr # ptr
 ```
 
 ---
@@ -59,28 +59,28 @@ p = 0 as ptr         # ptr
 
 ### Array: `[T; N]` [x]
 
-Stack array, tamaño fijo en compile-time. GEP directo, cero runtime calls.
+Stack array, size fijo en compile-time. GEP directo, cero runtime calls.
 
 ```ky
-a = [1, 2, 3]                # → [i32; 3]
-b = [0; 100]                 # → [i32; 100], repetido
-c = [1 as i64; 10000]        # → [i64; 10000]
-first = a[0]                 # GEP + load
-a[0] = 99                    # GEP + store
+a = [1, 2, 3] # → [i32; 3]
+b = [0; 100] # → [i32; 100], repetido
+c = [1 as i64; 10000] # → [i64; 10000]
+first = a[0] # GEP + load
+a[0] = 99 # GEP + store
 ```
 
 ### List: `{T}` [x]
 
-Heap list dinámica.
+Heap list dynamic.
 
 ```ky
-v = {1, 2, 3}                # → {i32}
+v = {1, 2, 3} # → {i32}
 v.push(4)
-v.reserve(100)               # pre-asigna capacidad
-x = v[0]                     # list_get (runtime)
-v[0] = 99                    # list_set (runtime)
-v.pop()                      # list_pop (runtime)
-v.len()                      # list_len (runtime)
+v.reserve(100) # pre-asigna capacidad
+x = v[0] # list_get (runtime)
+v[0] = 99 # list_set (runtime)
+v.pop() # list_pop (runtime)
+v.len() # list_len (runtime)
 ```
 
 ### Dict: `{K: V}` [x]
@@ -88,7 +88,7 @@ v.len()                      # list_len (runtime)
 Heap dictionary (hash map).
 
 ```ky
-d = {"name": "Kyle", "age": 30}   # → {str: i32}
+d = {"name": "Kyle", "age": 30} # → {str: i32}
 d["city"] = "NYC"
 name = d["name"]
 d.len()
@@ -99,51 +99,51 @@ d.len()
 Fixed-size heterogeneous.
 
 ```ky
-t = (1, "hello", 3.14)       # → (i32, str, f64)
-x = t.0                      # → 1
-y = t.1                      # → "hello"
+t = (1, "hello", 3.14) # → (i32, str, f64)
+x = t.0 # → 1
+y = t.1 # → "hello"
 ```
 
 ### set: `set<T>` [ ]
 
-Hash set. Construcción vía `set{...}` o constructor.
+Hash set. Construction via `set{...}` o constructor.
 
 ```ky
-s: set<i32> = set{1, 2, 3}   # set literal
+s: set<i32> = set{1, 2, 3} # set literal
 s.add(4)
-s.contains(1)                # → true
+s.contains(1) # → true
 s.remove(1)
 for val in s:
-    println(val.to_str())
+ println(val.to_str())
 ```
 
 ### Queue via list [ ]
 
-No hay tipo `Queue<T>` dedicado. Usar `{T}` con `.push()` / `.pop_first()`:
+No there is type `Queue<T>` dedicado. Usar `{T}` with `.push()` / `.pop_first()`:
 
 ```ky
 q: {i32} = {}
-q.push(10)                   # enqueue
+q.push(10) # enqueue
 q.push(20)
-val = q.pop_first()           # dequeue → 10 (FIFO)
+val = q.pop_first() # dequeue → 10 (FIFO)
 q.len()
 ```
 
 ### Stack via list [ ]
 
-No hay tipo `Stack<T>` dedicado. Usar `{T}` con `.push()` / `.pop()` — ya funciona:
+No there is type `Stack<T>` dedicado. Usar `{T}` with `.push()` / `.pop()` — ya funciona:
 
 ```ky
 st: {i32} = {}
-st.push(10)                  # push
+st.push(10) # push
 st.push(20)
-val = st.pop()               # → 20 (LIFO)
+val = st.pop() # → 20 (LIFO)
 st.len()
 ```
 
-> **Decisión de diseño:** Stack y Queue no tienen tipos dedicados porque `{T}` ya soporta
-> todas las operaciones necesarias con métodos `.push()`, `.pop()`, `.pop_first()`.
-> Esto sigue el enfoque de Go y JavaScript, donde arrays/listas cubren ambos roles.
+> **Decision de diseno:** Stack y Queue no have typis dedicados porque `{T}` ya supports
+> todas operacionis necesarias with methods `.push()`, `.pop()`, `.pop_first()`.
+> Esto sigue enfoque de Go y JavaScript, where arrays/lists cubren ambos roles.
 
 ### Slice: `&[T]` [ ]
 
@@ -151,8 +151,8 @@ Vista de un array existente (no copia). Similar a Rust `&[T]`.
 
 ```ky
 a = [1, 2, 3, 4, 5]
-s: &[i32] = &a[1..3]        # slice: [2, 3]
-first = s[0]                 # → 2
+s: &[i32] = &a[1..3] # slice: [2, 3]
+first = s[0] # → 2
 ```
 
 ---
@@ -163,22 +163,22 @@ first = s[0]                 # → 2
 
 ```ky
 name: str? = None
-if value = get_name():       # pattern matching
-    println(value)
+if value = get_name(): # pattern matching
+ println(value)
 ```
 
 ### Fallible: `T!` [ ]
 
 ```ky
 fn divide(a: i32, b: i32) i32!:
-    if b == 0:
-        return error("division by zero")
-    a / b
+ if b == 0:
+ return error("division by zero")
+ a / b
 
 result = divide(10, 2)
 match result:
-    ok(v): println(v)
-    error(e): println(e)
+ ok(v): println(v)
+ error(e): println(e)
 ```
 
 ---
@@ -188,41 +188,41 @@ match result:
 ### Mutable: `^T` [x]
 
 ```ky
-x: ^i32 = 0          # mutable
-x = x + 1            # reasignación permitida
+x: ^i32 = 0 # mutable
+x = x + 1 # reallocation permitida
 ```
 
 ### Borrow: `&T` [x]
 
 ```ky
-fn read(s: &str):     # parámetro: borrow
-    println(s)
+fn read(s: &str): # parameter: borrow
+ println(s)
 
 fn main():
-    name = "Kyle"
-    read(&name)        # name prestado
-    println(name)       # ✅ name sigue vivo
+ name = "Kyle"
+ read(&name) # name prestado
+ println(name) # ✅ name sigue vivo
 ```
 
 ### Mutable borrow: `^&T` [x]
 
 ```ky
 fn fill(buf: ^&str):
-    buf = "datos"
+ buf = "data"
 
 fn main():
-    buf: ^str = ""
-    fill(^&buf)
-    println(buf)         # "datos"
+ buf: ^str = ""
+ fill(^&buf)
+ println(buf) # "data"
 ```
 
 ### box: `box<T>` [ ]
 
-Heap allocation explícita.
+Heap allocation explicita.
 
 ```ky
 b: box<i32> = box(42)
-*b = *b + 1              # deref + mutate
+*b = *b + 1 # deref + mutate
 ```
 
 ### rc: `rc<T>` [ ]
@@ -231,8 +231,8 @@ Reference counting (single-thread).
 
 ```ky
 r: rc<str> = rc("hello")
-r2 = r.clone()          # incrementa refcount
-println(*r)               # deref
+r2 = r.clone() # incrementa refcount
+println(*r) # deref
 ```
 
 ### arc: `arc<T>` [ ]
@@ -251,25 +251,25 @@ a: arc<i64> = arc(0)
 
 ```ky
 async fn fetch(url: &str) str:
-    "response"
+ "response"
 
 fn main():
-    task = async: fetch("https://...")
-    result = await task
+ task = async: fetch("https://...")
+ result = await task
 ```
 
 ### future: `future<T>` [ ]
 
 ```ky
 task: future<str> = async:
-    "result"
+ "result"
 val = await task
 ```
 
 ### channel: `channel<T>` [ ]
 
 ```ky
-ch: channel<i32> = channel(16)     # buffer 16
+ch: channel<i32> = channel(16) # buffer 16
 ch.send(42)
 val = ch.recv()
 ch.len()
@@ -280,12 +280,12 @@ ch.close()
 
 ```ky
 select:
-    &msg -> ch1:
-        println("got: " + msg)
-    &msg -> ch2:
-        println("got: " + msg)
-    after 1s:
-        println("timeout")
+ &msg -> ch1:
+ println("got: " + msg)
+ &msg -> ch2:
+ println("got: " + msg)
+ after 1s:
+ println("timeout")
 ```
 
 ### mutex: `mutex<T>` [ ]
@@ -293,7 +293,7 @@ select:
 ```ky
 m: mutex<i32> = mutex(0)
 lock(m):
-    *val += 1                 # operación segura
+ *val += 1 # operation segura
 ```
 
 ### atomic: `atomic_i64` / `atomic_bool` [ ]
@@ -301,11 +301,11 @@ lock(m):
 ```ky
 counter: atomic_i64 = atomic_i64(0)
 counter.fetch_add(1)
-counter.load()                # → 1
+counter.load() # → 1
 
 flag: atomic_bool = atomic_bool(false)
 flag.store(true)
-flag.load()                   # → true
+flag.load() # → true
 ```
 
 ### iterator [ ]
@@ -314,15 +314,15 @@ flag.load()                   # → true
 iter = list.iter()
 doubled = iter.map(fn(x): x * 2)
 filtered = iter.filter(fn(x): x > 5)
-result = doubled.collect()     # → {i32}
+result = doubled.collect() # → {i32}
 ```
 
 ---
 
-## Specialized types (NATIVOS)
+## Specialized typis (NATIVOS)
 
-> Todos estos son nativos de Kyle (no requieren `from X import Y`).
-> Están disponibles globalmente como tipos built-in del lenguaje.
+> Todos estos are nativos de Kyle (no requieren `from X import Y`).
+> Estan disponiblis globalmente as typis built-in del language.
 
 ### date_time [ ]
 
@@ -348,7 +348,7 @@ d = duration.from_secs(60)
 d = duration.from_millis(1000)
 d = duration.from_hours(1)
 d = duration.from_days(7)
-d.to_str()              # → "1h 0m 0s"
+d.to_str() # → "1h 0m 0s"
 ```
 
 ### date [ ]
@@ -374,14 +374,14 @@ minute = t.minute()
 second = t.second()
 ```
 
-### bytes [ ]
+### bytis [ ]
 
 ```ky
 b = bytes.new(1024)
 b = bytes.from_hex("deadbeef")
 b = bytes.from_base64("SGVsbG8=")
 b.len()
-val = b.get(0)           # → byte
+val = b.get(0) # → byte
 b.set(0, 255)
 hex = b.hex()
 b64 = b.to_base64()
@@ -391,10 +391,10 @@ b64 = b.to_base64()
 
 ```ky
 d = decimal.from_str("3.14")
-d = decimal.from_i64(314, 2)    # 3.14
-d.round(1)                       # → 3.1
-d.truncate()                     # → 3
-d.to_str()                       # → "3.14"
+d = decimal.from_i64(314, 2) # 3.14
+d.round(1) # → 3.1
+d.truncate() # → 3
+d.to_str() # → "3.14"
 ```
 
 ### uuid [ ]
@@ -409,37 +409,37 @@ id.to_str()
 
 ```ky
 u = url.parse("https://user:pass@host:8080/path?q=1#frag")
-u.scheme()     # → "https"
-u.host()       # → "host"
-u.port()       # → 8080
-u.path()       # → "/path"
-u.query()      # → "q=1"
+u.scheme() # → "https"
+u.host() # → "host"
+u.port() # → 8080
+u.path() # → "/path"
+u.query() # → "q=1"
 ```
 
 ### regex [ ]
 
 ```ky
 re = regex("[0-9]+")
-re.is_match("abc123")       # → true
-m = re.find("abc123")       # → "123"
-result = re.replace("abc123", "X")  # → "abcX"
+re.is_match("abc123") # → true
+m = re.find("abc123") # → "123"
+result = re.replace("abc123", "X") # → "abcX"
 ```
 
 ### env [ ]
 
 ```ky
 val = env("PATH")
-env("MY_VAR", "value")      # set
+env("MY_VAR", "value") # set
 ```
 
-### json [ ]
+### jare [ ]
 
 ```ky
 j = json.parse('{"name": "Kyle", "age": 30}')
-name = j["name"]          # access field
-j["city"] = "NYC"         # set field
-str = j.stringify()        # serialize
-str = j.pretty()           # pretty-print
+name = j["name"] # access field
+j["city"] = "NYC" # set field
+str = j.stringify() # serialize
+str = j.pretty() # pretty-print
 ```
 
 ### file [ ]
@@ -450,9 +450,9 @@ f.write("hello world")
 f.close()
 
 f = file.open("/tmp/test.txt", "r")
-content = f.read()           # → str
+content = f.read() # → str
 f.close()
-f.exists()                   # → true
+f.exists() # → true
 ```
 
 ### socket [ ]
@@ -476,13 +476,13 @@ conn.close()
 
 ```ky
 p = path("/home/user/file.txt")
-p.dirname()          # → "/home/user"
-p.basename()         # → "file.txt"
-p.extension()        # → ".txt"
-p.exists()           # → true
-p.is_file()           # → true
-p.is_dir()            # → false
-p.join("subdir")     # → "/home/user/file.txt/subdir"
+p.dirname() # → "/home/user"
+p.basename() # → "file.txt"
+p.extension() # → ".txt"
+p.exists() # → true
+p.is_file() # → true
+p.is_dir() # → false
+p.join("subdir") # → "/home/user/file.txt/subdir"
 ```
 
 ### big_int [ ]
@@ -508,9 +508,9 @@ result = sb.to_str()
 
 ## Status summary
 
-| Categoría | [x] Completo | [ ] Diseñado | ❌ No planeado |
+| Category | [x] Completo | [ ] Designed | ❌ No planned |
 |-----------|:-----------:|:-----------:|:-------------:|
-| Primitives | 13 | 2 (`u8-u64` codegen, `never`) | 1 (`byte`) |
+| Primitivis | 13 | 2 (`u8-u64` codegen, `never`) | 1 (`byte`) |
 | Compounds | 4 | 4 (tuple, set, slice) | 2 (Queue, Stack — usar `{T}`) |
 | Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |

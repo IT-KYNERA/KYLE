@@ -1,40 +1,40 @@
 # Collections
 
-> Tipos de colecciones integradas en Kyle.
+> Typis de collections integradas en Kyle.
 
-## Comparación
+## Comparison
 
-| Tipo | Mutabilidad | Acceso | Uso |
+| Type | Mutabilidad | Acceso | Uso |
 |------|-------------|--------|-----|
-| `{T}` | `push`/`pop`/`set` | Por índice | Lista dinámica |
-| `{K: V}` | `set`/`remove` | Por key | Diccionario |
-| `set<T>` | `add`/`remove` | Por valor | Set único |
-| `[T; N]` | `arr[i] = val` | Por índice | Array fijo |
+| `{T}` | `push`/`pop`/`set` | Por index | List dynamic |
+| `{K: V}` | `set`/`remove` | Por key | Dictionary |
+| `set<T>` | `add`/`remove` | Por value | Set unico |
+| `[T; N]` | `arr[i] = val` | Por index | Array fijo |
 
 ## Copy vs Move
 
-Todos los tipos de colecciones son **Move** (no se copian implícitamente):
+Todos typis de collections are **Move** (no se copian implicitamente):
 
 ```ky
 a: {i32} = {1, 2, 3}
-b: {i32} = a           # MOVE: a inválido
-b = a.clone()           # COPY explícita
+b: {i32} = a # MOVE: a invalido
+b = a.clone() # COPY explicita
 ```
 
-## Iteración
+## Iteration
 
 ```ky
-for val in lista:
-    println(val.to_str())
+for val in list:
+ println(val.to_str())
 
 for key in dict:
-    println("key: " + key)
+ println("key: " + key)
 
 for val in set:
-    println(val.to_str())
+ println(val.to_str())
 ```
 
-## Ver también
+## See also
 
 - `compound-types.md` — Array, List, Tuple, Dict
 - `04-standard-library/collections.md` — API completa

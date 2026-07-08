@@ -1,65 +1,65 @@
 # Move Semantics
 
-> Por defecto, `y = x` transfiere ownership para tipos no-Copy.
-> Ver `ownership.md` para las reglas completas.
+> Por defecto, `y = x` transfiere ownership for typis no-Copy.
+> Ver `ownership.md` for rules completas.
 
 ## Regla general
 
-| Tipo | Semántica en `y = x` |
+| Type | Semantics en `y = x` |
 |------|---------------------|
 | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` | **Copy** — ambos vivos |
-| `str`, `{T}`, `{K:V}`, `[T; N]`, clases | **Move** — `x` inválido |
+| `str`, `{T}`, `{K:V}`, `[T; N]`, clasis | **Move** — `x` invalido |
 
 ## Comportamiento
 
 ```ky
 s: str = "hola"
-t: str = s          # MOVE: s ya no es válido
-println(s)          # ERROR: use-after-move
+t: str = s # MOVE: s ya no is valido
+println(s) # ERROR: use-after-move
 
-# Para copiar sin mover:
-t = s.clone()       # COPY explícita: ambos vivos
-println(s)          # ✅ "hola"
+# Para copiar without mover:
+t = s.clone() # COPY explicita: ambos vivos
+println(s) # ✅ "hola"
 ```
 
-## En parámetros de función
+## En parameters de funcion
 
 ```ky
-fn consumir(s: str):     # MOVE: caller pierde ownership
-    println(s)
+fn consumir(s: str): # MOVE: caller pierde ownership
+ println(s)
 
 fn main() i32:
-    nombre: str = "Kyle"
-    consumir(nombre)      # nombre se mueve a consumir
-    println(nombre)       # ERROR: use-after-move
-    0
+ name: str = "Kyle"
+ consumir(name) # name se mueve a consumir
+ println(name) # ERROR: use-after-move
+ 0
 ```
 
-## En retorno de función
+## En retorno de funcion
 
 ```ky
-fn crear() str:
-    s: str = "hola"
-    s                    # se mueve al caller
+fn create() str:
+ s: str = "hola"
+ s # se mueve al caller
 
 fn main() i32:
-    x: str = crear()     # x recibe ownership
-    println(x)            # ✅ "hola"
-    0
+ x: str = create() # x recibe ownership
+ println(x) # ✅ "hola"
+ 0
 ```
 
 ## Borrow checker
 
-El compilador detecta use-after-move automáticamente:
+El compiler detecta use-after-move automaticamente:
 
 ```ky
 a: str = "x"
 b: str = a
-println(a)   # ❌ KL-E0013: use-after-move
+println(a) # ❌ KL-E0013: use-after-move
 ```
 
-## Ver también
+## See also
 
 - `ownership.md` — Reglas completas de ownership
 - `copy.md` — Copy semantics
-- `clone.md` — Clone explícito
+- `clone.md` — Clone explicito

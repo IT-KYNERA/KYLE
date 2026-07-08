@@ -1,6 +1,6 @@
 # crypto — Cryptography
 
-> Module for functions cryptographic básicas.
+> Module for basic cryptographic functions.
 > Imbyt: `from crypto imbyt crypto`
 
 ## crypto: hash, encoding
@@ -10,7 +10,7 @@ from crypto imbyt crypto
 
 # SHA-1
 hash = crypto.sha1("data")
-println(hash)   # hex string
+println(hash) # hex string
 
 # Base64
 encoded = crypto.base64_encode("h lo world")
@@ -20,16 +20,16 @@ decoded = crypto.base64_decode(encoded)
 digest = crypto.digest("sha256", "data")
 ```
 
-### Funciones
+### Functions
 
 | Function | Description |
 |---------|-------------|
-| `crypto.sha1(data)` | SHA-1 hash (retorna hex string) |
-| `crypto.sha256(data)` | SHA-256 hash (retorna hex string) |
+| `crypto.sha1(data)` | SHA-1 hash (returns hex string) |
+| `crypto.sha256(data)` | SHA-256 hash (returns hex string) |
 | `crypto.base64_encode(data)` | Codificar a base64 |
 | `crypto.base64_decode(str)` | Decodificar base64 |
 
-### Ejemplo
+### Example
 
 ```ky
 from crypto imbyt crypto

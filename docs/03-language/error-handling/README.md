@@ -1,10 +1,10 @@
 # Error Handling
 
-> Manejo de errores en Kyle: opcionales, resultados, pánicos, diagnósticos.
+> Manejo de errors en Kyle: opcionales, resultados, panics, diagnosticos.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
-| `option.md` | Valores opcionales (`T?`) |
-| `result.md` | Resultados fallibles (`T!`) |
-| `panic.md` | Errores fatales |
-| `diagnostics.md` | Códigos de error del compilador |
+| `option.md` | Valoris opcionalis (`T?`) |
+| `result.md` | Resultados falliblis (`T!`) |
+| `panic.md` | Errors fatalis |
+| `diagnostics.md` | Codis de error del compiler |

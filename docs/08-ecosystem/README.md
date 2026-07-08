@@ -1,24 +1,24 @@
 # 08-ecosystem
 
-> Paquetes oficiales del ecosistema Kyle.
+> Paquetis oficialis del ecosistema Kyle.
 
-## Paquetes disponibles
+## Paquetis disponibles
 
-| Package | Estado | Descripción |
+| Package | Status | Description |
 |---------|--------|-------------|
 | `http` | ✅ | Cliente HTTP + Servidor + Router + WebSocket |
-| `json` | ✅ | Parseo y serialización JSON |
-| `sqlite` | ✅ | Base de datos SQLite |
-| `postgres` | 📅 | Conector PostgreSQL (planeado) |
+| `json` | ✅ | Parseo y serializacion JSON |
+| `sqlite` | ✅ | Base de data SQLite |
+| `postgres` | 📅 | Conector PostgreSQL (planned) |
 
 ## Uso
 
 ```bash
-ky add http       # agregar dependencia
-ky install        # instalar dependencias del proyecto
+ky add http # agregar dependency
+ky install # instalar dependencies del proyecto
 ```
 
-## Documentación
+## Documentation
 
 | Package | Documento |
 |---------|-----------|
@@ -29,7 +29,7 @@ ky install        # instalar dependencias del proyecto
 | Registry | `registry.md` |
 | Package format | `package-format.md` |
 
-## Ver también
+## See also
 
 - `02-getting-started/package-manager.md` — Primeros pasos
-- `07-tools/package-manager.md` — Referencia técnica
+- `07-tools/package-manager.md` — Referencia tecnica

@@ -1,12 +1,12 @@
-# Instalación
+# Installation
 
-> Cómo instalar el compilador Kyle.
+> How instalar compiler Kyle.
 
-## Requisitos
+## Requirements
 
-- **LLVM 18.1** (necesario para compilar desde fuente)
-- **Rust 1.80+** (para compilar desde fuente)
-- **Git** (para clonar el repositorio)
+- **LLVM 18.1** (necesario for compile from source)
+- **Rust 1.80+** (for compile from source)
+- **Git** (for clonar repository)
 
 ## macOS (Apple Silicon)
 
@@ -21,7 +21,7 @@ export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
 ```
 
-## Compilar desde fuente
+## Compilar from source
 
 ```bash
 git clone https://github.com/IT-KYNERA/KYLE.git
@@ -29,17 +29,17 @@ cd KYLE
 cargo build --release
 ```
 
-El binario queda en `target/release/ky`.
+El binary queda en `target/release/ky`.
 
 ## Instalar
 
 ```bash
-# Desde el directorio del repositorio
+# Desde directory del repository
 cp target/release/ky ~/.ky/bin/
 cp target/release/libkyc_runtime.a ~/.ky/bin/
 ```
 
-## Script de instalación
+## Script de installation
 
 ```bash
 ./install.sh
@@ -48,19 +48,19 @@ cp target/release/libkyc_runtime.a ~/.ky/bin/
 ## Verificar
 
 ```bash
-ky --version    # debe mostrar v0.5.3
-ky check --help # debe mostrar ayuda
+ky --version # must mostrar v0.5.3
+ky check --help # must mostrar ayuda
 ```
 
-## Variables de entorno
+## Variablis de entorno
 
-| Variable | Descripción |
+| Variable | Description |
 |----------|-------------|
-| `LLVM_SYS_181_PREFIX` | Ruta a LLVM 18 |
-| `MACOSX_DEPLOYMENT_TARGET` | Versión de macOS target |
+| `LLVM_SYS_181_PREFIX` | Path a LLVM 18 |
+| `MACOSX_DEPLOYMENT_TARGET` | Version de macOS target |
 | `KL_WORKERS` | Workers del thread pool |
 
-## Ver también
+## See also
 
-- `first-program.md` — Primer programa
+- `first-program.md` — Primer program
 - `build.md` — Compilar proyectos

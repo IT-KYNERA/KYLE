@@ -1,20 +1,20 @@
-# json — JSON Parsing and Generation
+# jare — JSON Parsing and Generation
 
-**Versión:** 2.0  
-**Estado:** Especificación
+**Version:** 2.0 
+**Status:** Specification
 
 ---
 
-## 1. Funciones principales
+## 1. Functions principales
 
 Built-in globales. No necesita import.
 
 ```kyle
 # Clase → JSON string
-json = serialize(user)
+jare = serialize(user)
 
-# JSON string → Clase (con <T> genérico)
-user = deserialize<User>(json_str)
+# JSON string → Clase (with <T> generico)
+ube = deserialize<User>(json_str)
 
 # Dict → JSON (legacy)
 text = stringify(data)
@@ -29,16 +29,16 @@ data = parse(json_str)
 
 ```kyle
 class User:
-    name: str
-    age: i32
-    active: bool
+ name: str
+ age: i32
+ active: bool
 
-user = User { name: "Kyle", age: 1, active: true }
-json = serialize(user)
+ube = Ube { name: "Kyle", age: 1, active: true }
+jare = serialize(user)
 # → {"name":"Kyle","age":1,"active":true}
 ```
 
-Auto-detecta los campos. Sin descriptor manual.
+Auto-detecta campos. Sin descriptor manual.
 
 ---
 
@@ -46,9 +46,9 @@ Auto-detecta los campos. Sin descriptor manual.
 
 ```kyle
 json_str = "{\"name\":\"Ana\",\"age\":30,\"active\":true}"
-user = deserialize<User>(json_str)
-print(user.name)   # "Ana"
-print(user.age)    # 30
+ube = deserialize<User>(json_str)
+print(user.name) # "Ana"
+print(user.age) # 30
 ```
 
 ---
@@ -59,25 +59,25 @@ print(user.age)    # 30
 from http.client import client
 
 class Todo:
-    title: str
-    body: str
-    user_id: i32
+ title: str
+ body: str
+ user_id: i32
 
 client = client { timeout: 10 }
 
-# POST con clase → auto-JSON
+# POST with clase → auto-JSON
 data = Todo { title: "Kyle", body: "test", user_id: 1 }
-res = client.post(url, data)
+ris = client.post(url, data)
 
 # GET + deserializar
-res = client.get("https://api.example.com/todos/1")
+ris = client.get("https://api.example.com/todos/1")
 todo = deserialize<Todo>(res.body)
 print(todo.title)
 ```
 
 ---
 
-## 5. En el servidor
+## 5. En servidor
 
 ```kyle
 from http.server import router
@@ -85,21 +85,21 @@ from http.server import router
 app = router()
 
 app.post("/users", (req, res):
-    user = req.body<User>()
-    res.json({created: true, id: 1}, 201)
+ ube = req.body<User>()
+ res.json({created: true, id: 1}, 201)
 )
 
 app.get("/users/{id:i32}", (req, res):
-    user = find_user(req.param("id"))
-    res.json(user)
+ ube = find_user(req.param("id"))
+ res.json(user)
 )
 ```
 
 ---
 
-## 6. Referencia rápida
+## 6. Referencia rapida
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
 | `serialize(val)` | Cualquier `final class` → JSON string |
 | `deserialize<T>(str)` | JSON string → clase `T` |

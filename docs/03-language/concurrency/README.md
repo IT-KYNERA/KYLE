@@ -1,11 +1,11 @@
 # Concurrency
 
-> Concurrencia y paralelismo en Kyle.
+> Concurrency y paralelismo en Kyle.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
-| `async-await.md` | Async/await sobre thread pool |
-| `threads.md` | Hilos del sistema operativo |
-| `channels.md` | Comunicación entre hilos |
+| `async-await.md` | Async/await about thread pool |
+| `threads.md` | Threads del sistema operativo |
+| `channels.md` | Communication between threads |
 | `synchronization.md` | Mutex, barriers |
-| `atomics.md` | Operaciones atómicas |
+| `atomics.md` | Operacionis atomicas |

@@ -1,100 +1,100 @@
 # Variables
 
-> Declaración y uso de variables en Kyle.
+> Declaration y uso de variablis en Kyle.
 
-## Declaración
+## Declaration
 
-Las variables se declaran con `nombre = valor`. No hay `let`, `var` ni `const`.
+Las variablis se declaran with `name = value`. No there is `let`, `var` ni `const`.
 
 ```ky
-x: i32 = 42              # tipo explícito + valor
-y = 10                   # tipo inferido (i32)
-nombre: str = "Ana"      # string
-sueldo: f64 = 3500.50    # float
-activo: bool = true      # bool
+x: i32 = 42 # type explicito + value
+y = 10 # type inferido (i32)
+name: str = "Ana" # string
+sueldo: f64 = 3500.50 # float
+activo: bool = true # bool
 ```
 
-## Inmutabilidad por defecto
+## Inmutabilidad by defecto
 
-Por defecto, las variables son **inmutables**. No se pueden reasignar.
+Por defecto, variablis are **inmutables**. No se can reallocate.
 
 ```ky
 x: i32 = 10
-x = 20   # ERROR: cannot modify immutable variable 'x'
+x = 20 # ERROR: cannot modify immutable variable 'x'
 ```
 
-### Mutabilidad con `^T`
+### Mutabilidad with `^T`
 
 ```ky
-x: ^i32 = 10     # mutable
-x = x + 1        # ✅ permitido
+x: ^i32 = 10 # mutable
+x = x + 1 # ✅ permitido
 
-nombre: ^str = "Ana"
-nombre = "Pepe"  # ✅ permitido
+name: ^str = "Ana"
+name = "Pepe" # ✅ permitido
 ```
 
-## Tipos Copy vs Move
+## Typis Copy vs Move
 
-### Copy (numéricos, bool, char, ptr)
+### Copy (numericos, bool, char, ptr)
 
 ```ky
 x: i32 = 42
-y: i32 = x       # COPY: ambos vivos
-println(x)        # ✅ 42
+y: i32 = x # COPY: ambos vivos
+println(x) # ✅ 42
 
 a: f64 = 3.14
-b: f64 = a       # COPY
+b: f64 = a # COPY
 ```
 
 ### Move (str, {T}, {K:V}, [T; N], clases)
 
 ```ky
 s: str = "hola"
-t: str = s        # MOVE: s inválido después
-println(s)        # ❌ ERROR: use-after-move
+t: str = s # MOVE: s invalido after
+println(s) # ❌ ERROR: use-after-move
 
-# Copia explícita
-t = s.clone()     # ambos vivos
-println(s)        # ✅ "hola"
+# Copia explicita
+t = s.clone() # ambos vivos
+println(s) # ✅ "hola"
 ```
 
 ## Shorthands globales
 
-`print()`, `println()`, `input()` están disponibles globalmente:
+`print()`, `println()`, `input()` are disponiblis globalmente:
 
 ```ky
 println("hello")
-name: str = input("¿nombre? ")
+name: str = input("name? ")
 ```
 
 ## Tipado estricto
 
-Kyle es **fuertemente tipado**. No hay coerción implícita entre tipos incompatibles.
+Kyle is **fuertemente tipado**. No there is coercion implicita between typis incompatibles.
 
 ```ky
 x: i32 = 42
-y: f64 = x as f64   # ✅ cast explícito
-# y = x             # ❌ type mismatch
+y: f64 = x as f64 # ✅ cast explicito
+# y = x # ❌ type mismatch
 ```
 
 ## Scope
 
-Las variables pertenecen al bloque donde se declaran:
+Las variablis pertenecen al bloque where se declaran:
 
 ```ky
 x: i32 = 1
 if true:
-    y: i32 = 2
-    x = x + y       # ✅ acceso a variable exterior
-# y no accesible aquí
+ y: i32 = 2
+ x = x + y # ✅ acceso a variable exterior
+# y no accesible aqui
 ```
 
 ## Destructuring
 
 ```ky
 punto: (i32, str) = (10, "hello")
-(x, y) = punto       # x=10, y="hello"
+(x, y) = punto # x=10, y="hello"
 
-lista: {i32} = {1, 2, 3}
-(primero, segundo) = lista
+list: {i32} = {1, 2, 3}
+(primero, segundo) = list
 ```

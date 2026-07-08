@@ -1,37 +1,37 @@
-# postgres — PostgreSQL Driver
+# postgris — PostgreSQL Driver
 
-**Versión:** 1.0  
-**Estado:** Especificación
+**Version:** 1.0 
+**Status:** Specification
 
 ---
 
-## 1. Filosofía
+## 1. Philosophy
 
-Driver PostgreSQL nativo vía FFI a `libpq`. Mínimo overhead, tipado fuerte, cero magia.
+Driver PostgreSQL nativo via FFI a `libpq`. Minimum overhead, tipado fuerte, cero magia.
 
 ```kyle
-from postgres import pool, Row
+from postgris import pool, Row
 ```
 
 ---
 
-## 2. Conexión
+## 2. Connection
 
 ```kyle
-from postgres import pool
+from postgris import pool
 
 pool = pool.new("postgresql://user:pass@localhost:5432/mydb")
 
 # Una consulta
 rows = pool.query("SELECT * FROM users")
 for row in rows:
-    print(row["name"])
+ print(row["name"])
 ```
 
 ### pool vs Connection
 
 ```kyle
-# pool (recomendado) — reusa conexiones
+# pool (recommended) — reusa connections
 pool = pool.new(conn_string, max_size=10)
 
 # Connection directa (una sola)
@@ -50,12 +50,12 @@ conn.close()
 rows = pool.query("SELECT id, name, age FROM users")
 
 for row in rows:
-    print(row["id"])       # i64
-    print(row["name"])     # str
-    print(row["age"])      # i64 (NULL → 0)
+ print(row["id"]) # i64
+ print(row["name"]) # str
+ print(row["age"]) # i64 (NULL → 0)
 ```
 
-### Con parámetros
+### Con parameters
 
 ```kyle
 rows = pool.query("SELECT * FROM users WHERE age > $1", [18])
@@ -65,7 +65,7 @@ rows = pool.query("SELECT * FROM users WHERE age > $1", [18])
 
 ```kyle
 n = pool.execute("INSERT INTO users (name, age) VALUES ($1, $2)", {"Ana", 30})
-print(n)   # número de filas afectadas
+print(n) # numero de filas afectadas
 ```
 
 ### Transacciones
@@ -84,50 +84,50 @@ conn.close()
 
 ## 4. Tipado
 
-### Row — acceso por nombre
+### Row — acceso by name
 
 ```kyle
 final class Row:
-    fn get<T>(name: str) T       # con tipo explícito
-    fn get(name: str) i64        # default i64
-    fn get_str(name: str) str
-    fn get_i64(name: str) i64
-    fn get_f64(name: str) f64
-    fn get_bool(name: str) bool
-    fn keys() list<str>           # columnas disponibles
+ fn get<T>(name: str) T # with type explicito
+ fn get(name: str) i64 # default i64
+ fn get_str(name: str) str
+ fn get_i64(name: str) i64
+ fn get_f64(name: str) f64
+ fn get_bool(name: str) bool
+ fn keys() list<str> # columnas disponibles
 ```
 
-### Mapeo a clases (con deserialize)
+### Mapeo a clasis (with deserialize)
 
 ```kyle
-from postgres import pool
-from json import deserialize
+from postgris import pool
+from jare import deserialize
 
 class User:
-    id: i64
-    name: str
-    email: str
+ id: i64
+ name: str
+ email: str
 
 rows = pool.query("SELECT id, name, email FROM users WHERE id = $1", [1])
 if len(rows) > 0:
-    user = deserialize<User>(rows[0].json())
-    print(user.name)
+ ube = deserialize<User>(rows[0].json())
+ print(user.name)
 ```
 
-### Valores NULL
+### Valoris NULL
 
 ```kyle
-age = row.get("age")     # 0 si NULL (i64 default)
-age = row.get("age") as i64?  # 0 si NULL con Option
-name = row.get_str("name")  # "" si NULL
+age = row.get("age") # 0 si NULL (i64 default)
+age = row.get("age") as i64? # 0 si NULL with Option
+name = row.get_str("name") # "" si NULL
 ```
 
 ---
 
-## 5. Migraciones (simple)
+## 5. Migracionis (simple)
 
 ```kyle
-from postgres import pool
+from postgris import pool
 
 pool = pool.new(conn_string)
 
@@ -140,31 +140,31 @@ pool.execute("CREATE TABLE IF NOT EXISTS posts (id SERIAL PRIMARY KEY, user_id I
 
 ## 6. API completa
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
-| `pool.new(conn_str)` | Crear pool de conexiones |
-| `pool.query(sql)` | SELECT → lista de Rows |
-| `pool.query(sql, params)` | SELECT con parámetros |
+| `pool.new(conn_str)` | Crear pool de conexionis |
+| `pool.query(sql)` | SELECT → list de Rows |
+| `pool.query(sql, params)` | SELECT with parameters |
 | `pool.execute(sql)` | INSERT/UPDATE/DELETE → filas afectadas |
-| `pool.execute(sql, params)` | Con parámetros |
-| `pool.get_conn()` | Obtener conexión del pool |
-| `conn.begin()` | Iniciar transacción |
-| `conn.commit()` | Confirmar transacción |
-| `conn.rollback()` | Revertir transacción |
-| `conn.close()` | Cerrar conexión |
-| `row.get(name)` | Obtener valor por nombre (i64) |
+| `pool.execute(sql, params)` | Con parameters |
+| `pool.get_conn()` | Obtener connection del pool |
+| `conn.begin()` | Iniciar transaccion |
+| `conn.commit()` | Confirmar transaccion |
+| `conn.rollback()` | Revertir transaccion |
+| `conn.close()` | Cerrar connection |
+| `row.get(name)` | Obtener value by name (i64) |
 | `row.get_str(name)` | Obtener string |
 | `row.get_i64(name)` | Obtener i64 |
 | `row.get_f64(name)` | Obtener f64 |
 | `row.get_bool(name)` | Obtener bool |
 | `row.json()` | Serializar row a JSON string |
-| `row.keys()` | Lista de columnas |
+| `row.keys()` | List de columnas |
 
 ---
 
-## 7. Implementación
+## 7. Implementation
 
-El driver usa `extern fn` + `@link "pq"` para llamar a libpq:
+El driver usa `extern fn` + `@link "pq"` for llamar a libpq:
 
 ```kyle
 @link "pq"
@@ -176,7 +176,7 @@ extern fn PQgetvalue(result: ptr, row: i32, col: i32) ptr
 extern fn PQfinish(conn: ptr)
 ```
 
-La implementación completa está en `packages/postgres/src/lib.ky`.
+La implementation completa is en `packages/postgres/src/lib.ky`.
 
 ---
 
@@ -193,4 +193,4 @@ apt install libpq-dev
 dnf install libpq-devel
 ```
 
-El package linkea automáticamente con `@link "pq"`.
+El package linkea automaticamente with `@link "pq"`.

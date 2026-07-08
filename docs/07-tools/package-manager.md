@@ -1,24 +1,24 @@
 # Package Manager (Technical Reference)
 
-> Documentación técnica del gestor de paquetes.
-> Para uso básico, ver `02-getting-started/package-manager.md`.
+> Documentation tecnica del gestor de packages.
+> Para uso basico, ver `02-getting-started/package-manager.md`.
 
 ## Comandos
 
-| Comando | Descripción |
+| Comando | Description |
 |---------|-------------|
-| `ky add <pkg>` | Agregar dependencia |
-| `ky remove <pkg>` | Eliminar dependencia |
-| `ky install` | Instalar dependencias del proyecto |
-| `ky publish` | Publicar paquete en registry |
+| `ky add <pkg>` | Agregar dependency |
+| `ky remove <pkg>` | Eliminar dependency |
+| `ky install` | Instalar dependencies del proyecto |
+| `ky publish` | Publicar package en registry |
 
-## Formato del paquete
+## Formato del package
 
 ```
 package-name/
-├── ky.toml          # metadata del paquete
+├── ky.toml # metadata del package
 └── src/
-    └── lib.ky       # código fuente
+ └── lib.ky # code source
 ```
 
 ## Registry URL
@@ -27,7 +27,7 @@ package-name/
 https://IT-KYNERA.github.io/KYLE/docs
 ```
 
-## Ver también
+## See also
 
-- `02-getting-started/package-manager.md` — Guía de uso
-- `08-ecosystem/registry.md` — Especificación del registry
+- `02-getting-started/package-manager.md` — Guide de uso
+- `08-ecosystem/registry.md` — Specification del registry

@@ -1,39 +1,39 @@
 # Macros
 
-> **No implementado.** Kyle no tiene sistema de macros actualmente.
+> **No implemented.** Kyle no has sistema de macros currentmente.
 
-## Estado
+## Status
 
-| Tipo de macro | Status |
+| Type de macro | Status |
 |---------------|--------|
 | `#[attribute]` | ✅ Parcial (solo `#[test]`, `#[bench]`) |
-| Macros procedurales | ❌ No implementado |
-| Macros declarativas (`macro_rules!`) | ❌ No implementado |
-| `compile-time` functions | ❌ No implementado |
+| Macros proceduralis | ❌ No implemented |
+| Macros declarativas (`macro_rules!`) | ❌ No implemented |
+| `compile-time` functions | ❌ No implemented |
 
-## Alternativas actuales
+## Alternativas currentes
 
-Para metaprogramación, usa funciones y genéricos:
+Para metaprogramacion, usa functions y genericos:
 
 ```ky
 fn max<T: copy>(a: T, b: T) T:
-    if a > b: a else: b
+ if a > b: a else: b
 
 fn clamp<T: copy>(val: T, min: T, max: T) T:
-    if val < min: min
-    else if val > max: max
-    else: val
+ if val < min: min
+ else if val > max: max
+ else: val
 ```
 
 ## Futuro
 
-Las macros están en el roadmap para permitir:
+Las macros are en roadmap for permitir:
 - DSLs embebidos
-- Generación de código
-- Serialización automática
+- Generation de code
+- Serialization automatica
 - Traits derive
 
-## Ver también
+## See also
 
-- `generics.md` — Genéricos (alternativa a macros)
-- `attributes.md` — Atributos existentes
+- `generics.md` — Generics (alternativa a macros)
+- `attributes.md` — Attributis existentes

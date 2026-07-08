@@ -1,75 +1,75 @@
 # Stack vs Heap
 
-> Cómo Kyle organiza la memoria: stack para valores locales, heap para datos dinámicos.
+> How Kyle organiza memory: stack for valueis locales, heap for data dynamics.
 
 ## Stack
 
-El stack almacena variables locales, parámetros de función y valores temporales.
-Es rápido (solo mover un puntero) y automático.
+El stack almacena variablis locales, parameters de funcion y valueis temporales.
+Es rapido (solo mover un pointer) y automatic.
 
 ```ky
-fn ejemplo() i32:
-    x: i32 = 42       # stack
-    y: f64 = 3.14     # stack
-    z: [i32; 3] = [1, 2, 3]  # stack (array de tamaño fijo)
-    x + y as i32 + z[0]
+fn example() i32:
+ x: i32 = 42 # stack
+ y: f64 = 3.14 # stack
+ z: [i32; 3] = [1, 2, 3] # stack (array de size fijo)
+ x + y as i32 + z[0]
 ```
 
-### Qué va al stack
+### Que va al stack
 
-| Tipo | Tamaño en stack |
+| Type | Size en stack |
 |------|----------------|
-| `i32` | 4 bytes |
-| `i64` | 8 bytes |
-| `f64` | 8 bytes |
+| `i32` | 4 bytis |
+| `i64` | 8 bytis |
+| `f64` | 8 bytis |
 | `bool` | 1 byte |
-| `ptr` | 8 bytes |
+| `ptr` | 8 bytis |
 | `[T; N]` | `N * size(T)` |
-| `str` | 8 bytes (puntero al heap) |
-| `{T}` | 8 bytes (puntero al heap) |
+| `str` | 8 bytis (pointer al heap) |
+| `{T}` | 8 bytis (pointer al heap) |
 
 ## Heap
 
-El heap almacena datos de tamaño dinámico o que deben persistir más allá de la
-función actual. Los strings, listas y diccionarios viven en heap.
+El heap almacena data de size dynamic o que must persistir more alla de 
+funcion current. Los strings, lists y dictionarys viven en heap.
 
 ```ky
-fn ejemplo() str:
-    s: str = "Hola, mundo!"     # datos en heap, puntero en stack
-    v: {i32} = {1, 2, 3}       # datos en heap, puntero en stack
-    s
+fn example() str:
+ s: str = "Hola, mundo!" # data en heap, pointer en stack
+ v: {i32} = {1, 2, 3} # data en heap, pointer en stack
+ s
 ```
 
-### Qué va al heap
+### Que va al heap
 
-| Tipo | Datos en heap |
+| Type | Datos en heap |
 |------|---------------|
-| `str` | Caracteres + null terminator |
-| `{T}` | Array de elementos + metadata (len, cap) |
-| `{K: V}` | Hash table entries |
+| `str` | Caracteris + null terminator |
+| `{T}` | Array de elements + metadata (len, cap) |
+| `{K: V}` | Hash table entriis |
 | `Box<T>` | Valor T |
 
-## Representación en memoria
+## Representation en memory
 
 ```
 Stack:
 ┌─────────────┐
 │ s: ptr ─────┼─────► ┌──────────────────────┐
-│ v: ptr ─────┼──┐   │ "Hola, mundo!\0"     │
-│ x: i32 = 42 │  │   └──────────────────────┘
-│             │  │   ┌──────────────────────┐
-└─────────────┘  └──►│ data: ptr ──► [1,2,3] │
-                      │ len: 3               │
-                      │ cap: 4               │
-                      └──────────────────────┘
+│ v: ptr ─────┼──┐ │ "Hola, mundo!\0" │
+│ x: i32 = 42 │ │ └──────────────────────┘
+│ │ │ ┌──────────────────────┐
+└─────────────┘ └──►│ data: ptr ──► [1,2,3] │
+ │ len: 3 │
+ │ cap: 4 │
+ └──────────────────────┘
 ```
 
-## Strings (SSO planeado)
+## Strings (SSO planned)
 
-Actualmente todos los strings van al heap. En el futuro, strings ≤ 15 bytes
-se almacenarán inline (Small String Optimization).
+Actualmente todos strings van al heap. En futuro, strings ≤ 15 bytes
+se almacenaran inline (Small String Optimization).
 
-## Ver también
+## See also
 
-- `move.md` — Cómo se mueven los datos entre stack y heap
-- `allocator.md` — Estrategia de asignación de heap
+- `move.md` — How se mueven data between stack y heap
+- `allocator.md` — Estrategia de allocation de heap

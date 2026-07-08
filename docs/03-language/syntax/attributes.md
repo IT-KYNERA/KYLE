@@ -1,24 +1,24 @@
 # Attributes
 
-> Metadatos para funciones, clases y módulos mediante `#[...]`.
+> Metadatos for functions, clasis y modulis using `#[...]`.
 
-## Atributos disponibles
+## Attributis disponibles
 
-| Atributo | Destino | Descripción |
+| Attribute | Destino | Description |
 |----------|---------|-------------|
-| `#[test]` | `fn` | Marcar función como test |
-| `#[bench]` | `fn` | Marcar función como benchmark |
+| `#[test]` | `fn` | Marcar funcion as test |
+| `#[bench]` | `fn` | Marcar funcion as benchmark |
 
 ## #[test]
 
 ```ky
 #[test]
 fn test_addition():
-    assert.eq(2 + 2, 4)
+ assert.eq(2 + 2, 4)
 
 #[test]
 fn test_string():
-    assert.eq("hello", "hello")
+ assert.eq("hello", "hello")
 ```
 
 Ejecutar:
@@ -32,17 +32,17 @@ ky test
 ```ky
 #[bench]
 fn bench_fib():
-    fib(1000000)
+ fib(1000000)
 ```
 
-## Atributos en módulos (import)
+## Attributis en modulis (import)
 
 ```ky
-from json import json
+from jare import json
 from http import client
 ```
 
-## Ver también
+## See also
 
-- `04-standard-library/testing.md` — Testing con aserciones
+- `04-standard-library/testing.md` — Testing with aserciones
 - `macros.md` — Macros (futuro)

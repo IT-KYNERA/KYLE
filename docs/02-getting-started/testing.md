@@ -1,6 +1,6 @@
 # Testing
 
-> Kyle tiene un framework de testing integrado con el atributo `#[test]`.
+> Kyle has un framework de testing integrado with attribute `#[test]`.
 
 ## Escribir tests
 
@@ -9,14 +9,14 @@ from testing import assert
 
 #[test]
 fn test_addition():
-    result: i32 = 2 + 2
-    assert.eq(result, 4)
+ result: i32 = 2 + 2
+ assert.eq(result, 4)
 
 #[test]
 fn test_string():
-    assert.eq("hello", "hello")
-    assert.ne("hello", "world")
-    assert.str_eq("hello", "hello")
+ assert.eq("hello", "hello")
+ assert.ne("hello", "world")
+ assert.str_eq("hello", "hello")
 ```
 
 ## Ejecutar tests
@@ -25,16 +25,16 @@ fn test_string():
 ky test
 ```
 
-Busca funciones `#[test]` en `tests/`, las compila y ejecuta.
+Busca functions `#[test]` en `tests/`, compila y ejecuta.
 
 ## Aserciones
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
-| `assert.is_true(cond)` | Afirmar condición verdadera |
+| `assert.is_true(cond)` | Afirmar conditionn verdadera |
 | `assert.eq(a, b)` | Afirmar a == b |
 | `assert.ne(a, b)` | Afirmar a != b |
-| `assert.str_eq(a, b)` | Afirmar strings iguales |
+| `assert.str_eq(a, b)` | Afirmar strings igualis |
 
 ## Estructura del proyecto
 
@@ -42,40 +42,40 @@ Busca funciones `#[test]` en `tests/`, las compila y ejecuta.
 my-project/
 ├── ky.toml
 ├── src/
-│   └── main.ky
+│ └── main.ky
 └── tests/
-    ├── test_unit.ky
-    └── test_integration.ky
+ ├── test_unit.ky
+ └── test_integration.ky
 ```
 
-## Requisitos
+## Requirements
 
-Cada función de test debe:
-- No tomar parámetros
-- Retornar `i32` (0 = pasa, !=0 = falla)
-- Usar funciones `assert` para validación
+Cada funcion de test debe:
+- No tomar parameters
+- Retornar `i32` (0 = pasa, !=0 = fails)
+- Usar functions `assert` for validacion
 
-## Ejemplo completo
+## Example completo
 
 ```ky
 from testing import assert
 
 fn sum_list(lst: {i32}) i32:
-    result: ^i32 = 0
-    for val in lst:
-        result = result + val
-    result
+ result: ^i32 = 0
+ for val in lst:
+ result = result + val
+ result
 
 #[test]
 fn test_sum_list():
-    assert.eq(sum_list({1, 2, 3}), 6)
+ assert.eq(sum_list({1, 2, 3}), 6)
 
 #[test]
 fn test_sum_empty():
-    assert.eq(sum_list({}), 0)
+ assert.eq(sum_list({}), 0)
 ```
 
-## Ver también
+## See also
 
-- `04-standard-library/testing.md` — Documentación completa de testing
+- `04-standard-library/testing.md` — Documentation completa de testing
 - `project-layout.md` — Estructura de proyectos

@@ -1,46 +1,46 @@
 # Build
 
-> Compilar proyectos Kyle con el CLI `ky`.
+> Compilar proyectos Kyle with CLI `ky`.
 
-## Compilar un archivo
+## Compilar un file
 
 ```bash
-ky build archivo.ky              # compilar (debug)
-ky build --release archivo.ky   # compilar con optimizaciones
-ky build archivo.ky -o salida   # especificar nombre de salida
+ky build file.ky # compile (debug)
+ky build --release file.ky # compile with optimizaciones
+ky build file.ky -o output # especificar name de output
 ```
 
-## Compilar y ejecutar
+## Compilar y execute
 
 ```bash
-ky run archivo.ky               # compila y ejecuta
-ky run --release archivo.ky     # compila optimizado y ejecuta
+ky run file.ky # compila y ejecuta
+ky run --release file.ky # compila optimizado y ejecuta
 ```
 
-## Type-check rápido
+## Type-check rapido
 
 ```bash
-ky check archivo.ky              # solo type checking, sin código objeto
+ky check file.ky # solo type checking, without code objeto
 ```
 
 ## Proyectos
 
 ```bash
-ky build                         # compilar proyecto actual
-ky build --release               # compilar en release
-ky check                         # type-check del proyecto
+ky build # compile proyecto current
+ky build --release # compile en release
+ky check # type-check del proyecto
 ```
 
 ## Flags
 
-| Flag | Descripción |
+| Flag | Description |
 |------|-------------|
-| `--release` | Compilación optimizada (O3 + LTO) |
-| `-o` | Nombre del binario de salida |
+| `--release` | Compilation optimizada (O3 + LTO) |
+| `-o` | Nombre del binary de output |
 | `--target` | Target triple (ej: `wasm32`) |
 
-## Ver también
+## See also
 
 - `installation.md` — Instalar Kyle
-- `first-program.md` — Primer programa
-- `06-compiler/pipeline.md` — Pipeline de compilación
+- `first-program.md` — Primer program
+- `06-compiler/pipeline.md` — Pipeline de compilation

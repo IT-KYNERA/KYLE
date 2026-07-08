@@ -1,29 +1,29 @@
 # Panic
 
-> Manejo de pánicos del runtime de Kyle.
-> Crate: `kyc_runtime/src/panic.rs` (6 líneas, función: `ky_panic`).
+> Manejo de panics del runtime de Kyle.
+> Crate: `kyc_runtime/src/panic.rs` (6 lines, funcion: `ky_panic`).
 
 ## Responsabilidad
 
-El sistema de panic maneja errores fatales del runtime: division by zero,
-acceso fuera de bounds, null pointer dereference, etc.
+El sistema de panic maneja errors fatalis del runtime: division by zero,
+acceso outside de bounds, null pointer dereference, etc.
 
-## Implementación
+## Implementation
 
 ```rust
  fn ky_panic(message: &str) -> ! {
-    eprintln!("KL PANIC: {}", message);
-    std::process::abort();
+ eprintln!("KL PANIC: {}", message);
+ std::process::abort();
 }
 ```
 
-- Imprime el mensaje de error en stderr
-- Termina el proceso inmediatamente con `abort()` (no limpia recursos)
-- No hay stack trace ni recovery — es un error fatal
+- Imprime mensaje de error en stderr
+- Termina proceso inmediatamente with `abort()` (no limpia recursos)
+- No there is stack trace ni recovery — is un error fatal
 
-## Errores que causan panic
+## Errors que causan panic
 
-| Condición | Mensaje |
+| Condition | Mensaje |
 |-----------|---------|
 | Division by zero | `KL PANIC: division by zero` |
 | Index out of bounds | `KL PANIC: index out of bounds` |
@@ -31,23 +31,23 @@ acceso fuera de bounds, null pointer dereference, etc.
 | Assertion failed | `KL PANIC: assertion failed` |
 | Overflow | `KL PANIC: arithmetic overflow` |
 
-## Integración con Result
+## Integration with Result
 
-El sistema `T!` (Result) permite manejar errores sin panic:
+El sistema `T!` (Result) allows manejar errors without panic:
 
 ```ky
 fn divide(a: i32, b: i32) i32!:
-    if b == 0:
-        return error("division by zero")
-    a / b
+ if b == 0:
+ return error("division by zero")
+ a / b
 
 result = divide(10, 0)
 match result:
-    ok(v): println(v.to_str())
-    error(e): println(e)    # "division by zero"
+ ok(v): println(v.to_str())
+ error(e): println(e) # "division by zero"
 ```
 
-## Ver también
+## See also
 
-- `03-language/error-handling/panic.md` — Sintaxis de panic/error
-- `startup.md` — Inicialización del runtime
+- `03-language/error-handling/panic.md` — Syntax de panic/error
+- `startup.md` — Initialization del runtime

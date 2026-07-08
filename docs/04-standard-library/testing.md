@@ -1,6 +1,6 @@
 # testing — Testing y Aserciones
 
-> Módulo de testing y aserciones.
+> Module de testing y aserciones.
 > Import: `from testing import assert`
 
 ## assert: aserciones
@@ -10,35 +10,35 @@ from testing import assert
 
 #[test]
 fn test_addition():
-    assert.eq(2 + 2, 4)
+ assert.eq(2 + 2, 4)
 
 #[test]
 fn test_string():
-    assert.eq("hello", "hello")
-    assert.ne("hello", "world")
-    assert.str_eq("hello", "hello")
+ assert.eq("hello", "hello")
+ assert.ne("hello", "world")
+ assert.str_eq("hello", "hello")
 ```
 
-### Funciones
+### Functions
 
-| Función | Firma | Descripción |
+| Function | Firma | Description |
 |---------|-------|-------------|
-| `assert.is_true(cond)` | `fn(cond: bool)` | Afirmar que condición es `true` |
+| `assert.is_true(cond)` | `fn(cond: bool)` | Afirmar que conditionn is `true` |
 | `assert.eq(a, b)` | `fn(a: T, b: T)` | Afirmar que a == b |
 | `assert.ne(a, b)` | `fn(a: T, b: T)` | Afirmar que a != b |
-| `assert.str_eq(a, b)` | `fn(a: str, b: str)` | Afirmar strings iguales |
+| `assert.str_eq(a, b)` | `fn(a: str, b: str)` | Afirmar strings igualis |
 | `assert.gt(a, b)` | `fn(a: T, b: T)` | Afirmar a > b |
 | `assert.lt(a, b)` | `fn(a: T, b: T)` | Afirmar a < b |
 | `assert.gte(a, b)` | `fn(a: T, b: T)` | Afirmar a >= b |
 | `assert.lte(a, b)` | `fn(a: T, b: T)` | Afirmar a <= b |
 
-### Atributo `#[test]`
+### Attribute `#[test]`
 
 ```ky
 #[test]
 fn test_sum_list():
-    result: i32 = sum_list({1, 2, 3})
-    assert.eq(result, 6)
+ result: i32 = sum_list({1, 2, 3})
+ assert.eq(result, 6)
 ```
 
 Ejecutar:
@@ -47,22 +47,22 @@ Ejecutar:
 ky test
 ```
 
-### Ejemplo completo
+### Example completo
 
 ```ky
 from testing import assert
 
 fn sum_list(lst: {i32}) i32:
-    result: ^i32 = 0
-    for val in lst:
-        result = result + val
-    result
+ result: ^i32 = 0
+ for val in lst:
+ result = result + val
+ result
 
 #[test]
 fn test_sum_list():
-    assert.eq(sum_list({1, 2, 3}), 6)
+ assert.eq(sum_list({1, 2, 3}), 6)
 
 #[test]
 fn test_sum_empty():
-    assert.eq(sum_list({}), 0)
+ assert.eq(sum_list({}), 0)
 ```

@@ -1,6 +1,6 @@
 # Modules
 
-**Status:** [x] `from X import Y`, `import X`, relative `~X` imports (with packages installed).
+**Status:** [x] `from X import Y`, `import X`, relative `~X` imports (with packagis installed).
 
 ## Module definition
 
@@ -9,9 +9,9 @@ A module is a `.ky` file. The module name is the filename without extension.
 ## Imports
 
 ```ky
-from math import square          # import single name
-from math import *               # import all public names
-from math import add, subtract   # import multiple
+from math import square # import single name
+from math import * # import all public names
+from math import add, subtract # import multiple
 ```
 
 ## Visibility
@@ -30,8 +30,8 @@ A package is a directory with a `ky.toml` manifest.
 my-project/
 ├── ky.toml
 └── src/
-    ├── main.ky
-    └── lib.ky
+ ├── main.ky
+ └── lib.ky
 ```
 
 ## Package manifest (ky.toml)

@@ -1,38 +1,38 @@
 # Platform Abstraction
 
-> Capa de abstracción de plataforma: interacción con el sistema operativo.
+> Capa de abstraccion de plataforma: interaccion with sistema operativo.
 > Crate: `kyc_platform` (en desarrollo).
 
 ## Responsabilidad
 
-La capa Platform abstrae las diferencias entre sistemas operativos, proporcionando
-una API unificada para el runtime de Kyle. Es la única capa que conoce el SO subyacente.
+La capa Platform abstrae diferencias between sistemas operativos, proporcionando
+una API unificada for runtime de Kyle. Es unica capa que conoce SO subyacente.
 
-## Status actual
+## Status current
 
-| Módulo | Estado | Crate | Notas |
+| Module | Status | Crate | Notis |
 |--------|--------|-------|-------|
 | File I/O | ✅ | `kyc_runtime/src/io.rs` | open/read/write/close |
 | Time | ✅ | `kyc_runtime/src/datetime.rs` | now/parse/format |
 | Networking | ✅ | `kyc_runtime/src/net.rs` | TCP listen/accept/read/write |
 | Threads | ✅ | `kyc_runtime/src/thread.rs` | spawn/join |
 | Environment | ✅ | `kyc_runtime/src/string.rs` | getenv/setenv |
-| Filesystem (dirs) | ❌ | — | Pendiente |
-| Process | ❌ | — | Pendiente |
-| Signals | ❌ | — | Pendiente |
-| Sockets (UDP) | ❌ | — | Pendiente |
-| USB/Serial | ❌ | — | Pendiente |
+| Filesystem (dirs) | ❌ | — | Pending |
+| Process | ❌ | — | Pending |
+| Signals | ❌ | — | Pending |
+| Sockets (UDP) | ❌ | — | Pending |
+| USB/Serial | ❌ | — | Pending |
 
 ## I/O Module
 
-El módulo I/O actual (`io.rs`) proporciona:
+El module I/O current (`io.rs`) proporciona:
 
 ```rust
 // File operations
-ky_open(path, mode) -> i32 fd       // Open file
-ky_read_str(fd, len) -> ptr         // Read as string
-ky_write_str(fd, buf) -> i32        // Write string
-ky_close(fd) -> i32                 // Close fd
+ky_open(path, mode) -> i32 fd // Open file
+ky_read_str(fd, len) -> ptr // Read as string
+ky_write_str(fd, buf) -> i32 // Write string
+ky_close(fd) -> i32 // Close fd
 ```
 
 ## Networking Module
@@ -63,25 +63,25 @@ ky_ptr_write_i32(ptr, i32)
 ## Time Module
 
 ```rust
-ky_now() -> i64                     // Current timestamp (ms)
-ky_sleep(ms)                        // Sleep milliseconds
+ky_now() -> i64 // Current timestamp (ms)
+ky_sleep(ms) // Sleep milliseconds
 ```
 
 ## Platform Adapters
 
-Cada SO tiene su propia implementación de la plataforma:
+Cada SO has su propia implementation de plataforma:
 
 | SO | Status |
 |----|--------|
-| macOS (Apple Silicon) | ✅ Producción |
+| macOS (Apple Silicon) | ✅ Production |
 | Linux (ARM64) | ✅ CI tested |
 | Linux (x86_64) | ✅ CI tested |
 | WASM | 🔶 Experimental |
-| Windows | 📅 Planeado |
-| KYOS | 📅 Aspiracional |
+| Windows | 📅 Planned |
+| KYOS | 📅 Aspirational |
 
-## Ver también
+## See also
 
-- `06-compiler/linker.md` — Cómo se linkea con bibliotecas de plataforma
-- `04-standard-library/io.md` — API de I/O para el usuario
+- `06-compiler/linker.md` — How se linkea with libraries de plataforma
+- `04-standard-library/io.md` — API de I/O for usuario
 - `04-standard-library/fs.md` — API de filesystem

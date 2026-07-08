@@ -1,13 +1,13 @@
 # Memory
 
-> Gestión de memoria en Kyle: ownership, move, copy, stack vs heap.
+> Management de memory en Kyle: ownership, move, copy, stack vs heap.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
 | `ownership.md` | Reglas completas de ownership |
 | `move.md` | Move semantics (transferencia de ownership) |
-| `copy.md` | Copy semantics (tipos numéricos) |
-| `clone.md` | Clone explícito |
-| `drop.md` | Liberación automática (ky_free) |
+| `copy.md` | Copy semantics (typis numericos) |
+| `clone.md` | Clone explicito |
+| `drop.md` | Deallocation automatica (ky_free) |
 | `stack-heap.md` | Stack vs heap |
-| `allocator.md` | Estrategia de asignación |
+| `allocator.md` | Estrategia de allocation |

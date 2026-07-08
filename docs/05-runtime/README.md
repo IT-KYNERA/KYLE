@@ -1,21 +1,21 @@
 # 05-runtime
 
-> Documentación del runtime de Kyle: librería estática que se linkea a todo binario compilado.
+> Documentation del runtime de Kyle: libreria static que se linkea a todo binary compilado.
 
-## Archivos
+## Files
 
-| Documento | Descripción | Estado |
+| Documento | Description | Status |
 |-----------|-------------|--------|
-| `memory.md` | Asignación y liberación de memoria (`ky_alloc`/`ky_free`) | ✅ |
-| `allocator.md` | Estrategia de asignación y limitaciones | ✅ |
+| `memory.md` | Assignment y deallocation de memory (`ky_alloc`/`ky_free`) | ✅ |
+| `allocator.md` | Estrategia de allocation y limitacionis | ✅ |
 | `scheduler.md` | Thread pool y async/await | ✅ |
-| `panic.md` | Manejo de errores fatales | ✅ |
+| `panic.md` | Manejo de errors fatalis | ✅ |
 | `startup.md` | Secuencia de inicio del runtime | ✅ |
-| `platform.md` | Abstracción de plataforma (OS) | ✅ |
+| `platform.md` | Abstraction de plataforma (OS) | ✅ |
 
-## Módulos del runtime
+## Modulis del runtime
 
-| Módulo (Rust) | Líneas | Funciones exportadas |
+| Module (Rust) | Lines | Functions exportadas |
 |---------------|--------|---------------------|
 | `memory.rs` | 67 | `ky_alloc`, `ky_free`, `ky_retain`, `ky_release` |
 | `io.rs` | 202 | `ky_print`, `ky_println`, `ky_input`, `ky_open`, `ky_read_str`, `ky_write_str`, `ky_close`, `ky_sleep`, `ky_now` |
@@ -36,4 +36,4 @@
 | `panic.rs` | 6 | `ky_panic` |
 | `task.rs` | 41 | Interno: `PollState`, `BoxedFuture` |
 
-**Total: ~3350 líneas de Rust. 88 funciones `extern "C"` exportadas.**
+**Total: ~3350 lines de Rust. 88 functions `extern "C"` exportadas.**

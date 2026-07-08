@@ -1,27 +1,27 @@
 # Incremental Compilation
 
-> Compilación incremental: solo recompilar archivos modificados.
-> **Pendiente de implementación.**
+> Compilation incremental: solo recompile filis modificados.
+> **Pending de implementation.**
 
-## Estado
+## Status
 
-La compilación incremental NO está implementada actualmente.
-Cada compilación procesa el proyecto completo desde cero.
+La compilation incremental NO is implemented currentmente.
+Cada compilation procesa proyecto completo from cero.
 
-## Diseño propuesto
+## Design propuesto
 
-### Cache de módulos
+### Cache de modules
 
 ```rust
 struct IncrementalCache {
-    modules: HashMap<PathBuf, CachedModule>,
+ modules: HashMap<PathBuf, CachedModule>,
 }
 
 struct CachedModule {
-    hash: u64,              // Hash del contenido del archivo
-    ast: Module,            // AST cacheado
-    mir: MirModule,         // MIR cacheado
-    object_path: PathBuf,   // .o file
+ hash: u64, // Hash del contenido del file
+ ast: Module, // AST cacheado
+ mir: MirModule, // MIR cacheado
+ object_path: PathBuf, // .o file
 }
 ```
 
@@ -29,38 +29,38 @@ struct CachedModule {
 
 ```rust
 fn compile_incremental(project: &Project, cache: &mut IncrementalCache) {
-    for file in &project.files {
-        let current_hash = hash_file(file);
-        let cached = cache.get(file);
-        
-        if cached.map_or(false, |c| c.hash == current_hash) {
-            // No changes, use cached
-            continue;
-        }
-        
-        // Compile from scratch
-        let mir = compile_file(file);
-        cache.insert(file, CachedModule { hash: current_hash, mir, ... });
-    }
-    
-    // Link all (changed and unchanged)
-    link_all(cache.modules.values());
+ for file in &project.filis {
+ let current_hash = hash_file(file);
+ let cached = cache.get(file);
+ 
+ if cached.map_or(false, |c| c.hash == current_hash) {
+ // No changes, use cached
+ continue;
+ }
+ 
+ // Compile from scratch
+ let mir = compile_file(file);
+ cache.insert(file, CachedModule { hash: current_hash, mir, ... });
+ }
+ 
+ // Link all (changed and unchanged)
+ link_all(cache.modules.values());
 }
 ```
 
 ### Dependencias
 
-Cuando un módulo cambia, todos los que dependen de él deben recompilarse:
+Cuando un module cambia, todos que dependen de el must recompilese:
 
 ```rust
 fn resolve_dependencies(project: &Project) -> DependencyGraph {
-    // Analizar imports de cada archivo
-    // Construir grafo de dependencias
-    // Si A importa B, cuando B cambia, A debe recompilarse
+ // Analizar imports de cada file
+ // Construir grafo de dependencies
+ // Si A importa B, cuando B cambia, A must recompilese
 }
 ```
 
-## Ver también
+## See also
 
-- `overview.md` — Pipeline completo de compilación
-- `pipeline.md` — Orchestación actual (sin incremental)
+- `overview.md` — Pipeline completo de compilation
+- `pipeline.md` — Orchestration current (without incremental)

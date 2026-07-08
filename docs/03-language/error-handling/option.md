@@ -1,57 +1,57 @@
 # Option
 
-> Valores opcionales: `T?` / `option<T>`.
-> Un valor que puede ser `some(val)` o `none`.
+> Valoris opcionales: `T?` / `option<T>`.
+> Un value que can be `some(val)` o `none`.
 
-## Sintaxis sugar `T?`
+## Syntax sugar `T?`
 
 ```ky
-nombre: str? = "Kyle"
-nombre = none
+name: str? = "Kyle"
+name = none
 
-if valor = nombre:        # pattern matching
-    println(valor)
+if value = name: # pattern matching
+ println(value)
 ```
 
 ## Pattern matching
 
 ```ky
-match nombre:
-    some(v): println("nombre: " + v)
-    none: println("sin nombre")
+match name:
+ some(v): println("name: " + v)
+ none: println("without name")
 ```
 
-## Métodos
+## Methods
 
-| Método | Descripción |
+| Method | Description |
 |--------|-------------|
-| `is_some()` | `true` si tiene valor |
-| `is_none()` | `true` si es none |
-| `unwrap()` | Retorna valor o panic |
-| `unwrap_or(default)` | Retorna valor o default |
+| `is_some()` | `true` si has value |
+| `is_none()` | `true` si is none |
+| `unwrap()` | Retorna value o panic |
+| `unwrap_or(default)` | Retorna value o default |
 
 ```ky
-nombre: str? = obtener_nombre()
-if nombre.is_some():
-    println(nombre.unwrap())
+name: str? = get_nombre()
+if name.is_some():
+ println(name.unwrap())
 
-nombre = nombre.unwrap_or("invitado")
+name = name.unwrap_or("invitado")
 ```
 
-## Uso en retorno de función
+## Uso en retorno de funcion
 
 ```ky
 fn find_user(id: i32) User?:
-    if id == 0:
-        return none
-    User { name: "Kyle", id: id }
+ if id == 0:
+ return none
+ Ube { name: "Kyle", id: id }
 
 match find_user(1):
-    some(u): println(u.name)
-    none: println("no encontrado")
+ some(u): println(u.name)
+ none: println("no encontrado")
 ```
 
-## Ver también
+## See also
 
-- `result.md` — Result (versión con error)
-- `panic.md` — Errores fatales
+- `result.md` — Result (version with error)
+- `panic.md` — Errors fatales

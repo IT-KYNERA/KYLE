@@ -1,47 +1,47 @@
 # io — Entrada / Salida
 
-> Módulo de entrada y salida por consola.
+> Module de input y output by console.
 > Import: `from io import console`
 
-## console: lectura y escritura en terminal
+## console: read y write en terminal
 
 ```ky
 from io import console
 
-print("hello")         # sin newline
-println("hello")       # con newline
-line: str = input()    # leer línea
-line = input("> ")     # leer línea con prompt
+print("hello") # without newline
+println("hello") # with newline
+line: str = input() # leer line
+line = input("> ") # leer line with prompt
 ```
 
 ### Shorthands globales
 
-Las funciones `print()` y `println()` están disponibles globalmente sin import:
+Las functions `print()` y `println()` are disponiblis globalmente without import:
 
 ```ky
-print("hello")          # print()
-println("hello")        # println()
-input("> ")             # input()
+print("hello") # print()
+println("hello") # println()
+input("> ") # input()
 ```
 
-### Métodos de console
+### Methods de console
 
-| Nombre | Firma | Descripción |
+| Nombre | Firma | Description |
 |--------|-------|-------------|
-| `print` | `fn(text: str)` | Imprimir texto sin salto |
-| `println` | `fn(text: str)` | Imprimir texto con salto |
-| `input` | `fn(prompt: str) str` | Leer línea con prompt |
+| `print` | `fn(text: str)` | Imprimir texto without salto |
+| `println` | `fn(text: str)` | Imprimir texto with salto |
+| `input` | `fn(prompt: str) str` | Leer line with prompt |
 | `clear` | `fn()` | Limpiar terminal |
 
-### Ejemplos
+### Examples
 
 ```ky
 from io import console
 
-name: str = input("¿Cómo te llamas? ")
+name: str = input("�What is your name? ")
 println("Hola, " + name + "!")
 
-# Equivalente con shorthands globales
-name = input("¿Cómo te llamas? ")
+# Equivalente with shorthands globales
+name = input("�What is your name? ")
 println("Hola, " + name + "!")
 ```

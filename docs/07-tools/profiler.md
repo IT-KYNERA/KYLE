@@ -1,3 +1,3 @@
 # Profiler
 
-> **Pendiente de contenido.**
+> **Pending content.**

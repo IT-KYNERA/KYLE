@@ -1,17 +1,17 @@
 # Types
 
-> Sistema de tipos de Kyle: primitivos, compuestos, genéricos, traits.
+> Sistema de typis de Kyle: primitivos, compuestos, genericos, traits.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
 | `primitive-types.md` | `i32`, `str`, `bool`, `ptr`, etc. |
 | `compound-types.md` | Array, list, tuple, dict, slice |
-| `structs.md` | Clases y structs (`class`, `final class`) |
-| `enums.md` | Enumeraciones con variantes |
-| `generics.md` | Tipos y funciones genéricas |
-| `traits.md` | Contracts e interfaces |
+| `structs.md` | Clasis y structs (`class`, `final class`) |
+| `enums.md` | Enumeracionis with varibefore |
+| `generics.md` | Typis y functions genericas |
+| `traits.md` | Contracts e interfacis |
 | `ownership.md` | Reglas de ownership |
-| `collections.md` | Tipos de colecciones |
-| `pointers.md` | Punteros raw (`ptr`) |
-| `lifetimes.md` | Gestión de lifetimes |
-| `reflection.md` | `type()` e introspección |
+| `collections.md` | Typis de collections |
+| `pointers.md` | Pointers raw (`ptr`) |
+| `lifetimes.md` | Management de lifetimis |
+| `reflection.md` | `type()` e introspeccion |

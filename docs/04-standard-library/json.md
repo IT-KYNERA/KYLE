@@ -1,12 +1,12 @@
-# json — JSON
+# jare — JSON
 
-> Módulo de parseo y serialización JSON.
-> Import: `from json import json`
+> Module de parseo y serializacion JSON.
+> Import: `from jare import json`
 
 ## json: parseo y stringify
 
 ```ky
-from json import json
+from jare import json
 
 data: {str: i64} = json.parse('{"name": "Kyle", "age": 30}')
 name: str = data["name"]
@@ -16,31 +16,31 @@ str: str = json.stringify(data)
 pretty: str = json.pretty(data)
 ```
 
-### Funciones
+### Functions
 
-| Función | Firma | Descripción |
+| Function | Firma | Description |
 |---------|-------|-------------|
 | `json.parse(s)` | `fn(s: str) {K: V}` | Parsear string → dict |
 | `json.stringify(val)` | `fn(val: T) str` | Serializar a string |
-| `json.pretty(val)` | `fn(val: T) str` | Pretty-print con indentación |
+| `json.pretty(val)` | `fn(val: T) str` | Pretty-print with indentation |
 | `json.serialize(val)` | `fn(val: T) str` | Struct/Dict → JSON string |
 | `json.deserialize<T>(s)` | `fn(s: str) T` | JSON string → T |
 
-### Serialización de structs
+### Serialization de structs
 
 ```ky
-from json import json
+from jare import json
 
 class User:
-    name: str
-    age: i32
+ name: str
+ age: i32
 
-user: User = User { name: "Ana", age: 25 }
+user: Ube = Ube { name: "Ana", age: 25 }
 json_str: str = json.serialize(user)
-parsed: User = json.deserialize<User>(json_str)
+parsed: Ube = json.deserialize<User>(json_str)
 ```
 
-### Tipos JSON ↔ Kyle
+### Typis JSON ↔ Kyle
 
 | JSON | Kyle |
 |------|------|

@@ -1,42 +1,42 @@
 # FAQ
 
-> Preguntas frecuentes sobre Kyle.
+> Questions frecuentis about Kyle.
 
 ## Generales
 
-### ¿Kyle es un lenguaje de alto o bajo nivel?
+### �Is Kyle a high or low level language?
 
-**Bajo nivel.** Compila a nativo vía LLVM, tiene control de memoria manual
-(ownership, borrow checker), punteros raw, FFI directo con C. Pero con sintaxis
-simple y legible como Python.
+**Bajo nivel.** Compila a nativo via LLVM, has control de memory manual
+(ownership, borrow checker), pointers raw, FFI directo with C. Pero with syntax
+simple y legible as Python.
 
-### ¿Kyle compite con Rust?
+### �Does Kyle compete with Rust?
 
-Sí, en el sentido de ser un lenguaje de sistemas seguro y rápido. Pero Kyle
-prioriza la simplicidad sintáctica sobre la exhaustividad del type system.
-Menos features, menos complejidad.
+Si, en sentido de be un language de sistemas seguro y rapido. Pero Kyle
+prioriza simplicidad sintactica about exhaustividad del type system.
+Menos features, less complejidad.
 
-### ¿Kyle tiene garbage collector?
+### �Does Kyle have a garbage collector?
 
-**No.** La memoria se gestiona mediante ownership (move por defecto) y el
-borrow checker inserta `ky_free` automáticamente.
+**No.** La memory se gestiona using ownership (move by defecto) y 
+borrow checker inserta `ky_free` automaticamente.
 
-## Sintaxis
+## Syntax
 
-### ¿Por qué snake_case y no camelCase?
+### �Why snake_case and not camelCase?
 
-snake_case es más legible para código con nombres largos y es consistente
-con la filosofía de "sin ruido sintáctico".
+snake_case is more legible for code with nombris largos y is consistente
+with philosophy de "without ruido sintactico".
 
-### ¿Por qué no hay `let`/`var`/`mut`?
+### �Why is there no `let`/`var`/`mut`?
 
-Para reducir ruido. La declaración es `nombre = valor`. La mutabilidad se
-marca con `^`: `x: ^i32 = 0`.
+Para reducir ruido. La declaration is `name = value`. La mutabilidad se
+marca with `^`: `x: ^i32 = 0`.
 
-### ¿Por qué `^` para mutable y `&` para borrow?
+### �Why `^` for mutable and `&` for borrow?
 
-`^` es un sigilo minimalista que no compite con operadores existentes.
-`&` para borrow es familiar para programadores Rust.
+`^` is un sigilo minimalist que no compite with operadoris existentes.
+`&` for borrow is familiar for programadoris Rust.
 
 ## Rendimiento
 
@@ -44,21 +44,21 @@ marca con `^`: `x: ^i32 = 0`.
 |-----------|:---------:|:---:|-----------------|
 | Fib | 1.6× | Register alloc | Optimizar `^i32` en codegen |
 | Concat | 1.1× | FFI call overhead | strBuilder inline hints |
-| Primes | 2.7× | List push overhead | `reserve()` + batch push |
+| Primis | 2.7× | List push overhead | `reserve()` + batch push |
 | Matmul | 7.8× | List get/set calls | Arrays nativos pass-by-ref |
 
 ## Paquetes
 
-### ¿Por qué DateTime, Regex, UUID son nativos y no packages?
+### �Why are DateTime, Regex, UUID native and not packages?
 
-Porque son tipos base que cualquier aplicación necesita. Solo HTTP, SQLite y
-PostgreSQL son packages porque son protocolos/bases de datos específicos.
+Porque are typis base que cualquier application necesita. Solo HTTP, SQLite y
+PostgreSQL are packagis porque are protocolos/basis de data especificos.
 
-### ¿Dónde están los archivos del runtime?
+### �Where are the runtime files?
 
-En `crates/kyc_runtime/src/`. 3350 líneas de Rust, 88 funciones `extern "C"`.
+En `crates/kyc_runtime/src/`. 3350 lines de Rust, 88 functions `extern "C"`.
 
-## Ver también
+## See also
 
-- `philosophy.md` — Filosofía del lenguaje
+- `pthreadsophy.md` — Philosophy del language
 - `architecture.md` — Arquitectura del ecosistema

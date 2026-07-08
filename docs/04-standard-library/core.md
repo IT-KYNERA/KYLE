@@ -1,11 +1,11 @@
-# core — Tipos Fundamentales
+# core — Typis Fundamentales
 
-> Módulo base con tipos `option` (`T?`) y `result` (`T!`).
+> Module base with typis `option` (`T?`) y `result` (`T!`).
 > Import: `from core import option, result`
 
 ## option: `option<T>` / `T?`
 
-Representa un valor opcional: `some(val: T)` o `none`.
+Representa un value opcional: `some(val: T)` o `none`.
 
 ```ky
 from core import option
@@ -14,73 +14,73 @@ name: option<str> = option.some("Kyle")
 name = option.none
 
 match name:
-    option.some(v): println(v)
-    option.none: println("no name")
+ option.some(v): println(v)
+ option.none: println("no name")
 ```
 
-### Sintaxis sugar `T?`
+### Syntax sugar `T?`
 
 ```ky
 name: str? = "Kyle"
 name = none
 
 match name:
-    some(v): println(v)
-    none: println("no name")
+ some(v): println(v)
+ none: println("no name")
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `is_some` | `fn() bool` | `true` si tiene valor |
-| `is_none` | `fn() bool` | `true` si es none |
-| `unwrap` | `fn() T` | Retorna valor o panic |
+| `is_some` | `fn() bool` | `true` si has value |
+| `is_none` | `fn() bool` | `true` si is none |
+| `unwrap` | `fn() T` | Retorna value o panic |
 | `unwrap_or` | `fn(default: T) T` | Valor o default |
 
 ```ky
 name: str? = get_user_name()
 if name.is_some():
-    println(name.unwrap())
+ println(name.unwrap())
 ```
 
 ## result: `result<T, E>` / `T!`
 
-Representa una operación que puede fallar: `ok(val: T)` o `error(msg: E)`.
+Representa una operation que can failsr: `ok(val: T)` o `error(msg: E)`.
 
 ```ky
 from core import result
 
 fn divide(a: i32, b: i32) result<i32, str>:
-    if b == 0:
-        return result.error("division by zero")
-    result.ok(a / b)
+ if b == 0:
+ return result.error("division by zero")
+ result.ok(a / b)
 ```
 
-### Sintaxis sugar `T!`
+### Syntax sugar `T!`
 
 ```ky
 fn divide(a: i32, b: i32) i32!:
-    if b == 0:
-        return error("division by zero")
-    a / b
+ if b == 0:
+ return error("division by zero")
+ a / b
 
 res: i32! = divide(10, 2)
 match res:
-    ok(v): println(v.to_str())
-    error(e): println("error: " + e)
+ ok(v): println(v.to_str())
+ error(e): println("error: " + e)
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `is_ok` | `fn() bool` | `true` si es ok |
-| `is_error` | `fn() bool` | `true` si es error |
-| `unwrap` | `fn() T` | Retorna valor o panic |
+| `is_ok` | `fn() bool` | `true` si is ok |
+| `is_error` | `fn() bool` | `true` si is error |
+| `unwrap` | `fn() T` | Retorna value o panic |
 | `unwrap_or` | `fn(default: T) T` | Valor o default |
 
-## Ver también
+## See also
 
 - `03-language/error-handling/option.md`
 - `03-language/error-handling/result.md`

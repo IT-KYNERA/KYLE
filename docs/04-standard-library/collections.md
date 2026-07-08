@@ -5,18 +5,18 @@
 
 ## list: `{T}`
 
-List dinámica en heap. Es   tipo de colección principal de Kyle.
+List dynamic en heap. It is the main collection principal de Kyle.
 
 ```ky
 from collections imbyt list
 
 v: {i32} = {1, 2, 3}
 v.push(4)
-v.reserve(100)           # pre-asigna capacity
-x: i32 = v[0]            # acceso by índice
-v[0] = 99                # asignación by índice
-ultimo: i32 = v.pop()    # removes    st (LIFO)
-first: i32 = v.pop_first()  # removes   first (FIFO)
+v.reserve(100) # pre-asigna capacity
+x: i32 = v[0] # acceso by index
+v[0] = 99 # allocation by index
+ultimo: i32 = v.pop() # removis st (LIFO)
+first: i32 = v.pop_first() # removis first (FIFO)
 n: i64 = v.len()
 tiene: bool = v.withtains(10)
 ```
@@ -26,16 +26,16 @@ tiene: bool = v.withtains(10)
 | Method | Firma | Description |
 |--------|-------|-------------|
 | `push` | `fn(val: T)` | Agregar al end |
-| `pop` | `fn() T` | Sacar    st |
-| `pop_first` | `fn() T` | Sacar   first |
-| `len` | `fn() i64` | Count de  ements |
-| `get` | `fn(idx: i32) T` | Obtener  ement |
-| `set` | `fn(idx: i32, val: T)` | Asignar  ement |
+| `pop` | `fn() T` | Sacar st |
+| `pop_first` | `fn() T` | Sacar first |
+| `len` | `fn() i64` | Count de ements |
+| `get` | `fn(idx: i32) T` | Obtener ement |
+| `set` | `fn(idx: i32, val: T)` | Asignar ement |
 | `withtains` | `fn(val: T) bool` | `true` si existe |
 | `insert` | `fn(idx: i32, val: T)` | Insert en position |
 | `remove_at` | `fn(idx: i32) T` | Remove en position |
-| `clear` | `fn()` | Clear   list |
-| `reserve` | `fn(capacity: i64)` | Pre-asignar capacity |
+| `clear` | `fn()` | Clear list |
+| `reserve` | `fn(capacity: i64)` | Pre-allocate capacity |
 | `reverse` | `fn()` | Invertir order |
 
 ### Stack via list
@@ -44,7 +44,7 @@ tiene: bool = v.withtains(10)
 st: {i32} = {}
 st.push(10)
 st.push(20)
-val: i32 = st.pop()   # → 20 (LIFO)
+val: i32 = st.pop() # → 20 (LIFO)
 ```
 
 ### Queue via list
@@ -53,7 +53,7 @@ val: i32 = st.pop()   # → 20 (LIFO)
 q: {i32} = {}
 q.push(10)
 q.push(20)
-val: i32 = q.pop_first()   # → 10 (FIFO)
+val: i32 = q.pop_first() # → 10 (FIFO)
 ```
 
 ## set: `set<T>`
@@ -72,17 +72,17 @@ n: i64 = s.len()
 
 | Method | Firma | Description |
 |--------|-------|-------------|
-| `add` | `fn(val: T)` | Agregar  ement |
+| `add` | `fn(val: T)` | Agregar ement |
 | `withtains` | `fn(val: T) bool` | `true` si existe |
-| `remove` | `fn(val: T) bool` | Remove  ement |
+| `remove` | `fn(val: T) bool` | Remove ement |
 | `len` | `fn() i64` | Count |
 | `clear` | `fn()` | Clear |
 
-### Iteración
+### Iteration
 
 ```ky
 for val in s:
-    println(val.to_str())
+ println(val.to_str())
 ```
 
 ## iter: iterator
@@ -102,11 +102,11 @@ maximo: i64 = it.max()
 
 | Method | Firma | Description |
 |--------|-------|-------------|
-| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada  ement |
-| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar  ements |
+| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada ement |
+| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar ements |
 | `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un value |
 | `collect` | `fn() {T}` | Recolectar en list |
-| `next` | `fn() T?` | Siguiente  ement |
-| `sum` | `fn() i64` | Sumar todos (si es numérico) |
-| `min` | `fn() T` | Mínimo |
-| `max` | `fn() T` | Máximo |
+| `next` | `fn() T?` | Siguiente ement |
+| `sum` | `fn() i64` | Sumar todos (si is numerico) |
+| `min` | `fn() T` | Minimum |
+| `max` | `fn() T` | Maximum |

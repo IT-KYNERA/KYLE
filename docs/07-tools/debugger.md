@@ -1,3 +1,3 @@
 # Debugger
 
-> **Pendiente de contenido.**
+> **Pending content.**

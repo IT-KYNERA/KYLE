@@ -1,27 +1,27 @@
 # Atomics
 
-> Operaciones atómicas lock-free para programación concurrente.
-> Actualmente no implementadas como tipos Kyle (solo uso interno en runtime Rust).
+> Operacionis atomicas lock-free for programacion concurrente.
+> Actualmente no implementeds as typis Kyle (solo uso interno en runtime Rust).
 
-## Estado actual
+## Status current
 
-| Tipo | Status | Descripción |
+| Type | Status | Description |
 |------|--------|-------------|
-| `atomic_i64` | 📅 Planeado | Entero atómico de 64 bits |
-| `atomic_bool` | 📅 Planeado | Booleano atómico |
-| `atomic_ptr` | 📅 Planeado | Puntero atómico |
+| `atomic_i64` | 📅 Planned | Entero atomico de 64 bits |
+| `atomic_bool` | 📅 Planned | Booleano atomico |
+| `atomic_ptr` | 📅 Planned | Puntero atomico |
 
-## Diseño propuesto
+## Design propuesto
 
 ```ky
 counter: atomic_i64 = atomic_i64(0)
 
-# Operaciones atómicas
+# Operacionis atomicas
 counter.store(42)
 val: i64 = counter.load()
 counter.fetch_add(1)
 counter.fetch_sub(1)
-counter.compare_and_swap(10, 20)   # CAS
+counter.compare_and_swap(10, 20) # CAS
 ```
 
 ### atomic_bool
@@ -32,22 +32,22 @@ flag.store(true)
 val: bool = flag.load()
 ```
 
-### Ordenamiento de memoria
+### Ordenamiento de memory
 
 ```ky
-counter.store(42, "relaxed")     # sin barreras
-counter.store(42, "acquire")     # acquire semantics
-counter.store(42, "release")     # release semantics
-counter.store(42, "acqrel")      # acquire + release
-counter.store(42, "seqcst")      # sequentially consistent (default)
+counter.store(42, "relaxed") # without barreras
+counter.store(42, "acquire") # acquire semantics
+counter.store(42, "release") # release semantics
+counter.store(42, "acqrel") # acquire + release
+counter.store(42, "seqcst") # sequentially consistent (default)
 ```
 
-## Verificación
+## Verification
 
-Las operaciones atómicas son **lock-free** (no usan mutex internamente).
-Son implementadas con instrucciones CPU como `LDXR`/`STXR` en ARM64.
+Las operacionis atomicas are **lock-free** (no usan mutex internamente).
+Son implementeds with instruccionis CPU as `LDXR`/`STXR` en ARM64.
 
-## Ver también
+## See also
 
 - `synchronization.md` — Mutex, barriers
-- `threads.md` — Hilos del SO
+- `threads.md` — Threads del SO

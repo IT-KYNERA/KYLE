@@ -1,16 +1,16 @@
 # Syntax
 
-> Cómo se escribe código Kyle: variables, funciones, expresiones, statements.
+> How se escribe code Kyle: variables, functions, expressions, statements.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
-| `variables.md` | Declaración, mutabilidad, scope |
-| `functions.md` | Parámetros, retorno, fn pointers |
-| `expressions.md` | Todas las expresiones del lenguaje |
+| `variables.md` | Declaration, mutabilidad, scope |
+| `functions.md` | Parameters, retorno, fn pointers |
+| `expressions.md` | Todas expresionis del language |
 | `statements.md` | if, while, for, match, return |
-| `modules.md` | Importación y organización de módulos |
+| `modules.md` | Import y organization de modulis |
 | `pattern-matching.md` | Match y destructuring |
 | `attributes.md` | `#[test]`, `#[bench]` |
 | `macros.md` | Macros (futuro) |
-| `ui-syntax.md` | Sintaxis `.kyx` para UI |
-| `patterns.md` | Patrones de diseño en Kyle |
+| `ui-syntax.md` | Syntax `.kyx` for UI |
+| `patterns.md` | Patronis de diseno en Kyle |

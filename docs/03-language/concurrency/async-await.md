@@ -9,55 +9,55 @@
 
 ```ky
 async fn double(n: i64) i64:
-    n * 2
+ n * 2
 
 fn main() i32:
-    task = double(21)
-    result = await task
-    println(result.to_str())    # 42
-    0
+ task = double(21)
+ result = await task
+ println(result.to_str()) # 42
+ 0
 ```
 
 ## async: block [x]
 
 ```ky
 fn main() i32:
-    task = async:
-        sleep(100)
-        42
-    result = await task
-    println(str(result))    # 42
-    0
+ task = async:
+ sleep(100)
+ 42
+ result = await task
+ println(str(result)) # 42
+ 0
 ```
 
 ## parallel.for [x]
 
 ```ky
 fn heavy(n: i64) i64:
-    s: ^i64 = 0
-    j: ^i64 = 0
-    while j < 10000000:
-        s = s + (n * j) % 1000
-        j = j + 1
-    s
+ s: ^i64 = 0
+ j: ^i64 = 0
+ while j < 10000000:
+ s = s + (n * j) % 1000
+ j = j + 1
+ s
 
 fn main() i32:
-    fn_ptr = heavy as ptr
-    parallel.for(fn_ptr, 0, 8)
-    0
+ fn_ptr = heavy as ptr
+ parallel.for(fn_ptr, 0, 8)
+ 0
 ```
 
 ## Threads [x]
 
 ```ky
 fn worker(n: i64) i64:
-    n * 2
+ n * 2
 
 fn main() i32:
-    h = thread.spawn(worker as ptr, 21)
-    r = thread.join(h)
-    println(str(r))    # 42
-    0
+ h = thread.spawn(worker as ptr, 21)
+ r = thread.join(h)
+ println(str(r)) # 42
+ 0
 ```
 
 ---
@@ -66,14 +66,14 @@ fn main() i32:
 
 ```ky
 task: future<str> = async:
-    "response"
+ "response"
 val = await task
 ```
 
 ## channel: `channel<T>` [ ]
 
 ```ky
-ch: channel<i32> = channel(16)     # buffer 16
+ch: channel<i32> = channel(16) # buffer 16
 ch.send(42)
 val = ch.recv()
 ch.len()
@@ -84,12 +84,12 @@ ch.close()
 
 ```ky
 select:
-    &msg -> ch1:
-        println("got: " + msg)
-    &msg -> ch2:
-        println("got: " + msg)
-    after 1s:
-        println("timeout")
+ &msg -> ch1:
+ println("got: " + msg)
+ &msg -> ch2:
+ println("got: " + msg)
+ after 1s:
+ println("timeout")
 ```
 
 ## mutex: `mutex<T>` [ ]
@@ -97,19 +97,19 @@ select:
 ```ky
 m: mutex<i32> = mutex(0)
 lock(m):
-    *val += 1                 # operación segura
+ *val += 1 # operation segura
 ```
 
-## Atomic types [ ]
+## Atomic typis [ ]
 
 ```ky
 counter: atomic_i64 = atomic_i64(0)
 counter.fetch_add(1)
-counter.load()                # → 1
+counter.load() # → 1
 
 flag: atomic_bool = atomic_bool(false)
 flag.store(true)
-flag.load()                   # → true
+flag.load() # → true
 ```
 
 ## iterator [ ]
@@ -118,14 +118,14 @@ flag.load()                   # → true
 iter = list.iter()
 doubled = iter.map(fn(x): x * 2)
 filtered = iter.filter(fn(x): x > 5)
-result = doubled.collect()     # → {i32}
+result = doubled.collect() # → {i32}
 ```
 
 ---
 
 ## Resumen
 
-| Forma | Estado | Sintaxis |
+| Forma | Status | Syntax |
 |-------|--------|----------|
 | `async fn` | ✅ | `async fn f(p: T) R:` |
 | `async:` block | ✅ | `t = async: ...` |

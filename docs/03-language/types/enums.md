@@ -8,17 +8,17 @@ Enums are tagged unions (discriminated unions).
 
 ```ky
 enum Color:
-    Red
-    Green
-    Blue
+ Red
+ Green
+ Blue
 ```
 
 ## With payload
 
 ```ky
 enum Optional:
-    Some(i32)
-    None
+ Some(i32)
+ None
 ```
 
 ## Usage
@@ -27,12 +27,12 @@ enum Optional:
 c = Color.Red
 
 match c:
-    Color.Red:
-        println("red")
-    Color.Green:
-        println("green")
-    Color.Blue:
-        println("blue")
+ Color.Red:
+ println("red")
+ Color.Green:
+ println("green")
+ Color.Blue:
+ println("blue")
 ```
 
 ## Variant with payload
@@ -41,8 +41,8 @@ match c:
 v = Optional.Some(42)
 
 match v:
-    Optional.Some(n):
-        println(n)
-    Optional.None:
-        println("none")
+ Optional.Some(n):
+ println(n)
+ Optional.None:
+ println("none")
 ```

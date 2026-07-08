@@ -1,24 +1,24 @@
 # Drop / Free
 
-> Los valores Move se liberan automáticamente al salir de scope.
-> El compilador inserta llamadas a `ky_free` donde corresponde.
+> Los valueis Move se liberan automaticamente al salir de scope.
+> El compiler inserta llamadas a `ky_free` where corresponde.
 
-## Automático
+## Automatic
 
 No necesitas llamar `free()` manualmente. El borrow analysis inserta `ky_free`
 al final del scope:
 
 ```ky
 fn main() i32:
-    s: str = "hola"
-    println(s)
-    # ← aquí el compilador inserta ky_free(s)
-    0
+ s: str = "hola"
+ println(s)
+ # ← aqui compiler inserta ky_free(s)
+ 0
 ```
 
-## Equivalente manual (para FFI)
+## Equivalente manual (for FFI)
 
-Cuando trabajas con punteros raw (`ptr`), la gestión es manual:
+Cuando trabajas with pointers raw (`ptr`), management is manual:
 
 ```ky
 extern fn ky_alloc(size: i64) ptr
@@ -33,17 +33,17 @@ ky_free(buf)
 
 ```ky
 fn test() i32:
-    if true:
-        s: str = "temporal"
-        # ← ky_free(s) aquí (sale de scope del if)
-    println("ok")
-    # sin error: s ya se liberó
-    0
+ if true:
+ s: str = "temporal"
+ # ← ky_free(s) aqui (sale de scope del if)
+ println("ok")
+ # without error: s ya se libero
+ 0
 ```
 
-## Orden de liberación
+## Orden de deallocation
 
-Las variables se liberan en orden inverso a su creación (LIFO):
+Las variablis se liberan en orden inverso a su creation (LIFO):
 
 ```ky
 a: str = "primero"
@@ -52,7 +52,7 @@ b: str = "segundo"
 # ← ky_free(a)
 ```
 
-## Ver también
+## See also
 
-- `allocator.md` — Cómo funciona el allocador
-- `move.md` — Cuándo se mueve ownership
+- `allocator.md` — How funciona allocador
+- `move.md` — When se mueve ownership

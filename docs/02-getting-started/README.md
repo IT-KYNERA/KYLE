@@ -1,17 +1,17 @@
 # 02-getting-started
 
-> Guías de inicio rápido para Kyle. Instalación, primeros pasos, testing, debugging.
+> Guides de inicio rapido for Kyle. Installation, primeros pasos, testing, debugging.
 
-## Archivos
+## Files
 
-| Documento | Descripción |
+| Documento | Description |
 |-----------|-------------|
-| `installation.md` | Instalar el compilador Kyle |
-| `first-program.md` | Crear y ejecutar el primer programa |
+| `installation.md` | Instalar compiler Kyle |
+| `first-program.md` | Crear y execute primer program |
 | `build.md` | Compilar proyectos |
-| `testing.md` | Escribir y ejecutar tests |
-| `debugging.md` | Depurar programas Kyle |
+| `testing.md` | Escribir y execute tests |
+| `debugging.md` | Depurar programs Kyle |
 | `performance.md` | Consejos de rendimiento |
 | `project-layout.md` | Estructura de proyectos |
-| `package-manager.md` | Gestor de paquetes |
-| `ide.md` | Soporte para editores |
+| `package-manager.md` | Gestor de paquetis |
+| `ide.md` | Support for editoris |

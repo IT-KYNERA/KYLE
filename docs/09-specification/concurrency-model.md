@@ -1,7 +1,7 @@
 # Concurrency Model
 
-> El modelo de concurrencia de Kyle está especificado en `03-language/concurrency/`.
-> Este documento es un índice que referencia los archivos relevantes.
+> El modelo de concurrency de Kyle is especificado en `03-language/concurrency/`.
+> Este documento is un index que referencia filis relevantes.
 
 | Aspecto | Documento |
 |---------|-----------|
@@ -11,6 +11,6 @@
 | Synchronization | `03-language/concurrency/synchronization.md` |
 | Atomics | `03-language/concurrency/atomics.md` |
 
-## Ver también
+## See also
 
-- `03-language/concurrency/` — Directorio completo de concurrencia
+- `03-language/concurrency/` — Directorio completo de concurrency

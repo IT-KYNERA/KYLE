@@ -1,41 +1,41 @@
 # Vision
 
-Kyle es un lenguaje de programación compilado, estáticamente tipado, diseñado para
-sistemas backend, herramientas CLI y desarrollo full-stack con rendimiento nativo,
-legibilidad de Python y seguridad de tipos de Rust.
+Kyle is un language de programacion compilado, staticmente tipado, disenado para
+sistemas backend, herramientas CLI y desarrollo full-stack with rendimiento nativo,
+legibilidad de Python y seguridad de typis de Rust.
 
 ## Objetivos
 
 | Aspecto | Objetivo | Referencia |
 |---------|----------|------------|
-| Velocidad de compilación | Comparable a Go | ~5s para proyectos medianos |
-| Rendimiento runtime | Comparable a C/Rust | Fib: 1.6× C, Matmul: 7.8× C (con listas) |
-| Legibilidad | Comparable a Python | Indentación, sin `{}`, sin `;` |
-| Seguridad de memoria | Compile-time | Borrow checker, move por defecto |
-| Tipado estático | Fuerte e inferido | Sin `null`, sin coerción implícita |
+| Velocidad de compilation | Comparable a Go | ~5s for proyectos medianos |
+| Rendimiento runtime | Comparable a C/Rust | Fib: 1.6× C, Matmul: 7.8× C (with lists) |
+| Legibilidad | Comparable a Python | Indentation, without `{}`, without `;` |
+| Seguridad de memory | Compile-time | Borrow checker, move by defecto |
+| Tipado estatico | Fuerte e inferido | Sin `null`, without coercion implicita |
 
 ## Audiencia
 
-Kyle está diseñado para:
+Kyle is disenado para:
 
-- **Desarrolladores backend** — APIs, microservicios, CLIs
-- **Equipos** que valoran legibilidad tanto como rendimiento
-- **Proyectos** que necesitan rendimiento nativo sin complejidad C++
-- **Desarrolladores Rust** que quieren menos verbosidad sin sacrificar seguridad
-- **Desarrolladores Python/Go** que quieren mejor rendimiento sin cambiar drásticamente
+- **Desarrolladoris backend** — APIs, microservicios, CLIs
+- **Equipos** que valuean legibilidad tanto as rendimiento
+- **Proyectos** que necesitan rendimiento nativo without complejidad C++
+- **Desarrolladoris Rust** que quieren less verbosidad without sacrificar seguridad
+- **Desarrolladoris Python/Go** que quieren mejor rendimiento without cambiar drasticamente
 
-## Filosofía
+## Philosophy
 
-> "Tan rápido como C, tan legible como Python, tan seguro como Rust."
+> "Tan rapido as C, tan legible as Python, tan seguro as Rust."
 
-No es un clon de ningún lenguaje existente. Toma lo mejor de cada uno:
+No is un clon de ningun language existente. Toma lo mejor de cada uno:
 - **Rendimiento** de C (LLVM, native code)
 - **Seguridad** de Rust (ownership, borrow checker)
-- **Simplicidad** de Go (compilación rápida, tooling integrado)
-- **Legibilidad** de Python (indentación, sin ruido sintáctico)
+- **Simplicidad** de Go (compilation rapida, tooling integrado)
+- **Legibilidad** de Python (indentation, without ruido sintactico)
 
-## Ver también
+## See also
 
-- `philosophy.md` — Filosofía de diseño
-- `principles.md` — Principios del lenguaje
+- `pthreadsophy.md` — Philosophy de diseno
+- `principles.md` — Principios del language
 - `architecture.md` — Arquitectura del ecosistema

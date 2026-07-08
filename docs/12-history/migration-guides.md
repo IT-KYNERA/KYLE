@@ -1,30 +1,30 @@
 # Migration Guide
 
-New syntax uses direct assignment:
+New syntax usis direct assignment:
 
 ```ky
-x = 5            # immutable
-y: ^i32 = 10     # mutable
-Z := 20          # constant
+x = 5 # immutable
+y: ^i32 = 10 # mutable
+Z := 20 # constant
 ```
 
 ### struct → final class
 
 ```ky
-class Point:       # replaces `struct Point:`
-    x: i32
-    y: i32
+class Point: # replacis `struct Point:`
+ x: i32
+ y: i32
 ```
 
 ### Option → T?
 
 ```ky
-name: str? = none        # replaces `name: Option<str> = None`
+name: str? = none # replacis `name: Option<str> = None`
 ```
 
 ## v0.5 → v0.6 (ownership)
 
-### Parámetros: borrow-by-default → move-by-default
+### Parameters: borrow-by-default → move-by-default
 
 | Concepto | v0.5 | v0.6 |
 |----------|------|------|
@@ -32,18 +32,18 @@ name: str? = none        # replaces `name: Option<str> = None`
 | Mutable | `&T` | **`^T`** |
 | Borrow | — | **`&T`** |
 | Mutable borrow | — | **`^&T`** |
-| Move explícito | `^T` | Default (no marcador) |
+| Move explicito | `^T` | Default (no marcador) |
 
 ```ky
 # v0.5 (antiguo)
-fn read(s: str):          # borrow
-fn append(s: &str):       # mutable
-fn consume(^s: str):      # move
+fn read(s: str): # borrow
+fn append(s: &str): # mutable
+fn consume(^s: str): # move
 
 # v0.6 (nuevo)
-fn read(s: &str):         # borrow
-fn append(s: ^&str):      # mutable borrow
-fn consume(s: str):       # move (default)
+fn read(s: &str): # borrow
+fn append(s: ^&str): # mutable borrow
+fn consume(s: str): # move (default)
 ```
 
 ### Variables: `&T` mutable → `^T` mutable
@@ -66,7 +66,7 @@ append(&buf)
 append(^&buf)
 ```
 
-## Ver también
+## See also
 
-- `03-language/memory/move.md` — Move semantics actual
+- `03-language/memory/move.md` — Move semantics current
 - `03-language/memory/ownership.md` — Reglas de ownership

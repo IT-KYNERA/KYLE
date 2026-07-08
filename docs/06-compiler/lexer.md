@@ -1,12 +1,12 @@
 # Lexer
 
-> Transforma código fuente `.ky` en un stream de tokens.
-> Crate: `kyc_frontend/src/lexer.rs` (914 líneas).
+> Transforma code source `.ky` en un stream de tokens.
+> Crate: `kyc_frontend/src/lexer.rs` (914 lines).
 
 ## Responsabilidad
 
-El lexer (también llamado tokenizer) convierte el texto fuente en tokens estructurados
-que el parser puede consumir. No realiza análisis sintáctico ni semántico.
+El lexer (tambien llamado tokenizer) convierte texto source en tokens estructurados
+que parbe can consumir. No realiza analysis sintactico ni semantico.
 
 ## Funcionamiento
 
@@ -14,7 +14,7 @@ que el parser puede consumir. No realiza análisis sintáctico ni semántico.
 fn tokenize(source: &str) -> Vec<Token>
 ```
 
-Toma el código fuente como string y devuelve un `Vec<Token>`.
+Toma code source as string y returns un `Vec<Token>`.
 
 ## Tokens
 
@@ -22,76 +22,76 @@ Cada token tiene:
 
 ```rust
  struct Token {
-     kind: TokenKind,   // El tipo de token (identificador, keyword, símbolo, etc.)
-     span: Span,         // Posición en el código fuente (línea, columna)
+ kind: TokenKind, // El type de token (identificador, keyword, simbolo, etc.)
+ span: Span, // Position en code source (line, column)
 }
 ```
 
 ### TokenKind (principales)
 
-| Categoría | Ejemplos |
+| Category | Examplis |
 |-----------|----------|
 | Keywords | `fn`, `class`, `if`, `while`, `return`, `match`, `let`, `async`, `await` |
-| Identifiers | `nombre`, `foo`, `mi_funcion` |
+| Identifiers | `name`, `foo`, `mi_funcion` |
 | Literals | Integer(`42`), Float(`3.14`), String(`"hola"`), Char(`'a'`), Boolean(`true`/`false`) |
 | Operators | `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `\|\|` |
 | Delimiters | `(`, `)`, `{`, `}`, `[`, `]`, `:`, `;`, `,` |
 | Special | `:=` (walrus), `->` (arrow), `..` (range), `..=` (inclusive range) |
 | Sigils | `^` (mutable/move), `&` (borrow), `@`, `#`, `?`, `!` |
 
-### Indentación como sintaxis
+### Indentation as syntax
 
-Kyle usa **indentación** para delimitar bloques (como Python), no llaves:
+Kyle usa **indentation** for delimitar bloquis (como Python), no llaves:
 
 ```ky
 fn main() i32:
-    x = 42
-    if x > 10:
-        println("mayor")
-    println("siempre")
+ x = 42
+ if x > 10:
+ println("mayor")
+ println("siempre")
 ```
 
-El lexer genera tokens `Indent`/`Dedent` basados en cambios de indentación.
-Esto simplifica el parser y hace el código más limpio.
+El lexer genera tokens `Indent`/`Dedent` basados en cambios de indentation.
+Esto simplifica parbe y does code more limpio.
 
-## Reglas de indentación
+## Reglas de indentation
 
-- Primer indent define el tamaño base (se adapta a 2, 3, 4 espacios o tabs)
-- `Indent` cuando la indentación aumenta
-- `Dedent` cuando la indentación disminuye
-- Líneas vacías y comentarios se ignoran para el cálculo de indentación
-- `:` al final de una línea (ej. `fn f():`) indica que sigue un bloque indentado
+- Primer indent defines size base (se adapta a 2, 3, 4 espacios o tabs)
+- `Indent` cuando indentation aumenta
+- `Dedent` cuando indentation disminuye
+- Lines vacias y comentarios se ignoran for calculo de indentation
+- `:` al final de una line (ej. `fn f():`) indicatis que sigue un bloque indentado
 
-## Ejemplo
+## Example
 
 ```ky
-# Código fuente
+# Code source
 fn sum(a: i32, b: i32) i32:
-    result = a + b
-    result
+ result = a + b
+ result
 
 # Tokens generados
 [
-    Fn, Ident("sum"), LParen, Ident("a"), Colon, Ident("i32"),
-    Comma, Ident("b"), Colon, Ident("i32"), RParen, Ident("i32"),
-    Colon, Newline,
-    Indent,
-        Ident("result"), Eq, Ident("a"), Plus, Ident("b"), Newline,
-        Ident("result"), Newline,
-    Dedent,
-    Eof
+ Fn, Ident("sum"), LParen, Ident("a"), Colon, Ident("i32"),
+ Comma, Ident("b"), Colon, Ident("i32"), RParen, Ident("i32"),
+ Colon, Newline,
+ Indent,
+ Ident("result"), Eq, Ident("a"), Plus, Ident("b"), Newline,
+ Ident("result"), Newline,
+ Dedent,
+ Eof
 ]
 ```
 
-## Manejo de errores
+## Manejo de errors
 
-Si encuentra un carácter no válido, el lexer retorna un error con la ubicación exacta:
+Si encuentra un caracter no valido, lexer returns un error with ubicacion exacta:
 
 ```rust
 Err("unexpected character '#' at line 3, column 5")
 ```
 
-## Ver también
+## See also
 
-- `parser.md` — Consume los tokens generados por el lexer
-- `03-language/lexical/` — Especificación de tokens, keywords, literales
+- `parser.md` — Consume tokens generados by lexer
+- `03-language/lexical/` — Specification de tokens, keywords, literales

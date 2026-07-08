@@ -7,8 +7,8 @@
 | Document | Description |
 |----------|-------------|
 | `vision.md` | Vision, goals, target audience |
-| `philosophy.md` | Philosophy: Python readability, Rust safety, Go simplicity, C perf |
-| `principles.md` | Language and tooling design principles |
+| `pthreadsophy.md` | Pthreadsophy: Python readability, Rust safety, Go simplicity, C perf |
+| `principles.md` | Language and tooling design principlis |
 | `architecture.md` | Layered ecosystem architecture |
 | `roadmap.md` | Development roadmap |
 | `faq.md` | Frequently asked questions |
@@ -24,4 +24,4 @@ Kyle is a **low-level language with high-level syntax**:
 - No `let`/`var`/`mut`/`const`
 - No `null`, no exceptions
 - snake_case everywhere
-- Packages only for HTTP/SQLite/Postgres — everything else is native
+- Packagis only for HTTP/SQLite/Postgris — everything else is native

@@ -1,60 +1,60 @@
 # Traits / Contracts
 
-> Interfaces en Kyle mediante `contract`. Definen comportamiento que las clases
-> pueden implementar.
+> Interfacis en Kyle using `contract`. Definen comportamiento que clases
+> can implementar.
 
-## Declaración
+## Declaration
 
 ```ky
 contract Drawable:
-    fn draw()
-    fn get_size() (i32, i32)
+ fn draw()
+ fn get_size() (i32, i32)
 
 contract Serializable:
-    fn serialize() str
-    fn deserialize(data: str)
+ fn serialize() str
+ fn deserialize(data: str)
 ```
 
-## Implementación
+## Implementation
 
 ```ky
 class Circle :: Drawable, Serializable:
-    radius: i32
+ radius: i32
 
-    fn draw():
-        println("circle r=" + radius.to_str())
+ fn draw():
+ println("circle r=" + radius.to_str())
 
-    fn get_size() (i32, i32):
-        (radius * 2, radius * 2)
+ fn get_size() (i32, i32):
+ (radius * 2, radius * 2)
 
-    fn serialize() str:
-        "Circle(" + radius.to_str() + ")"
+ fn serialize() str:
+ "Circle(" + radius.to_str() + ")"
 
-    fn deserialize(data: str):
-        radius = 10    # simplified
+ fn deserialize(data: str):
+ radius = 10 # simplified
 ```
 
 ## Herencia simple
 
 ```ky
 class Animal:
-    name: str
+ name: str
 
 class Dog :: Animal:
-    fn speak():
-        println(name + " says woof")
+ fn speak():
+ println(name + " says woof")
 ```
 
 ## Contracts vs class inheritance
 
 | Concepto | `contract` | `class :: Parent` |
 |----------|-----------|------------------|
-| Propósito | Interface | Herencia de implementación |
-| Múltiples | ✅ Sí | ❌ No (simple) |
-| Estado | ❌ No | ✅ Sí (fields) |
-| Métodos default | ❌ No | ✅ Sí |
+| Purpose | Interface | Herencia de implementation |
+| Multiples | ✅ Si | ❌ No (simple) |
+| Status | ❌ No | ✅ Si (fields) |
+| Methods default | ❌ No | ✅ Si |
 
-## Ver también
+## See also
 
-- `generics.md` — Genéricos con constraints
-- `structs.md` — Clases y structs
+- `generics.md` — Generics with constraints
+- `structs.md` — Clasis y structs

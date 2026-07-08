@@ -19,9 +19,9 @@
 | `math` | `math` | Math functions |
 | `random` | `random` | Random numbers |
 | `time` | `date_time`, `duration` | Date, time, duration |
-| `process` | `process` | OS processes |
+| `process` | `process` | OS processis |
 | `thread` | `thread` | OS threads |
-| `sync` | `mutex`, `atomic`, `channel` | Synchronization primitives |
+| `sync` | `mutex`, `atomic`, `channel` | Synchronization primitivis |
 | `crypto` | `crypto` | Cryptographic functions |
 | `regex` | `regex` | Regular expressions |
 | `serialization` | `serialize` | Serialization |
@@ -30,7 +30,7 @@
 
 ## Conventions
 
-- All modules imported explicitly: `from math import math`
+- All modulis imported explicitly: `from math import math`
 - Functions called with namespace: `math.max(a, b)`
 - snake_case everywhere: functions, types, methods
 - `T` uppercase = type parameter (generics)

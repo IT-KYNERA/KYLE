@@ -1,14 +1,14 @@
 # WASM — WebAssembly Target
 
-**Versión:** 1.0  
-**Estado:** Especificación
+**Version:** 1.0 
+**Status:** Specification
 
 ---
 
-## 1. ¿Qué es?
+## 1. What is it?
 
 Kyle compila a WebAssembly via LLVM (`wasm32-unknown-unknown`).
-Esto permite ejecutar código Kyle en el navegador.
+Esto allows execute code Kyle en navegador.
 
 ```
 .ky → LLVM IR → wasm32 → .wasm → navegador
@@ -16,32 +16,32 @@ Esto permite ejecutar código Kyle en el navegador.
 
 ---
 
-## 2. Compilación
+## 2. Compilation
 
 ```bash
 # Compilar a WASM
 ky build --target wasm32-unknown-unknown app.ky
 
-# Optimizado para tamaño
+# Optimizado for size
 ky build --target wasm32-unknown-unknown -O3 app.ky
 ```
 
-### Limitaciones del target WASM
+### Limitacionis del target WASM
 
 | Recurso | Disponible |
 |---------|-----------|
-| CPU (cálculos) | ✅ |
-| Memoria lineal | ✅ |
+| CPU (calculos) | ✅ |
+| Memory lineal | ✅ |
 | Math (f32/f64) | ✅ |
 | Strings | ✅ |
-| file system | ❌ (no hay FS en WASM) |
-| Networking | ❌ (no hay sockets) |
+| file system | ❌ (no there is FS en WASM) |
+| Networking | ❌ (no there is sockets) |
 | Threads | ❌ |
 | Console/print | ❌ (requiere JS glue) |
 
 ---
 
-## 3. web — Browser API bindings
+## 3. web — Browbe API bindings
 
 El package `web` expone APIs del navegador a Kyle compilado a WASM.
 
@@ -55,26 +55,26 @@ from web import document, console, fetch
 from web import document
 
 div = document.get_element_by_id("app")
-div.text_content = "Hola desde Kyle!"
+div.text_content = "Hola from Kyle!"
 
-# Crear elementos
+# Crear elements
 btn = document.create_element("button")
 btn.text_content = "Click me"
 btn.onclick = (event):
-    console.log("clicked!")
+ console.log("clicked!")
 div.append_child(btn)
 ```
 
-### Fetch (HTTP desde el browser)
+### Fetch (HTTP from browser)
 
 ```kyle
 from web import fetch, response
 
-res = fetch("/api/users")
+ris = fetch("/api/users")
 if res.ok:
-    users = res.json()
-    for user in users:
-        print(user["name"])
+ users = res.json()
+ for ube in users:
+ print(user["name"])
 ```
 
 ### Console
@@ -110,29 +110,29 @@ ctx.fill_text("Kyle!", 20, 80)
 packages/web/
 ├── ky.toml
 └── src/
-    ├── lib.ky          # Exportaciones principales
-    ├── dom.ky          # DOM API (get_element_by_id, create_element, etc.)
-    ├── fetch.ky        # Fetch API
-    ├── canvas.ky       # Canvas 2D
-    ├── console.ky      # Console API
-    └── events.ky       # Event listeners
+ ├── lib.ky # Exportacionis principales
+ ├── dom.ky # DOM API (get_element_by_id, create_element, etc.)
+ ├── fetch.ky # Fetch API
+ ├── canvas.ky # Canvas 2D
+ ├── console.ky # Console API
+ └── events.ky # Event listeners
 ```
 
-### Implementación
+### Implementation
 
-Las APIs del navegador se exponen via `extern fn` con `@link "js"`:
+Las APIs del navegador se exponen via `extern fn` with `@link "js"`:
 
 ```kyle
 @link "js"
 
 extern fn js_getElementById(id: ptr) ptr
-extern fn js_setTextContent(el: ptr, text: ptr)
+extern fn js_setTextContent( : ptr, text: ptr)
 extern fn js_createElement(tag: ptr) ptr
 extern fn js_appendChild(parent: ptr, child: ptr)
 extern fn js_fetch(url: ptr) ptr
 ```
 
-Un runtime de JS glue traduce las llamadas a las APIs reales del navegador.
+Un runtime de JS glue traduce llamadas a APIs realis del navegador.
 
 ---
 
@@ -142,28 +142,28 @@ Un runtime de JS glue traduce las llamadas a las APIs reales del navegador.
 # 1. Compilar Kyle a WASM
 ky build --target wasm32-unknown-unknown app.ky -o app.wasm
 
-# 2. Crear HTML con JS glue
+# 2. Crear HTML with JS glue
 cat > index.html << 'HTML'
 <!DOCTYPE html>
 <script src="runtime.js"></script>
 <script>
-    const wasm = await WebAssembly.instantiateStreaming(
-        fetch("app.wasm"), { js: KyJsGlue }
-    );
-    wasm.instance.exports.main();
+ const wasm = await WebAssembly.instantiateStreaming(
+ fetch("app.wasm"), { js: KyJsGlue }
+ );
+ wasm.instance.exports.main();
 </script>
 HTML
 ```
 
 ---
 
-## 6. Plan de implementación
+## 6. Plan de implementation
 
-| Fase | Descripción | Estado |
+| Fase | Description | Status |
 |------|-------------|--------|
-| 1 | Compilación WASM vía LLVM | ✅ (LLVM target existe) |
-| 2 | JS glue runtime básico | 🔜 |
-| 3 | web: console + DOM básico | 🔜 |
+| 1 | Compilation WASM via LLVM | ✅ (LLVM target existe) |
+| 2 | JS glue runtime basico | 🔜 |
+| 3 | web: console + DOM basico | 🔜 |
 | 4 | web: fetch, canvas, events | 🔜 |
-| 5 | Optimización de tamaño WASM | 🔜 |
+| 5 | Optimization de size WASM | 🔜 |
 | 6 | Reactive UI framework (JSX-like) | 📅 |

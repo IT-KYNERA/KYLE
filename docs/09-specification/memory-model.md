@@ -1,7 +1,7 @@
 # Memory Model
 
-> El modelo de memoria de Kyle está especificado en `03-language/memory/`.
-> Este documento es un índice que referencia los archivos relevantes.
+> El modelo de memory de Kyle is especificado en `03-language/memory/`.
+> Este documento is un index que referencia filis relevantes.
 
 | Aspecto | Documento |
 |---------|-----------|
@@ -13,6 +13,6 @@
 | Stack vs Heap | `03-language/memory/stack-heap.md` |
 | Allocator | `03-language/memory/allocator.md` |
 
-## Ver también
+## See also
 
-- `03-language/memory/` — Directorio completo de memoria
+- `03-language/memory/` — Directorio completo de memory

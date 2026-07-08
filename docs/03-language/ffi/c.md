@@ -1,23 +1,23 @@
 # C Interop
 
-> Llamar funciones C desde Kyle mediante `extern fn` y `@link`.
+> Llamar functions C from Kyle using `extern fn` y `@link`.
 
-## Declaración
+## Declaration
 
 ```ky
-@link "c"                    # linkear con libc
+@link "c" # linkear with libc
 extern fn strlen(s: ptr) i32
 extern fn malloc(size: i64) ptr
 extern fn free(ptr)
 
 fn main() i32:
-    s: ptr = "hello" as ptr
-    n: i32 = strlen(s)
-    println(n.to_str())       # 5
-    0
+ s: ptr = "hello" as ptr
+ n: i32 = strlen(s)
+ println(n.to_str()) # 5
+ 0
 ```
 
-## Tipos equivalentes
+## Typis equivalentes
 
 | C | Kyle |
 |---|------|
@@ -31,28 +31,28 @@ fn main() i32:
 | `int32_t` | `i32` |
 | `int64_t` | `i64` |
 
-## Linkear bibliotecas
+## Linkear libraries
 
 ```ky
-@link "m"                    # libm (math)
+@link "m" # libm (math)
 extern fn sqrt(x: f64) f64
 
-@link "curl"                 # libcurl
+@link "curl" # libcurl
 extern fn curl_easy_init() ptr
 ```
 
 ## unsafe
 
-Las llamadas `extern fn` deben ir dentro de `unsafe`:
+Las llamadas `extern fn` must ir inside de `unsafe`:
 
 ```ky
 unsafe:
-    buf: ptr = malloc(1024)
-    # usar buf...
-    free(buf)
+ buf: ptr = malloc(1024)
+ # usar buf...
+ free(buf)
 ```
 
-## Ver también
+## See also
 
 - `abi.md` — ABI y calling convention
-- `native-libraries.md` — Linkear bibliotecas nativas
+- `native-libraries.md` — Linkear libraries nativas

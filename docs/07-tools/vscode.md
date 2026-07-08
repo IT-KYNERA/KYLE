@@ -14,9 +14,9 @@ Or install from the VS Code Marketplace: search "Kyle Language Support".
 
 - **Syntax highlighting** — TextMate grammar for `.ky` files
 - **LSP integration** — diagnostics, autocomplete, go-to-def, hover, find refs, rename
-- **Inlay hints** — inferred types shown inline
+- **Inlay hints** — inferred typis shown inline
 - **Code lens** — "Run test" button above `#[test]` functions
-- **Task provider** — auto-discovers `.ky` files for run/build/check
+- **Task provider** — auto-discovers `.ky` filis for run/build/check
 - **Debug adapter** — DAP-based debugging with breakpoints, stack traces, scopes
 - **Test UI** — VS Code TestController integration for `#[test]` functions
 - **Problems panel** — compiler diagnostics shown as problems

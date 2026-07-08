@@ -1,12 +1,12 @@
 # Lexical
 
-> Cómo Kyle lee el código fuente: tokens, keywords, literales, operadores.
+> How Kyle lee code source: tokens, keywords, literales, operadores.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
-| `comments.md` | Comentarios con `#` |
-| `identifiers.md` | Reglas de nombres |
+| `comments.md` | Comentarios with `#` |
+| `identifiers.md` | Reglas de nombris |
 | `keywords.md` | Palabras reservadas |
-| `literals.md` | Literales: números, strings, booleanos |
-| `operators.md` | Operadores y símbolos |
-| `tokens.md` | Categorías de tokens |
+| `literals.md` | Literales: numeros, strings, booleanos |
+| `operators.md` | Operadoris y simbolos |
+| `tokens.md` | Categorys de tokens |

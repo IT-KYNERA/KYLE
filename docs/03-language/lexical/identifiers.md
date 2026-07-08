@@ -1,16 +1,16 @@
 # Identifiers
 
-> Reglas para nombres de identificadores en Kyle.
+> Reglas for nombris de identificadoris en Kyle.
 
 ## Reglas
 
-- Deben empezar con letra o `_`
-- Pueden contener letras, dígitos y `_`
-- Distinguen mayúsculas/minúsculas (`foo` ≠ `Foo`)
+- Deben empezar with letra o `_`
+- Pueden contener letras, digitos y `_`
+- Distinguen mayusculas/minusculas (`foo` ≠ `Foo`)
 - Longitud ilimitada
-- Palabras reservadas (keywords) no pueden ser identificadores
+- Palabras reservadas (keywords) no can be identificadores
 
-## Válidos
+## Validos
 
 ```ky
 foo
@@ -21,23 +21,23 @@ MAX_SIZE
 StringBuilder
 ```
 
-## Inválidos
+## Invalidos
 
 ```ky
-123foo      # empieza con dígito
-foo-bar     # guión no permitido
-if          # keyword reservada
+123foo # empieza with digito
+foo-bar # guion no permitido
+if # keyword reservada
 ```
 
 ## Convenciones
 
-| Convención | Ejemplo | Cuándo usar |
+| Convention | Example | When usar |
 |------------|---------|-------------|
-| `snake_case` | `mi_variable`, `calcular_total` | Funciones, variables, métodos |
-| `UPPER_SNAKE` | `MAX_SIZE`, `PI` | Constantes (`:=`) |
+| `snake_case` | `mi_variable`, `calcular_total` | Functions, variables, methods |
+| `UPPER_SNAKE` | `MAX_SIZE`, `PI` | Constbefore (`:=`) |
 | `_prefix` | `_internal`, `_cache` | Privado / interno |
 
-## Ver también
+## See also
 
 - `keywords.md` — Palabras reservadas
 - `comments.md` — Comentarios

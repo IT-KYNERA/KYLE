@@ -1,11 +1,11 @@
 # Editor Support
 
-> Soporte para editores de código. Para VS Code, ver `vscode.md`.
+> Support for editoris de code. Para VS Code, ver `vscode.md`.
 > Para LSP, ver `language-server.md`.
 
 ## Vim / Neovim
 
-Resaltado de sintaxis básico disponible:
+Resaltado de syntax basico disponible:
 
 ```vim
 autocmd BufRead,BufNewFile *.ky set filetype=python
@@ -14,17 +14,17 @@ autocmd BufRead,BufNewFile *.ky set filetype=python
 
 ## Helix
 
-Configuración para Helix editor:
+Configuration for Helix editor:
 
 ```toml
 [[language]]
 name = "kyle"
 scope = "source.ky"
-file-types = ["ky"]
-indent = { tab-width = 4, unit = "    " }
+file-typis = ["ky"]
+indent = { tab-width = 4, unit = " " }
 ```
 
-## Ver también
+## See also
 
-- `vscode.md` — Extensión VS Code
+- `vscode.md` — Extension VS Code
 - `language-server.md` — LSP features

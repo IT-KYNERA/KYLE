@@ -1,3 +1,3 @@
 # Versioning
 
-> **Pendiente de contenido.**
+> **Pending content.**

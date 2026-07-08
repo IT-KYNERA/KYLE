@@ -1,21 +1,21 @@
 # Project Layout
 
-> Estructura recomendada para proyectos Kyle.
+> Estructura recommended for proyectos Kyle.
 
 ## App project
 
 ```
 myapp/
-├── ky.toml              # Configuración del proyecto
+├── ky.toml # Configuration del proyecto
 ├── src/
-│   ├── main.ky          # Punto de entrada
-│   ├── lib.ky           # Librería del proyecto
-│   └── utils.ky         # Módulos auxiliares
+│ ├── main.ky # Punto de input
+│ ├── lib.ky # Library del proyecto
+│ └── utils.ky # Modulis auxiliares
 ├── tests/
-│   └── test_main.ky     # Tests
+│ └── test_main.ky # Tests
 └── target/
-    ├── debug/           # Build artifacts (debug)
-    └── release/         # Build artifacts (release)
+ ├── debug/ # Build artifacts (debug)
+ └── release/ # Build artifacts (release)
 ```
 
 ## API project
@@ -24,9 +24,9 @@ myapp/
 myapi/
 ├── ky.toml
 ├── src/
-│   ├── main.ky
-│   ├── routes.ky
-│   └── models.ky
+│ ├── main.ky
+│ ├── routes.ky
+│ └── models.ky
 ├── tests/
 └── target/
 ```
@@ -34,7 +34,7 @@ myapi/
 ## Bare script
 
 ```
-script.ky                 # Archivo único, sin ky.toml
+script.ky # File unico, without ky.toml
 ```
 
 ## ky.toml
@@ -45,7 +45,7 @@ version = "0.1.0"
 edition = "2024"
 ```
 
-## Ver también
+## See also
 
-- `build.md` — Compilación de proyectos
+- `build.md` — Compilation de proyectos
 - `first-program.md` — Crear primer proyecto

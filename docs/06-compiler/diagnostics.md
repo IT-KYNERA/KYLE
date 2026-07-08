@@ -1,18 +1,18 @@
 # Diagnostics
 
-> Sistema de errores y diagnósticos del compilador.
+> Sistema de errors y diagnosticos del compiler.
 > Crate: `kyc_core/src/diagnostics.rs` / `kyc_core/src/span.rs`
 
 ## Responsabilidad
 
-El sistema de diagnósticos provee errores y warnings con ubicación precisa
-en el código fuente, facilitando la depuración.
+El sistema de diagnosticos provee errors y warnings with ubicacion precisa
+en code source, facilitando depuracion.
 
 ## Error Codes
 
-Cada error tiene un código único:
+Cada error has un code unico:
 
-| Código | Significado |
+| Code | Significado |
 |--------|-------------|
 | `KL-E0001` | Type mismatch |
 | `KL-E0002` | Syntax error |
@@ -32,48 +32,48 @@ Cada error tiene un código único:
 
 ```rust
  struct Diagnostic {
-     code: ErrorCode,
-     message: String,
-     span: Option<Span>,
-     notes: Vec<String>,
+ code: ErrorCode,
+ message: String,
+ span: Option<Span>,
+ notes: Vec<String>,
 }
 
  struct Span {
-     start: usize,    // byte offset
-     end: usize,
-     line: u32,
-     column: u32,
+ start: usize, // byte offset
+ end: usize,
+ line: u32,
+ column: u32,
 }
 ```
 
-## Formato de salida
+## Formato de output
 
 ```
 KL-E0001: Type mismatch
 
-  expected 'i32', found 'str'
+ expected 'i32', found 'str'
 
-  --> file.ky:10:5
-   |
-10 |     x = "hello" + 42
-   |         ^^^^^^^^^^^^^ expected i32 here
-   |
+ --> file.ky:10:5
+ |
+10 | x = "hello" + 42
+ | ^^^^^^^^^^^^^ expected i32 here
+ |
 ```
 
 ## Warnings
 
-Además de errores, el compilador produce warnings:
+Ademore de errors, compiler produce warnings:
 
-| Warning | Condición |
+| Warning | Condition |
 |---------|-----------|
 | Unused variable | Variable declarada pero nunca usada |
-| Unused import | Import de módulo no utilizado |
-| Unreachable code | Código después de return/break |
-| Deprecated feature | Uso de sintaxis obsoleta |
-| Implicit conversion | Conversión de tipos sin `as` |
+| Unused import | Import de module no utilizado |
+| Unreachable code | Code after de return/break |
+| Deprecated feature | Uso de syntax obsoleta |
+| Implicit conversion | Conversion de typis without `as` |
 
-## Ver también
+## See also
 
-- `semantic.md` — Genera la mayoría de los errores semánticos
-- `parser.md` — Genera errores sintácticos
-- `borrow-analysis.md` — Genera errores de ownership
+- `semantic.md` — Genera mayoria de errors semanticos
+- `parser.md` — Genera errors sintacticos
+- `borrow-analysis.md` — Genera errors de ownership

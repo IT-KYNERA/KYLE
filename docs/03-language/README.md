@@ -1,13 +1,13 @@
 # 03-language
 
-> Referencia completa del lenguaje Kyle. Cada subdirectorio cubre un aspecto específico.
+> Referencia completa del language Kyle. Cada subdirectorio cubre un aspecto especifico.
 
 | Subdirectorio | Contenido |
 |---------------|-----------|
 | `lexical/` | Tokens, keywords, literales, comentarios |
-| `syntax/` | Variables, funciones, expresiones, statements |
-| `types/` | Primitivos, compuestos, structs, enums, genéricos |
+| `syntax/` | Variables, functions, expressions, statements |
+| `types/` | Primitivos, compuestos, structs, enums, genericos |
 | `memory/` | Ownership, move, copy, clone, stack/heap |
-| `concurrency/` | Async/await, threads, channels, sincronización |
-| `error-handling/` | Option, result, panic, diagnósticos |
-| `ffi/` | C interop, ABI, bibliotecas nativas |
+| `concurrency/` | Async/await, threads, channels, sincronizacion |
+| `error-handling/` | Option, result, panic, diagnosticos |
+| `ffi/` | C interop, ABI, libraries nativas |

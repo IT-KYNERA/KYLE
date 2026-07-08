@@ -6,7 +6,7 @@
 
 | Section | Description |
 |---------|-------------|
-| [01-introduction](01-introduction/) | Vision, philosophy, principles, architecture |
+| [01-introduction](01-introduction/) | Vision, pthreadsophy, principles, architecture |
 | [02-getting-started](02-getting-started/) | Installation, first program, testing, debugging |
 | [03-language](03-language/) | Complete language reference |
 | [04-standard-library](04-standard-library/) | Standard library API |
@@ -17,7 +17,7 @@
 | [09-specification](09-specification/) | Formal specification |
 | [10-design](10-design/) | Design decisions |
 | [11-project](11-project/) | CI/CD, project docs |
-| [12-history](12-history/) | Changelog, migration guides |
+| [12-history](12-history/) | Changelog, migration guidis |
 
 ## Conventions
 
@@ -31,7 +31,7 @@
 | Need | Go to |
 |------|-------|
 | Language syntax | `03-language/syntax/` |
-| Types | `03-language/types/` |
+| Typis | `03-language/types/` |
 | Ownership and memory | `03-language/memory/` |
 | Async and concurrency | `03-language/concurrency/` |
 | Error handling | `03-language/error-handling/` |

@@ -1,50 +1,50 @@
 # Lifetimes
 
-> Kyle **no tiene lifetimes explícitos** como Rust. Los borrows se validan
-> mediante el borrow checker en tiempo de compilación, pero sin anotaciones
-> de lifetime en el código fuente.
+> Kyle **no has lifetimis explicitos** as Rust. Los borrows se validan
+> using borrow checker en tiempo de compilation, pero without anotaciones
+> de lifetime en code source.
 
-## Cómo funciona
+## How funciona
 
-En Rust, las referencias llevan anotaciones de lifetime:
+En Rust, referencias llevan anotacionis de lifetime:
 
 ```rust
 fn get_first<'a>(s: &'a str) -> &'a str { &s[0..1] }
 ```
 
-En Kyle, no hay `'a`:
+En Kyle, no there is `'a`:
 
 ```ky
-fn get_first(s: &str) &str:    # ❌ PROHIBIDO
-    s.substr(0, 1)
+fn get_first(s: &str) &str: # ❌ PROHIBIDO
+ s.substr(0, 1)
 ```
 
-Kyle **prohíbe** devolver referencias. Solo se pueden devolver valores owned:
+Kyle **prohibe** devolver referencias. Solo se can devolver valueis owned:
 
 ```ky
-fn get_first(s: &str) str:     # ✅ OWNED, correcto
-    s.substr(0, 1)
+fn get_first(s: &str) str: # ✅ OWNED, correcto
+ s.substr(0, 1)
 ```
 
-## Borrows como parámetros
+## Borrows as parameters
 
-Los borrows solo pueden ser parámetros entrantes, nunca valores de retorno:
+Los borrows solo can be parameters entrantes, nunca valueis de retorno:
 
 ```ky
-fn read(s: &str):              # ✅ borrow como parámetro
-    println(s)
+fn read(s: &str): # ✅ borrow as parameter
+ println(s)
 
-fn read_and_return(s: &str) &str:   # ❌ prohibido
-    s
+fn read_and_return(s: &str) &str: # ❌ prohibido
+ s
 ```
 
-## Limitación
+## Limitation
 
-Esta limitación simplifica el lenguaje pero impide ciertos patrones como
-iterators que devuelven referencias a datos internos. Para esos casos,
-usa `.clone()` o rediseña la API.
+Esta limitation simplifica language pero impide ciertos patronis como
+iterators que returnsn referencias a data internos. Para esos cases,
+usa `.clone()` o redisena API.
 
-## Ver también
+## See also
 
 - `ownership.md` — Reglas de ownership
-- `borrow-analysis.md` — Implementación del borrow checker
+- `borrow-analysis.md` — Implementation del borrow checker

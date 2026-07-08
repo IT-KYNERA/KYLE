@@ -1,15 +1,15 @@
 # Memory Management
 
-> Gestión de memoria en el runtime de Kyle: asignación, liberación, retain/release.
-> Crate: `kyc_runtime/src/memory.rs` (67 líneas).
+> Management de memory en runtime de Kyle: allocation, deallocation, retain/release.
+> Crate: `kyc_runtime/src/memory.rs` (67 lines).
 
 ## Responsabilidad
 
-El runtime de Kyle proporciona gestión manual de memoria para strings, listas, diccionarios
-y otros tipos heap-allocados. No hay garbage collector — la memoria se libera explícitamente
-mediante el borrow analysis del compilador, que inserta llamadas a `ky_free` automáticamente.
+El runtime de Kyle proporciona management manual de memory for strings, lists, dictionarys
+y otros typis heap-allocados. No there is garbage collector — memory se libera explicitamente
+using borrow analysis del compiler, que inserta llamadas a `ky_free` automaticamente.
 
-## Funciones
+## Functions
 
 ### ky_alloc
 
@@ -18,15 +18,15 @@ mediante el borrow analysis del compilador, que inserta llamadas a `ky_free` aut
  extern "C" fn ky_alloc(size: i64) -> *mut u8
 ```
 
-Asigna un bloque de memoria del heap del tamaño especificado.
+Asigna un bloque de memory del heap del size especificado.
 
-- Retorna un puntero al bloque asignado, o null si falla
-- La memoria incluye un header con refcount y tamaño
+- Retorna un pointer al bloque asignado, o null si fails
+- La memory incluye un header with refcount y size
 - Equivalente a `malloc()` de C
 
 ```ky
 extern fn ky_alloc(size: i64) ptr
-buf = ky_alloc(1024)     # asigna 1024 bytes
+buf = ky_alloc(1024) # asigna 1024 bytes
 ```
 
 ### ky_free
@@ -36,15 +36,15 @@ buf = ky_alloc(1024)     # asigna 1024 bytes
  extern "C" fn ky_free(ptr: *mut u8)
 ```
 
-Libera un bloque de memoria previamente asignado con `ky_alloc`.
+Libera un bloque de memory previamente asignado with `ky_alloc`.
 
-- No hace nada si `ptr` es null
+- No does nada si `ptr` is null
 - No verifica doble-free (undefined behavior)
 - Equivalente a `free()` de C
 
 ```ky
 extern fn ky_free(ptr)
-ky_free(buf)              # libera memoria
+ky_free(buf) # libera memory
 ```
 
 ### ky_retain / ky_release
@@ -56,43 +56,43 @@ ky_free(buf)              # libera memoria
  extern "C" fn ky_release(ptr: *mut u8)
 ```
 
-Sistema de reference counting para memoria compartida.
+Sistema de reference counting for memory compartida.
 
-- `ky_retain`: incrementa el contador de referencias atómico
+- `ky_retain`: incrementa contador de referencias atomico
 - `ky_release`: decrementa y libera si llega a 0
-- Usa `AtomicI64` para el contador
+- Usa `AtomicI64` for contador
 
 ### Header
 
-Cada bloque de memoria tiene un header con:
+Cada bloque de memory has un header con:
 
 ```rust
 struct Header {
-    strong: AtomicI64,   // reference count
-    size: i64,            // tamaño del bloque
+ strong: AtomicI64, // reference count
+ size: i64, // size del bloque
 }
 ```
 
-## Integración con borrow analysis
+## Integration with borrow analysis
 
-El compilador (`borrow_analysis.rs`) determina automáticamente cuándo insertar `ky_free`:
+El compiler (`borrow_analysis.rs`) determina automaticamente cuando insertar `ky_free`:
 
 ```rust
-// Generado por el compilador al final del scope
-ky_free(s_ptr)        # str sale de scope → liberar
-ky_list_free(lst)     # lista sale de scope → liberar (llama ky_free internamente)
-ky_dict_free(d)       # diccionario sale de scope → liberar
+// Generado by compiler al final del scope
+ky_free(s_ptr) # str sale de scope → free
+ky_list_free(lst) # list sale de scope → free (llama ky_free internamente)
+ky_dict_free(d) # dictionary sale de scope → free
 ```
 
-Esto elimina la necesidad de `free()` manual o garbage collector.
+Esto elimina necesidad de `free()` manual o garbage collector.
 
-## Estrategia de asignación
+## Estrategia de allocation
 
 - `ky_alloc` usa `Layout::from_size_align` de Rust (que usa `malloc`/`free` del sistema)
-- Strings, listas y diccionarios usan `ky_alloc` internamente
-- El runtime NO tiene su propio pool/arena — delega en el asignador del sistema
+- Strings, lists y dictionarys usan `ky_alloc` internamente
+- El runtime NO has su propio pool/arena — delega en asignador del sistema
 
-## Ver también
+## See also
 
-- `allocator.md` — Detalles del asignador de memoria
-- `06-compiler/borrow-analysis.md` — Cómo el compilador inserta `ky_free`
+- `allocator.md` — Details del asignador de memory
+- `06-compiler/borrow-analysis.md` — How compiler inserta `ky_free`

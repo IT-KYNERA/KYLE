@@ -25,30 +25,30 @@ println(withtent)
 | Method | Firma | Description |
 |--------|-------|-------------|
 | `file.open(path, mode)` | `fn(path: str, mode: str) file` | Open file |
-| `f.read()` | `fn() str` | Leer todo como string |
-| `f.read_bytes(count)` | `fn(count: i64) bytes` | Leer N bytes |
+| `f.read()` | `fn() str` | Leer todo as string |
+| `f.read_bytes(count)` | `fn(count: i64) bytes` | Leer N bytis |
 | `f.write(text)` | `fn(text: &str)` | Escribir text |
-| `f.write_bytes(data)` | `fn(data: &bytes)` | Escribir bytes |
+| `f.write_bytes(data)` | `fn(data: &bytes)` | Escribir bytis |
 | `f.c e()` | `fn()` | C e file |
 | `f.exists()` | `fn() bool` | `true` si existe |
-| `f.len()` | `fn() i64` | Tamaño en bytes |
+| `f.len()` | `fn() i64` | Size en bytis |
 
-### Modes de apertura
+### Modis de apertura
 
 | Mode | Description |
 |------|-------------|
 | `"r"` | Lectura (text) |
 | `"w"` | Escritura (text, truncar) |
 | `"a"` | Append (text) |
-| `"rb"` | Lectura (binario) |
-| `"wb"` | Escritura (binario) |
+| `"rb"` | Lectura (binary) |
+| `"wb"` | Escritura (binary) |
 
-### Ejemplo
+### Example
 
 ```ky
 from fs imbyt file
 
 withtent: str = file.open("data.txt", "r").read()
 lines: {str} = withtent.split("\n")
-println("líneas: " + lines.len().to_str())
+println("lines: " + lines.len().to_str())
 ```

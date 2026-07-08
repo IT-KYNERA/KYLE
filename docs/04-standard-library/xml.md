@@ -15,12 +15,12 @@ text: str = first.text()
 id_val: str = first.attr("id")
 ```
 
-### Funciones
+### Functions
 
 | Function | Firma | Description |
 |---------|-------|-------------|
 | `xml.parse(str)` | `fn(s: str) xml` | Parsear string → documento |
-| `xml. ement(name)` | `fn(name: str) xml` | Create  ement |
+| `xml. ement(name)` | `fn(name: str) xml` | Create ement |
 
 ### Methods (nodo)
 
@@ -28,9 +28,9 @@ id_val: str = first.attr("id")
 |--------|-------|-------------|
 | `n.find_all(tag)` | `fn(tag: str) {xml}` | Buscar hijos by tag |
 | `n.find_first(tag)` | `fn(tag: str) xml?` | Primer hijo que matchea |
-| `n.text()` | `fn() str` | Texto d  nodo |
-| `n.attr(name)` | `fn(name: str) str` | Valor de atributo |
-| `n.set_attr(name, val)` | `fn(name: str, val: str)` | Asignar atributo |
+| `n.text()` | `fn() str` | Texto d nodo |
+| `n.attr(name)` | `fn(name: str) str` | Valor de attribute |
+| `n.set_attr(name, val)` | `fn(name: str, val: str)` | Asignar attribute |
 | `n.add_child(child)` | `fn(child: xml)` | Agregar hijo |
 | `n.set_text(text)` | `fn(text: str)` | Asignar text |
 | `n.to_str()` | `fn() str` | Serializar a string |

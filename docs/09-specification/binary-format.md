@@ -1,3 +1,3 @@
 # Binary Format
 
-> **Pendiente de contenido.**
+> **Pending content.**

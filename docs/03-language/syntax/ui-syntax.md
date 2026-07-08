@@ -1,43 +1,43 @@
 # Kyle UI Syntax Specification
 
-**Versión:** 1.0  
-**Estado:** Especificación
+**Version:** 1.0 
+**Status:** Specification
 
 ---
 
-## 1. Filosofía
+## 1. Philosophy
 
-Kyle UI es un sistema de UI declarativo construido sobre el lenguaje Kyle.
+Kyle UI is un sistema de UI declarativo construido about language Kyle.
 
-Un archivo `.kyx` representa una vista.
+Un file `.kyx` represents una vista.
 
-- Si contiene `page(...)`, representa una página.
-- Si no contiene `page(...)`, representa un componente reutilizable.
+- Si conhas `page(...)`, represents una page.
+- Si no conhas `page(...)`, represents un componente reutilizable.
 
-No existe JavaScript. Todo el código Kyle se integra mediante expresiones `@`.
+No existe JavaScript. Todo code Kyle se integra using expresionis `@`.
 
 ---
 
-## 2. Archivos
+## 2. Files
 
 ```
-Login.ky        ← Lógica opcional
-Login.kyx       ← Vista
+Login.ky ← Logic opcional
+Login.kyx ← Vista
 
-Button.kyx      ← Componente
+Button.kyx ← Componente
 ```
 
-El archivo `.ky` es opcional. Toda la lógica puede ir dentro del `.kyx`.
+El file `.ky` is opcional. Toda logic can ir inside del `.kyx`.
 
 ---
 
-## 3. Página
+## 3. Page
 
 ```kyle
 page("/login")
 
 <view>
-    <text value="Login" />
+ <text value="Login" />
 </view>
 ```
 
@@ -47,31 +47,31 @@ page("/login")
 
 ```kyle
 <view>
-    <text value="Hello" />
+ <text value="Hello" />
 </view>
 ```
 
-Sin `page(...)` → es un componente reutilizable.
+Sin `page(...)` → is un componente reutilizable.
 
 ---
 
-## 5. Código Kyle
+## 5. Code Kyle
 
-Fragmentos pequeños con `@`:
+Fragmentos pequenos with `@`:
 
 ```kyx
 <text value=@user.name />
 ```
 
-Varias líneas con `@(...)`:
+Varias lines with `@(...)`:
 
 ```kyle
 @(
-    email: str
-    password: str
+ email: str
+ password: str
 
-    fn login():
-        ...
+ fn login():
+ ...
 )
 ```
 
@@ -91,14 +91,14 @@ Varias líneas con `@(...)`:
 
 ```kyx
 @if(user.isAdmin):
-    <button text="Delete" />
+ <button text="Delete" />
 ```
 
 ```kyx
 @if(user.isAdmin):
-    <admin_panel />
+ <admin_panel />
 @else:
-    <user_panel />
+ <user_panel />
 ```
 
 ---
@@ -107,12 +107,12 @@ Varias líneas con `@(...)`:
 
 ```kyx
 @match(state):
-    Loading:
-        <spinner />
-    Success:
-        <dashboard />
-    Error:
-        <error_view />
+ Loading:
+ <spinner />
+ Success:
+ <dashboard />
+ Error:
+ <error_view />
 ```
 
 ---
@@ -121,7 +121,7 @@ Varias líneas con `@(...)`:
 
 ```kyx
 @for(product in products):
-    <product_card product=@product />
+ <product_card product=@product />
 ```
 
 ---
@@ -146,12 +146,12 @@ Varias líneas con `@(...)`:
 
 ---
 
-## 12. Componentes hijos
+## 12. Componentis hijos
 
 ```kyx
 <card>
-    <text />
-    <button />
+ <text />
+ <button />
 </card>
 ```
 
@@ -159,7 +159,7 @@ Varias líneas con `@(...)`:
 
 ## 13. Slots
 
-Declaración en el componente:
+Declaration en componente:
 
 ```kyle
 slot header
@@ -170,16 +170,16 @@ Uso:
 
 ```kyx
 <card>
-    <header>
-        <text value="Title" />
-    </header>
-    <content>
-        <text value="Body" />
-    </content>
+ <header>
+ <text value="Title" />
+ </header>
+ <content>
+ <text value="Body" />
+ </content>
 </card>
 ```
 
-Las páginas no admiten slots.
+Las pages no admiten slots.
 
 ---
 
@@ -196,7 +196,7 @@ fn on_dispose(): ...
 
 ---
 
-## 15. Componentes nativos
+## 15. Componentis nativos
 
 ```
 App, View, Column, Row, Grid, Stack, Spacer, Container,
@@ -215,15 +215,15 @@ Canvas, Video, Audio, Map, Chart, WebView
 
 ```kyle
 style<button> Primary:
-    background = theme.primary
-    color = white
-    radius = md
-    padding = (12, 24)
+ background = theme.primary
+ color = white
+ radius = md
+ padding = (12, 24)
 
 layout<Column> Center:
-    align = center
-    justify = center
-    spacing = 20
+ align = center
+ justify = center
+ spacing = 20
 ```
 
 Uso:
@@ -239,10 +239,10 @@ Uso:
 
 ```kyle
 tpl<button> Primary:
-    style = primary_style
-    animation = primary_animation
-    cursor = pointer
-    ripple = true
+ style = primary_style
+ animation = primary_animation
+ cursor = pointer
+ ripple = true
 ```
 
 Uso:
@@ -257,9 +257,9 @@ Uso:
 
 ```kyle
 theme Light:
-    primary = #0066FF
-    background = white
-    text = black
+ primary = #0066FF
+ background = white
+ text = black
 ```
 
 Uso:
@@ -270,25 +270,25 @@ Uso:
 
 ---
 
-## 19. Ejemplo completo: Login
+## 19. Example completo: Login
 
 ```kyle
 page("/login")
 
 @(
-    email: str
-    password: str
+ email: str
+ password: str
 
-    fn login():
-        print("login with " + email)
+ fn login():
+ print("login with " + email)
 )
 
 <view>
-    <Column layout=Center>
-        <text value="Login" typography=Title />
-        <text_field bind=@email />
-        <password_field bind=@password />
-        <button tpl=Primary text="Ingresar" click=@login />
-    </Column>
+ <Column layout=Center>
+ <text value="Login" typography=Title />
+ <text_field bind=@email />
+ <password_field bind=@password />
+ <button tpl=Primary text="Ingresar" click=@login />
+ </Column>
 </view>
 ```

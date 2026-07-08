@@ -1,25 +1,25 @@
 # Diagnostics
 
-> Sistema de errores y diagnósticos del compilador Kyle.
-> Reporta errores con código, mensaje y ubicación precisa.
+> Sistema de errors y diagnosticos del compiler Kyle.
+> Reporta errors with code, mensaje y ubicacion precisa.
 
 ## Formato de error
 
 ```
 KL-E0001: Type mismatch
 
-  expected 'i32', found 'str'
+ expected 'i32', found 'str'
 
-  --> archivo.ky:10:5
-   |
-10 |     x = "hello" + 42
-   |         ^^^^^^^^^^^^^ expected i32 here
-   |
+ --> file.ky:10:5
+ |
+10 | x = "hello" + 42
+ | ^^^^^^^^^^^^^ expected i32 here
+ |
 ```
 
-## Códigos de error
+## Codis de error
 
-| Código | Significado |
+| Code | Significado |
 |--------|-------------|
 | `KL-E0001` | Type mismatch |
 | `KL-E0002` | Syntax error |
@@ -37,23 +37,23 @@ KL-E0001: Type mismatch
 
 ## Warnings
 
-| Warning | Condición |
+| Warning | Condition |
 |---------|-----------|
-| Variable no usada | Declarada pero nunca leída |
-| Import no usado | Módulo importado no utilizado |
-| Código muerto | Código después de `return`/`break` |
-| Conversión implícita | Sin `as` cast explícito |
+| Variable no usada | Declarada pero nunca leida |
+| Import no usado | Module importado no utilizado |
+| Code muerto | Code after de `return`/`break` |
+| Conversion implicita | Sin `as` cast explicito |
 
 ## Move analysis errors
 
-El borrow checker produce errores específicos:
+El borrow checker produce errors especificos:
 
 ```
 KL-E0013: use-after-move: cannot move `s` (local #2) — value has been moved
 KL-E0013: cannot mutably borrow `s` — it is already borrowed immutably
 ```
 
-## Ver también
+## See also
 
-- `06-compiler/diagnostics.md` — Implementación del sistema de diagnósticos
-- `06-compiler/borrow-analysis.md` — Errores del borrow checker
+- `06-compiler/diagnostics.md` — Implementation del sistema de diagnosticos
+- `06-compiler/borrow-analysis.md` — Errors del borrow checker

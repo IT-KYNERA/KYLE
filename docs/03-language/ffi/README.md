@@ -1,10 +1,10 @@
 # FFI
 
-> Foreign Function Interface: llamar funciones nativas desde Kyle.
+> Foreign Function Interface: llamar functions nativas from Kyle.
 
-| Archivo | Descripción |
+| File | Description |
 |---------|-------------|
 | `abi.md` | ABI y calling convention |
-| `c.md` | Llamar funciones C |
-| `cpp.md` | Interoperar con C++ (wrapper) |
-| `native-libraries.md` | Linkear bibliotecas nativas |
+| `c.md` | Llamar functions C |
+| `cpp.md` | Interoperar with C++ (wrapper) |
+| `native-libraries.md` | Linkear libraries nativas |

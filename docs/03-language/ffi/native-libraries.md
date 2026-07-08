@@ -1,15 +1,15 @@
 # Native Libraries
 
-> Linkear y usar bibliotecas nativas del sistema desde Kyle.
+> Linkear y usar libraries nativas del sistema from Kyle.
 
-## Linker flags con `@link`
+## Linker flags with `@link`
 
 ```ky
-@link "curl"               # -lcurl
-@link "pthread"            # -lpthread
-@link "m"                  # -lm (math)
-@link "sqlite3"            # -lsqlite3
-@link "pq"                 # -lpq (PostgreSQL)
+@link "curl" # -lcurl
+@link "pthread" # -lpthread
+@link "m" # -lm (math)
+@link "sqlite3" # -lsqlite3
+@link "pq" # -lpq (PostgreSQL)
 ```
 
 ### Frameworks (macOS)
@@ -27,24 +27,24 @@
 @link "-L/opt/homebrew/lib"
 ```
 
-## Path de búsqueda
+## Path de busqueda
 
-El linker busca bibliotecas en:
+El linker busca libraries en:
 
 1. `-L` paths especificados en `@link`
-2. Variables de entorno (`LIBRARY_PATH`, `LD_LIBRARY_PATH`)
+2. Variablis de entorno (`LIBRARY_PATH`, `LD_LIBRARY_PATH`)
 3. Paths del sistema (`/usr/lib`, `/usr/local/lib`, `/opt/homebrew/lib`)
 
-## Compilación estática vs dinámica
+## Compilation static vs dynamic
 
-| Tipo | Ventaja | Desventaja |
+| Type | Ventaja | Desventaja |
 |------|---------|-------------|
-| Estática (`.a`) | Binario portable | Tamaño grande |
-| Dinámica (`.so`/`.dylib`) | Tamaño pequeño | Requiere runtime library |
+| Static (`.a`) | Binario portable | Size grande |
+| Dynamic (`.so`/`.dylib`) | Size pequeno | Requiere runtime library |
 
-Por defecto Kyle linkea dinámicamente. Para estático, usa `@link "lib.a"`.
+Por defecto Kyle linkea dynamicmente. Para estatico, usa `@link "lib.a"`.
 
-## Ver también
+## See also
 
-- `c.md` — Llamar funciones C
+- `c.md` — Llamar functions C
 - `abi.md` — ABI y calling convention

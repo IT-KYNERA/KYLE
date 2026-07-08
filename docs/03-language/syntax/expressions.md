@@ -1,13 +1,13 @@
 # Expressions
 
-**Status:** [x] All expression types work (arithmetic, bitwise, comparison, logical, as casts, ranges, ternary).
+**Status:** [x] All expression typis work (arithmetic, bitwise, comparison, logical, as casts, ranges, ternary).
 
 ## Binary operators
 
 | Category | Operators |
 |----------|-----------|
 | Arithmetic | `+` `-` `*` `/` `%` `**` |
-| Comparison | `==` `!=` `<` `>` `<=` `>=` |
+| Compariare | `==` `!=` `<` `>` `<=` `>=` |
 | Logical | `and` `or` `not` |
 | Bitwise | `&` `\|` `^` `<<` `>>` |
 | Range | `..` `..=` `..<` |
@@ -17,25 +17,25 @@
 ## Primary expressions
 
 ```ky
-42                  # literal
-"hello"             # string
-name                # identifier
-a + b               # binary
--a                  # unary negate
-not flag            # logical not
-a.b                 # property access
-a.b()               # method call
-a[b]                # index
-a[b..c]             # slice
-f(x, y)             # function call
+42 # literal
+"hello" # string
+name # identifier
+a + b # binary
+-a # unary negate
+not flag # logical not
+a.b # property access
+a.b() # method call
+a[b] # index
+a[b..c] # slice
+f(x, y) # function call
 ```
 
 ## Assignment
 
 ```ky
-x = value           # simple
-x += 1              # compound (also -= *= /= %=)
-(x, y) = tuple      # destructuring
+x = value # simple
+x += 1 # compound (also -= *= /= %=)
+(x, y) = tuple # destructuring
 ```
 
 ## Conditional expression
@@ -48,17 +48,17 @@ result = if x > 0: "positive" else: "negative"
 
 ```ky
 name = match x:
-    1: "one"
-    2: "two"
-    _: "other"
+ 1: "one"
+ 2: "two"
+ _: "other"
 ```
 
 ## Range expressions
 
 ```ky
-0..5       # exclusive end: 0,1,2,3,4
-0..=5      # inclusive end: 0,1,2,3,4,5
-0..<5      # exclusive (alias for ..)
+0..5 # exclusive end: 0,1,2,3,4
+0..=5 # inclusive end: 0,1,2,3,4,5
+0..<5 # exclusive (alias for ..)
 ```
 
 ## Async expressions

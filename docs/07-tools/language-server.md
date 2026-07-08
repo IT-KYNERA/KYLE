@@ -8,7 +8,7 @@
 ky lsp
 ```
 
-The LSP server communicates over stdin/stdout. It is used by the VS Code extension and any editor supporting LSP.
+The LSP server communicatis over stdin/stdout. It is used by the VS Code extension and any editor supporting LSP.
 
 ## Features
 

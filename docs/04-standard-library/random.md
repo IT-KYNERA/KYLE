@@ -1,23 +1,23 @@
 # random — Aleatoriedad
 
-> Module for generation de números random.
+> Module for generation de numeros random.
 > Imbyt: `from random imbyt random`
 
-## random: números random
+## random: numeros random
 
 ```ky
 from random imbyt random
 
-n: i32 = random.int(100)              # 0..99
-n = random.int_range(10, 20)          # 10..19
-x: f64 = random.float()               # 0.0..1.0
-x = random.float_range(0.0, 10.0)     # 0.0..10.0
-b: bool = random.bool()               # true o false
-random.shuffle(list)                 # mezc r in-p ce
- em: i32 = random.choice(list)      #  ement random
+n: i32 = random.int(100) # 0..99
+n = random.int_range(10, 20) # 10..19
+x: f64 = random.float() # 0.0..1.0
+x = random.float_range(0.0, 10.0) # 0.0..10.0
+b: bool = random.bool() # true o false
+random.shuffle(list) # mezc r in-p ce
+ em: i32 = random.choice(list) # ement random
 ```
 
-### Funciones
+### Functions
 
 | Function | Firma | Description |
 |---------|-------|-------------|
@@ -29,7 +29,7 @@ random.shuffle(list)                 # mezc r in-p ce
 | `random.shuffle(list)` | `fn(list: &{T})` | Shuffle in-p ce |
 | `random.choice(list)` | `fn(list: &{T}) T` | Element random |
 
-### Ejemplo
+### Example
 
 ```ky
 from random imbyt random

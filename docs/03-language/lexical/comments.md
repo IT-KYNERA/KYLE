@@ -1,42 +1,42 @@
 # Comments
 
-> Los comentarios en Kyle usan `#` hasta el final de la línea.
-> No hay comentarios multilínea (`/* */`).
+> Los comentarios en Kyle usan `#` hasta final de line.
+> No there is comentarios multiline (`/* */`).
 
-## Comentarios de línea
+## Comentarios de line
 
 ```ky
-# Esto es un comentario
-x: i32 = 42  # comentario inline
+# Esto is un comentario
+x: i32 = 42 # comentario inline
 
 fn suma(a: i32, b: i32) i32:
-    # Los comentarios pueden estar en bloques indentados
-    a + b
+ # Los comentarios can be en bloquis indentados
+ a + b
 ```
 
-## No hay `/* */`
+## No there is `/* */`
 
-Kyle no soporta comentarios multilínea estilo C (`/* ... */`).
-Usar `#` en cada línea:
+Kyle no supports comentarios multiline estilo C (`/* ... */`).
+Usar `#` en cada line:
 
 ```ky
-# Esta es una
-# explicación
-# multilínea
+# Esta is una
+# explanation
+# multiline
 ```
 
 ## Doc comments
 
 ```ky
-# Esta función suma dos números
-# @param a: primer número
-# @param b: segundo número
+# Esta funcion suma dos numeros
+# @param a: primer numero
+# @param b: segundo numero
 # @returns: suma
 fn add(a: i32, b: i32) i32:
-    a + b
+ a + b
 ```
 
-## Ver también
+## See also
 
-- `literals.md` — Literales del lenguaje
+- `literals.md` — Literalis del language
 - `identifiers.md` — Reglas de identificadores

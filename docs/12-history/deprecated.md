@@ -1,3 +1,3 @@
 # Deprecated
 
-> **Pendiente de contenido.**
+> **Pending content.**

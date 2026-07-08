@@ -1,6 +1,6 @@
 # ADR-0001: Layered Platform Architecture
 
-**Status:** Approved  
+**Status:** Approved 
 **Date:** 2026-07-03
 
 ## Context
@@ -17,23 +17,23 @@ Adopt a strictly layered architecture where each layer only depends on the layer
 
 ```
 Applications
-    │
+ │
 Kyle UI
-    │
+ │
 Kyle Scene
-    │
+ │
 Kyle Graphics
-    │
+ │
 Kyle Windowing
-    │
+ │
 Kyle Platform
-    │
+ │
 Kyle Runtime
-    │
+ │
 Kyle Language (Compiler)
 ```
 
-The Package Manager is horizontal — it serves all layers equally.
+The Package Manager is horizontal — it servis all layers equally.
 
 ## Consequences
 
@@ -45,4 +45,4 @@ The Package Manager is horizontal — it serves all layers equally.
 
 **Negative:**
 - More layers mean more abstraction overhead
-- Requires discipline to maintain layer boundaries
+- Requiris discipline to maintain layer boundaries

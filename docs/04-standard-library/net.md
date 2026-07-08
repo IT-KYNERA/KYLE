@@ -1,9 +1,9 @@
 # net — Red
 
-> Módulo de redes (TCP).
+> Module de redis (TCP).
 > Import: `from net import tcp`
 
-## tcp: conexiones TCP
+## tcp: conexionis TCP
 
 ```ky
 from net import tcp
@@ -23,19 +23,19 @@ resp: str = conn.read(4096)
 conn.close()
 ```
 
-### Métodos (socket servidor)
+### Methods (socket servidor)
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
 | `tcp.listen(port)` | `fn(port: i32) tcp` | Crear socket servidor |
-| `s.accept()` | `fn() tcp` | Aceptar conexión |
+| `s.accept()` | `fn() tcp` | Aceptar connection |
 | `s.close()` | `fn()` | Cerrar socket |
 
-### Métodos (socket cliente)
+### Methods (socket cliente)
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
 | `tcp.connect(host, port)` | `fn(host: str, port: i32) tcp` | Conectar |
-| `c.read(count)` | `fn(count: i32) str` | Leer hasta N bytes |
-| `c.write(data)` | `fn(data: &str)` | Enviar datos |
-| `c.close()` | `fn()` | Cerrar conexión |
+| `c.read(count)` | `fn(count: i32) str` | Leer hasta N bytis |
+| `c.write(data)` | `fn(data: &str)` | Enviar data |
+| `c.close()` | `fn()` | Cerrar connection |

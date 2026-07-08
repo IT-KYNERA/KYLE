@@ -1,57 +1,57 @@
 # Package Manager
 
-> Gestor de paquetes de Kyle: `ky add`, `ky remove`, `ky install`.
+> Gestor de paquetis de Kyle: `ky add`, `ky remove`, `ky install`.
 
 ## Comandos
 
-### Agregar dependencia
+### Agregar dependency
 
 ```bash
-ky add http                    # agrega http desde registry
-ky add http@1.0.0             # versión específica
+ky add http # agrega http from registry
+ky add http@1.0.0 # version especifica
 ```
 
-### Instalar dependencias
+### Instalar dependencies
 
 ```bash
-ky install                     # instala todas las dependencias de ky.lock
+ky install # instala todas dependencies de ky.lock
 ```
 
-### Eliminar dependencia
+### Eliminar dependency
 
 ```bash
-ky remove http                 # elimina http
+ky remove http # elimina http
 ```
 
-### Publicar paquete
+### Publicar package
 
 ```bash
-ky publish                     # publica en registry local
+ky publish # publica en registry local
 ```
 
 ## Registry
 
-Los paquetes se distribuyen via GitHub Pages:
+Los paquetis se distribuyen via GitHub Pages:
 
 ```text
 https://IT-KYNERA.github.io/KYLE/docs
 ```
 
-## Paquetes oficiales
+## Paquetis oficiales
 
-| Package | Descripción |
+| Package | Description |
 |---------|-------------|
 | `http` | Cliente y servidor HTTP |
-| `json` | Parseo y serialización JSON |
-| `sqlite` | Base de datos SQLite |
+| `json` | Parseo y serializacion JSON |
+| `sqlite` | Base de data SQLite |
 
 ## ky.lock
 
-El archivo `ky.lock` se genera automáticamente al instalar dependencias.
-No se debe modificar manualmente.
+El file `ky.lock` se genera automaticamente al instalar dependencies.
+No se must modificar manualmente.
 
-## Ver también
+## See also
 
-- `build.md` — Compilación
+- `build.md` — Compilation
 - `project-layout.md` — Estructura de proyectos
-- `08-ecosystem/` — Documentación del ecosistema
+- `08-ecosystem/` — Documentation del ecosistema

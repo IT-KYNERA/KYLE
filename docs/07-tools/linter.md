@@ -1,3 +1,3 @@
 # Linter
 
-> **Pendiente de contenido.**
+> **Pending content.**

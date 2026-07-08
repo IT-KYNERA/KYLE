@@ -1,3 +1,3 @@
 # Dependency Resolution
 
-> **Pendiente de contenido.**
+> **Pending content.**
