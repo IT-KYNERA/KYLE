@@ -45,7 +45,17 @@ See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 **Key files to consult:**
 - `docs/03-language/` — **Read this for ANY syntax question** (8 subdirectories)
 - `docs/03-language/lexical/operators.md` — Quick lookup: keywords, operators
-- `docs/04-standard-library/` — Available built-in functions
+- `docs/04-standard-library/` — Standard library API
+- `TEST_CHECKLIST.md` — Verified syntax features with test status
+
+**Critical naming conventions:**
+- **snake_case** for everything: functions, types, methods, variables
+- **`^T`** = mutable type, `&T` = borrow, `^&T` = mutable borrow
+- **Move by default**: `y = x` transfers ownership for non-Copy types
+- **No `let`, `var`, `const`, `mut`**: use `name = value` or `name: ^T = value`
+- **No `pub`**: use `_name` for protected, `__name` for private
+- **No `self`**: use `this.field` for field access
+- **Generic params**: uppercase `T` (only exception to snake_case)
 
 **This file (AGENTS.md) does NOT contain syntax reference.**
 Do not guess Kyle syntax — always check the docs.
@@ -87,16 +97,20 @@ ky/
 
 | Section | Files | Content |
 |---------|:-----:|---------|
-| [01-overview/](docs/01-overview/README.md) | 5 | Vision, philosophy, principles, layered architecture |
-| [02-guide/](docs/02-guide/README.md) | 7 | Tutorial: install, first program, testing, debugging, patterns, performance, CI/CD |
+| Section | Files | Content |
+|---------|:-----:|---------|
+| [01-introduction/](docs/01-introduction/README.md) | 6 | Vision, philosophy, principles, architecture, roadmap, FAQ |
+| [02-getting-started/](docs/02-getting-started/README.md) | 9 | Installation, first program, build, testing, debugging, IDE |
 | [03-language/](docs/03-language/README.md) | **8 subdirectories** | **Formal language specification** (read for ANY syntax question) |
 | [04-standard-library/](docs/04-standard-library/README.md) | 22 | Standard library modules |
-| [05-packages/](docs/05-packages/README.md) | 4 | Official package specs: HTTP, JSON, SQLite, PostgreSQL |
-| [03-language/lexical/](docs/03-language/lexical/README.md) | 6 | Quick lookup: keywords, operators, tokens |
-| [07-engineering/](docs/07-engineering/README.md) | 5 | Compiler architecture, SSA, optimization pipeline, codegen |
-| [08-design/](docs/08-design/README.md) | 3 | ADRs, RFCs (architecture decisions, move semantics) |
-| [09-project/](docs/09-project/README.md) | 1 | Changelog |
-| [10-history/](docs/10-history/README.md) | 1 | Migration guide |
+| [05-runtime/](docs/05-runtime/README.md) | 6 | Runtime internals (memory, scheduler, panic, startup) |
+| [06-compiler/](docs/06-compiler/README.md) | 17 | Compiler pipeline (lexer, parser, MIR, codegen, linker) |
+| [07-tools/](docs/07-tools/README.md) | 10 | CLI, formatter, LSP, VSCode, build system |
+| [08-ecosystem/](docs/08-ecosystem/README.md) | 9 | Registry, packages (http, json, sqlite) |
+| [09-specification/](docs/09-specification/README.md) | 7 | Grammar, precedence, type system references |
+| [10-design/](docs/10-design/README.md) | 2 | ADRs, RFCs (architecture decisions, move semantics) |
+| [11-project/](docs/11-project/README.md) | 1 | CI/CD workflows |
+| [12-history/](docs/12-history/README.md) | 3 | Changelog, migration guides, deprecated |
 
 ### Quick reference links
 
@@ -105,13 +119,14 @@ ky/
 | **ANY syntax question** | `docs/03-language/` (8 subdirectories) |
 | Quick keyword/operator lookup | `docs/03-language/lexical/` |
 | Compiler CLI flags | `docs/07-tools/compiler-cli.md` |
-| How to test | `docs/02-guide/testing.md` |
-| Standard library functions | `docs/04-platform/standard-library/overview.md` |
-| Package manager usage | `docs/05-packages/registry.md` |
-| VS Code extension | `docs/04-platform/tools/vscode.md` |
-| Performance tips | `docs/02-guide/performance.md` |
-| Common patterns | `docs/02-guide/patterns.md` |
-| FFI (extern fn, @link, ptr) | `docs/03-language-reference/ffi.md` |
+| How to test | `docs/02-getting-started/testing.md` |
+| Standard library | `docs/04-standard-library/` |
+| Package manager | `docs/02-getting-started/package-manager.md` |
+| VS Code extension | `docs/07-tools/vscode.md` |
+| Performance tips | `docs/02-getting-started/performance.md` |
+| FFI (extern fn, @link, ptr) | `docs/03-language/ffi/abi.md` |
+| Runtime internals | `docs/05-runtime/` |
+| Compiler pipeline | `docs/06-compiler/` |
 
 ---
 
@@ -344,53 +359,42 @@ rm -rf /tmp/verify_release_*
 
 ---
 
-## Syntax Status por Documento
+## Syntax Status by Document
 
-Testeado con `ky run` en `/tmp/syntax_tests/`. Cada documento de `docs/03-language-reference/` fue verificado.
+> All items start as `[ ]` — must be tested and verified.
+> See `TEST_CHECKLIST.md` for the complete test suite.
 
-| # | Documento | Status | Notas |
-|---|-----------|--------|-------|
-| 1 | [lexical-structure.md](docs/03-language-reference/lexical-structure.md) | [x] | Keywords, literales, comentarios `#`, escapes `\n \t \r \0`. `\u{XXXX}` unicode no expandido. No hay `/* */` |
-| 2 | [variables.md](docs/03-language-reference/variables.md) | [x] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
-| 3 | [types.md](docs/03-language-reference/types.md) | [ ] | `ptr = 0 as ptr` type mismatch (bug #2). `char = 'a'` mismatch. `{str: i64}` con literal `1` inferido como i32 |
-| 4 | [expressions.md](docs/03-language-reference/expressions.md) | [x] | Aritmética, comparaciones, bitwise, `as` casts, rangos `..` |
-| 5 | [statements.md](docs/03-language-reference/statements.md) | [x] | if/elif/else, while, for-in range, match, return |
-| 6 | [functions.md](docs/03-language-reference/functions.md) | [ ] | Default params sí. `static fn` syntax (expected LParen before Static). `Calc.double()` undefined symbol |
-| 7 | [classes.md](docs/03-language-reference/classes.md) | [x] | `final class`, StructLiteral `Point {x:1}`, métodos, `Class :: Parent` herencia. Sin `this` obligatorio |
-| 8 | [enums.md](docs/03-language-reference/enums.md) | [x] | Enum con variants, match con `Enum.Variant` |
-| 9 | [generics.md](docs/03-language-reference/generics.md) | [x] | `class box<T>`, `fn identity<T>`, `box<T> {value: 7}`, `identity<i32>(42)` |
-| 10 | [ownership.md](docs/03-language-reference/ownership.md) | [x] | `^` = mutable, `&` = borrow, move por defecto, borrow checker |
-| 11 | [pattern-matching.md](docs/03-language-reference/pattern-matching.md) | [ ] | `..=` range pattern no existe. `1 \| 2` or-pattern no funciona. Match básico con `_:` sí |
-| 12 | [error-handling.md](docs/03-language-reference/error-handling.md) | [ ] | `-> Type` syntax no existe. `ok(v)`/`error(e)` result match no funciona. `return -1` sí |
-| 13 | [modules.md](docs/03-language-reference/modules.md) | [x] | `from X import Y` funciona (con packages instalados). `import X` funciona |
-| 14 | [ffi.md](docs/03-language-reference/ffi.md) | [x] | `@link`, `extern fn` funcionan |
-| 15 | [concurrency.md](docs/03-language-reference/concurrency.md) | [x] | `async fn` con 1 param, `async:` block, `await`, `ky_parallel_for`, `ky_spawn_thread` |
+| # | Document | Status | Notes |
+|---|----------|--------|-------|
+| 1 | `03-language/lexical/literals.md` | [ ] | Keywords, literals, comments `#`, escapes `\n \t \r \0` |
+| 2 | `03-language/syntax/variables.md` | [ ] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
+| 3 | `03-language/types/primitive-types.md` | [ ] | All types, Copy/Move, `^T`, `&T`, `^&T` |
+| 4 | `03-language/syntax/expressions.md` | [ ] | Arithmetic, comparisons, bitwise, `as` casts, ranges `..` |
+| 5 | `03-language/syntax/statements.md` | [ ] | if/elif/else, while, for-in range, match, return |
+| 6 | `03-language/syntax/functions.md` | [ ] | Parameters (move/borrow/mut borrow), fn pointers, closures |
+| 7 | `03-language/types/structs.md` | [ ] | `class`, `final class`, StructLiteral, methods, inheritance |
+| 8 | `03-language/types/enums.md` | [ ] | Enum with variants, match with `Enum.Variant` |
+| 9 | `03-language/types/generics.md` | [ ] | `class Box<T>`, `fn identity<T>`, `identity<i32>(42)` |
+| 10 | `03-language/memory/ownership.md` | [ ] | `^T` = mutable, `&T` = borrow, `^&T` = mut borrow, move default |
+| 11 | `03-language/syntax/pattern-matching.md` | [ ] | `..=` range pattern, `1 | 2` or-pattern, basic match |
+| 12 | `03-language/error-handling/result.md` | [ ] | `T!`, `ok(v)`/`error(e)` patterns, result match |
+| 13 | `03-language/syntax/modules.md` | [ ] | `from X import Y`, `import X` |
+| 14 | `03-language/ffi/abi.md` | [ ] | `@link`, `extern fn` declarations |
+| 15 | `03-language/concurrency/async-await.md` | [ ] | `async fn`, `async:` block, `await` |
 
-### Bugs activos (de sintaxis documentada que no funciona)
+### Known bugs
 
-| Bug | Docs ref | Síntoma | Location |
-|-----|----------|---------|----------|
+| Bug | Reference | Symptom | Location |
+|-----|-----------|---------|----------|
 | `static fn` syntax error | functions.md | "expected LParen, found Static" | parser.rs |
-| `Calc.double()` not found | functions.md | "undefined symbol 'double'" | lower.rs o scope.rs |
-| `char = 'a'` type mismatch | types.md | "expected 'char', found 'i32'" | type_checker.rs |
+| `Calc.double()` not found | functions.md | "undefined symbol 'double'" | lower.rs or scope.rs |
+| `char = 'a'` type mismatch | types/primitive-types.md | "expected 'char', found 'i32'" | type_checker.rs |
 | `..=` range pattern | pattern-matching.md | "expected Colon, found DotDotEquals" | parser.rs |
-| `1 \| 2` or-pattern | pattern-matching.md | No implementado | parser.rs |
+| `1 \| 2` or-pattern | pattern-matching.md | Not implemented | parser.rs |
 | `-> Type` return syntax | error-handling.md | "expected type name, found Arrow" | parser.rs |
 | `ok(v)`/`error(e)` result | error-handling.md | "expected pattern, found OkKw" | parser.rs |
-| `T?` optional type | types.md | Type mismatch 'str' expects 1 arg, got 2 | type_checker.rs |
-| `char` type literal `'a'` | types.md | expected 'char', found 'i32' | type_checker.rs |
-| `none` in docs | lexical-structure.md | El keyword es `None` (capital N), no `none` | docs.md |
-
-## Documentation Map
-
-Toda la documentación del lenguaje está en [`docs/`](docs/README.md):
-
-| Para saber... | Ir a... |
-|---------------|---------|
-| Sintaxis del lenguaje (completa) | `docs/03-language-reference/` (15 archivos) |
-| Referencia rápida (keywords, operadores) | `docs/06-reference/` |
-| Documentación del compilador (flags, CLI) | `docs/04-platform/` |
-| Standard library (builtins) | `docs/04-platform/standard-library/` |
-| Paquetes oficiales (http, json, sqlite) | `docs/05-packages/` |
-| Benchmarks y rendimiento | `benchmarks/` + `ROADMAP.md` |
-| Arquitectura del compilador | `docs/07-engineering/`
+| `T?` optional type | types/primitive-types.md | Type mismatch 'str' expects 1 arg, got 2 | type_checker.rs |
+| `char` type literal `'a'` | types/primitive-types.md | expected 'char', found 'i32' | type_checker.rs |
+| Official packages | `docs/08-ecosystem/` |
+| Benchmarks | `benchmarks/` + `ROADMAP.md` |
+| Compiler architecture | `docs/06-compiler/overview.md` |
