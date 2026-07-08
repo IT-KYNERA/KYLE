@@ -103,7 +103,7 @@ El punto de entrada es `kyc_cli::main` que delega en `Pipeline::build_source()`.
 ### build_source
 
 ```rust
-pub fn build_source(source: &str, file_name: &str, output: &Path) -> Result<(), String> {
+ fn build_source(source: &str, file_name: &str, output: &Path) -> Result<(), String> {
     // 1. Compile .ky → MIR (lexer → parser → HIR → semantic → MIR → borrow → SSA → optimize)
     let mir_output = Self::compile(source)?;
     

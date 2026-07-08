@@ -7,7 +7,7 @@
 
 ```rust
 // memory.rs — simplified
-pub extern "C" fn ky_alloc(size: i64) -> *mut u8 {
+ extern "C" fn ky_alloc(size: i64) -> *mut u8 {
     let layout = Layout::from_size_align(size as usize, 8).unwrap();
     std::alloc::alloc(layout)
 }

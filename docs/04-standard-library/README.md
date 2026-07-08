@@ -1,38 +1,36 @@
 # 04-standard-library
 
-> Librería estándar de Kyle. Cada módulo es un namespace que se importa y contiene
-> funciones, tipos y utilidades organizadas jerárquicamente.
+> Kyle standard library. Each module is a namespace that you import with `from module import ...`.
 
-## Módulos
+## Modules
 
-| Módulo | Import | Descripción |
+| Module | Import | Description |
 |--------|--------|-------------|
-| `core` | `from core import ...` | Tipos fundamentales (`option`, `result`) |
-| `collections` | `from collections import ...` | Listas, dicts, sets |
-| `strings` | `from strings import ...` | Utilidades de string |
-| `io` | `from io import ...` | Entrada/salida por consola |
-| `fs` | `from fs import ...` | Sistema de archivos |
-| `path` | `from path import ...` | Manipulación de rutas |
-| `net` | `from net import ...` | Red (TCP, UDP) |
-| `http` | `from http import ...` | HTTP client/server |
-| `json` | `from json import ...` | JSON |
-| `xml` | `from xml import ...` | XML |
-| `math` | `from math import ...` | Matemáticas |
-| `random` | `from random import ...` | Aleatoriedad |
-| `time` | `from time import ...` | Tiempo y sleep |
-| `datetime` | `from datetime import ...` | Fechas y duraciones |
-| `process` | `from process import ...` | Procesos del SO |
-| `thread` | `from thread import ...` | Hilos |
-| `sync` | `from sync import ...` | Sincronización |
-| `crypto` | `from crypto import ...` | Criptografía |
-| `regex` | `from regex import ...` | Expresiones regulares |
-| `serialization` | `from serialization import ...` | Serialización |
-| `database` | `from database import ...` | Base de datos |
-| `testing` | `from testing import ...` | Testing y aserciones |
+| `core` | `option`, `result` | `option<T>`, `result<T>` with methods |
+| `collections` | `list`, `set`, `iter` | Dynamic lists, sets, iterators |
+| `strings` | `str`, `str_builder` | String utilities, builder |
+| `io` | `print`, `println`, `input` | Console I/O |
+| `fs` | `file` | File operations |
+| `path` | `path` | Path manipulation |
+| `net` | `tcp` | TCP networking |
+| `http` | `client`, `server` | HTTP client/server |
+| `json` | `json` | JSON parse/stringify |
+| `xml` | `xml` | XML parse/generate |
+| `math` | `math` | Math functions |
+| `random` | `random` | Random numbers |
+| `time` | `date_time`, `duration` | Date, time, duration |
+| `process` | `process` | OS processes |
+| `thread` | `thread` | OS threads |
+| `sync` | `mutex`, `atomic`, `channel` | Synchronization primitives |
+| `crypto` | `crypto` | Cryptographic functions |
+| `regex` | `regex` | Regular expressions |
+| `serialization` | `serialize` | Serialization |
+| `database` | `sqlite`, `postgres` | Database access |
+| `testing` | `assert` | Test assertions |
 
-## Convenciones
+## Conventions
 
-- Todos los módulos se importan explícitamente: `from math import math`
-- Las funciones se llaman con namespace: `math.max(a, b)`
-- snake_case para todo: funciones, métodos, tipos
-- `T` mayúscula = type parameter (genéricos)
+- All modules imported explicitly: `from math import math`
+- Functions called with namespace: `math.max(a, b)`
+- snake_case everywhere: functions, types, methods
+- `T` uppercase = type parameter (generics)

@@ -21,7 +21,7 @@ println(t.size)    # 8 (bytes del puntero)
 ## type_info
 
 ```ky
-final class type_info:
+class type_info:
     name: str
     kind: str        # "primitive", "struct", "enum", "array", "list"
     size: i32        # bytes

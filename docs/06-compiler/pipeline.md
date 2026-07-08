@@ -13,7 +13,7 @@ desde el código fuente hasta el binario final.
 ### build_source
 
 ```rust
-pub fn build_source(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
+ fn build_source(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
     // Dev builds: no LTO
     let mir_output = Self::compile(source)?;
     let module = compile_functions(&mir_output)?;
@@ -26,7 +26,7 @@ pub fn build_source(source: &str, file_name: &str, output_path: &Path) -> Result
 ### build_source_release
 
 ```rust
-pub fn build_source_release(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
+ fn build_source_release(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
     // Release builds: -O3 + LTO
     let mir_output = Self::compile(source)?;
     let module = compile_functions(&mir_output)?;

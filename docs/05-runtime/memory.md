@@ -15,7 +15,7 @@ mediante el borrow analysis del compilador, que inserta llamadas a `ky_free` aut
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_alloc(size: i64) -> *mut u8
+ extern "C" fn ky_alloc(size: i64) -> *mut u8
 ```
 
 Asigna un bloque de memoria del heap del tamaño especificado.
@@ -33,7 +33,7 @@ buf = ky_alloc(1024)     # asigna 1024 bytes
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_free(ptr: *mut u8)
+ extern "C" fn ky_free(ptr: *mut u8)
 ```
 
 Libera un bloque de memoria previamente asignado con `ky_alloc`.
@@ -51,9 +51,9 @@ ky_free(buf)              # libera memoria
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_retain(ptr: *mut u8)
+ extern "C" fn ky_retain(ptr: *mut u8)
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_release(ptr: *mut u8)
+ extern "C" fn ky_release(ptr: *mut u8)
 ```
 
 Sistema de reference counting para memoria compartida.

@@ -103,17 +103,17 @@ fn main() i32:       # main → global scope
 ## Symbol Table
 
 ```rust
-pub struct SymbolTable {
+ struct SymbolTable {
     scopes: Vec<HashMap<String, Symbol>>,
-    pub type_defs: HashMap<String, Type>,
+     type_defs: HashMap<String, Type>,
 }
 
-pub struct Symbol {
-    pub name: String,
-    pub kind: SymKind,
+ struct Symbol {
+     name: String,
+     kind: SymKind,
 }
 
-pub enum SymKind {
+ enum SymKind {
     Variable { is_mutable: bool, is_auto: bool },
     Function(FunctionDecl),
     Constant(ConstantDecl),

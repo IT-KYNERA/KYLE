@@ -103,7 +103,7 @@ final class Row:
 from postgres import pool
 from json import deserialize
 
-final class User:
+class User:
     id: i64
     name: str
     email: str

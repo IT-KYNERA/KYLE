@@ -11,7 +11,7 @@ El linker toma los archivos objeto (`.o`) generados por LLVM y los enlaza con
 ## Proceso
 
 ```rust
-pub fn link(&self, object_files: &[&Path], output: &Path, 
+ fn link(&self, object_files: &[&Path], output: &Path, 
             runtime_lib: Option<&Path>, release: bool, links: &[String]) -> Result<(), String> {
     let mut cmd = linker_cmd();
     cmd.arg("-o").arg(output);
@@ -50,7 +50,7 @@ pub fn link(&self, object_files: &[&Path], output: &Path,
 ## Runtime library discovery
 
 ```rust
-pub fn find_runtime_lib() -> Option<PathBuf> {
+ fn find_runtime_lib() -> Option<PathBuf> {
     // 1. Relative to ky binary
     //    /usr/local/bin/ky → /usr/local/lib/kl/libkyc_runtime.a
     // 2. Cargo workspace

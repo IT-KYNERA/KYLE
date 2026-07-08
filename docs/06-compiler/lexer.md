@@ -21,9 +21,9 @@ Toma el código fuente como string y devuelve un `Vec<Token>`.
 Cada token tiene:
 
 ```rust
-pub struct Token {
-    pub kind: TokenKind,   // El tipo de token (identificador, keyword, símbolo, etc.)
-    pub span: Span,         // Posición en el código fuente (línea, columna)
+ struct Token {
+     kind: TokenKind,   // El tipo de token (identificador, keyword, símbolo, etc.)
+     span: Span,         // Posición en el código fuente (línea, columna)
 }
 ```
 

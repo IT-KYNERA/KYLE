@@ -11,7 +11,7 @@ acceso fuera de bounds, null pointer dereference, etc.
 ## Implementación
 
 ```rust
-pub fn ky_panic(message: &str) -> ! {
+ fn ky_panic(message: &str) -> ! {
     eprintln!("KL PANIC: {}", message);
     std::process::abort();
 }

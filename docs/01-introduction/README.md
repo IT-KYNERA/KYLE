@@ -1,27 +1,27 @@
 # 01-introduction
 
-> Introducción al lenguaje de programación Kyle.
+> Introduction to the Kyle programming language.
 
-## Archivos
+## Files
 
-| Documento | Descripción |
-|-----------|-------------|
-| `vision.md` | Visión, objetivos y audiencia |
-| `philosophy.md` | Filosofía: Python readability, Rust safety, Go simplicity, C perf |
-| `principles.md` | Principios de diseño del lenguaje y tooling |
-| `architecture.md` | Arquitectura del ecosistema por capas |
-| `roadmap.md` | Roadmap de desarrollo y próximos pasos |
-| `faq.md` | Preguntas frecuentes |
+| Document | Description |
+|----------|-------------|
+| `vision.md` | Vision, goals, target audience |
+| `philosophy.md` | Philosophy: Python readability, Rust safety, Go simplicity, C perf |
+| `principles.md` | Language and tooling design principles |
+| `architecture.md` | Layered ecosystem architecture |
+| `roadmap.md` | Development roadmap |
+| `faq.md` | Frequently asked questions |
 
-## Resumen
+## Summary
 
-Kyle es un lenguaje de **bajo nivel con sintaxis de alto nivel**:
-- Compilado vía LLVM 18
-- Tipado estático fuerte con inferencia
-- Ownership y borrow checker (v0.6)
-- Move por defecto, `^` para mutable, `&` para borrow
-- Sin GC, sin runtime overhead
-- Sin `let`/`var`/`mut`/`const`
-- Sin `null`, sin excepciones
-- snake_case para todo
-- Paquetes solo para HTTP/SQLite/Postgres — el resto es nativo
+Kyle is a **low-level language with high-level syntax**:
+- Compiled via LLVM 18
+- Strong static typing with inference
+- Ownership and borrow checker (v0.6)
+- Move by default, `^` for mutable, `&` for borrow
+- No GC, no runtime overhead
+- No `let`/`var`/`mut`/`const`
+- No `null`, no exceptions
+- snake_case everywhere
+- Packages only for HTTP/SQLite/Postgres — everything else is native

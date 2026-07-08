@@ -31,18 +31,18 @@ Cada error tiene un código único:
 ## Estructura
 
 ```rust
-pub struct Diagnostic {
-    pub code: ErrorCode,
-    pub message: String,
-    pub span: Option<Span>,
-    pub notes: Vec<String>,
+ struct Diagnostic {
+     code: ErrorCode,
+     message: String,
+     span: Option<Span>,
+     notes: Vec<String>,
 }
 
-pub struct Span {
-    pub start: usize,    // byte offset
-    pub end: usize,
-    pub line: u32,
-    pub column: u32,
+ struct Span {
+     start: usize,    // byte offset
+     end: usize,
+     line: u32,
+     column: u32,
 }
 ```
 

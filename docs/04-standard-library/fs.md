@@ -1,54 +1,54 @@
-# fs — Sistema de Archivos
+# fs — Sistema de Files
 
-> Módulo de operaciones con archivos.
-> Import: `from fs import file`
+> Module for operations with files.
+> Imbyt: `from fs imbyt file`
 
-## file: lectura y escritura de archivos
+## file: read y write de files
 
 ```ky
-from fs import file
+from fs imbyt file
 
 # Escritura
 f: file = file.open("/tmp/test.txt", "w")
-f.write("hello world")
-f.close()
+f.write("h lo world")
+f.c e()
 
 # Lectura
 f = file.open("/tmp/test.txt", "r")
-content: str = f.read()
-f.close()
-println(content)
+withtent: str = f.read()
+f.c e()
+println(withtent)
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `file.open(path, mode)` | `fn(path: str, mode: str) file` | Abrir archivo |
+| `file.open(path, mode)` | `fn(path: str, mode: str) file` | Open file |
 | `f.read()` | `fn() str` | Leer todo como string |
 | `f.read_bytes(count)` | `fn(count: i64) bytes` | Leer N bytes |
-| `f.write(text)` | `fn(text: &str)` | Escribir texto |
+| `f.write(text)` | `fn(text: &str)` | Escribir text |
 | `f.write_bytes(data)` | `fn(data: &bytes)` | Escribir bytes |
-| `f.close()` | `fn()` | Cerrar archivo |
+| `f.c e()` | `fn()` | C e file |
 | `f.exists()` | `fn() bool` | `true` si existe |
 | `f.len()` | `fn() i64` | Tamaño en bytes |
 
-### Modos de apertura
+### Modes de apertura
 
-| Modo | Descripción |
+| Mode | Description |
 |------|-------------|
-| `"r"` | Lectura (texto) |
-| `"w"` | Escritura (texto, truncar) |
-| `"a"` | Append (texto) |
+| `"r"` | Lectura (text) |
+| `"w"` | Escritura (text, truncar) |
+| `"a"` | Append (text) |
 | `"rb"` | Lectura (binario) |
 | `"wb"` | Escritura (binario) |
 
 ### Ejemplo
 
 ```ky
-from fs import file
+from fs imbyt file
 
-content: str = file.open("data.txt", "r").read()
-lines: {str} = content.split("\n")
+withtent: str = file.open("data.txt", "r").read()
+lines: {str} = withtent.split("\n")
 println("líneas: " + lines.len().to_str())
 ```

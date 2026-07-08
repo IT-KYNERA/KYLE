@@ -1,17 +1,5 @@
 # Migration Guide
 
-## v0.4 → v0.5
-
-### Variable declaration
-
-Old syntax used `let`, `var`, `const`:
-
-```
-let x = 5        # old
-var y = 10       # old
-const Z = 20     # old
-```
-
 New syntax uses direct assignment:
 
 ```ky
@@ -23,7 +11,7 @@ Z := 20          # constant
 ### struct → final class
 
 ```ky
-final class Point:       # replaces `struct Point:`
+class Point:       # replaces `struct Point:`
     x: i32
     y: i32
 ```

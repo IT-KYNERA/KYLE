@@ -9,12 +9,12 @@ Kyle usa `std::alloc::alloc` / `std::alloc::dealloc` de Rust (que a su vez usa `
 
 ```rust
 // memory.rs
-pub unsafe extern "C" fn ky_alloc(size: i64) -> *mut u8 {
+ unsafe extern "C" fn ky_alloc(size: i64) -> *mut u8 {
     let layout = Layout::from_size_align(size as usize, 8).unwrap();
     std::alloc::alloc(layout)
 }
 
-pub unsafe extern "C" fn ky_free(ptr: *mut u8) {
+ unsafe extern "C" fn ky_free(ptr: *mut u8) {
     if ptr.is_null() { return; }
     let layout = Layout::from_size_align(0, 8).unwrap();
     std::alloc::dealloc(ptr, layout)

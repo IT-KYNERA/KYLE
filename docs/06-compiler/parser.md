@@ -25,18 +25,18 @@ que el compilador puede analizar. Definido en `kyc_core/src/ast.rs`.
 ### Module
 
 ```rust
-pub struct Module {
-    pub name: String,
-    pub declarations: Vec<Decl>,
-    pub statements: Vec<Stmt>,
-    pub links: Vec<String>,      // @link directives
+ struct Module {
+     name: String,
+     declarations: Vec<Decl>,
+     statements: Vec<Stmt>,
+     links: Vec<String>,      // @link directives
 }
 ```
 
 ### Decl
 
 ```rust
-pub enum Decl {
+ enum Decl {
     Function(FunctionDecl),       // fn declarations
     Class(ClassDecl),             // class / final class
     Enum(EnumDecl),               // enum
@@ -51,7 +51,7 @@ pub enum Decl {
 ### Stmt
 
 ```rust
-pub enum Stmt {
+ enum Stmt {
     Variable(VariableDecl),        // x = value / x := value
     TypedVariable(VariableDecl),   // x: Type = value
     Expression(Expr),              // expression statement
@@ -71,7 +71,7 @@ pub enum Stmt {
 ### Expr
 
 ```ky
-pub enum Expr {
+ enum Expr {
     Literal { value: Literal },
     Identifier { name: String },
     Binary { left, operator, right },

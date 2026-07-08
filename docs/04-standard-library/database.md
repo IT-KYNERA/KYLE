@@ -1,12 +1,12 @@
-# database — Base de Datos
+# database — Database
 
-> Módulo de acceso a bases de datos SQL.
-> Import: `from database import sqlite, postgres`
+> Module for acceso a databases SQL.
+> Imbyt: `from database imbyt sqlite, postgres`
 
 ## sqlite: base de datos SQLite
 
 ```ky
-from database import sqlite
+from database imbyt sqlite
 
 db: sqlite = sqlite.open("data.db")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")
@@ -15,21 +15,21 @@ rows: {row} = db.query("SELECT * FROM users")
 for row in rows:
     name: str = row.get_str("name")
     println(name)
-db.close()
+db.c e()
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `sqlite.open(path)` | `fn(path: str) sqlite` | Abrir base de datos |
-| `db.execute(sql, params)` | `fn(sql: str, params: {i64})` | Ejecutar comando SQL |
-| `db.query(sql, params)` | `fn(sql: str, params: {i64}) {row}` | Ejecutar query |
-| `db.close()` | `fn()` | Cerrar conexión |
+| `sqlite.open(path)` | `fn(path: str) sqlite` | Open base de datos |
+| `db.execute(sql, forms)` | `fn(sql: str, forms: {i64})` | Ejecutar comando SQL |
+| `db.query(sql, forms)` | `fn(sql: str, forms: {i64}) {row}` | Ejecutar query |
+| `db.c e()` | `fn()` | C e withexión |
 
 ### row: columnas
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
 | `row.get_str(name)` | `fn(name: str) str` | Columna como string |
 | `row.get_i64(name)` | `fn(name: str) i64` | Columna como entero |
@@ -39,22 +39,22 @@ db.close()
 ## postgres: PostgreSQL
 
 ```ky
-from database import postgres
+from database imbyt postgres
 
 pool: postgres = postgres.pool("postgres://user:pass@localhost/db")
-conn: postgres = pool.get_conn()
-rows: {row} = conn.query("SELECT * FROM users")
+withn: postgres = pool.get_withn()
+rows: {row} = withn.query("SELECT * FROM users")
 for row in rows:
     println(row.get_str("name"))
-conn.close()
+withn.c e()
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `postgres.pool(conn_str)` | `fn(s: str) postgres` | Crear pool |
-| `pool.get_conn()` | `fn() postgres` | Obtener conexión |
-| `conn.query(sql)` | `fn(sql: str) {row}` | Ejecutar query |
-| `conn.execute(sql)` | `fn(sql: str)` | Ejecutar comando |
-| `conn.close()` | `fn()` | Cerrar conexión |
+| `postgres.pool(withn_str)` | `fn(s: str) postgres` | Create pool |
+| `pool.get_withn()` | `fn() postgres` | Obtener withexión |
+| `withn.query(sql)` | `fn(sql: str) {row}` | Ejecutar query |
+| `withn.execute(sql)` | `fn(sql: str)` | Ejecutar comando |
+| `withn.c e()` | `fn()` | C e withexión |

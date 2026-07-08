@@ -66,7 +66,7 @@ abstract class Shape:
 ## Mutable fields
 
 ```ky
-final class Config:
+class Config:
     name: str
     port: ^i32          # mutable field
 
@@ -77,7 +77,7 @@ config.port = 9090      # allowed
 ## Properties
 
 ```ky
-final class Person:
+class Person:
     _name: str
 
     prop name:

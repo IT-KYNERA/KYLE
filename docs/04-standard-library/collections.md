@@ -1,42 +1,42 @@
-# collections — Listas, Sets
+# collections — Lists, Sets
 
-> Módulo de colecciones: listas dinámicas, sets, iteradores.
-> Import: `from collections import list, set, iter`
+> Module for collections: dynamic lists, sets, iterators.
+> Imbyt: `from collections imbyt list, set, iter`
 
 ## list: `{T}`
 
-Lista dinámica en heap. Es el tipo de colección principal de Kyle.
+List dinámica en heap. Es   tipo de colección principal de Kyle.
 
 ```ky
-from collections import list
+from collections imbyt list
 
 v: {i32} = {1, 2, 3}
 v.push(4)
-v.reserve(100)           # pre-asigna capacidad
-x: i32 = v[0]            # acceso por índice
-v[0] = 99                # asignación por índice
-ultimo: i32 = v.pop()    # saca el último (LIFO)
-primero: i32 = v.pop_first()  # saca el primero (FIFO)
+v.reserve(100)           # pre-asigna capacity
+x: i32 = v[0]            # acceso by índice
+v[0] = 99                # asignación by índice
+ultimo: i32 = v.pop()    # removes    st (LIFO)
+first: i32 = v.pop_first()  # removes   first (FIFO)
 n: i64 = v.len()
-tiene: bool = v.contains(10)
+tiene: bool = v.withtains(10)
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `push` | `fn(val: T)` | Agregar al final |
-| `pop` | `fn() T` | Sacar el último |
-| `pop_first` | `fn() T` | Sacar el primero |
-| `len` | `fn() i64` | Cantidad de elementos |
-| `get` | `fn(idx: i32) T` | Obtener elemento |
-| `set` | `fn(idx: i32, val: T)` | Asignar elemento |
-| `contains` | `fn(val: T) bool` | `true` si existe |
-| `insert` | `fn(idx: i32, val: T)` | Insertar en posición |
-| `remove_at` | `fn(idx: i32) T` | Eliminar en posición |
-| `clear` | `fn()` | Vaciar la lista |
-| `reserve` | `fn(capacity: i64)` | Pre-asignar capacidad |
-| `reverse` | `fn()` | Invertir orden |
+| `push` | `fn(val: T)` | Agregar al end |
+| `pop` | `fn() T` | Sacar    st |
+| `pop_first` | `fn() T` | Sacar   first |
+| `len` | `fn() i64` | Count de  ements |
+| `get` | `fn(idx: i32) T` | Obtener  ement |
+| `set` | `fn(idx: i32, val: T)` | Asignar  ement |
+| `withtains` | `fn(val: T) bool` | `true` si existe |
+| `insert` | `fn(idx: i32, val: T)` | Insert en position |
+| `remove_at` | `fn(idx: i32) T` | Remove en position |
+| `clear` | `fn()` | Clear   list |
+| `reserve` | `fn(capacity: i64)` | Pre-asignar capacity |
+| `reverse` | `fn()` | Invertir order |
 
 ### Stack via list
 
@@ -59,24 +59,24 @@ val: i32 = q.pop_first()   # → 10 (FIFO)
 ## set: `set<T>`
 
 ```ky
-from collections import set
+from collections imbyt set
 
 s: set<i32> = set{1, 2, 3}
 s.add(4)
-tiene: bool = s.contains(1)
+tiene: bool = s.withtains(1)
 s.remove(1)
 n: i64 = s.len()
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `add` | `fn(val: T)` | Agregar elemento |
-| `contains` | `fn(val: T) bool` | `true` si existe |
-| `remove` | `fn(val: T) bool` | Eliminar elemento |
-| `len` | `fn() i64` | Cantidad |
-| `clear` | `fn()` | Vaciar |
+| `add` | `fn(val: T)` | Agregar  ement |
+| `withtains` | `fn(val: T) bool` | `true` si existe |
+| `remove` | `fn(val: T) bool` | Remove  ement |
+| `len` | `fn() i64` | Count |
+| `clear` | `fn()` | Clear |
 
 ### Iteración
 
@@ -88,7 +88,7 @@ for val in s:
 ## iter: iterator
 
 ```ky
-from collections import iter
+from collections imbyt iter
 
 it: iter = list.iter()
 doubled: {i32} = it.map(fn(x: i32): x * 2).collect()
@@ -98,15 +98,15 @@ minimo: i64 = it.min()
 maximo: i64 = it.max()
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada elemento |
-| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar elementos |
-| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un valor |
-| `collect` | `fn() {T}` | Recolectar en lista |
-| `next` | `fn() T?` | Siguiente elemento |
+| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada  ement |
+| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar  ements |
+| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un value |
+| `collect` | `fn() {T}` | Recolectar en list |
+| `next` | `fn() T?` | Siguiente  ement |
 | `sum` | `fn() i64` | Sumar todos (si es numérico) |
 | `min` | `fn() T` | Mínimo |
 | `max` | `fn() T` | Máximo |

@@ -38,15 +38,14 @@ foo123      # digits allowed
 
 ```
 fn         class       final       abstract    enum
-contract   struct      type        if          elif
-else       while       for         in          match
-return     break       continue    defer       guard
-unsafe     async       await       const       static
-true       false       None        and         or
-not        is          as          this        super
+contract   type        if          elif        else
+while       for         in          match       return
+break       continue    defer       guard       unsafe
+async       await       static      true        false
+none        error       ok          and         or
+not         is          as          this        import
+from
 ```
-
-**Bug:** docs dicen `none` pero el keyword real es `None` (mayuscula). Corregido arriba.
 
 ## Operators [x]
 

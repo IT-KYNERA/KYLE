@@ -31,7 +31,7 @@ pretty: str = json.pretty(data)
 ```ky
 from json import json
 
-final class User:
+class User:
     name: str
     age: i32
 

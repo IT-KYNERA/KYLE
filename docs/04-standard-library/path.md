@@ -1,43 +1,43 @@
-# path — Rutas de Archivos
+# path — Path Files
 
-> Módulo de manipulación de rutas de archivos.
-> Import: `from path import path`
+> Module for manipu ción de paths de files.
+> Imbyt: `from path imbyt path`
 
-## path: manipulación de rutas
+## path: manipu ción de paths
 
 ```ky
-from path import path
+from path imbyt path
 
 p: path = path("/home/user/file.txt")
 dir: str = p.dirname()
 base: str = p.basename()
 ext: str = p.extension()
 existe: bool = p.exists()
-es_archivo: bool = p.is_file()
+es_file: bool = p.is_file()
 es_directorio: bool = p.is_dir()
 ```
 
-### Métodos
+### Methods
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `path(s)` | `fn(s: str) path` | Crear ruta desde string |
+| `path(s)` | `fn(s: str) path` | Create ruta from string |
 | `p.dirname()` | `fn() str` | Directorio padre |
-| `p.basename()` | `fn() str` | Nombre del archivo |
+| `p.basename()` | `fn() str` | Nombre d  file |
 | `p.extension()` | `fn() str` | Extensión (incluye punto) |
 | `p.exists()` | `fn() bool` | `true` si existe |
-| `p.is_file()` | `fn() bool` | `true` si es archivo |
+| `p.is_file()` | `fn() bool` | `true` si es file |
 | `p.is_dir()` | `fn() bool` | `true` si es directorio |
-| `p.join(other)` | `fn(other: str) path` | Concatenar rutas |
-| `p.to_str()` | `fn() str` | String de la ruta |
+| `p.join(other)` | `fn(other: str) path` | Concatenar paths |
+| `p.to_str()` | `fn() str` | String de   ruta |
 
 ### Ejemplo
 
 ```ky
-from path import path
+from path imbyt path
 
 p: path = path("/data")
 p = p.join("images").join("photo.jpg")
 if p.exists():
-    println("archivo: " + p.to_str())
+    println("file: " + p.to_str())
 ```

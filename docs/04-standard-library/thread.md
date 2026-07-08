@@ -1,12 +1,12 @@
-# thread — Hilos
+# thread — Threads
 
-> Módulo de hilos del sistema operativo.
-> Import: `from thread import thread`
+> Module for threads d  sistema operativo.
+> Imbyt: `from thread imbyt thread`
 
 ## thread: spawn y join
 
 ```ky
-from thread import thread
+from thread imbyt thread
 
 fn worker(n: i64) i64:
     n * 2
@@ -18,18 +18,18 @@ println(result.to_str())    # 42
 
 ### Funciones
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
-| `thread.spawn(fn_ptr, arg)` | Crear nuevo hilo del SO |
-| `thread.join(handle)` | Esperar que el hilo termine |
-| `thread.yield()` | Ceder el turno al scheduler |
-| `thread.sleep(ms)` | Dormir el hilo actual |
-| `thread.id()` | ID del hilo actual |
+| `thread.spawn(fn_ptr, arg)` | Create nuevo hilo d  SO |
+| `thread.join(handle)` | Wait que   hilo termine |
+| `thread.yi d()` | Ceder   turno al scheduler |
+| `thread.sleep(ms)` | Dormir   hilo actual |
+| `thread.id()` | ID d  hilo actual |
 
 ### Ejemplo
 
 ```ky
-from thread import thread
+from thread imbyt thread
 
 fn compute(n: i64) i64:
     i: ^i64 = 0

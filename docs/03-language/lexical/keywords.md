@@ -1,6 +1,6 @@
 # Keywords
 
-> Palabras reservadas de Kyle. No pueden usarse como identificadores.
+> Reserved words in Kyle. Cannot be used as identifiers.
 
 ```
 fn          class       final       abstract    enum
@@ -10,33 +10,32 @@ break       continue    defer       guard       unsafe
 async       await       static      true        false
 none        error       ok          and         or
 not         is          as          this        import
-from        pub
+from
 ```
 
-## Notas
+## Notes
 
-| Keyword | Uso |
-|---------|-----|
-| `none` | Valor nulo para `T?` |
-| `error` | Retornar error en `T!` |
-| `ok` | Retornar éxito en `T!` |
-| `this` | Referencia al objeto actual (en métodos) |
+| Keyword | Usage |
+|---------|-------|
+| `none` | Null value for `T?` |
+| `error` | Return error in `T!` |
+| `ok` | Return success in `T!` |
+| `this` | Current object reference (in methods) |
 | `is` | Type check (`x is Type`) |
-| `as` | Cast explícito (`x as T`) |
-| `static` | Método estático (`static fn name`) |
-| `pub` | Visibilidad pública |
+| `as` | Explicit cast (`x as T`) |
+| `static` | Static method (`static fn name`) |
 
-## No son keywords
+## Non-keywords
 
-| Palabra | Por qué |
-|---------|---------|
-| `const` | No existe. Usar `NAME := value` para constantes |
-| `let` / `var` | No existen. Usar `nombre = valor` |
-| `mut` | No existe. Usar `^T` para mutable |
-| `self` | No existe. Usar `this.field` para campos |
-| `interface` | No existe. Usar `contract` |
+| Word | Reason |
+|------|--------|
+| `` | Does not exist. Python-style: `_name` = protected, `__name` = private |
+| `let` / `var` | Do not exist. Use `name = value` |
+| `mut` | Does not exist. Use `^T` for mutable |
+| `const` | Does not exist. Use `NAME := value` for constants |
+| `self` | Does not exist. Use `this.field` for fields |
 
-## Ver también
+## See also
 
-- `identifiers.md` — Reglas de identificadores
-- `literals.md` — Literales del lenguaje
+- `identifiers.md` — Identifier rules
+- `tokens.md` — All token categories

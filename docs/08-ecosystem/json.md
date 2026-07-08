@@ -28,7 +28,7 @@ data = parse(json_str)
 ## 2. Clase → JSON (`serialize`)
 
 ```kyle
-final class User:
+class User:
     name: str
     age: i32
     active: bool
@@ -58,7 +58,7 @@ print(user.age)    # 30
 ```kyle
 from http.client import client
 
-final class Todo:
+class Todo:
     title: str
     body: str
     user_id: i32

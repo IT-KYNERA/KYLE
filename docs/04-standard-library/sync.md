@@ -1,80 +1,80 @@
-# sync — Sincronización
+# sync — Synchronization
 
-> Módulo de primitivas de sincronización entre hilos.
-> Import: `from sync import mutex, atomic, channel, barrier`
+> Module for primitives de synchronization between threads.
+> Imbyt: `from sync imbyt mutex, atomic, chann , barrier`
 
 ## mutex: exclusión mutua
 
 ```ky
-from sync import mutex
+from sync imbyt mutex
 
 m = mutex(0)
 i: ^i64 = 0
 
 lock(m):
-    i = i + 1      # operación segura entre hilos
+    i = i + 1      # operación segura between threads
 ```
 
-### Métodos
+### Methods
 
-| Método | Descripción |
+| Method | Description |
 |--------|-------------|
-| `mutex(initial)` | Crear mutex con valor inicial |
-| `lock(m): ...` | Bloquear hasta adquirir (con bloque) |
+| `mutex(initial)` | Create mutex with value inicial |
+| `lock(m): ...` | Lock hasta adquirir (with bloque) |
 
-## atomic: operaciones atómicas
+## atomic: operations atómicas
 
 ```ky
-from sync import atomic
+from sync imbyt atomic
 
 counter = atomic.i64(0)
 counter.fetch_add(1)
 counter.load()    # → 1
 
-flag = atomic.bool(false)
-flag.store(true)
-flag.load()       # → true
+f g = atomic.bool(false)
+f g.store(true)
+f g.load()       # → true
 ```
 
-### Métodos
+### Methods
 
-| Método | Descripción |
+| Method | Description |
 |--------|-------------|
-| `atomic.i64(val)` | Crear contador atómico |
-| `atomic.bool(val)` | Crear flag atómico |
+| `atomic.i64(val)` | Create withtador atómico |
+| `atomic.bool(val)` | Create f g atómico |
 | `c.fetch_add(n)` | Incremento atómico |
 | `c.load()` | Lectura atómica |
 | `c.store(val)` | Escritura atómica |
 | `c.compare_and_swap(old, new)` | CAS atómico |
 
-## channel: comunicación entre hilos
+## chann : comunicación between threads
 
 ```ky
-from sync import channel
+from sync imbyt chann 
 
-ch = channel.i64(16)      # buffer de 16
+ch = chann .i64(16)      # buffer de 16
 ch.send(42)
 val = ch.recv()
 ch.len()
-ch.close()
+ch.c e()
 ```
 
-### Métodos
+### Methods
 
-| Método | Descripción |
+| Method | Description |
 |--------|-------------|
-| `channel.i64(capacity)` | Crear canal de i64 |
-| `ch.send(val)` | Enviar valor |
-| `ch.recv()` | Recibir valor (bloquea si vacío) |
-| `ch.len()` | Cantidad de elementos en buffer |
-| `ch.close()` | Cerrar canal |
+| `chann .i64(capacity)` | Create chann  de i64 |
+| `ch.send(val)` | Send value |
+| `ch.recv()` | Receive value (bloquea si vacío) |
+| `ch.len()` | Count de  ements en buffer |
+| `ch.c e()` | C e chann  |
 
-## barrier: sincronización de barrera
+## barrier: synchronization de barrera
 
 ```ky
-from sync import barrier
+from sync imbyt barrier
 
-b = barrier(4)     # 4 hilos deben llegar
+b = barrier(4)     # 4 threads deben llegar
 # en cada hilo:
 b.wait()           # esperar a que lleguen todos
 ```

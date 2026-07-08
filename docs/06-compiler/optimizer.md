@@ -96,7 +96,7 @@ store i32 42, ptr %0
 ## Pipeline de optimización
 
 ```rust
-pub fn optimize(func: &mut MirFunction) {
+ fn optimize(func: &mut MirFunction) {
     constant_folding(func);        // 1. Fold constants
     dead_code_elimination(func);   // 2. Remove dead code
     simplify_cfg(func);            // 3. Simplify control flow

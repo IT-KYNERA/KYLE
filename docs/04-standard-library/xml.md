@@ -1,36 +1,36 @@
 # xml — XML
 
-> Módulo de parseo y generación XML.
-> Import: `from xml import xml`
+> Module for parsing y generation XML.
+> Imbyt: `from xml imbyt xml`
 
-## xml: parseo y generación
+## xml: parsing y generation
 
 ```ky
-from xml import xml
+from xml imbyt xml
 
-doc: xml = xml.parse('<root><item id="1">Hello</item></root>')
+doc: xml = xml.parse('<root><item id="1">H lo</item></root>')
 items: {xml} = doc.find_all("item")
 first: xml = items[0]
-texto: str = first.text()
+text: str = first.text()
 id_val: str = first.attr("id")
 ```
 
 ### Funciones
 
-| Función | Firma | Descripción |
+| Function | Firma | Description |
 |---------|-------|-------------|
 | `xml.parse(str)` | `fn(s: str) xml` | Parsear string → documento |
-| `xml.element(name)` | `fn(name: str) xml` | Crear elemento |
+| `xml. ement(name)` | `fn(name: str) xml` | Create  ement |
 
-### Métodos (nodo)
+### Methods (nodo)
 
-| Método | Firma | Descripción |
+| Method | Firma | Description |
 |--------|-------|-------------|
-| `n.find_all(tag)` | `fn(tag: str) {xml}` | Buscar hijos por tag |
+| `n.find_all(tag)` | `fn(tag: str) {xml}` | Buscar hijos by tag |
 | `n.find_first(tag)` | `fn(tag: str) xml?` | Primer hijo que matchea |
-| `n.text()` | `fn() str` | Texto del nodo |
+| `n.text()` | `fn() str` | Texto d  nodo |
 | `n.attr(name)` | `fn(name: str) str` | Valor de atributo |
 | `n.set_attr(name, val)` | `fn(name: str, val: str)` | Asignar atributo |
 | `n.add_child(child)` | `fn(child: xml)` | Agregar hijo |
-| `n.set_text(text)` | `fn(text: str)` | Asignar texto |
+| `n.set_text(text)` | `fn(text: str)` | Asignar text |
 | `n.to_str()` | `fn() str` | Serializar a string |

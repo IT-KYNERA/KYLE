@@ -15,7 +15,7 @@ El borrow analysis opera sobre el MIR para:
 ## Clasificación de tipos
 
 ```rust
-pub fn is_move_type(t: &MirType) -> bool {
+ fn is_move_type(t: &MirType) -> bool {
     match t {
         MirType::Str => true,
         MirType::List(_) => true,

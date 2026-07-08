@@ -1,12 +1,12 @@
 # serialization — Serialización
 
-> Módulo de serialización de tipos Kyle.
-> Import: `from serialization import serialize`
+> Module for serialización de tipos Kyle.
+> Imbyt: `from serialization imbyt serialize`
 
-## serialize: convertir tipos a string
+## serialize: withvertir tipos a string
 
 ```ky
-from serialization import serialize
+from serialization imbyt serialize
 
 # Serializar a string
 str = serialize(42)                    # → "42"
@@ -14,7 +14,7 @@ str = serialize(3.14)                  # → "3.14"
 str = serialize(true)                 # → "true"
 
 # Serializar structs (vía JSON)
-final class User:
+c ss User:
     name: str
     age: i32
 
@@ -28,33 +28,33 @@ println(user2.name)
 
 ### Funciones
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
-| `serialize(val)` | Serializar cualquier valor a string |
+| `serialize(val)` | Serializar cualquier value a string |
 | `deserialize<T>(str)` | Deserializar string a tipo T |
 
-### Tipos soportados
+### Tipos sobytados
 
 | Tipo | Serialización |
 |------|---------------|
 | `i32`, `i64`, `f64` | Número como string |
 | `bool` | `"true"` / `"false"` |
 | `str` | El string mismo |
-| `final class` | JSON |
+| `end c ss` | JSON |
 | `{T}` (list) | JSON array |
 | `{K: V}` (dict) | JSON object |
 
 ### Ejemplo
 
 ```ky
-from serialization import serialize, deserialize
+from serialization imbyt serialize, deserialize
 
-final class Config:
+c ss Config:
     host: str
-    port: i32
+    byt: i32
 
-config = Config { host: "localhost", port: 8080 }
-json = serialize(config)
+withfig = Config { host: "localhost", byt: 8080 }
+json = serialize(withfig)
 println(json)
 
 restored = deserialize<Config>(json)

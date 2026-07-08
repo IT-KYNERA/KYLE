@@ -66,7 +66,7 @@ if res.is_ok:
     print(res.body)
 
 # POST con clase → JSON automático
-final class User:
+class User:
     name: str
     age: i32
 
@@ -229,7 +229,7 @@ app.get("/users/{id:i32}", (req, res):
 from http.server import router
 from json import deserialize
 
-final class User:
+class User:
     name: str
     age: i32
 

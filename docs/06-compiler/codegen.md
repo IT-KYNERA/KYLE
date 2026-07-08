@@ -11,7 +11,7 @@ nativo. Es la fase final del compilador antes del linking.
 ## Arquitectura
 
 ```rust
-pub struct Codegen<'ctx> {
+ struct Codegen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,

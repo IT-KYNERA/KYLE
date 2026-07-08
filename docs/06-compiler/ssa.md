@@ -31,23 +31,23 @@ En puntos de join (if/else, while), se insertan nodos φ (phi) para combinar
 múltiples definiciones de una misma variable:
 
 ```rust
-pub struct PhiNode {
-    pub dest: usize,
-    pub incoming: Vec<(usize, usize)>,   // (block_id, value_local)
-    pub type_: MirType,
+ struct PhiNode {
+     dest: usize,
+     incoming: Vec<(usize, usize)>,   // (block_id, value_local)
+     type_: MirType,
 }
 
-pub struct SsaBlock {
-    pub phis: Vec<PhiNode>,
-    pub insts: Vec<SsaInst>,
-    pub terminator: MirTerminator,
+ struct SsaBlock {
+     phis: Vec<PhiNode>,
+     insts: Vec<SsaInst>,
+     terminator: MirTerminator,
 }
 ```
 
 ## Algoritmo
 
 ```rust
-pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
+ fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
     // 1. Identify locals that need phi nodes (defined in multiple blocks)
     let phi_candidates = find_phi_candidates(func);
     
@@ -123,18 +123,18 @@ Evalúa expresiones constantes en compile-time:
 ## Estructura de salida
 
 ```rust
-pub struct SsaFunction {
-    pub name: String,
-    pub params: Vec<MirType>,
-    pub return_type: MirType,
-    pub blocks: Vec<SsaBlock>,
-    pub param_modes: Vec<ParamMode>,
+ struct SsaFunction {
+     name: String,
+     params: Vec<MirType>,
+     return_type: MirType,
+     blocks: Vec<SsaBlock>,
+     param_modes: Vec<ParamMode>,
 }
 
-pub struct SsaBlock {
-    pub label: String,
-    pub insts: Vec<SsaInst>,
-    pub terminator: MirTerminator,
+ struct SsaBlock {
+     label: String,
+     insts: Vec<SsaInst>,
+     terminator: MirTerminator,
 }
 ```
 

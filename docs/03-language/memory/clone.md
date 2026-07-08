@@ -36,7 +36,7 @@ copia: [i32; 3] = arr.clone()
 ## Clone en clases
 
 ```ky
-final class Point:
+class Point:
     x: i32
     y: i32
 

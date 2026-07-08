@@ -17,7 +17,7 @@ Debug builds skip LLVM optimizations.
 Use `final class` for small data structures. These are allocated on the stack or inline in their parent.
 
 ```ky
-final class Point:       # stack-allocated when possible
+class Point:       # stack-allocated when possible
     x: i32
     y: i32
 ```

@@ -14,7 +14,7 @@ resultado i64 que se obtiene vía `await`.
 ```rust
 type TaskFn = Box<dyn FnOnce() + Send>;
 
-pub struct Executor {
+ struct Executor {
     running: Arc<AtomicBool>,
     task_sender: mpsc::Sender<TaskFn>,
     workers: Vec<thread::JoinHandle<()>>,
@@ -31,7 +31,7 @@ pub struct Executor {
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_spawn_task(
+ extern "C" fn ky_spawn_task(
     func: Option<unsafe extern "C" fn(i64) -> i64>,
     arg: i64,
 ) -> i64
@@ -52,7 +52,7 @@ result = await task
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_await_task(handle: i64) -> i64
+ extern "C" fn ky_await_task(handle: i64) -> i64
 ```
 
 Esperar el resultado de una tarea asíncrona.
@@ -65,7 +65,7 @@ Esperar el resultado de una tarea asíncrona.
 
 ```rust
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_yield()
+ extern "C" fn ky_yield()
 ```
 
 Cede el paso al scheduler. Permite que otra tarea se ejecute.
@@ -73,7 +73,7 @@ Cede el paso al scheduler. Permite que otra tarea se ejecute.
 ## Task internals
 
 ```rust
-pub struct Task<T> {
+ struct Task<T> {
     id: u64,
     future: Arc<Mutex<BoxedFuture<T>>>,
 }

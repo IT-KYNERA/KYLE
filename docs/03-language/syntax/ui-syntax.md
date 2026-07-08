@@ -59,7 +59,7 @@ Sin `page(...)` → es un componente reutilizable.
 
 Fragmentos pequeños con `@`:
 
-```xml
+```kyx
 <text value=@user.name />
 ```
 
@@ -89,12 +89,12 @@ Varias líneas con `@(...)`:
 
 ## 7. Condicionales
 
-```xml
+```kyx
 @if(user.isAdmin):
     <button text="Delete" />
 ```
 
-```xml
+```kyx
 @if(user.isAdmin):
     <admin_panel />
 @else:
@@ -105,7 +105,7 @@ Varias líneas con `@(...)`:
 
 ## 8. Match
 
-```xml
+```kyx
 @match(state):
     Loading:
         <spinner />
@@ -119,7 +119,7 @@ Varias líneas con `@(...)`:
 
 ## 9. For
 
-```xml
+```kyx
 @for(product in products):
     <product_card product=@product />
 ```
@@ -128,7 +128,7 @@ Varias líneas con `@(...)`:
 
 ## 10. Eventos
 
-```xml
+```kyx
 <button click=@login />
 
 <text_field change=@on_change />
@@ -140,7 +140,7 @@ Varias líneas con `@(...)`:
 
 ## 11. Binding
 
-```xml
+```kyx
 <text_field bind=@email />
 ```
 
@@ -148,7 +148,7 @@ Varias líneas con `@(...)`:
 
 ## 12. Componentes hijos
 
-```xml
+```kyx
 <card>
     <text />
     <button />
@@ -168,7 +168,7 @@ slot Content
 
 Uso:
 
-```xml
+```kyx
 <card>
     <header>
         <text value="Title" />
@@ -228,7 +228,7 @@ layout<Column> Center:
 
 Uso:
 
-```xml
+```kyx
 <button style=Primary />
 <Column layout=Center />
 ```
@@ -247,7 +247,7 @@ tpl<button> Primary:
 
 Uso:
 
-```xml
+```kyx
 <button tpl=Primary />
 ```
 
@@ -264,7 +264,7 @@ theme Light:
 
 Uso:
 
-```xml
+```kyx
 <App theme=Light />
 ```
 

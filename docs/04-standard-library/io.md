@@ -8,10 +8,10 @@
 ```ky
 from io import console
 
-console.print("hello")         # sin newline
-console.println("hello")       # con newline
-line: str = console.input()    # leer línea
-line = console.input("> ")     # leer línea con prompt
+print("hello")         # sin newline
+println("hello")       # con newline
+line: str = input()    # leer línea
+line = input("> ")     # leer línea con prompt
 ```
 
 ### Shorthands globales
@@ -19,27 +19,27 @@ line = console.input("> ")     # leer línea con prompt
 Las funciones `print()` y `println()` están disponibles globalmente sin import:
 
 ```ky
-print("hello")          # console.print()
-println("hello")        # console.println()
-input("> ")             # console.input()
+print("hello")          # print()
+println("hello")        # println()
+input("> ")             # input()
 ```
 
 ### Métodos de console
 
 | Nombre | Firma | Descripción |
 |--------|-------|-------------|
-| `console.print` | `fn(text: str)` | Imprimir texto sin salto |
-| `console.println` | `fn(text: str)` | Imprimir texto con salto |
-| `console.input` | `fn(prompt: str) str` | Leer línea con prompt |
-| `console.clear` | `fn()` | Limpiar terminal |
+| `print` | `fn(text: str)` | Imprimir texto sin salto |
+| `println` | `fn(text: str)` | Imprimir texto con salto |
+| `input` | `fn(prompt: str) str` | Leer línea con prompt |
+| `clear` | `fn()` | Limpiar terminal |
 
 ### Ejemplos
 
 ```ky
 from io import console
 
-name: str = console.input("¿Cómo te llamas? ")
-console.println("Hola, " + name + "!")
+name: str = input("¿Cómo te llamas? ")
+println("Hola, " + name + "!")
 
 # Equivalente con shorthands globales
 name = input("¿Cómo te llamas? ")

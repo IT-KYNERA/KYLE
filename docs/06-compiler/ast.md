@@ -32,7 +32,7 @@ Module
 ## Types (AstType)
 
 ```rust
-pub enum AstType {
+ enum AstType {
     Primitive { name: String, span: Span },
     User { name: String, span: Span },
     Generic { name: String, args: Vec<AstType>, span: Span },
@@ -56,11 +56,11 @@ pub enum AstType {
 Cada nodo del AST tiene un `Span` que indica su posición exacta en el código fuente:
 
 ```rust
-pub struct Span {
-    pub start: usize,   // byte offset
-    pub end: usize,     // byte offset
-    pub line: u32,
-    pub column: u32,
+ struct Span {
+     start: usize,   // byte offset
+     end: usize,     // byte offset
+     line: u32,
+     column: u32,
 }
 ```
 

@@ -18,7 +18,7 @@ contract Serializable:
 ## Implementación
 
 ```ky
-final class Circle :: Drawable, Serializable:
+class Circle :: Drawable, Serializable:
     radius: i32
 
     fn draw():

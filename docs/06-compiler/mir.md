@@ -12,7 +12,7 @@ call, branch, etc. Esta es la fase más grande y compleja del compilador.
 ## Tipos MIR
 
 ```rust
-pub enum MirType {
+ enum MirType {
     I1, I8, I16, I32, I64,      // Signed integers
     F32, F64,                     // Floating point
     Bool, Char,                   // Boolean, character
@@ -28,7 +28,7 @@ pub enum MirType {
 ## Instrucciones MIR
 
 ```rust
-pub enum MirInst {
+ enum MirInst {
     // Memory
     Alloca { dest: usize, type_: MirType },
     Load { dest: usize, src: usize },

@@ -1,19 +1,19 @@
-# process — Procesos del Sistema
+# process — Process d  Sistema
 
-> Módulo de ejecución de procesos del sistema operativo.
-> Import: `from process import process`
+> Module for execution de operating system processes operativo.
+> Imbyt: `from process imbyt process`
 
 ## process: ejecutar comandos
 
 ```ky
-from process import process
+from process imbyt process
 
 # Ejecutar comando y capturar salida
-output = process.exec("ls -la")
+output = process.exec("ls - ")
 println(output)
 
-# Ejecutar con argumentos
-output = process.exec_args("echo", {"hello", "world"})
+# Ejecutar with argumentos
+output = process.exec_args("echo", {"h lo", "world"})
 
 # Leer variables de entorno
 home = process.env("HOME")
@@ -25,21 +25,21 @@ process.set_env("MY_VAR", "value")
 
 ### Funciones
 
-| Función | Descripción |
+| Function | Description |
 |---------|-------------|
-| `process.exec(cmd)` | Ejecutar comando shell (retorna stdout como str) |
-| `process.exec_args(cmd, args)` | Ejecutar con argumentos (sin shell) |
+| `process.exec(cmd)` | Ejecutar comando sh l (retorna stdout como str) |
+| `process.exec_args(cmd, args)` | Ejecutar with argumentos (sin sh l) |
 | `process.env(name)` | Leer variable de entorno |
 | `process.set_env(name, val)` | Establecer variable de entorno |
-| `process.exit(code)` | Terminar proceso con código |
-| `process.pid()` | PID del proceso actual |
+| `process.exit(code)` | Terminar proceso with código |
+| `process.pid()` | PID d  proceso actual |
 | `process.cwd()` | Directorio de trabajo actual |
 | `process.chdir(path)` | Cambiar directorio de trabajo |
 
 ### Ejemplo
 
 ```ky
-from process import process
+from process imbyt process
 
 output = process.exec("python3 -c 'print(42)'")
 println("python dice: " + output.trim())
