@@ -1,19 +1,34 @@
-# std.io — Input/Output
+# io — Entrada / Salida
 
-| Function | Description |
-|----------|-------------|
-| `print(value)` | Print without newline |
-| `println(value)` | Print with newline |
-| `input()` | Read line from stdin |
-| `input(prompt)` | Show prompt, read line |
-| `read_file(path)` | Read file as string |
-| `write_file(path, data)` | Write string to file |
+> Módulo de entrada y salida por consola.
+> Import: `from io import console`
 
-## file I/O
+## console: lectura y escritura en terminal
 
 ```ky
-from std.io import read_file, write_file
+from io import console
 
-data = read_file("config.txt")
-write_file("output.txt", "hello")
+console.print("hello")         # sin newline
+console.println("hello")       # con newline
+line = console.input()         # leer línea
+line = console.input("> ")     # leer línea con prompt
+```
+
+### Funciones
+
+| Función | Descripción |
+|---------|-------------|
+| `console.print(text)` | Imprimir texto sin salto de línea |
+| `console.println(text)` | Imprimir texto con salto de línea |
+| `console.input()` | Leer línea desde stdin |
+| `console.input(prompt)` | Leer línea con prompt |
+| `console.clear()` | Limpiar terminal |
+
+### Ejemplo
+
+```ky
+from io import console
+
+name = console.input("¿Cómo te llamas? ")
+console.println("Hola, " + name + "!")
 ```

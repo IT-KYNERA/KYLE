@@ -1,38 +1,63 @@
-# std.str — String Utilities
+# strings — Utilidades de String
 
-| Function | Description |
-|----------|-------------|
-| `starts_with(s, prefix)` | Check if string starts with prefix |
-| `ends_with(s, suffix)` | Check if string ends with suffix |
-| `capitalize(s)` | Capitalize first letter |
-| `repeat_str(s, count)` | Repeat string n times |
+> Módulo de manipulación de strings y el tipo `str_builder`.
+> Import: `from strings import str, str_builder`
 
-## str_builder — Efficient String Building
+## str: métodos del tipo string
 
-`str_builder` is a growable string buffer for efficient concatenation, similar to Go's `strings.Builder` or Java's `StringBuilder`. It avoids the O(n²) cost of repeated `s + "x"` concatenation.
-
-### Class
+Los strings en Kyle son inmutables y heap-allocados. Tienen métodos integrados.
 
 ```ky
-final class str_builder:
-    data: ptr
+from strings import str
 
-    str_builder(capacity: i64 = 16):
-        this.data = ky_str_builder_new(capacity)
-    
-    fn append(s: &str):
-        ky_str_builder_append(this.data, s as ptr, len(s))
-    
-    fn to_str() str:
-        ky_str_builder_to_str(this.data)
-    
-    fn free():
-        ky_str_builder_free(this.data)
+s = "  Hello World  "
+s2 = s.trim()
+s3 = s.to_upper()
+s4 = s3.replace("HELLO", "HI")
 ```
 
-### Usage
+### Métodos de str
+
+| Método | Descripción | Ejemplo |
+|--------|-------------|---------|
+| `len()` | Largo del string | `s.len()` |
+| `contains(sub)` | `true` si contiene substring | `s.contains("lo")` |
+| `starts_with(prefix)` | `true` si empieza con | `s.starts_with("He")` |
+| `ends_with(suffix)` | `true` si termina con | `s.ends_with("ld")` |
+| `to_upper()` | Mayúsculas | `s.to_upper()` |
+| `to_lower()` | Minúsculas | `s.to_lower()` |
+| `trim()` | Sin espacios extremos | `s.trim()` |
+| `replace(from, to)` | Reemplazar substring | `s.replace("a", "b")` |
+| `char_at(idx)` | Carácter en posición | `s.char_at(0)` |
+| `substr(start, count)` | Substring | `s.substr(0, 5)` |
+
+### Funciones standalone
+
+| Función | Descripción |
+|---------|-------------|
+| `len(s)` | Largo del string |
+| `str.is_digit(c)` | `true` si es dígito |
+| `str.is_alpha(c)` | `true` si es letra |
+| `str.is_alnum(c)` | `true` si es alfanumérico |
+| `str.is_whitespace(c)` | `true` si es espacio |
+| `str.is_upper(c)` | `true` si es mayúscula |
+| `str.is_lower(c)` | `true` si es minúscula |
 
 ```ky
+from strings import str
+
+if str.is_digit('5'):
+    println("es dígito")
+```
+
+## str_builder: construcción eficiente de strings
+
+`str_builder` es un buffer mutable para concatenación eficiente, similar a
+`strings.Builder` de Go o `StringBuilder` de Java.
+
+```ky
+from strings import str_builder
+
 sb = str_builder(50000)
 i: ^i32 = 0
 while i < 50000:
@@ -42,6 +67,18 @@ result = sb.to_str()
 println(result)
 ```
 
+### Métodos
+
+| Método | Descripción |
+|--------|-------------|
+| `str_builder(capacity)` | Constructor con capacidad inicial |
+| `append(s)` | Agregar string al buffer |
+| `to_str()` | Extraer string final |
+| `free()` | Liberar memoria del builder |
+
 ### Performance
 
-`str_builder.append()` reallocates with doubling strategy (2× capacity) when the buffer is full, achieving amortized O(1) append. Compared to `s + "x"` (which allocates + copies on every concat), `str_builder` is **~380× faster** for 50k concatenations.
+`append()` redimensiona con estrategia de duplicación (2× capacidad) cuando el buffer
+se llena, logrando O(1) amortizado por operación. Comparado con `s = s + "x"` (que
+asigna + copia en cada concat), `str_builder` es ~380× más rápido para 50k
+concatenaciones.
