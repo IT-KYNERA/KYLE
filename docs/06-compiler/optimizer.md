@@ -1,59 +1,110 @@
-# Optimization Pipeline
+# MIR Optimizer
 
-## LLVM Optimization Passes
+> Optimizaciones a nivel MIR: constant folding, dead code elimination, simplificaciones.
+> Crate: `kyc_mir/src/optimize.rs` (888 líneas).
 
-After code generation, KKyle runs the full LLVM optimization pipeline:
+## Responsabilidad
+
+Aplica optimizaciones sobre el MIR (y SSA) para mejorar el código generado.
+Opera antes de la generación de LLVM IR.
+
+## Pases de optimización
+
+### 1. Constant Folding
+
+Evalúa operaciones con operandos constantes en tiempo de compilación:
 
 ```rust
-// pipeline.rs
-let pipeline = match optimization {
-    OptimizationLevel::Aggressive => "default<O3>",
-    OptimizationLevel::Default => "default<O2>",
-    _ => "default<O1>",
-};
-module.run_passes(pipeline, &tm, opts);
+fn constant_fold(inst: &MirInst) -> Option<MirConstant> {
+    match inst {
+        BinaryOp { op: Add, left: Constant(I32(a)), right: Constant(I32(b)) } => {
+            Some(I32(a.wrapping_add(*b)))
+        }
+        BinaryOp { op: Mul, left: Constant(I64(a)), right: Constant(I64(b)) } => {
+            Some(I64(a.wrapping_mul(*b)))
+        }
+        // ... otros casos
+    }
+}
 ```
 
-## Included passes
+```ky
+# Antes
+x = 2 + 3 * 4
 
-The `default<O3>` pipeline includes:
-- **mem2reg** — promotes allocas to SSA registers
-- **GVN** — Global Value Numbering (redundancy elimination)
-- **LICM** — Loop Invariant Code Motion
-- **SCCP** — Sparse Conditional Constant Propagation
-- **Inlining** — function inlining
-- **Loop unrolling** — loop optimization
-- **Vectorization** — SIMD auto-vectorization
+# Después (constant folding)
+x = 14
+```
 
-## Kyle-specific optimizations
+### 2. Dead Code Elimination (DCE)
 
-### SSA Construction (before LLVM)
+Elimina instrucciones cuyo resultado nunca se usa:
 
-Before LLVM sees the IR, Kyle performs its own SSA construction:
-- Promotable allocas (simple types, no escaping) are promoted to SSA values
-- Phi nodes are inserted at dominance frontiers
-- GVN runs on the SSA function to eliminate redundant computations
+```rust
+fn dead_code_elimination(block: &mut MirBasicBlock, used: &HashSet<usize>) {
+    block.insts.retain(|inst| {
+        let dest = inst_dest(inst);
+        dest.map_or(true, |d| used.contains(&d))
+    });
+}
+```
 
-### nsw/nuw flags
+```ky
+# Antes
+x = expensive_function()  # resultado nunca usado
+println("hello")
 
-All integer arithmetic uses `nsw` (no signed wrap) flags, allowing LLVM to optimize integer expressions more aggressively.
+# Después
+println("hello")           # llamada eliminada
+```
 
-### TBAA metadata
+### 3. Alloca Elimination
 
-Memory operations carry TBAA (Type-Based Alias Analysis) metadata so LLVM can disambiguate memory accesses.
+Elimina allocas que nunca se usan o que se pueden reemplazar por SSA values:
 
-### inbounds GEPs
+```rust
+fn remove_unused_allocas(block: &mut MirBasicBlock, local_types: &HashMap<usize, MirType>) {
+    // Simple allocas (I32, I64, etc.) that are only loaded/stored can be
+    // fully promoted to SSA values and don't need an alloca
+}
+```
 
-All pointer arithmetic uses `inbounds` guarantees, allowing LLVM to optimize loop induction variables.
+### 4. Store-Store Elimination
 
-### noalias parameters
+Elimina stores redundantes donde el mismo valor se escribe dos veces:
 
-Function pointer parameters are marked `noalias`, enabling better alias analysis.
+```rust
+store i32 5, ptr %0   # se elimina si hay otro store después sin load intermedio
+store i32 10, ptr %0  # solo este se mantiene
+```
 
-### readonly/readnone
+### 5. Load-Forwarding
 
-Runtime functions are annotated with `memory(read)` or `memory(none)` attributes.
+Reemplaza loads con el valor stored más reciente:
 
-### !range metadata
+```rust
+store i32 42, ptr %0
+%1 = load i32, ptr %0  # → reemplazar con 42 directamente
+```
 
-Boolean comparison results carry `!range { i32 0, i32 2 }` metadata.
+## Pipeline de optimización
+
+```rust
+pub fn optimize(func: &mut MirFunction) {
+    constant_folding(func);        // 1. Fold constants
+    dead_code_elimination(func);   // 2. Remove dead code
+    simplify_cfg(func);            // 3. Simplify control flow
+    // Repetir hasta punto fijo
+    loop {
+        let changed = false;
+        changed |= constant_folding(func);
+        changed |= dead_code_elimination(func);
+        if !changed { break; }
+    }
+}
+```
+
+## Ver también
+
+- `ssa.md` — SSA form que habilita optimizaciones avanzadas
+- `codegen.md` — LLVM codegen que recibe el MIR optimizado
