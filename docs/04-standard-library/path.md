@@ -8,37 +8,36 @@
 ```ky
 from path import path
 
-p = path("/home/user/file.txt")
-println(p.dirname())      # "/home/user"
-println(p.basename())     # "file.txt"
-println(p.extension())    # ".txt"
-println(p.exists())       # true
-println(p.is_file())      # true
-println(p.is_dir())       # false
+p: path = path("/home/user/file.txt")
+dir: str = p.dirname()
+base: str = p.basename()
+ext: str = p.extension()
+existe: bool = p.exists()
+es_archivo: bool = p.is_file()
+es_directorio: bool = p.is_dir()
 ```
 
 ### Métodos
 
-| Método | Descripción |
-|--------|-------------|
-| `path(s)` | Crear ruta desde string |
-| `p.dirname()` | Directorio padre |
-| `p.basename()` | Nombre del archivo |
-| `p.extension()` | Extensión (incluye punto) |
-| `p.exists()` | `true` si existe |
-| `p.is_file()` | `true` si es archivo |
-| `p.is_dir()` | `true` si es directorio |
-| `p.join(other)` | Concatenar rutas |
-| `p.to_str()` | String de la ruta |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `path(s)` | `fn(s: str) path` | Crear ruta desde string |
+| `p.dirname()` | `fn(self) str` | Directorio padre |
+| `p.basename()` | `fn(self) str` | Nombre del archivo |
+| `p.extension()` | `fn(self) str` | Extensión (incluye punto) |
+| `p.exists()` | `fn(self) bool` | `true` si existe |
+| `p.is_file()` | `fn(self) bool` | `true` si es archivo |
+| `p.is_dir()` | `fn(self) bool` | `true` si es directorio |
+| `p.join(other)` | `fn(self, other: str) path` | Concatenar rutas |
+| `p.to_str()` | `fn(self) str` | String de la ruta |
 
 ### Ejemplo
 
 ```ky
 from path import path
 
-p = path("/data")
-p = p.join("images")
-p = p.join("photo.jpg")
+p: path = path("/data")
+p = p.join("images").join("photo.jpg")
 if p.exists():
     println("archivo: " + p.to_str())
 ```

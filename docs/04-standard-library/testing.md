@@ -8,45 +8,40 @@
 ```ky
 from testing import assert
 
-fn test_addition():
-    result = 2 + 2
-    assert.eq(result, 4)
-
-fn test_string():
-    assert.eq("hello", "hello")
-    assert.ne("hello", "world")
-    assert.str_eq("hello", "hello")
-
-fn test_condition():
-    assert.is_true(1 == 1)
-```
-
-### Funciones
-
-| Función | Descripción |
-|---------|-------------|
-| `assert.is_true(cond)` | Afirmar que condición es `true` |
-| `assert.eq(a, b)` | Afirmar que a == b |
-| `assert.ne(a, b)` | Afirmar que a != b |
-| `assert.str_eq(a, b)` | Afirmar strings iguales |
-| `assert.gt(a, b)` | Afirmar a > b |
-| `assert.lt(a, b)` | Afirmar a < b |
-| `assert.gte(a, b)` | Afirmar a >= b |
-| `assert.lte(a, b)` | Afirmar a <= b |
-
-## Atributo `#[test]`
-
-```ky
 #[test]
 fn test_addition():
     assert.eq(2 + 2, 4)
 
 #[test]
-fn test_substraction():
-    assert.eq(5 - 3, 2)
+fn test_string():
+    assert.eq("hello", "hello")
+    assert.ne("hello", "world")
+    assert.str_eq("hello", "hello")
 ```
 
-Ejecutar tests:
+### Funciones
+
+| Función | Firma | Descripción |
+|---------|-------|-------------|
+| `assert.is_true(cond)` | `fn(cond: bool)` | Afirmar que condición es `true` |
+| `assert.eq(a, b)` | `fn(a: T, b: T)` | Afirmar que a == b |
+| `assert.ne(a, b)` | `fn(a: T, b: T)` | Afirmar que a != b |
+| `assert.str_eq(a, b)` | `fn(a: str, b: str)` | Afirmar strings iguales |
+| `assert.gt(a, b)` | `fn(a: T, b: T)` | Afirmar a > b |
+| `assert.lt(a, b)` | `fn(a: T, b: T)` | Afirmar a < b |
+| `assert.gte(a, b)` | `fn(a: T, b: T)` | Afirmar a >= b |
+| `assert.lte(a, b)` | `fn(a: T, b: T)` | Afirmar a <= b |
+
+### Atributo `#[test]`
+
+```ky
+#[test]
+fn test_sum_list():
+    result: i32 = sum_list({1, 2, 3})
+    assert.eq(result, 6)
+```
+
+Ejecutar:
 
 ```bash
 ky test

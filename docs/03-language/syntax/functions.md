@@ -1,104 +1,106 @@
 # Functions
 
-**Status:** [x] Basic fn, params, return, default params. [ ] `static fn` syntax error. [ ] `Calc.method()` undefined symbol.
+> Declaración y uso de funciones en Kyle.
 
-## Declaration
+## Declaración básica
 
 ```ky
 fn add(a: i32, b: i32) i32:
     a + b
 ```
 
-## Parameters
+- `fn` keyword
+- Parámetros con tipo: `nombre: Tipo`
+- Tipo de retorno después de los parámetros
+- Cuerpo indentado
+- La última expresión es el retorno (implícito)
 
-| Mode | Syntax | Semantics |
-|------|--------|-----------|
-| Move (default) | `s: str` | Ownership transfer (caller pierde) |
-| Borrow | `s: &str` | Immutable reference (caller presta) |
-| Mutable borrow | `s: ^&str` | Mutable reference |
-| Copy | `s: i32` | Copia (tipos Copy, caller retiene) |
+## Parámetros (Move por defecto)
 
 ```ky
-fn read(s: &str):          # borrow
+fn consume(s: str):        # MOVE: caller pierde ownership
     println(s)
 
-fn append(s: ^&str):       # mutable borrow
+fn read(s: &str):          # BORROW: caller presta
+    println(s)
+
+fn fill(s: ^&str):         # MUT BORROW: caller presta mutable
     s = s + "!"
-
-fn consume(s: str):        # move (default)
-    println(s)
 ```
+
+| Modo | Sintaxis | Semántica |
+|------|----------|-----------|
+| Move (default) | `s: str` | Ownership transfer |
+| Borrow | `s: &str` | Referencia inmutable |
+| Mutable Borrow | `s: ^&str` | Referencia mutable |
 
 ## Return type
 
 ```ky
-fn add(a: i32, b: i32) i32:     # returns i32
+fn add(a: i32, b: i32) i32:     # retorna i32
     a + b
 
-fn greet(name: str) str:         # returns str
+fn greet(name: str) str:         # retorna str
     "Hello, {name}!"
 
-fn log(msg: str):                # returns void
+fn log(msg: str):                # retorna void
     println(msg)
-```
 
-## Multiple return values
-
-```ky
-fn divmod(a: i32, b: i32) (i32, i32):
-    (a / b, a % b)
-
-(result, remainder) = divmod(10, 3)
+fn divide(a: i32, b: i32) i32!: # retorna fallible
+    if b == 0:
+        return error("div by zero")
+    a / b
 ```
 
 ## Default parameters
 
 ```ky
-fn greet(name: str, greeting: str = "Hello") str:
-    "{greeting}, {name}!"
+fn connect(host: str = "localhost", port: i32 = 8080):
+    println("conectando a " + host + ":" + port.to_str())
+
+connect()                     # localhost:8080
+connect("example.com")        # example.com:8080
+connect("example.com", 80)    # example.com:80
 ```
 
-## Methods
-
-Methods are defined inside a class. The instance is accessed via `this` inside the body, but `this` is not declared as a parameter.
+## Function pointers
 
 ```ky
-final class Vec2:
-    x: i32
-    y: i32
+fn double(n: i64) i64:
+    n * 2
 
-    fn len() f64:
-        sqrt((this.x * this.x + this.y * this.y) as f64)
-
-a = Vec2 { x: 3, y: 4 }
-a.len()     # 5.0
-```
-
-## Static methods
-
-```ky
-class math_utils:
-    static fn square(x: i32) i32:
-        x * x
-
-math_utils.square(5)    # 25
-```
-
-## Operator overloading
-
-```ky
-final class Vec2:
-    fn op_+(other: Vec2) Vec2:
-        Vec2 { x: this.x + other.x, y: this.y + other.y }
-
-a = Vec2 { x: 1, y: 2 }
-b = Vec2 { x: 3, y: 4 }
-c = a + b               # calls op_+
+fn main() i32:
+    fn_ptr: ptr = double as ptr
+    result: i64 = fn_ptr(21)    # call indirect
+    println(result.to_str())     # 42
+    0
 ```
 
 ## Closures
 
 ```ky
-adder = fn(x: i32, y: i32) i32: x + y
-result = adder(3, 4)    # 7
+doubled: {i32} = list.map(fn(x: i32): x * 2)
+filtered: {i32} = list.filter(fn(x: i32): x > 5)
+```
+
+## async fn
+
+```ky
+async fn fetch(url: &str) str:
+    "response"
+
+fn main() i32:
+    task = fetch("https://...")
+    result: str = await task
+    0
+```
+
+## static fn
+
+```ky
+class MathUtils:
+    static fn square(x: i32) i32:
+        x * x
+
+MathUtils.square(5)    # 25
 ```

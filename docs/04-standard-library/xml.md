@@ -8,37 +8,29 @@
 ```ky
 from xml import xml
 
-# Parsear XML
-doc = xml.parse('<root><item id="1">Hello</item></root>')
-items = doc.find_all("item")
-first = items[0]
-println(first.text())      # "Hello"
-println(first.attr("id"))  # "1"
-
-# Generar XML
-doc = xml.element("root")
-item = doc.add_child("item")
-item.set_attr("id", "1")
-item.set_text("Hello")
-str = doc.to_str()
+doc: xml = xml.parse('<root><item id="1">Hello</item></root>')
+items: {xml} = doc.find_all("item")
+first: xml = items[0]
+texto: str = first.text()
+id_val: str = first.attr("id")
 ```
 
 ### Funciones
 
-| Función | Descripción |
-|---------|-------------|
-| `xml.parse(str)` | Parsear string → documento |
-| `xml.element(name)` | Crear elemento |
+| Función | Firma | Descripción |
+|---------|-------|-------------|
+| `xml.parse(str)` | `fn(s: str) xml` | Parsear string → documento |
+| `xml.element(name)` | `fn(name: str) xml` | Crear elemento |
 
 ### Métodos (nodo)
 
-| Método | Descripción |
-|--------|-------------|
-| `n.find_all(tag)` | Buscar hijos por tag |
-| `n.find_first(tag)` | Primer hijo que matchea |
-| `n.text()` | Texto del nodo |
-| `n.attr(name)` | Valor de atributo |
-| `n.set_attr(name, val)` | Asignar atributo |
-| `n.add_child(child)` | Agregar hijo |
-| `n.set_text(text)` | Asignar texto |
-| `n.to_str()` | Serializar a string |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `n.find_all(tag)` | `fn(self, tag: str) {xml}` | Buscar hijos por tag |
+| `n.find_first(tag)` | `fn(self, tag: str) xml?` | Primer hijo que matchea |
+| `n.text()` | `fn(self) str` | Texto del nodo |
+| `n.attr(name)` | `fn(self, name: str) str` | Valor de atributo |
+| `n.set_attr(name, val)` | `fn(self, name: str, val: str)` | Asignar atributo |
+| `n.add_child(child)` | `fn(self, child: xml)` | Agregar hijo |
+| `n.set_text(text)` | `fn(self, text: str)` | Asignar texto |
+| `n.to_str()` | `fn(self) str` | Serializar a string |

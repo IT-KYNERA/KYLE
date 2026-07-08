@@ -8,64 +8,62 @@
 ```ky
 from math import math
 
-x = math.max(10, 20)         # → 20
-x = math.min(10, 20)         # → 10
-x = math.abs(-5)             # → 5
-x = math.pow(2, 10)          # → 1024
-x = math.sqrt(144)           # → 12 (f64)
-x = math.floor(3.7)          # → 3 (i64)
-x = math.ceil(3.2)           # → 4 (i64)
-x = math.round(3.5)          # → 4 (i64)
-x = math.clamp(15, 0, 10)   # → 10 (limita a rango)
+x: i32 = math.max(10, 20)
+x = math.min(10, 20)
+x = math.abs(-5)
+x = math.pow(2, 10)              # → 1024 (i64)
+x = math.clamp(15, 0, 10)        # → 10
 ```
 
-### Aritméticas
+### Funciones
 
-| Función | Descripción | Retorno |
-|---------|-------------|---------|
-| `math.max(a, b)` | Mayor de dos valores | i32/i64/f64 |
-| `math.min(a, b)` | Menor de dos valores | i32/i64/f64 |
-| `math.abs(x)` | Valor absoluto | i32/i64/f64 |
-| `math.pow(base, exp)` | Potencia | i64 |
-| `math.sqrt(x)` | Raíz cuadrada | f64 |
+| Función | Firma | Descripción |
+|---------|-------|-------------|
+| `math.max(a, b)` | `fn(a: T, b: T) T` | Mayor de dos valores |
+| `math.min(a, b)` | `fn(a: T, b: T) T` | Menor de dos valores |
+| `math.abs(x)` | `fn(x: T) T` | Valor absoluto |
+| `math.pow(base, exp)` | `fn(base: i64, exp: i64) i64` | Potencia |
+| `math.clamp(val, min, max)` | `fn(val: T, min: T, max: T) T` | Limitar a rango |
+| `math.lerp(a, b, t)` | `fn(a: f64, b: f64, t: f64) f64` | Interpolación lineal |
 
-### Redondeo
+### Funciones de punto flotante
 
-| Función | Descripción |
-|---------|-------------|
-| `math.floor(x)` | Redondear hacia abajo |
-| `math.ceil(x)` | Redondear hacia arriba |
-| `math.round(x)` | Redondear (0.5 hacia arriba) |
+| Función | Firma | Descripción |
+|---------|-------|-------------|
+| `math.sqrt(x)` | `fn(x: f64) f64` | Raíz cuadrada |
+| `math.floor(x)` | `fn(x: f64) i64` | Redondear hacia abajo |
+| `math.ceil(x)` | `fn(x: f64) i64` | Redondear hacia arriba |
+| `math.round(x)` | `fn(x: f64) i64` | Redondear (0.5↑) |
 
-### Utilidades
-
-| Función | Descripción |
-|---------|-------------|
-| `math.clamp(val, min, max)` | Limitar valor a rango |
-| `math.lerp(a, b, t)` | Interpolación lineal (`a + (b-a) * t`) |
+```ky
+x: f64 = math.sqrt(144.0)         # → 12.0
+n: i64 = math.floor(3.7)          # → 3
+n = math.ceil(3.2)                # → 4
+n = math.round(3.5)               # → 4
+```
 
 ### Constantes
 
 ```ky
-println(math.pi)    # 3.141592653589793
-println(math.e)     # 2.718281828459045
+pi: f64 = math.pi    # 3.141592653589793
+e: f64 = math.e      # 2.718281828459045
 ```
 
-### Ejemplo
+### Ejemplo completo
 
 ```ky
 from math import math
 
 fn solve_quadratic(a: f64, b: f64, c: f64) (f64, f64)!:
-    disc = b * b - 4 * a * c
+    disc: f64 = b * b - 4 * a * c
     if disc < 0:
         return error("no real roots")
-    sqrt_disc = math.sqrt(disc)
-    x1 = (-b + sqrt_disc) / (2 * a)
-    x2 = (-b - sqrt_disc) / (2 * a)
+    sqrt_disc: f64 = math.sqrt(disc)
+    x1: f64 = (-b + sqrt_disc) / (2 * a)
+    x2: f64 = (-b - sqrt_disc) / (2 * a)
     ok((x1, x2))
 
-match solve_quadratic(1, -3, 2):
+match solve_quadratic(1.0, -3.0, 2.0):
     ok((x1, x2)):
         println("x1: " + x1.to_str() + ", x2: " + x2.to_str())
     error(e): println(e)

@@ -5,7 +5,7 @@
 
 ## option: `option<T>` / `T?`
 
-Representa un valor opcional: `some(val)` o `none`.
+Representa un valor opcional: `some(val: T)` o `none`.
 
 ```ky
 from core import option
@@ -31,22 +31,22 @@ match name:
 
 ### Métodos
 
-| Método | Descripción | Ejemplo |
-|--------|-------------|---------|
-| `is_some()` | `true` si tiene valor | `opt.is_some()` |
-| `is_none()` | `true` si es none | `opt.is_none()` |
-| `unwrap()` | Retorna valor o panic | `opt.unwrap()` |
-| `unwrap_or(default)` | Valor o default | `opt.unwrap_or("")` |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `is_some` | `fn(self) bool` | `true` si tiene valor |
+| `is_none` | `fn(self) bool` | `true` si es none |
+| `unwrap` | `fn(self) T` | Retorna valor o panic |
+| `unwrap_or` | `fn(self, default: T) T` | Valor o default |
 
 ```ky
-name = get_user_name()  # str?
+name: str? = get_user_name()
 if name.is_some():
     println(name.unwrap())
 ```
 
 ## result: `result<T, E>` / `T!`
 
-Representa una operación que puede fallar: `ok(val)` o `error(msg)`.
+Representa una operación que puede fallar: `ok(val: T)` o `error(msg: E)`.
 
 ```ky
 from core import result
@@ -65,20 +65,20 @@ fn divide(a: i32, b: i32) i32!:
         return error("division by zero")
     a / b
 
-result = divide(10, 2)
-match result:
+res: i32! = divide(10, 2)
+match res:
     ok(v): println(v.to_str())
     error(e): println("error: " + e)
 ```
 
 ### Métodos
 
-| Método | Descripción |
-|--------|-------------|
-| `is_ok()` | `true` si es ok |
-| `is_error()` | `true` si es error |
-| `unwrap()` | Retorna valor o panic |
-| `unwrap_or(default)` | Valor o default |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `is_ok` | `fn(self) bool` | `true` si es ok |
+| `is_error` | `fn(self) bool` | `true` si es error |
+| `unwrap` | `fn(self) T` | Retorna valor o panic |
+| `unwrap_or` | `fn(self, default: T) T` | Valor o default |
 
 ## Ver también
 

@@ -8,45 +8,36 @@
 ```ky
 from random import random
 
-# Enteros
-n = random.int(100)           # 0..99
-n = random.int_range(10, 20)  # 10..19
-
-# Flotantes
-x = random.float()            # 0.0..1.0
-x = random.float_range(0, 10) # 0.0..10.0
-
-# Booleanos
-b = random.bool()             # true o false
-
-# Utilidades
-random.shuffle(list)          # mezclar lista in-place
-elem = random.choice(list)    # elemento aleatorio de lista
+n: i32 = random.int(100)              # 0..99
+n = random.int_range(10, 20)          # 10..19
+x: f64 = random.float()               # 0.0..1.0
+x = random.float_range(0.0, 10.0)     # 0.0..10.0
+b: bool = random.bool()               # true o false
+random.shuffle(lista)                 # mezclar in-place
+elem: i32 = random.choice(lista)      # elemento aleatorio
 ```
 
 ### Funciones
 
-| Función | Descripción |
-|---------|-------------|
-| `random.int(max)` | Entero aleatorio 0..max-1 |
-| `random.int_range(min, max)` | Entero aleatorio min..max-1 |
-| `random.float()` | Flotante aleatorio 0.0..1.0 |
-| `random.float_range(min, max)` | Flotante aleatorio min..max |
-| `random.bool()` | Booleano aleatorio |
-| `random.shuffle(list)` | Mezclar lista in-place |
-| `random.choice(list)` | Elemento aleatorio de lista |
+| Función | Firma | Descripción |
+|---------|-------|-------------|
+| `random.int(max)` | `fn(max: i32) i32` | Entero 0..max-1 |
+| `random.int_range(min, max)` | `fn(min: i32, max: i32) i32` | Entero min..max-1 |
+| `random.float()` | `fn() f64` | Flotante 0.0..1.0 |
+| `random.float_range(min, max)` | `fn(min: f64, max: f64) f64` | Flotante min..max |
+| `random.bool()` | `fn() bool` | Booleano aleatorio |
+| `random.shuffle(list)` | `fn(self: &{T})` | Mezclar in-place |
+| `random.choice(list)` | `fn(self: &{T}) T` | Elemento aleatorio |
 
 ### Ejemplo
 
 ```ky
 from random import random
 
-# Simular dado
-dado = random.int_range(1, 7)
+dado: i32 = random.int_range(1, 7)
 println("dado: " + dado.to_str())
 
-# Barajar cartas
-cartas = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+cartas: {i32} = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 random.shuffle(cartas)
 println("primera carta: " + cartas[0].to_str())
 ```

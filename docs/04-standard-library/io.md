@@ -10,25 +10,38 @@ from io import console
 
 console.print("hello")         # sin newline
 console.println("hello")       # con newline
-line = console.input()         # leer línea
+line: str = console.input()    # leer línea
 line = console.input("> ")     # leer línea con prompt
 ```
 
-### Funciones
+### Shorthands globales
 
-| Función | Descripción |
-|---------|-------------|
-| `console.print(text)` | Imprimir texto sin salto de línea |
-| `console.println(text)` | Imprimir texto con salto de línea |
-| `console.input()` | Leer línea desde stdin |
-| `console.input(prompt)` | Leer línea con prompt |
-| `console.clear()` | Limpiar terminal |
+Las funciones `print()` y `println()` están disponibles globalmente sin import:
 
-### Ejemplo
+```ky
+print("hello")          # console.print()
+println("hello")        # console.println()
+input("> ")             # console.input()
+```
+
+### Métodos de console
+
+| Nombre | Firma | Descripción |
+|--------|-------|-------------|
+| `console.print` | `fn(text: str)` | Imprimir texto sin salto |
+| `console.println` | `fn(text: str)` | Imprimir texto con salto |
+| `console.input` | `fn(prompt: str) str` | Leer línea con prompt |
+| `console.clear` | `fn()` | Limpiar terminal |
+
+### Ejemplos
 
 ```ky
 from io import console
 
-name = console.input("¿Cómo te llamas? ")
+name: str = console.input("¿Cómo te llamas? ")
 console.println("Hola, " + name + "!")
+
+# Equivalente con shorthands globales
+name = input("¿Cómo te llamas? ")
+println("Hola, " + name + "!")
 ```

@@ -1,7 +1,7 @@
 # net — Red
 
-> Módulo de redes (TCP, UDP).
-> Import: `from net import tcp, udp`
+> Módulo de redes (TCP).
+> Import: `from net import tcp`
 
 ## tcp: conexiones TCP
 
@@ -9,53 +9,33 @@
 from net import tcp
 
 # Servidor
-server = tcp.listen(8080)
-client = server.accept()
-data = client.read(1024)
+server: tcp = tcp.listen(8080)
+client: tcp = server.accept()
+data: str = client.read(1024)
 client.write("HTTP/1.1 200 OK\r\n\r\n")
 client.close()
 server.close()
 
 # Cliente
-conn = tcp.connect("example.com", 80)
+conn: tcp = tcp.connect("example.com", 80)
 conn.write("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
-resp = conn.read(4096)
+resp: str = conn.read(4096)
 conn.close()
 ```
 
 ### Métodos (socket servidor)
 
-| Método | Descripción |
-|--------|-------------|
-| `tcp.listen(port)` | Crear socket servidor |
-| `s.accept()` | Aceptar conexión (retorna socket cliente) |
-| `s.close()` | Cerrar socket |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `tcp.listen(port)` | `fn(port: i32) tcp` | Crear socket servidor |
+| `s.accept()` | `fn(self) tcp` | Aceptar conexión |
+| `s.close()` | `fn(self)` | Cerrar socket |
 
 ### Métodos (socket cliente)
 
-| Método | Descripción |
-|--------|-------------|
-| `tcp.connect(host, port)` | Conectar a servidor |
-| `c.read(count)` | Leer hasta N bytes |
-| `c.write(data)` | Enviar datos |
-| `c.close()` | Cerrar conexión |
-
-## udp: UDP
-
-```ky
-from net import udp
-
-sock = udp.bind(8080)
-data, addr = sock.recv_from(1024)
-sock.send_to("response", addr)
-sock.close()
-```
-
-### Métodos
-
-| Método | Descripción |
-|--------|-------------|
-| `udp.bind(port)` | Bind a puerto local |
-| `s.recv_from(count)` | Recibir datagrama |
-| `s.send_to(data, addr)` | Enviar datagrama |
-| `s.close()` | Cerrar socket |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `tcp.connect(host, port)` | `fn(host: str, port: i32) tcp` | Conectar |
+| `c.read(count)` | `fn(self, count: i32) str` | Leer hasta N bytes |
+| `c.write(data)` | `fn(self, data: &str)` | Enviar datos |
+| `c.close()` | `fn(self)` | Cerrar conexión |

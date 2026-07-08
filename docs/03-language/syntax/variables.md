@@ -1,61 +1,100 @@
 # Variables
 
-## Declaration [x]
+> Declaración y uso de variables en Kyle.
 
-Variables are declared with `name = value`. No `let`, `var`, or `const` keywords.
+## Declaración
+
+Las variables se declaran con `nombre = valor`. No hay `let`, `var` ni `const`.
 
 ```ky
-name = "Ana"        # immutable (default), OWNED (str es Move)
-age: ^i32 = 25      # mutable with ^T
+x: i32 = 42              # tipo explícito + valor
+y = 10                   # tipo inferido (i32)
+nombre: str = "Ana"      # string
+sueldo: f64 = 3500.50    # float
+activo: bool = true      # bool
 ```
 
-## Constants [x]
+## Inmutabilidad por defecto
 
-Compile-time constants use `:=`. UPPER_CASE naming by convention.
+Por defecto, las variables son **inmutables**. No se pueden reasignar.
 
 ```ky
-VERSION := "1.0.0"
-MAX_SIZE := 1024
+x: i32 = 10
+x = 20   # ERROR: cannot modify immutable variable 'x'
 ```
 
-## Mutability [x]
-
-| Form | Mutability | Ownership |
-|------|------------|-----------|
-| `x = value` | Immutable | Copy o Move según tipo |
-| `x: ^T = value` | Mutable | Ídem |
-| Copy types | — | `y = x` copia (ambos vivos) |
-| Move types | — | `y = x` mueve (x inválido) |
+### Mutabilidad con `^T`
 
 ```ky
-x = 5              # immutable, COPY (i32)
-y: ^i32 = 5        # mutable, COPY
-y = y + 1          # reassignment allowed
+x: ^i32 = 10     # mutable
+x = x + 1        # ✅ permitido
 
-s = "hola"         # immutable, MOVE (str)
-t = s              # MOVE: s inválido después
-t = s.clone()      # COPY explícita: ambos vivos
+nombre: ^str = "Ana"
+nombre = "Pepe"  # ✅ permitido
 ```
 
-## Scope [x]
+## Tipos Copy vs Move
 
-Variables are block-scoped. Each indentation level creates a new scope.
+### Copy (numéricos, bool, char, ptr)
 
 ```ky
-x = 1
+x: i32 = 42
+y: i32 = x       # COPY: ambos vivos
+println(x)        # ✅ 42
+
+a: f64 = 3.14
+b: f64 = a       # COPY
+```
+
+### Move (str, {T}, {K:V}, [T; N], clases)
+
+```ky
+s: str = "hola"
+t: str = s        # MOVE: s inválido después
+println(s)        # ❌ ERROR: use-after-move
+
+# Copia explícita
+t = s.clone()     # ambos vivos
+println(s)        # ✅ "hola"
+```
+
+## Shorthands globales
+
+`print()`, `println()`, `input()` están disponibles globalmente:
+
+```ky
+println("hello")
+name: str = input("¿nombre? ")
+```
+
+## Tipado estricto
+
+Kyle es **fuertemente tipado**. No hay coerción implícita entre tipos incompatibles.
+
+```ky
+x: i32 = 42
+y: f64 = x as f64   # ✅ cast explícito
+# y = x             # ❌ type mismatch
+```
+
+## Scope
+
+Las variables pertenecen al bloque donde se declaran:
+
+```ky
+x: i32 = 1
 if true:
-    y = 2
-    x = x + y
-# y is not accessible here
+    y: i32 = 2
+    x = x + y       # ✅ acceso a variable exterior
+# y no accesible aquí
 ```
 
-## Destructuring [x]
+## Destructuring
 
 ```ky
-point = (10, 20)
-(x, y) = point      # x=10, y=20
+punto: (i32, str) = (10, "hello")
+(x, y) = punto       # x=10, y="hello"
 
-lst = {1, 2, 3}
-(first, second) = lst
+lista: {i32} = {1, 2, 3}
+(primero, segundo) = lista
 ```
-Nota: destructuring de listas da punteros (valores raw i64), no funciona para tipos reference como lista/string.

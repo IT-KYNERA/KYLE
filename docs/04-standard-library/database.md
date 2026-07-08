@@ -8,42 +8,42 @@
 ```ky
 from database import sqlite
 
-db = sqlite.open("data.db")
+db: sqlite = sqlite.open("data.db")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")
 db.execute("INSERT INTO users VALUES (?, ?)", {1, "Kyle"})
-rows = db.query("SELECT * FROM users")
+rows: {row} = db.query("SELECT * FROM users")
 for row in rows:
-    println(row.get_str("name"))
-
+    name: str = row.get_str("name")
+    println(name)
 db.close()
 ```
 
 ### Métodos
 
-| Método | Descripción |
-|--------|-------------|
-| `sqlite.open(path)` | Abrir base de datos |
-| `db.execute(sql, params)` | Ejecutar comando SQL |
-| `db.query(sql, params)` | Ejecutar query (retorna rows) |
-| `db.close()` | Cerrar conexión |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `sqlite.open(path)` | `fn(path: str) sqlite` | Abrir base de datos |
+| `db.execute(sql, params)` | `fn(self, sql: str, params: {i64})` | Ejecutar comando SQL |
+| `db.query(sql, params)` | `fn(self, sql: str, params: {i64}) {row}` | Ejecutar query |
+| `db.close()` | `fn(self)` | Cerrar conexión |
 
-### row: acceso a columnas
+### row: columnas
 
-| Método | Descripción |
-|--------|-------------|
-| `row.get_str(name)` | Columna como string |
-| `row.get_i64(name)` | Columna como i64 |
-| `row.get_f64(name)` | Columna como f64 |
-| `row.get_bool(name)` | Columna como bool |
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `row.get_str(name)` | `fn(self, name: str) str` | Columna como string |
+| `row.get_i64(name)` | `fn(self, name: str) i64` | Columna como entero |
+| `row.get_f64(name)` | `fn(self, name: str) f64` | Columna como float |
+| `row.get_bool(name)` | `fn(self, name: str) bool` | Columna como bool |
 
 ## postgres: PostgreSQL
 
 ```ky
 from database import postgres
 
-pool = postgres.pool("postgres://user:pass@localhost/db")
-conn = pool.get_conn()
-rows = conn.query("SELECT * FROM users")
+pool: postgres = postgres.pool("postgres://user:pass@localhost/db")
+conn: postgres = pool.get_conn()
+rows: {row} = conn.query("SELECT * FROM users")
 for row in rows:
     println(row.get_str("name"))
 conn.close()
@@ -51,30 +51,10 @@ conn.close()
 
 ### Métodos
 
-| Método | Descripción |
-|--------|-------------|
-| `postgres.pool(conn_str)` | Crear pool de conexiones |
-| `pool.get_conn()` | Obtener conexión del pool |
-| `conn.query(sql)` | Ejecutar query |
-| `conn.execute(sql)` | Ejecutar comando |
-| `conn.close()` | Cerrar conexión |
-
-### Ejemplo
-
-```ky
-from database import sqlite
-
-db = sqlite.open("test.db")
-db.execute("""
-    CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY,
-        title TEXT NOT NULL,
-        body TEXT
-    )
-""")
-db.execute("INSERT INTO posts VALUES (?, ?, ?)", {1, "Hello", "World"})
-rows = db.query("SELECT * FROM posts")
-for row in rows:
-    println(row.get_str("title") + ": " + row.get_str("body"))
-db.close()
-```
+| Método | Firma | Descripción |
+|--------|-------|-------------|
+| `postgres.pool(conn_str)` | `fn(s: str) postgres` | Crear pool |
+| `pool.get_conn()` | `fn(self) postgres` | Obtener conexión |
+| `conn.query(sql)` | `fn(self, sql: str) {row}` | Ejecutar query |
+| `conn.execute(sql)` | `fn(self, sql: str)` | Ejecutar comando |
+| `conn.close()` | `fn(self)` | Cerrar conexión |
