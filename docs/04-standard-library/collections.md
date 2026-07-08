@@ -25,18 +25,18 @@ tiene: bool = v.contains(10)
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `push` | `fn(self, val: T)` | Agregar al final |
-| `pop` | `fn(self) T` | Sacar el último |
-| `pop_first` | `fn(self) T` | Sacar el primero |
-| `len` | `fn(self) i64` | Cantidad de elementos |
-| `get` | `fn(self, idx: i32) T` | Obtener elemento |
-| `set` | `fn(self, idx: i32, val: T)` | Asignar elemento |
-| `contains` | `fn(self, val: T) bool` | `true` si existe |
-| `insert` | `fn(self, idx: i32, val: T)` | Insertar en posición |
-| `remove_at` | `fn(self, idx: i32) T` | Eliminar en posición |
-| `clear` | `fn(self)` | Vaciar la lista |
-| `reserve` | `fn(self, capacity: i64)` | Pre-asignar capacidad |
-| `reverse` | `fn(self)` | Invertir orden |
+| `push` | `fn(val: T)` | Agregar al final |
+| `pop` | `fn() T` | Sacar el último |
+| `pop_first` | `fn() T` | Sacar el primero |
+| `len` | `fn() i64` | Cantidad de elementos |
+| `get` | `fn(idx: i32) T` | Obtener elemento |
+| `set` | `fn(idx: i32, val: T)` | Asignar elemento |
+| `contains` | `fn(val: T) bool` | `true` si existe |
+| `insert` | `fn(idx: i32, val: T)` | Insertar en posición |
+| `remove_at` | `fn(idx: i32) T` | Eliminar en posición |
+| `clear` | `fn()` | Vaciar la lista |
+| `reserve` | `fn(capacity: i64)` | Pre-asignar capacidad |
+| `reverse` | `fn()` | Invertir orden |
 
 ### Stack via list
 
@@ -72,11 +72,11 @@ n: i64 = s.len()
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `add` | `fn(self, val: T)` | Agregar elemento |
-| `contains` | `fn(self, val: T) bool` | `true` si existe |
-| `remove` | `fn(self, val: T) bool` | Eliminar elemento |
-| `len` | `fn(self) i64` | Cantidad |
-| `clear` | `fn(self)` | Vaciar |
+| `add` | `fn(val: T)` | Agregar elemento |
+| `contains` | `fn(val: T) bool` | `true` si existe |
+| `remove` | `fn(val: T) bool` | Eliminar elemento |
+| `len` | `fn() i64` | Cantidad |
+| `clear` | `fn()` | Vaciar |
 
 ### Iteración
 
@@ -102,11 +102,11 @@ maximo: i64 = it.max()
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `map` | `fn(self, fn: fn(T) U) iter<U>` | Transformar cada elemento |
-| `filter` | `fn(self, fn: fn(T) bool) iter<T>` | Filtrar elementos |
-| `fold` | `fn(self, init: U, fn: fn(U, T) U) U` | Reducir a un valor |
-| `collect` | `fn(self) {T}` | Recolectar en lista |
-| `next` | `fn(self) T?` | Siguiente elemento |
-| `sum` | `fn(self) i64` | Sumar todos (si es numérico) |
-| `min` | `fn(self) T` | Mínimo |
-| `max` | `fn(self) T` | Máximo |
+| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada elemento |
+| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar elementos |
+| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un valor |
+| `collect` | `fn() {T}` | Recolectar en lista |
+| `next` | `fn() T?` | Siguiente elemento |
+| `sum` | `fn() i64` | Sumar todos (si es numérico) |
+| `min` | `fn() T` | Mínimo |
+| `max` | `fn() T` | Máximo |

@@ -26,8 +26,8 @@ elem: i32 = random.choice(lista)      # elemento aleatorio
 | `random.float()` | `fn() f64` | Flotante 0.0..1.0 |
 | `random.float_range(min, max)` | `fn(min: f64, max: f64) f64` | Flotante min..max |
 | `random.bool()` | `fn() bool` | Booleano aleatorio |
-| `random.shuffle(list)` | `fn(self: &{T})` | Mezclar in-place |
-| `random.choice(list)` | `fn(self: &{T}) T` | Elemento aleatorio |
+| `random.shuffle(list)` | `fn(list: &{T})` | Mezclar in-place |
+| `random.choice(list)` | `fn(list: &{T}) T` | Elemento aleatorio |
 
 ### Ejemplo
 

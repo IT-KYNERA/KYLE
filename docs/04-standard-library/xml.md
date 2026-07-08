@@ -26,11 +26,11 @@ id_val: str = first.attr("id")
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `n.find_all(tag)` | `fn(self, tag: str) {xml}` | Buscar hijos por tag |
-| `n.find_first(tag)` | `fn(self, tag: str) xml?` | Primer hijo que matchea |
-| `n.text()` | `fn(self) str` | Texto del nodo |
-| `n.attr(name)` | `fn(self, name: str) str` | Valor de atributo |
-| `n.set_attr(name, val)` | `fn(self, name: str, val: str)` | Asignar atributo |
-| `n.add_child(child)` | `fn(self, child: xml)` | Agregar hijo |
-| `n.set_text(text)` | `fn(self, text: str)` | Asignar texto |
-| `n.to_str()` | `fn(self) str` | Serializar a string |
+| `n.find_all(tag)` | `fn(tag: str) {xml}` | Buscar hijos por tag |
+| `n.find_first(tag)` | `fn(tag: str) xml?` | Primer hijo que matchea |
+| `n.text()` | `fn() str` | Texto del nodo |
+| `n.attr(name)` | `fn(name: str) str` | Valor de atributo |
+| `n.set_attr(name, val)` | `fn(name: str, val: str)` | Asignar atributo |
+| `n.add_child(child)` | `fn(child: xml)` | Agregar hijo |
+| `n.set_text(text)` | `fn(text: str)` | Asignar texto |
+| `n.to_str()` | `fn() str` | Serializar a string |

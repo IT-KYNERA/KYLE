@@ -23,18 +23,18 @@ db.close()
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `sqlite.open(path)` | `fn(path: str) sqlite` | Abrir base de datos |
-| `db.execute(sql, params)` | `fn(self, sql: str, params: {i64})` | Ejecutar comando SQL |
-| `db.query(sql, params)` | `fn(self, sql: str, params: {i64}) {row}` | Ejecutar query |
-| `db.close()` | `fn(self)` | Cerrar conexión |
+| `db.execute(sql, params)` | `fn(sql: str, params: {i64})` | Ejecutar comando SQL |
+| `db.query(sql, params)` | `fn(sql: str, params: {i64}) {row}` | Ejecutar query |
+| `db.close()` | `fn()` | Cerrar conexión |
 
 ### row: columnas
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `row.get_str(name)` | `fn(self, name: str) str` | Columna como string |
-| `row.get_i64(name)` | `fn(self, name: str) i64` | Columna como entero |
-| `row.get_f64(name)` | `fn(self, name: str) f64` | Columna como float |
-| `row.get_bool(name)` | `fn(self, name: str) bool` | Columna como bool |
+| `row.get_str(name)` | `fn(name: str) str` | Columna como string |
+| `row.get_i64(name)` | `fn(name: str) i64` | Columna como entero |
+| `row.get_f64(name)` | `fn(name: str) f64` | Columna como float |
+| `row.get_bool(name)` | `fn(name: str) bool` | Columna como bool |
 
 ## postgres: PostgreSQL
 
@@ -54,7 +54,7 @@ conn.close()
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `postgres.pool(conn_str)` | `fn(s: str) postgres` | Crear pool |
-| `pool.get_conn()` | `fn(self) postgres` | Obtener conexión |
-| `conn.query(sql)` | `fn(self, sql: str) {row}` | Ejecutar query |
-| `conn.execute(sql)` | `fn(self, sql: str)` | Ejecutar comando |
-| `conn.close()` | `fn(self)` | Cerrar conexión |
+| `pool.get_conn()` | `fn() postgres` | Obtener conexión |
+| `conn.query(sql)` | `fn(sql: str) {row}` | Ejecutar query |
+| `conn.execute(sql)` | `fn(sql: str)` | Ejecutar comando |
+| `conn.close()` | `fn()` | Cerrar conexión |

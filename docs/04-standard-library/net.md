@@ -28,14 +28,14 @@ conn.close()
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `tcp.listen(port)` | `fn(port: i32) tcp` | Crear socket servidor |
-| `s.accept()` | `fn(self) tcp` | Aceptar conexión |
-| `s.close()` | `fn(self)` | Cerrar socket |
+| `s.accept()` | `fn() tcp` | Aceptar conexión |
+| `s.close()` | `fn()` | Cerrar socket |
 
 ### Métodos (socket cliente)
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `tcp.connect(host, port)` | `fn(host: str, port: i32) tcp` | Conectar |
-| `c.read(count)` | `fn(self, count: i32) str` | Leer hasta N bytes |
-| `c.write(data)` | `fn(self, data: &str)` | Enviar datos |
-| `c.close()` | `fn(self)` | Cerrar conexión |
+| `c.read(count)` | `fn(count: i32) str` | Leer hasta N bytes |
+| `c.write(data)` | `fn(data: &str)` | Enviar datos |
+| `c.close()` | `fn()` | Cerrar conexión |

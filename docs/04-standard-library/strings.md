@@ -20,16 +20,16 @@ s4: str = s3.replace("HELLO", "HI")
 
 | Método | Firma | Descripción | Ejemplo |
 |--------|-------|-------------|---------|
-| `len` | `fn(self) i32` | Largo del string | `s.len()` |
-| `contains` | `fn(self, sub: str) bool` | `true` si contiene substring | `s.contains("lo")` |
-| `starts_with` | `fn(self, prefix: str) bool` | `true` si empieza con | `s.starts_with("He")` |
-| `ends_with` | `fn(self, suffix: str) bool` | `true` si termina con | `s.ends_with("ld")` |
-| `to_upper` | `fn(self) str` | Mayúsculas | `s.to_upper()` |
-| `to_lower` | `fn(self) str` | Minúsculas | `s.to_lower()` |
-| `trim` | `fn(self) str` | Sin espacios extremos | `s.trim()` |
-| `replace` | `fn(self, from: str, to: str) str` | Reemplazar substring | `s.replace("a", "b")` |
-| `char_at` | `fn(self, idx: i32) i8` | Carácter en posición | `s.char_at(0)` |
-| `substr` | `fn(self, start: i32, count: i32) str` | Substring | `s.substr(0, 5)` |
+| `len` | `fn() i32` | Largo del string | `s.len()` |
+| `contains` | `fn(sub: str) bool` | `true` si contiene substring | `s.contains("lo")` |
+| `starts_with` | `fn(prefix: str) bool` | `true` si empieza con | `s.starts_with("He")` |
+| `ends_with` | `fn(suffix: str) bool` | `true` si termina con | `s.ends_with("ld")` |
+| `to_upper` | `fn() str` | Mayúsculas | `s.to_upper()` |
+| `to_lower` | `fn() str` | Minúsculas | `s.to_lower()` |
+| `trim` | `fn() str` | Sin espacios extremos | `s.trim()` |
+| `replace` | `fn(from: str, to: str) str` | Reemplazar substring | `s.replace("a", "b")` |
+| `char_at` | `fn(idx: i32) i8` | Carácter en posición | `s.char_at(0)` |
+| `substr` | `fn(start: i32, count: i32) str` | Substring | `s.substr(0, 5)` |
 
 ### Funciones standalone
 
@@ -81,9 +81,9 @@ println(result)
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `str_builder` | `fn(capacity: i64 = 16) str_builder` | Constructor |
-| `append` | `fn(self, s: &str)` | Agregar string al buffer |
-| `to_str` | `fn(self) str` | Extraer string final |
-| `free` | `fn(self)` | Liberar memoria del builder |
+| `append` | `fn(s: &str)` | Agregar string al buffer |
+| `to_str` | `fn() str` | Extraer string final |
+| `free` | `fn()` | Liberar memoria del builder |
 
 ### Performance
 

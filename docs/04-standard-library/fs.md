@@ -25,13 +25,13 @@ println(content)
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `file.open(path, mode)` | `fn(path: str, mode: str) file` | Abrir archivo |
-| `f.read()` | `fn(self) str` | Leer todo como string |
-| `f.read_bytes(count)` | `fn(self, count: i64) bytes` | Leer N bytes |
-| `f.write(text)` | `fn(self, text: &str)` | Escribir texto |
-| `f.write_bytes(data)` | `fn(self, data: &bytes)` | Escribir bytes |
-| `f.close()` | `fn(self)` | Cerrar archivo |
-| `f.exists()` | `fn(self) bool` | `true` si existe |
-| `f.len()` | `fn(self) i64` | Tamaño en bytes |
+| `f.read()` | `fn() str` | Leer todo como string |
+| `f.read_bytes(count)` | `fn(count: i64) bytes` | Leer N bytes |
+| `f.write(text)` | `fn(text: &str)` | Escribir texto |
+| `f.write_bytes(data)` | `fn(data: &bytes)` | Escribir bytes |
+| `f.close()` | `fn()` | Cerrar archivo |
+| `f.exists()` | `fn() bool` | `true` si existe |
+| `f.len()` | `fn() i64` | Tamaño en bytes |
 
 ### Modos de apertura
 

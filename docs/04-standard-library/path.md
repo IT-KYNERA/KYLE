@@ -22,14 +22,14 @@ es_directorio: bool = p.is_dir()
 | Método | Firma | Descripción |
 |--------|-------|-------------|
 | `path(s)` | `fn(s: str) path` | Crear ruta desde string |
-| `p.dirname()` | `fn(self) str` | Directorio padre |
-| `p.basename()` | `fn(self) str` | Nombre del archivo |
-| `p.extension()` | `fn(self) str` | Extensión (incluye punto) |
-| `p.exists()` | `fn(self) bool` | `true` si existe |
-| `p.is_file()` | `fn(self) bool` | `true` si es archivo |
-| `p.is_dir()` | `fn(self) bool` | `true` si es directorio |
-| `p.join(other)` | `fn(self, other: str) path` | Concatenar rutas |
-| `p.to_str()` | `fn(self) str` | String de la ruta |
+| `p.dirname()` | `fn() str` | Directorio padre |
+| `p.basename()` | `fn() str` | Nombre del archivo |
+| `p.extension()` | `fn() str` | Extensión (incluye punto) |
+| `p.exists()` | `fn() bool` | `true` si existe |
+| `p.is_file()` | `fn() bool` | `true` si es archivo |
+| `p.is_dir()` | `fn() bool` | `true` si es directorio |
+| `p.join(other)` | `fn(other: str) path` | Concatenar rutas |
+| `p.to_str()` | `fn() str` | String de la ruta |
 
 ### Ejemplo
 

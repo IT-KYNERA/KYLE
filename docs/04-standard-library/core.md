@@ -33,10 +33,10 @@ match name:
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `is_some` | `fn(self) bool` | `true` si tiene valor |
-| `is_none` | `fn(self) bool` | `true` si es none |
-| `unwrap` | `fn(self) T` | Retorna valor o panic |
-| `unwrap_or` | `fn(self, default: T) T` | Valor o default |
+| `is_some` | `fn() bool` | `true` si tiene valor |
+| `is_none` | `fn() bool` | `true` si es none |
+| `unwrap` | `fn() T` | Retorna valor o panic |
+| `unwrap_or` | `fn(default: T) T` | Valor o default |
 
 ```ky
 name: str? = get_user_name()
@@ -75,10 +75,10 @@ match res:
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `is_ok` | `fn(self) bool` | `true` si es ok |
-| `is_error` | `fn(self) bool` | `true` si es error |
-| `unwrap` | `fn(self) T` | Retorna valor o panic |
-| `unwrap_or` | `fn(self, default: T) T` | Valor o default |
+| `is_ok` | `fn() bool` | `true` si es ok |
+| `is_error` | `fn() bool` | `true` si es error |
+| `unwrap` | `fn() T` | Retorna valor o panic |
+| `unwrap_or` | `fn(default: T) T` | Valor o default |
 
 ## Ver también
 
