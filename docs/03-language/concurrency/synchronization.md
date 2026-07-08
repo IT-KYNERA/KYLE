@@ -1,0 +1,3 @@
+# Synchronization
+
+> **Pendiente de contenido.**

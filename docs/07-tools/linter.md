@@ -1,0 +1,3 @@
+# Linter
+
+> **Pendiente de contenido.**

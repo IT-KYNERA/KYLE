@@ -1,0 +1,3 @@
+# Allocator
+
+> **Pendiente de contenido.**

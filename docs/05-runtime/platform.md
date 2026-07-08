@@ -1,0 +1,3 @@
+# Platform
+
+> **Pendiente de contenido.**

@@ -1,0 +1,3 @@
+# Proposals
+
+> **Pendiente de contenido.**

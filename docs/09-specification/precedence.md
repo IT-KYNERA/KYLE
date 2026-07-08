@@ -1,0 +1,3 @@
+# Precedence
+
+> **Pendiente de contenido.**

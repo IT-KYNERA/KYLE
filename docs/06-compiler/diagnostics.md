@@ -1,0 +1,3 @@
+# Diagnostics
+
+> **Pendiente de contenido.**
