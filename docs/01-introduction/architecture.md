@@ -27,7 +27,8 @@ Kyle Language (compiler)
 ```
 
 > **Nota:** Las capas superiores (Windowing, Graphics, Scene, UI, Applications) son **aspiracionales**.
-> El foco actual es la capa **Platform** y los **packages backend** (HTTP, SQLite, Postgres, websocket, WASM).
+> El foco actual es el **compilador**, el **runtime** y los **tipos nativos**.
+> Packages backend (HTTP, SQLite, Postgres) se mantienen como packages.
 
 ## Language layer
 

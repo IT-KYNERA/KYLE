@@ -1,21 +1,49 @@
 # Principles
 
-## 1. Readability
+## Lenguaje
 
-Code reads like prose. No `;`, no `{}`, no `let`/`var`/`const`. Just indentation (4 spaces) and direct assignment.
+| Principio | Descripción | Ejemplo |
+|-----------|-------------|---------|
+| **Sin keywords innecesarios** | No `let`, `var`, `const`, `mut` | `x: i32 = 42` |
+| **Tipado fuerte** | Sin coerción implícita | `x = "42" + 1` → error |
+| **Move por defecto** | Ownership transfer automático | `y = x` mueve si es no-Copy |
+| **Borrow con `&`** | Préstamos explícitos | `f(&x)` presta, no mueve |
+| **Mutable con `^`** | Mutabilidad marcada | `x: ^i32 = 0` |
+| **Null seguro** | Sin `null`, `T?` para opcionales | `name: str? = none` |
+| **Errores como valores** | Sin excepciones, `T!` para fallos | `fn f() i32!` |
+| **Sin herencia múltiple** | Solo herencia simple (`::`) | `class Dog :: Animal` |
+| **Sin sobrecarga de operadores** | Solo `op_+`, `op_*` etc. | `fn op_+(other: T) T` |
 
-## 2. Strong typing with inference
+## Compilador
 
-The compiler knows all types at compile time. The programmer writes the minimum necessary.
+| Principio | Descripción |
+|-----------|-------------|
+| **Single pass** | Lexer → Parser → HIR → Semantic → MIR → Codegen |
+| **SSA opcional** | Deshabilitado por defecto (bugs conocidos) |
+| **LLVM O3** | Optimización agresiva en release |
+| **LTO** | Link-Time Optimization en release |
+| **Sin runtime pesado** | `libkyc_runtime.a` ~3MB |
 
-## 3. Radical simplicity
+## Tooling
 
-One way to do each thing. No exceptions.
+| Herramienta | Propósito |
+|-------------|-----------|
+| `ky build` | Compilar a binario |
+| `ky run` | Compilar y ejecutar |
+| `ky check` | Type-check rápido |
+| `ky test` | Ejecutar tests |
+| `ky fmt` | Formatear código |
+| `ky lsp` | Language server |
+| `ky add` / `ky install` | Gestión de paquetes |
 
-## 4. Zero-cost performance
+## Paquetes
 
-Move by default, borrow via `&`, mutable via `^`. No GC, no implicit refcounting. You don't pay for what you don't use.
+| Tipo | Ejemplos |
+|------|----------|
+| **Nativos** (built-in) | `str`, `{T}`, `date_time`, `regex`, `json` |
+| **Packages** (externos) | `http`, `sqlite`, `postgres` |
 
-## 5. Syntactic consistency
+## Ver también
 
-What looks the same behaves the same. `T?` replaces `Option<T>`. `final class` replaces `struct`. No surprises.
+- `philosophy.md` — Filosofía del lenguaje
+- `architecture.md` — Arquitectura del ecosistema
