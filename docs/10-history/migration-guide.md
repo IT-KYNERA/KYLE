@@ -16,7 +16,7 @@ New syntax uses direct assignment:
 
 ```ky
 x = 5            # immutable
-y: &i32 = 10     # mutable
+y: ^i32 = 10     # mutable
 Z := 20          # constant
 ```
 
@@ -26,7 +26,7 @@ Old syntax moved by default. New syntax borrows by default:
 
 ```ky
 fn read(s: str):         # borrows (new default)
-fn consume(^s: str):     # explicit move
+fn consume(s: str):     # explicit move
 ```
 
 ### struct → final class

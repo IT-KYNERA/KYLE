@@ -14,7 +14,7 @@ async fn double(n: i64) i64:
 fn main() i32:
     task = double(21)
     result = await task
-    println(str(result))    # 42
+    println(result.to_str())    # 42
     0
 ```
 

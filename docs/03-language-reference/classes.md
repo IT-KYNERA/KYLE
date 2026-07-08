@@ -22,7 +22,7 @@ v = Vec2 { x: 10, y: 20 }
 
 ### Explicit constructor
 
-Use `fn class_name(...)` to define a constructor.
+Use `class_name(...)` to define a constructor.
 
 ```ky
 class Config:

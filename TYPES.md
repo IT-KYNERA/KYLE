@@ -155,8 +155,8 @@ Copy types (`y = x` no mueve): `i8-u64`, `f32-f64`, `bool`, `char`, `ptr`
 | 68 | `json` | ❌ functions | ✅ Nativo | `json.parse(str)` | ❌ |
 | 69 | `big_int` | ❌ | ❌ | — | ❌ |
 | 70 | `xml` | ❌ | ❌ | — | ❌ |
-| 71 | `Tensor` | ❌ | ❌ | — | ❌ |
-| 72 | `DataFrame` | ❌ | ❌ | — | ❌ |
+| 71 | `tensor` | ❌ | ❌ | — | ❌ |
+| 72 | `data_frame` | ❌ | ❌ | — | ❌ |
 
 ---
 

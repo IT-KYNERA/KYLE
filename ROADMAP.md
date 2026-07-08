@@ -649,8 +649,8 @@ Cada tipo package → integración nativa requiere:
 
 | Package actual | Tipo nativo | Runtime status |
 |---------------|-------------|----------------|
-| `from datetime import datetime` | `DateTime` | ✅ `kyc_runtime/src/datetime.rs` |
-| `from datetime import duration` | `Duration` | ✅ en datetime.rs |
+| `from datetime import datetime` | `date_time` | ✅ `kyc_runtime/src/datetime.rs` |
+| `from datetime import duration` | `duration` | ✅ en datetime.rs |
 | `from date import date` | `Date` | ✅ `kyc_runtime/src/date.rs` |
 | `from date import time` | `Time` | ✅ en date.rs |
 | `from bytes import bytes` | `bytes` | ✅ `kyc_runtime/src/bytes.rs` |
