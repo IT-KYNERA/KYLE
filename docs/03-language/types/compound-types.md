@@ -43,10 +43,10 @@ y = cubo[1][2][0]  # → 11
 ### Pasaje por borrow vs mutable borrow
 
 ```ky
-fn fn_borrow(arr: &[100]i32):     # solo lectura
+fn fn_borrow(arr: &[i32; 100]):     # solo lectura
     println(arr[0].to_str())
 
-fn fn_mut(arr: ^&[100]i32):       # permite modificar
+fn fn_mut(arr: ^&[i32; 100]):       # permite modificar
     arr[0] = 99
 ```
 

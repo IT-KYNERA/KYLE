@@ -14,7 +14,7 @@ Array nativo en **stack**. Tamaño fijo en compile-time.
 
 ```ky
 # Declaración con tipo explícito
-arr: [5]i32 = [1, 2, 3, 4, 5]
+arr: [i32; 5] = [1, 2, 3, 4, 5]
 
 # Inferencia de tipo
 nums = [1, 2, 3]         # → [i32; 3]
@@ -78,7 +78,7 @@ Los arrays son **Copy** porque están en stack. Pero para arrays grandes convien
 
 ```ky
 fn main():
-    nums: [1000]i32 = [0; 1000]
+    nums: [i32; 1000] = [0; 1000]
     nums[0] = 1
 
     # 1. PASAR POR VALOR — COPIA el array completo (1000 × 4 bytes)
@@ -92,19 +92,19 @@ fn main():
     duplicar_todo(^&nums)
     println(nums[1].to_str())  # 2
 
-fn sumar_valor(arr: [1000]i32) i64:
+fn sumar_valor(arr: [i32; 1000]) i64:
     total = 0
     for i in 0..arr.len():
         total = total + arr[i]
     total
 
-fn sumar_borrow(arr: &[1000]i32) i64:
+fn sumar_borrow(arr: &[i32; 1000]) i64:
     total = 0
     for i in 0..arr.len():
         total = total + arr[i]
     total
 
-fn duplicar_todo(arr: ^&[1000]i32):
+fn duplicar_todo(arr: ^&[i32; 1000]):
     for i in 0..arr.len():
         arr[i] = arr[i] * 2
 ```
