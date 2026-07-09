@@ -117,17 +117,31 @@ jobs:
       - name: Install LLVM 18 (Windows x64)
         shell: pwsh
         run: |
-          # Download LLVM 18.1.8 NSIS installer and extract with 7z
-          # (7-Zip 26.x is pre-installed on windows-2025 runner)
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
-          $out = "$env:TEMP\LLVM-18.1.8-win64.exe"
+          # Download full clang+llvm tarball (936 MB) — includes headers, libs, and tools.
+          # The smaller LLVM-18.1.8-win64.exe only has the DLL, not the dev headers.
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz"
+          $out = "$env:TEMP\llvm-18.tar.xz"
           $dest = "$env:LLVM_SYS_181_PREFIX"
-          Write-Host "Downloading LLVM 18..."
+          Write-Host "Downloading LLVM 18 (936 MB, may take ~2 min)..."
           Invoke-WebRequest -Uri $url -OutFile $out
           Write-Host "Extracting LLVM 18 to $dest..."
+          $extractDir = "$env:TEMP\llvm-extract"
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          & "C:\Program Files\7-Zip\7z.exe" x $out -o"$extractDir" -y
+          if ($LASTEXITCODE -ne 0) { Write-Error "7z extraction failed"; exit 1 }
+          # The tarball contains a top-level clang+llvm-18.1.8-x86_64-pc-windows-msvc/ dir
+          $topDir = Get-ChildItem $extractDir -Directory | Select-Object -First 1
+          if (-not $topDir) { Write-Error "Expected top-level directory in tarball not found"; exit 1 }
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          & "C:\Program Files\7-Zip\7z.exe" x $out -o"$dest" -y | Out-Null
+          Get-ChildItem $topDir.FullName | Move-Item -Destination $dest -Force
+          Remove-Item -Recurse $extractDir -Force -ErrorAction SilentlyContinue
           Remove-Item $out -Force
+          # Verify dev headers exist
+          if (-not (Test-Path "$dest\include\llvm-c\Core.h")) {
+            Write-Error "LLVM headers not found after extraction"
+            Get-ChildItem "$dest\include" -ErrorAction SilentlyContinue
+            exit 1
+          }
           Write-Host "LLVM 18 installed to $dest"
 
       - name: Patch LLVM headers & create llvm-config
