@@ -241,7 +241,7 @@ impl ScopeResolver {
         match expr {
             Expr::Literal { .. } => {}
             Expr::Identifier { name, span } => {
-                if self.symbols.lookup(name).is_none() {
+                if self.symbols.lookup(name).is_none() && !is_namespace(name) {
                     self.reporter.report(
                         Diagnostic::error(ErrorCode::E0009, format!("undefined symbol '{}'", name))
                             .with_span(*span)
@@ -422,4 +422,11 @@ impl ScopeResolver {
             AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
         }
     }
+}
+
+/// Check if a name is a known module namespace for namespaced APIs.
+fn is_namespace(name: &str) -> bool {
+    matches!(name, "parallel" | "thread" | "assert" | "json" | "math"
+        | "str" | "tcp" | "crypto" | "process" | "regex"
+        | "date_time" | "date" | "time" | "console" | "random")
 }

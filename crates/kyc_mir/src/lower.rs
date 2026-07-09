@@ -3609,10 +3609,42 @@ impl Lowerer {
                         if !ctx.locals.contains_key(mod_name) {
                             let ev_map = self.enum_variants.borrow();
                             if !ev_map.contains_key(mod_name) {
-                                // Module-qualified call: emit direct function call to `property`
-                                let fn_name = property.clone();
-                                let call_type = self.fn_returns.borrow()
-                                    .get(&fn_name).cloned().unwrap_or(MirType::Void);
+                                // Map namespaced API to flat function name
+                                let resolve_namespace = |ns: &str, func: &str| -> Option<String> {
+                                    match (ns, func) {
+                                        ("parallel", "for") => Some("ky_parallel_for".into()),
+                                        ("thread", "spawn") => Some("ky_spawn_thread".into()),
+                                        ("thread", "join") => Some("ky_join_thread".into()),
+                                        ("thread", "sleep") => Some("ky_sleep".into()),
+                                        ("thread", "yield") => Some("ky_yield".into()),
+                                        ("assert", "is_true") => Some("assert".into()),
+                                        ("assert", "eq") => Some("assert_eq".into()),
+                                        ("assert", "ne") => Some("assert_ne".into()),
+                                        ("assert", "str_eq") => Some("assert_str".into()),
+                                        ("math", "pow") => Some("ky_pow".into()),
+                                        ("math", "ceil") => Some("ceil".into()),
+                                        ("math", "floor") => Some("floor".into()),
+                                        ("math", "round") => Some("round".into()),
+                                        ("json", "parse") => Some("json_parse".into()),
+                                        ("json", "stringify") => Some("json_stringify".into()),
+                                        ("json", "serialize") => Some("serialize".into()),
+                                        ("json", "deserialize") => Some("deserialize".into()),
+                                        ("crypto", "sha1") => Some("ky_sha1".into()),
+                                        ("crypto", "base64_encode") => Some("ky_base64_encode".into()),
+                                        ("process", "env") => Some("ky_getenv".into()),
+                                        ("tcp", "listen") => Some("ky_tcp_listen".into()),
+                                        ("tcp", "accept") => Some("ky_tcp_accept".into()),
+                                        ("tcp", "read") => Some("ky_tcp_read".into()),
+                                        ("tcp", "write") => Some("ky_tcp_write".into()),
+                                        ("tcp", "close") => Some("ky_tcp_close".into()),
+                                        _ => None,
+                                    }
+                                };
+                                let fn_name = resolve_namespace(mod_name, property)
+                                    .unwrap_or_else(|| property.clone());
+                                let call_type = builtin_return_type(&fn_name)
+                                    .or_else(|| self.fn_returns.borrow().get(&fn_name).cloned())
+                                    .unwrap_or(MirType::Void);
                                 let mut args = Vec::new();
                                 for arg in arguments {
                                     if let Expr::Identifier { name, .. } = arg {
@@ -6948,6 +6980,8 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("kind".into(), MirType::Str),
             ("size".into(), MirType::I32),
         ])),
+        "ceil" | "floor" | "round" => Some(MirType::F64),
+        "ky_getenv" | "ky_setenv" => Some(MirType::Str),
         "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Some(MirType::I64),
         "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Some(MirType::I64),
         "ky_channel_close" => Some(MirType::Void),

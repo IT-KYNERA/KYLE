@@ -2108,6 +2108,10 @@ impl Parser {
                 TokenKind::True => Some("True".to_string()),
                 TokenKind::False => Some("False".to_string()),
                 TokenKind::Type => Some("type".to_string()),
+                TokenKind::For => Some("for".to_string()),
+                TokenKind::In => Some("in".to_string()),
+                TokenKind::Is => Some("is".to_string()),
+                TokenKind::As => Some("as".to_string()),
                 _ => None,
             };
             if let Some(n) = name {
