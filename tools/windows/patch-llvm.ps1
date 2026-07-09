@@ -163,7 +163,7 @@ if /i "%~1"=="--libnames"      echo LLVM-C.lib & goto :eof
 if /i "%~1"=="--libfiles"      echo %PREFIX_FWD%/lib/LLVM-C.lib & goto :eof
 if /i "%~1"=="--components"    echo all & goto :eof
 if /i "%~1"=="--shared-mode"   echo shared & goto :eof
-if /i "%~1"=="--system-libs"   echo( & goto :eof
+if /i "%~1"=="--system-libs"   echo -lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lws2_32 -llegacy_stdio_definitions -ldbghelp -lkernel32 -lntdll -luserenv -lbcrypt & goto :eof
 if /i "%~1"=="--targets-built" echo AArch64 ARM X86 & goto :eof
 if /i "%~1"=="--host-target"   echo x86_64-pc-windows-msvc & goto :eof
 if /i "%~1"=="--has-rtti"      echo NO & goto :eof
@@ -217,7 +217,7 @@ class LlvmConfig {
         if (a == "--libfiles")       { Console.WriteLine(fwd + "/lib/LLVM-C.lib"); return 0; }
         if (a == "--components")     { Console.WriteLine("all"); return 0; }
         if (a == "--shared-mode")    { Console.WriteLine("shared"); return 0; }
-        if (a == "--system-libs")    { Console.WriteLine(); return 0; }
+        if (a == "--system-libs")    { Console.WriteLine("-lpsapi -lshell32 -lole32 -luuid -ladvapi32 -lws2_32 -llegacy_stdio_definitions -ldbghelp -lkernel32 -lntdll -luserenv -lbcrypt"); return 0; }
         if (a == "--targets-built")  { Console.WriteLine("AArch64 ARM X86"); return 0; }
         if (a == "--host-target")    { Console.WriteLine("x86_64-pc-windows-msvc"); return 0; }
         if (a == "--has-rtti")       { Console.WriteLine("NO"); return 0; }
@@ -233,10 +233,8 @@ class LlvmConfig {
 '@
 
 $llvmExe = Join-Path $binDir "llvm-config.exe"
-if (Test-Path $llvmExe) {
-    Write-Host "llvm-config.exe already exists (provided by tarball)"
-} elseif ($cscPath) {
-    Write-Host "Compiling llvm-config.exe with csc.exe..."
+if ($cscPath) {
+    Write-Host "Compiling llvm-config.exe with csc.exe (overwriting tarball version)..."
     & $cscPath /nologo /target:exe /out:$llvmExe $csSrc 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0 -and (Test-Path $llvmExe)) {
         Write-Host "  -> $llvmExe ($([math]::Round((Get-Item $llvmExe).Length / 1KB)) KB)"
