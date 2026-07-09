@@ -12,6 +12,7 @@ use inkwell::values::AsValueRef;
 use inkwell::values::InstructionValue as InkwellInstructionValue;
 use inkwell::values::PointerValue;
 use inkwell::IntPredicate;
+use llvm_sys::core::{LLVMSetNSW, LLVMSetNUW};
 use std::collections::{HashMap, HashSet};
 
 use kyc_mir::mir::*;
@@ -197,19 +198,25 @@ impl<'ctx> Codegen<'ctx> {
         }
     }
 
-    /// Create an integer add with nsw flag for signed overflow UB optimization.
+    /// Create an integer add with nsw+nuw flags for signed/unsigned overflow UB optimization.
     fn int_nsw_nuw_add(&self, lhs: inkwell::values::IntValue<'ctx>, rhs: inkwell::values::IntValue<'ctx>) -> Result<inkwell::values::IntValue<'ctx>, String> {
-        self.builder.build_int_nsw_add(lhs, rhs, "").map_err(|e| format!("add: {}", e))
+        let val = self.builder.build_int_nsw_add(lhs, rhs, "").map_err(|e| format!("add: {}", e))?;
+        unsafe { LLVMSetNUW(val.as_value_ref(), true.into()); }
+        Ok(val)
     }
 
-    /// Create an integer sub with nsw flag.
+    /// Create an integer sub with nsw+nuw flags.
     fn int_nsw_nuw_sub(&self, lhs: inkwell::values::IntValue<'ctx>, rhs: inkwell::values::IntValue<'ctx>) -> Result<inkwell::values::IntValue<'ctx>, String> {
-        self.builder.build_int_nsw_sub(lhs, rhs, "").map_err(|e| format!("sub: {}", e))
+        let val = self.builder.build_int_nsw_sub(lhs, rhs, "").map_err(|e| format!("sub: {}", e))?;
+        unsafe { LLVMSetNUW(val.as_value_ref(), true.into()); }
+        Ok(val)
     }
 
-    /// Create an integer mul with nsw flag.
+    /// Create an integer mul with nsw+nuw flags.
     fn int_nsw_nuw_mul(&self, lhs: inkwell::values::IntValue<'ctx>, rhs: inkwell::values::IntValue<'ctx>) -> Result<inkwell::values::IntValue<'ctx>, String> {
-        self.builder.build_int_nsw_mul(lhs, rhs, "").map_err(|e| format!("mul: {}", e))
+        let val = self.builder.build_int_nsw_mul(lhs, rhs, "").map_err(|e| format!("mul: {}", e))?;
+        unsafe { LLVMSetNUW(val.as_value_ref(), true.into()); }
+        Ok(val)
     }
 
     /// Emit `llvm.lifetime.start` for an alloca to help LLVM reuse stack slots.

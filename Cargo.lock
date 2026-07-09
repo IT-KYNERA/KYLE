@@ -534,6 +534,7 @@ dependencies = [
  "inkwell",
  "kyc_core",
  "kyc_mir",
+ "llvm-sys",
 ]
 
 [[package]]

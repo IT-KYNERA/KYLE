@@ -9,3 +9,4 @@ license.workspace = true
 kyc_core = { path = "../kyc_core" }
 kyc_mir = { path = "../kyc_mir" }
 inkwell = { version = "0.9", features = ["llvm18-1"] }
+llvm-sys = "181"
