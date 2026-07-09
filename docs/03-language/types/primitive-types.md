@@ -94,7 +94,7 @@ name = d["name"]
 d.len()
 ```
 
-### Tuple: `(T1, T2, ...)` [ ]
+### Tuple: `(T1, T2, ...)` [x]
 
 Fixed-size heterogeneous.
 

@@ -86,6 +86,7 @@ impl SymbolTable {
             "ky_channel_close", "ky_channel_len", "ky_channel_free",
             "ky_str_builder_new", "ky_str_builder_append",
             "ky_str_builder_to_str", "ky_str_builder_free",
+            "ky_dict_contains", "ky_dict_remove",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {

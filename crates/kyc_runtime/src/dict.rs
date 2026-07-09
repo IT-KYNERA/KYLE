@@ -38,6 +38,26 @@ pub extern "C" fn ky_dict_len(dict: *mut std::ffi::c_void) -> i64 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn ky_dict_contains(dict: *mut std::ffi::c_void, key: *const c_char) -> i32 {
+    if dict.is_null() || key.is_null() {
+        return 0;
+    }
+    let map = unsafe { &*(dict as *const HashMap<String, i64>) };
+    let key_str = unsafe { CStr::from_ptr(key) }.to_str().unwrap_or("");
+    if map.contains_key(key_str) { 1 } else { 0 }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_dict_remove(dict: *mut std::ffi::c_void, key: *const c_char) -> i64 {
+    if dict.is_null() || key.is_null() {
+        return -1;
+    }
+    let map = unsafe { &mut *(dict as *mut HashMap<String, i64>) };
+    let key_str = unsafe { CStr::from_ptr(key) }.to_str().unwrap_or("").to_string();
+    if map.remove(&key_str).is_some() { 0 } else { -1 }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ky_dict_free(dict: *mut std::ffi::c_void) {
     if dict.is_null() {
         return;

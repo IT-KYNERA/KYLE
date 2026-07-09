@@ -29,7 +29,7 @@ pub use list::{ky_list_new, ky_list_free, ky_list_push, ky_list_pop, ky_list_get
 pub use async_::{ky_spawn_task, ky_await_task, ky_yield};
 pub use thread::{ky_spawn_thread, ky_join_thread};
 pub use channel::{ky_channel_new, ky_channel_send, ky_channel_recv, ky_channel_close, ky_channel_len, ky_channel_free};
-pub use dict::{ky_dict_new, ky_dict_free, ky_dict_get, ky_dict_set, ky_dict_len, ky_struct_to_json, ky_json_to_struct};
+pub use dict::{ky_dict_new, ky_dict_free, ky_dict_get, ky_dict_set, ky_dict_len, ky_dict_contains, ky_dict_remove, ky_struct_to_json, ky_json_to_struct};
 pub use net::{ky_tcp_listen, ky_tcp_accept, ky_tcp_read, ky_tcp_write, ky_tcp_close, ky_ptr_read_i32, ky_ptr_read_ptr, ky_ptr_write_i32, ky_sha1, ky_base64_encode, ky_ws_accept, ky_ws_read_frame, ky_ws_send_frame};
 pub use datetime::{ky_datetime_now, ky_datetime_parse, ky_datetime_format, ky_datetime_year, ky_datetime_month, ky_datetime_day, ky_datetime_hour, ky_datetime_minute, ky_datetime_second, ky_datetime_add_days, ky_datetime_add_hours, ky_datetime_diff, ky_datetime_from_ymdhms};
 pub use uuid::{ky_uuid_v4, ky_uuid_parse};

@@ -1494,10 +1494,10 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i32_ty.fn_type(&params, false);
             self.add_runtime_extern("ky_dict_contains", ft, &[("memory", "read")]);
         }
-        // void kl_dict_remove(ptr, ptr)
+        // i64 kl_dict_remove(ptr, ptr)
         {
             let params = [ptr_ty.into(), ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
+            let ft = self.context.i64_type().fn_type(&params, false);
             self.module.add_function("ky_dict_remove", ft, None);
         }
         // ptr kl_json_parse(ptr) — parse JSON string into dict
@@ -2453,7 +2453,10 @@ impl<'ctx> Codegen<'ctx> {
                                 (BasicValueEnum::IntValue(int_val), BasicTypeEnum::IntType(t)) => {
                                     let src_width = int_val.get_type().get_bit_width();
                                     let dst_width = t.get_bit_width();
-                                    let result = if src_width == 1 && dst_width > 1 {
+                                    let result = if src_width < dst_width && src_width > 1 {
+                                        self.builder.build_int_s_extend(*int_val, *t, "")
+                                            .map_err(|e| format!("sext: {}", e))?
+                                    } else if src_width == 1 && dst_width > 1 {
                                         self.builder.build_int_z_extend(*int_val, *t, "")
                                             .map_err(|e| format!("zext: {}", e))?
                                     } else if dst_width == 1 && src_width > 1 {

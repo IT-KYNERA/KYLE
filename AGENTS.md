@@ -218,7 +218,6 @@ LLVM 18.1 required.
 
 ---
 
-<<<<<<< Updated upstream
 ## How to publish a new release
 
 ### 1. Pre-flight checklist
@@ -252,34 +251,6 @@ cargo build --release --bin ky
 ```
 
 ### 4. Rebuild package tarballs (if packages changed)
-=======
-FASE 6 — Self-Hosting (⏳ In Progress)
-├── [x] Runtime char ops + ord() builtin
-├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
-├── [x] Lexer escrito en KL (examples/lexer.kl) — tokeniza archivos reales
-├── [x] Fix: char/int comparison + type widening en lowering
-├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
-├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
-├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
-├── [x] Parser escrito en KL
-├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
-├── [ ] Compilador completo en KL
-│   Hito: kl build klc
-```
-
-### Phase 4/5 Bugfixes
-- `codegen.rs`: MirValue::Param(id) devolvía 0 siempre → ahora resuelve al parámetro LLVM real
-- `lower.rs`: str() pasaba i32 a kl_i64_to_str (espera i64) → añadido Cast i32→i64
-- `lower.rs`: Stmt::Variable/TypedVariable no emitían Store para literales → arreglado
-- `optimize.rs`: DCE eliminaba Store si solo Return lo usaba → añadido collect_terminator_refs
-- `symbol_table.rs`: println faltaba de builtins → añadido
-- `lexer.rs`: make_token() usaba Span::dummy() → ahora usa posición real (line, column, offset)
-- `parser.rs`: todos los AST nodos usaban Span::dummy() → ahora propagan spans desde tokens
-- `formatter.rs`: conservación de comentarios usando last_comment_line tracking + source_lines
-- `parser.rs`: `parse_block` ahora para tras 1 statement si no hay Newline (single-line bodies)
-- `parser.rs`: `parse_if` consume Newlines entre if-body y elif/else (blank lines entre branches)
-- `type_checker.rs`: auto-declara `ident = expr` con el tipo inferido del valor (para que `str(result)` funcione)
->>>>>>> Stashed changes
 
 If you modified any package source (`packages/<name>/src/`), rebuild its tarball:
 

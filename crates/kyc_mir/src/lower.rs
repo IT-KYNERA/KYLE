@@ -3639,6 +3639,12 @@ impl Lowerer {
                                         ("tcp", "read") => Some("ky_tcp_read".into()),
                                         ("tcp", "write") => Some("ky_tcp_write".into()),
                                         ("tcp", "close") => Some("ky_tcp_close".into()),
+                                        ("dict", "contains") => Some("ky_dict_contains".into()),
+                                        ("dict", "remove") => Some("ky_dict_remove".into()),
+                                        ("str_builder", "new") => Some("ky_str_builder_new".into()),
+                                        ("str_builder", "append") => Some("ky_str_builder_append".into()),
+                                        ("str_builder", "to_str") => Some("ky_str_builder_to_str".into()),
+                                        ("str_builder", "free") => Some("ky_str_builder_free".into()),
                                         _ => None,
                                     }
                                 };
@@ -3998,11 +4004,22 @@ impl Lowerer {
                             });
                             return ctx;
                         } else {
+                            let i64_val = if id_type == MirType::I32 {
+                                let ext = ctx.alloc_local("_i64v", MirType::I64);
+                                ctx.current_block.insts.push(MirInst::Cast {
+                                    dest: ext,
+                                    value: MirValue::Local(obj_local),
+                                    to_type: MirType::I64,
+                                });
+                                MirValue::Local(ext)
+                            } else {
+                                MirValue::Local(obj_local)
+                            };
                             let result = ctx.alloc_local("_ts", MirType::Str);
                             ctx.string_locals.push(result);
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(result), name: "ky_i64_to_str".to_string(),
-                                args: vec![MirValue::Local(obj_local)],
+                                args: vec![i64_val],
                             });
                             return ctx;
                         }
@@ -7012,6 +7029,11 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ])),
+        "ky_dict_contains" => Some(MirType::I32),
+        "ky_dict_remove" => Some(MirType::I64),
+        "ky_str_builder_new" => Some(MirType::Str),
+        "ky_str_builder_append" | "ky_str_builder_free" => Some(MirType::Void),
+        "ky_str_builder_to_str" => Some(MirType::Str),
         _ => None,
     }
 }

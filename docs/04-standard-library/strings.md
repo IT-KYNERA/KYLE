@@ -65,25 +65,22 @@ println(result) # "HELLO"
 `str_builder` is un buffer mutable for concatenacion eficiente.
 
 ```ky
-from strings import str_builder
-
-sb: str_builder = str_builder(50000)
-i: ^i32 = 0
-while i < 50000:
- sb.append("x")
- i = i + 1
-result: str = sb.to_str()
-println(result)
+sb = str_builder.new(100)
+str_builder.append(sb, "hello ")
+str_builder.append(sb, "world")
+result = str_builder.to_str(sb)
+println(result)   # "hello world"
+str_builder.free(sb)
 ```
 
-### Methods
+### API
 
-| Method | Firma | Description |
-|--------|-------|-------------|
-| `str_builder` | `fn(capacity: i64 = 16) str_builder` | Constructor |
-| `append` | `fn(s: &str)` | Agregar string al buffer |
-| `to_str` | `fn() str` | Extraer string final |
-| `free` | `fn()` | Free memory del builder |
+| Function | Firma | Description |
+|----------|-------|-------------|
+| `str_builder.new` | `fn(capacity: i64) str` | Create new builder |
+| `str_builder.append` | `fn(sb: str, s: str)` | Append string |
+| `str_builder.to_str` | `fn(sb: str) str` | Build result string |
+| `str_builder.free` | `fn(sb: str)` | Free memory |
 
 ### Performance
 

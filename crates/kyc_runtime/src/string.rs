@@ -32,9 +32,12 @@ pub extern "C" fn ky_str_builder_new(capacity: i64) -> *mut strBuilder {
 pub extern "C" fn ky_str_builder_append(
     builder: *mut strBuilder,
     data: *const u8,
-    len: i64,
 ) {
-    if builder.is_null() || data.is_null() || len <= 0 {
+    if builder.is_null() || data.is_null() {
+        return;
+    }
+    let len = crate::ky_strlen(data) as i64;
+    if len <= 0 {
         return;
     }
     let b = unsafe { &mut *builder };
