@@ -22,6 +22,11 @@ detect_platform() {
     case "$(uname -s)" in
         Darwin) os="macos" ;;
         Linux)  os="linux" ;;
+        MINGW*|MSYS*|CYGWIN*)
+            echo "Error: este script es para macOS/Linux."
+            echo "En Windows, usa PowerShell:"
+            echo "  iwr -Uri \"https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1\" | iex"
+            exit 1 ;;
         *)      echo "Error: unsupported OS ($(uname -s))"; exit 1 ;;
     esac
     case "$(uname -m)" in

@@ -144,14 +144,20 @@ jobs:
       - name: Install LLVM 18 (Windows x64)
         shell: pwsh
         run: |
-          # Download LLVM 18.1 MSI for Windows x64
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
-          $out = "$env:TEMP\llvm-18.exe"
+          # Download LLVM 18.1.8 portable zip for Windows x64
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip"
+          $out = "$env:TEMP\llvm-18.zip"
+          $dest = "$env:LLVM_SYS_181_PREFIX"
           Write-Host "Downloading LLVM 18..."
           Invoke-WebRequest -Uri $url -OutFile $out
-          Write-Host "Installing LLVM 18..."
-          Start-Process -Wait -FilePath $out -ArgumentList "/S /D=$env:LLVM_SYS_181_PREFIX"
-          Write-Host "LLVM 18 installed to $env:LLVM_SYS_181_PREFIX"
+          Write-Host "Extracting LLVM 18 to $dest..."
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          $extractDir = "$env:TEMP\llvm-extract"
+          Expand-Archive -Path $out -DestinationPath $extractDir
+          # The zip contains a top-level LLVM-18.1.8-win64/ dir
+          Get-ChildItem "$extractDir\LLVM-18.1.8-win64" | Move-Item -Destination $dest -Force
+          Remove-Item -Recurse $extractDir -Force -ErrorAction SilentlyContinue
+          Write-Host "LLVM 18 installed to $dest"
 
       - name: Add LLVM to PATH
         shell: pwsh

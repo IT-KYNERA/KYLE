@@ -5,6 +5,7 @@ fn write_stdout(buf: &[u8]) {
     let _ = stdout.flush();
 }
 
+#[allow(dead_code)]
 fn write_int(val: i64) {
     let mut buf = [0u8; 20];
     let mut n = if val < 0 {

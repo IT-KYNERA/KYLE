@@ -1,9 +1,7 @@
-use std::ffi::c_void;
-
-// ─── Socket operations (Unix only) ──────────────────────────
+// ─── Platform-specific socket operations ────────────────────
 
 #[cfg(unix)]
-mod unix_sock {
+mod platform {
     use std::ffi::c_void;
 
     pub fn tcp_listen(port: i32) -> i32 {
@@ -69,23 +67,111 @@ mod unix_sock {
     }
 }
 
-#[cfg(not(unix))]
-mod unix_sock {
-    pub fn tcp_listen(_port: i32) -> i32 { -1 }
-    pub fn tcp_accept(_fd: i32) -> i32 { -1 }
-    pub fn tcp_read(_fd: i32, _buf: *mut u8, _count: usize) -> isize { -1 }
-    pub fn tcp_write(_fd: i32, _buf: *const u8, _len: usize) -> isize { -1 }
-    pub fn tcp_close(_fd: i32) -> i32 { -1 }
+#[cfg(windows)]
+mod platform {
+    use std::collections::HashMap;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::Mutex;
+
+    struct HandleEntry {
+        listener: Option<TcpListener>,
+        stream: Option<Mutex<TcpStream>>,
+    }
+
+    static HANDLES: std::sync::OnceLock<Mutex<HashMap<i32, HandleEntry>>> = std::sync::OnceLock::new();
+    static NEXT_HANDLE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(1);
+
+    fn handles() -> &'static Mutex<HashMap<i32, HandleEntry>> {
+        HANDLES.get_or_init(|| Mutex::new(HashMap::new()))
+    }
+
+    pub fn tcp_listen(port: i32) -> i32 {
+        let addr = format!("0.0.0.0:{}", port);
+        match TcpListener::bind(&addr) {
+            Ok(listener) => {
+                let handle = NEXT_HANDLE
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let mut map = handles().lock().unwrap();
+                map.insert(handle, HandleEntry { listener: Some(listener), stream: None });
+                handle
+            }
+            Err(_) => -1,
+        }
+    }
+
+    pub fn tcp_accept(fd: i32) -> i32 {
+        // Remove listener from table to avoid blocking while holding the lock
+        let listener = {
+            let mut map = handles().lock().unwrap();
+            map.remove(&fd).and_then(|entry| entry.listener)
+        };
+
+        match listener {
+            Some(listener) => match listener.accept() {
+                Ok((stream, _)) => {
+                    let new_handle = NEXT_HANDLE
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let mut map = handles().lock().unwrap();
+                    map.insert(fd, HandleEntry { listener: Some(listener), stream: None });
+                    map.insert(new_handle, HandleEntry { listener: None, stream: Some(Mutex::new(stream)) });
+                    new_handle
+                }
+                Err(_) => {
+                    let mut map = handles().lock().unwrap();
+                    map.insert(fd, HandleEntry { listener: Some(listener), stream: None });
+                    -1
+                }
+            },
+            None => -1,
+        }
+    }
+
+    pub fn tcp_read(fd: i32, buf: *mut u8, count: usize) -> isize {
+        let map = handles().lock().unwrap();
+        match map.get(&fd) {
+            Some(entry) => match &entry.stream {
+                Some(stream_mutex) => {
+                    let mut stream = stream_mutex.lock().unwrap();
+                    let slice = unsafe { std::slice::from_raw_parts_mut(buf, count) };
+                    stream.read(slice).unwrap_or(0) as isize
+                }
+                None => -1,
+            },
+            None => -1,
+        }
+    }
+
+    pub fn tcp_write(fd: i32, buf: *const u8, len: usize) -> isize {
+        let map = handles().lock().unwrap();
+        match map.get(&fd) {
+            Some(entry) => match &entry.stream {
+                Some(stream_mutex) => {
+                    let mut stream = stream_mutex.lock().unwrap();
+                    let slice = unsafe { std::slice::from_raw_parts(buf, len) };
+                    stream.write(slice).unwrap_or(0) as isize
+                }
+                None => -1,
+            },
+            None => -1,
+        }
+    }
+
+    pub fn tcp_close(fd: i32) -> i32 {
+        let mut map = handles().lock().unwrap();
+        map.remove(&fd);
+        0
+    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_tcp_listen(port: i32) -> i32 {
-    unix_sock::tcp_listen(port)
+    platform::tcp_listen(port)
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_tcp_accept(fd: i32) -> i32 {
-    unix_sock::tcp_accept(fd)
+    platform::tcp_accept(fd)
 }
 
 #[unsafe(no_mangle)]
@@ -97,7 +183,7 @@ pub extern "C" fn ky_tcp_read(fd: i32, count: i32) -> *mut u8 {
     if buf.is_null() {
         return std::ptr::null_mut();
     }
-    let n = unix_sock::tcp_read(fd, buf, count as usize);
+    let n = platform::tcp_read(fd, buf, count as usize);
     if n <= 0 {
         crate::ky_free(buf);
         return std::ptr::null_mut();
@@ -111,12 +197,12 @@ pub extern "C" fn ky_tcp_write(fd: i32, buf: *const u8, len: i32) -> i32 {
     if fd < 0 || buf.is_null() || len <= 0 {
         return -1;
     }
-    unix_sock::tcp_write(fd, buf, len as usize) as i32
+    platform::tcp_write(fd, buf, len as usize) as i32
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_tcp_close(fd: i32) -> i32 {
-    unix_sock::tcp_close(fd)
+    platform::tcp_close(fd)
 }
 
 // ─── Memory access (cross-platform) ─────────────────────────
@@ -217,7 +303,7 @@ pub extern "C" fn ky_ws_accept(key: *const u8) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_ws_read_frame(fd: i32) -> *mut u8 {
     fn read_all(fd: i32, buf: &mut [u8]) -> bool {
-        unix_sock::tcp_read(fd, buf.as_mut_ptr(), buf.len()) == buf.len() as isize
+        platform::tcp_read(fd, buf.as_mut_ptr(), buf.len()) == buf.len() as isize
     }
 
     // Read first 2 bytes
@@ -255,7 +341,7 @@ pub extern "C" fn ky_ws_read_frame(fd: i32) -> *mut u8 {
     let payload_buf = crate::ky_alloc((payload_size + 1) as i64);
     if payload_buf.is_null() { return std::ptr::null_mut(); }
     if payload_size > 0 {
-        let n = unix_sock::tcp_read(fd, payload_buf, payload_size);
+        let n = platform::tcp_read(fd, payload_buf, payload_size);
         if n as usize != payload_size {
             crate::ky_free(payload_buf);
             return std::ptr::null_mut();
@@ -301,11 +387,11 @@ pub extern "C" fn ky_ws_send_frame(fd: i32, opcode: i32, payload: *const u8, pay
     }
 
     // Write header + payload
-    let n = unix_sock::tcp_write(fd, header_buf.as_ptr(), header_buf.len());
+    let n = platform::tcp_write(fd, header_buf.as_ptr(), header_buf.len());
     if n < 0 { return -1; }
     let mut written = n as i32;
     if plen > 0 && !payload.is_null() {
-        let n2 = unix_sock::tcp_write(fd, payload, plen);
+        let n2 = platform::tcp_write(fd, payload, plen);
         if n2 < 0 { return -1; }
         written += n2 as i32;
     }

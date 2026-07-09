@@ -136,7 +136,7 @@ Esto es correcto: cada binario `ky` usa el linker nativo de su plataforma.
 ### Windows + LLVM 18
 
 GitHub Actions `windows-2025` tiene LLVM 20 pre-instalado, pero inkwell requiere LLVM 18.
-El workflow descarga e instala LLVM 18.1 explícitamente.
+El workflow descarga el zip portable de LLVM 18.1.8 y lo extrae (más confiable que el installer MSI).
 
 ### Checksums
 

@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 type TaskFn = Box<dyn FnOnce() + Send>;
@@ -24,6 +24,7 @@ fn global_executor() -> &'static Executor {
 pub struct Executor {
     running: Arc<AtomicBool>,
     task_sender: mpsc::Sender<TaskFn>,
+    #[allow(dead_code)]
     workers: Vec<thread::JoinHandle<()>>,
 }
 

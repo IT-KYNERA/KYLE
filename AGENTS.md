@@ -160,9 +160,15 @@ Esto significa que `from http.server import router` resuelve a:
 
 ## Testing
 
+### Rust unit tests (all platforms)
+
 ```bash
-# Rust unit tests (all crates)
+# Run all tests (157+ across 9 crates)
 cargo test --workspace
+
+# Run tests for a specific crate
+cargo test -p kyc_semantic
+cargo test -p kyc_frontend
 
 # Build (debug)
 cargo build --workspace
@@ -170,7 +176,16 @@ cargo build --workspace
 # Build release
 cargo build --release --bin ky
 
-# Kyle checks (sin fn main — implicit main auto-generado)
+# Cross-compile runtime only (no LLVM needed)
+cargo build --target x86_64-pc-windows-gnu -p kyc_runtime --release
+cargo build --target aarch64-unknown-linux-gnu -p kyc_runtime --release
+```
+
+**Note:** The `ky` binary (compiler) links against LLVM static libraries which are architecture-specific. Only the `kyc_runtime` crate can be freely cross-compiled. CI uses native runners per platform.
+
+### Kyle checks (no `fn main` needed — auto-generated)
+
+```bash
 ky check <file.ky>       # Type-check only
 ky build <file.ky>        # Compile to binary
 ky run <file.ky>          # Compile and run
@@ -178,6 +193,15 @@ ky run <file.ky>          # Compile and run
 # Package tests
 cd packages/<name> && ky check src/lib.ky
 ```
+
+### Cross-platform notes
+
+| Platform | Test command | Notes |
+|----------|-------------|-------|
+| **macOS** | `cargo test --workspace` | Native. LLVM via Homebrew. |
+| **Linux** | `cargo test --workspace` | Native. LLVM via apt. |
+| **Windows (MSVC)** | `cargo test --workspace` | Requires VS Build Tools for `link.exe`. |
+| **Windows (GNU)** | `cargo test --workspace` | Requires MinGW-w64. Use target `x86_64-pc-windows-gnu`. |
 
 ---
 
@@ -201,10 +225,16 @@ ky lsp                    # Start LSP server (for editors)
 
 ## LLVM Configuration
 
-LLVM 18.1 required.
+LLVM 18.1 required across all platforms.
 
-**macOS (Apple Silicon):** `brew install llvm@18 && export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)`
-**Linux (Ubuntu ARM):** `sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev`
+| Platform | Install command | Env var |
+|----------|----------------|---------|
+| **macOS** | `brew install llvm@18` | `LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)` |
+| **Linux (Debian/Ubuntu)** | `sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev` | `LLVM_SYS_181_PREFIX=/usr/lib/llvm-18` |
+| **Windows (Chocolatey)** | `choco install llvm --version=18.1.8` | `LLVM_SYS_181_PREFIX=C:\Program Files\LLVM` |
+| **Windows (portable)** | Download `LLVM-18.1.8-win64.zip` + extract | `LLVM_SYS_181_PREFIX=C:\path\to\LLVM-18.1.8-win64` |
+
+**Note:** `LLVM_SYS_181_PREFIX` tells `inkwell` (Rust LLVM bindings) where to find LLVM 18 libraries. Without this env var, the build will fail.
 
 ---
 
@@ -227,6 +257,7 @@ Update the version in ALL of these files (search for the old version string):
 | `Cargo.toml` | `version = "0.X.X"` | `version = "0.5.2"` |
 | `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.6.0` |
 | `install.sh` | `VERSION="v0.X.X"` | `VERSION="v0.5.2"` |
+| `install.ps1` | `$Version = "v0.X.X"` | `$Version = "v0.6.0"` |
 | `vscode-ky/install-extension.sh` | `TAG="v0.X.X"` | `TAG="v0.5.2"` |
 | `vscode-ky/package.json` | `"version": "0.X.X"` | `"version": "0.5.2"` |
 
@@ -276,26 +307,38 @@ git commit -m "Release v0.X.X: description of changes"
 git push origin main
 ```
 
-### 7. Create GitHub Release
+### 7. Create GitHub Release + upload assets
+
+The release is created automatically by CI when a tag is pushed, OR you can create it manually:
 
 ```bash
-# Compress the binary (MUST be named ky.gz — install.sh downloads this exact name)
-gzip -c target/release/ky > /tmp/ky.gz
-
-# Create the release
+# Create release (assets uploaded by CI)
 gh release create v0.X.X \
   --title "Kyle v0.X.X" \
   --notes "## Changes
 
 - Bullet list of changes
-" \
-  "/tmp/ky.gz" \
-  "vscode-ky/ky-0.X.X.vsix"
+"
 ```
 
-**Important:** The binary MUST be uploaded as `ky.gz` (the filename on disk, NOT with `#label`). The install script downloads `https://.../releases/download/v0.X.X/ky.gz`. If you use `#label.gz`, GitHub renames the file and the download will 404.
+**The CI workflow (`.github/workflows/release.yml`) builds and uploads 5 bundles automatically:**
 
-### 8. Push the tag
+| Bundle | Platform | CI Runner |
+|--------|----------|-----------|
+| `ky-macos-arm64.tar.gz` | macOS Apple Silicon | `macos-latest` |
+| `ky-macos-x64.tar.gz` | macOS Intel | `macos-13` |
+| `ky-linux-arm64.tar.gz` | Linux ARM64 | `ubuntu-24.04-arm` |
+| `ky-linux-x64.tar.gz` | Linux x86_64 | `ubuntu-24.04` |
+| `ky-windows-x64.zip` | Windows x86_64 | `windows-2025` |
+
+Each bundle contains (flat structure, no top-level dir):
+```
+ky (or ky.exe)
+libkyc_runtime.a
+LICENSE
+```
+
+### 8. Push the tag (triggers CI)
 
 ```bash
 git fetch --tags origin
@@ -303,16 +346,28 @@ git tag v0.X.X
 git push origin v0.X.X
 ```
 
+This triggers `.github/workflows/release.yml` which:
+1. Creates the release in GitHub
+2. Compiles `ky` + `kyc_runtime` for all 5 platforms in parallel
+3. Generates flat bundles + SHA-256 checksums
+4. Uploads assets to the release
+
+**No local build needed.** CI handles all cross-compilation via native runners.
+
 ### 9. Verify the release
 
 ```bash
-# Simulate a clean install
+# Simulate a clean install (macOS / Linux)
 cd /tmp && rm -rf verify_release
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
 
-# Add to PATH and test
-export PATH="$HOME/.ky/bin:$PATH"
+# Windows (PowerShell)
+iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | iex
+```
 
+Test on each platform:
+
+```bash
 # Version check
 ky --version                     # → must show v0.X.X
 
@@ -339,10 +394,13 @@ rm -rf /tmp/verify_release_*
 
 ### 10. If something fails
 
-- **Download 404**: The asset filename doesn't match install.sh. Upload again with the exact filename.
-- **Wrong version shown**: Binary wasn't rebuilt after Cargo.toml update. Run `cargo clean -p kyc_cli && cargo build --release --bin ky`.
-- **Package not found**: Tarball wasn't rebuilt or Pages is stale. Rebuild tarball and push again.
-- **Tests fail locally**: Fix tests, recommit, rebuild.
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| **Download 404** | Asset not uploaded or wrong name | Check CI logs; re-run failed CI jobs |
+| **Wrong version** | Binary not rebuilt after Cargo.toml update | `cargo clean -p kyc_cli && cargo build --release --bin ky` |
+| **Package not found** | Tarball not rebuilt or GitHub Pages stale | Rebuild tarball, push again |
+| **Tests fail** | Code regression | Fix tests, recommit, rebuild |
+| **Windows CI fails** | LLVM 18 installation | Check `windows-2025` runner; update LLVM download URL in `release.yml` |
 
 ---
 
@@ -358,7 +416,124 @@ rm -rf /tmp/verify_release_*
 
 ---
 
-*Version: v0.6.0 · Last updated: 2026-07-06 — Ver `AGENTS.md` > "How to publish a new release" para proceso completo de release.*
+## Cross-Platform Development Guide
+
+### Setting up a development environment
+
+#### macOS (Apple Silicon / Intel)
+
+```bash
+# 1. Install LLVM 18
+brew install llvm@18
+export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
+
+# 2. Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 3. Clone and build
+git clone https://github.com/IT-KYNERA/KYLE.git
+cd KYLE
+cargo build --release --bin ky
+cargo build --release -p kyc_runtime
+
+# 4. Test
+cargo test --workspace
+ky run examples/hello.ky
+```
+
+#### Linux (Ubuntu ARM64 / x86_64)
+
+```bash
+# 1. Install LLVM 18
+sudo apt update && sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
+export LLVM_SYS_181_PREFIX=/usr/lib/llvm-18
+
+# 2. Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 3. Clone and build
+git clone https://github.com/IT-KYNERA/KYLE.git
+cd KYLE
+cargo build --release --bin ky
+cargo build --release -p kyc_runtime
+
+# 4. Test
+cargo test --workspace
+ky run examples/hello.ky
+```
+
+#### Windows (x86_64)
+
+```powershell
+# 1. Install LLVM 18 (Option A — Chocolatey, run PowerShell as Admin)
+choco install llvm --version=18.1.8
+$env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
+
+# Or Option B — portable zip (no admin needed)
+Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip" -OutFile "$env:TEMP\llvm-18.zip"
+Expand-Archive -Path "$env:TEMP\llvm-18.zip" -DestinationPath "$env:USERPROFILE\llvm-18"
+$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18\LLVM-18.1.8-win64"
+
+# 2. Install Rust (https://rustup.rs)
+#    Default MSVC toolchain is recommended (requires Visual Studio Build Tools)
+#    For MinGW: rustup toolchain install stable-x86_64-pc-windows-gnu
+
+# 3. Clone and build
+git clone https://github.com/IT-KYNERA/KYLE.git
+cd KYLE
+cargo build --release --bin ky
+cargo build --release -p kyc_runtime
+
+# 4. Test
+cargo test --workspace
+.\target\release\ky.exe run examples\hello.ky
+```
+
+**Note:** The MSVC toolchain requires `link.exe` from Visual Studio Build Tools.
+If using MinGW (`x86_64-pc-windows-gnu`), install `mingw-w64` and the linker will default to GCC.
+
+### Building cross-platform bundles
+
+The `ky` binary links against LLVM static libraries, which are architecture-specific.
+Only `kyc_runtime` (pure Rust) can be freely cross-compiled.
+
+| Target | `ky` binary | `kyc_runtime` |
+|--------|-------------|---------------|
+| Same as host | ✅ Native build | ✅ Native build |
+| Different architecture | ❌ Needs LLVM for target | ✅ Cross-compile with `cargo-zigbuild` |
+| Different OS | ❌ Needs CI runner | ✅ Cross-compile with `cargo-zigbuild` |
+
+**Recommended workflow:**
+1. Push tag → CI builds all 5 platforms natively (`.github/workflows/release.yml`)
+2. OR build locally for host platform, use CI for the rest
+
+### Known issues per platform
+
+| Platform | Issue | Status |
+|----------|-------|--------|
+| **macOS** | None | ✅ Fully supported |
+| **Linux** | None | ✅ Fully supported |
+| **Windows** | Socket ops use `std::net` handle table (not raw `libc` fd) | ✅ Implemented |
+| **Windows** | VS Build Tools required for `link.exe` (MSVC toolchain) | ⚠️ Documented |
+| **Windows** | WebSocket over Windows sockets not tested on real Windows | 🔜 Needs testing |
+| **Windows** | CI runner `windows-2025` has LLVM 20 pre-installed; workflow installs LLVM 18 separately | ⚠️ Works with zip extraction |
+
+### Distribution model
+
+Each release publishes 5 platform-specific bundles (flat archives with `ky` + `libkyc_runtime.a` + `LICENSE`):
+
+| Platform | Install command |
+|----------|----------------|
+| macOS / Linux | `curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh \| sh` |
+| Windows | `iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" \| iex` |
+
+Both scripts detect the platform, download the correct bundle, verify SHA-256, install, and configure PATH.
+
+See `docs/07-tools/distribution.md` for full details.
+
+---
+
+*Version: v0.6.0 · Last updated: 2026-07-09 — See sections above for release process and cross-platform guide.*
 
 ---
 

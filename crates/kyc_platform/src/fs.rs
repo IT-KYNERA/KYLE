@@ -1,6 +1,4 @@
 use std::fs;
-use std::io::Read;
-use std::io::Write;
 use std::path::Path;
 
 /// Check if a path exists.
