@@ -116,6 +116,14 @@ mod platform {
 
 #[cfg(windows)]
 mod platform {
+    // Placeholder constants — exact values don't matter since fns return -1
+    pub const O_RDONLY: i32 = 0;
+    pub const O_WRONLY: i32 = 1;
+    pub const O_RDWR: i32 = 2;
+    pub const O_CREAT: i32 = 64;
+    pub const O_TRUNC: i32 = 512;
+    pub const O_APPEND: i32 = 1024;
+
     // Windows implementation — placeholder for Phase 7 Windows port
     pub fn open_file(_path: *const u8, _flags: i32, _mode: i32) -> i32 { -1 }
     pub fn read_fd(_fd: i32, _buf: *mut u8, _count: i64) -> i64 { -1 }

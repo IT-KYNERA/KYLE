@@ -572,9 +572,15 @@ pub extern "C" fn ky_setenv(name: *const u8, value: *const u8, overwrite: i32) -
     if name.is_null() || value.is_null() {
         return -1;
     }
-    unsafe {
-        libc::setenv(name .cast(), value .cast(), overwrite)
+    let name_str = unsafe { std::ffi::CStr::from_ptr(name as *const std::os::raw::c_char) }
+        .to_str().unwrap_or("");
+    let val_str = unsafe { std::ffi::CStr::from_ptr(value as *const std::os::raw::c_char) }
+        .to_str().unwrap_or("");
+    if overwrite != 0 || std::env::var(name_str).is_err() {
+        // SAFETY: single-threaded context (Kyle FFI call)
+        unsafe { std::env::set_var(name_str, val_str); }
     }
+    0
 }
 
 /// Read environment variable by name. Returns heap-allocated string or null.
