@@ -1196,32 +1196,31 @@ impl Parser {
                     self.advance();
                     Expr::Array { elements: vec![], span: self.span_from(start) }
                 } else {
-                    let first = self.parse_expr()?;
-                    if self.at(TokenKind::Semicolon) {
+                    let mut elements = Vec::new();
+                    loop {
+                        while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                            self.advance();
+                        }
+                        if self.at(TokenKind::RBracket) { break; }
+                        if self.at(TokenKind::DotDotDot) {
+                            let span_start = self.pos;
+                            self.advance();
+                            let expr = self.parse_expr()?;
+                            elements.push(Expr::Spread { expression: Box::new(expr), span: self.span_from(span_start) });
+                        } else {
+                            elements.push(self.parse_expr()?);
+                        }
+                        if !self.at(TokenKind::Comma) { break; }
+                        self.advance();
+                    }
+                    if elements.len() == 1 && self.at(TokenKind::Semicolon) {
                         self.advance();
                         let count = self.parse_expr()?;
                         self.expect(TokenKind::RBracket)?;
-                        Expr::ArrayRepeat { value: Box::new(first), count: Box::new(count), span: self.span_from(start) }
-                    } else {
-                        let mut elements = vec![first];
-                        while self.at(TokenKind::Comma) {
-                            self.advance();
-                            while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
-                                self.advance();
-                            }
-                            if self.at(TokenKind::RBracket) { break; }
-                            if self.at(TokenKind::DotDotDot) {
-                                let span_start = self.pos;
-                                self.advance();
-                                let expr = self.parse_expr()?;
-                                elements.push(Expr::Spread { expression: Box::new(expr), span: self.span_from(span_start) });
-                            } else {
-                                elements.push(self.parse_expr()?);
-                            }
-                        }
-                        self.expect(TokenKind::RBracket)?;
-                        Expr::Array { elements, span: self.span_from(start) }
+                        return Ok(Expr::ArrayRepeat { value: Box::new(elements.remove(0)), count: Box::new(count), span: self.span_from(start) });
                     }
+                    self.expect(TokenKind::RBracket)?;
+                    Expr::Array { elements, span: self.span_from(start) }
                 }
             }
             TokenKind::LBrace => {

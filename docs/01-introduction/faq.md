@@ -4,36 +4,36 @@
 
 ## Generales
 
-### ÂIs Kyle a high or low level language?
+### Is Kyle a high or low level language?
 
 **Bajo nivel.** Compila a nativo via LLVM, has control de memory manual
 (ownership, borrow checker), pointers raw, FFI directo with C. Pero with syntax
 simple y legible as Python.
 
-### ÂDoes Kyle compete with Rust?
+### ï¿½Does Kyle compete with Rust?
 
 Si, en sentido de be un language de sistemas seguro y rapido. Pero Kyle
 prioriza simplicidad sintactica about exhaustividad del type system.
 Menos features, less complejidad.
 
-### ÂDoes Kyle have a garbage collector?
+### ï¿½Does Kyle have a garbage collector?
 
 **No.** La memory se gestiona using ownership (move by defecto) y 
 borrow checker inserta `ky_free` automaticamente.
 
 ## Syntax
 
-### ÂWhy snake_case and not camelCase?
+### ï¿½Why snake_case and not camelCase?
 
 snake_case is more legible for code with nombris largos y is consistente
 with philosophy de "without ruido sintactico".
 
-### ÂWhy is there no `let`/`var`/`mut`?
+### ï¿½Why is there no `let`/`var`/`mut`?
 
 Para reducir ruido. La declaration is `name = value`. La mutabilidad se
 marca with `^`: `x: ^i32 = 0`.
 
-### ÂWhy `^` for mutable and `&` for borrow?
+### ï¿½Why `^` for mutable and `&` for borrow?
 
 `^` is un sigilo minimalist que no compite with operadoris existentes.
 `&` for borrow is familiar for programadoris Rust.
@@ -49,12 +49,12 @@ marca with `^`: `x: ^i32 = 0`.
 
 ## Paquetes
 
-### ÂWhy are DateTime, Regex, UUID native and not packages?
+### ï¿½Why are DateTime, Regex, UUID native and not packages?
 
 Porque are typis base que cualquier application necesita. Solo HTTP, SQLite y
 PostgreSQL are packagis porque are protocolos/basis de data especificos.
 
-### ÂWhere are the runtime files?
+### ï¿½Where are the runtime files?
 
 En `crates/kyc_runtime/src/`. 3350 lines de Rust, 88 functions `extern "C"`.
 

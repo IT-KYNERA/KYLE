@@ -38,10 +38,10 @@ input("> ") # input()
 ```ky
 from io import console
 
-name: str = input("ÂWhat is your name? ")
+name: str = input("What is your name? ")
 println("Hola, " + name + "!")
 
 # Equivalente with shorthands globales
-name = input("ÂWhat is your name? ")
+name = input("What is your name? ")
 println("Hola, " + name + "!")
 ```

@@ -623,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let kinds = tokenize("fn class abstract final struct enum contract if elif else while for in match return break defer guard unsafe async await const loop type None ok error extern");
+        let kinds = tokenize("fn class abstract final struct enum contract if elif else while for in match return break defer guard unsafe async await const loop type none ok error extern");
         assert_eq!(kinds, vec![
             TokenKind::Fn, TokenKind::Class, TokenKind::Abstract, TokenKind::Final, TokenKind::Struct,
             TokenKind::Enum, TokenKind::Contract, TokenKind::If, TokenKind::Elif,

@@ -1401,7 +1401,7 @@ mod tests {
     #[test]
     fn test_mutable_var_assign_in_fn() {
         // mutable var declared inside fn, then reassigned
-        let source = "fn f():\n    x: &i32 = 1\n    x = 2\n";
+        let source = "fn f():\n    x: ^i32 = 1\n    x = 2\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
@@ -1431,7 +1431,7 @@ mod tests {
     #[test]
     fn test_assign_inside_while() {
         // A variable declared in fn body and assigned inside a while
-        let source = "fn f():\n    x: &i32 = 0\n    while true:\n        x = 1\n";
+        let source = "fn f():\n    x: ^i32 = 0\n    while true:\n        x = 1\n";
         let diags = check(source);
         assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
     }
