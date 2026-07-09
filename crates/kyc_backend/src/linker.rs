@@ -10,7 +10,15 @@ impl Linker {
 
     fn linker_cmd() -> Command {
         if cfg!(target_os = "windows") {
-            Command::new("link.exe")
+            // Use clang as linker driver (it invokes lld/link internally)
+            // clang is always available as part of LLVM distribution
+            if Command::new("clang").arg("--version").output().is_ok() {
+                Command::new("clang")
+            } else if Command::new("lld-link.exe").arg("--version").output().is_ok() {
+                Command::new("lld-link.exe")
+            } else {
+                Command::new("link.exe")
+            }
         } else if cfg!(target_os = "macos") {
             Command::new("clang")
         } else {
@@ -55,6 +63,19 @@ impl Linker {
             } else {
                 cmd.arg(format!("-l{}", link));
             }
+        }
+
+        if cfg!(target_os = "windows") {
+            // Windows system libraries needed by Rust std
+            cmd.arg("-lkernel32");
+            cmd.arg("-lws2_32");
+            cmd.arg("-lbcrypt");
+            cmd.arg("-luserenv");
+            cmd.arg("-lntdll");
+            cmd.arg("-ladvapi32");
+            cmd.arg("-lcfgmgr32");
+            cmd.arg("-lshlwapi");
+            cmd.arg("-liphlpapi");
         }
 
         if release {
@@ -139,30 +160,36 @@ impl Linker {
     /// 2. Cargo workspace (debug/release)
     /// 3. Current working directory
     pub fn find_runtime_lib() -> Option<PathBuf> {
+        let runtime_lib = if cfg!(target_os = "windows") {
+            "kyc_runtime.lib"
+        } else {
+            "libkyc_runtime.a"
+        };
+
         let mut paths = Vec::new();
 
         // 1. Relative to the running binary
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 // /usr/local/bin/kl → /usr/local/lib/kl/libkyc_runtime.a
-                paths.push(exe_dir.join("../lib/kl/libkyc_runtime.a"));
+                paths.push(exe_dir.join("../lib/kl").join(runtime_lib));
                 // ~/.ky/bin/kl → ~/.ky/lib/libkyc_runtime.a
-                paths.push(exe_dir.join("../lib/libkyc_runtime.a"));
+                paths.push(exe_dir.join("../lib").join(runtime_lib));
                 // Alongside binary
-                paths.push(exe_dir.join("libkyc_runtime.a"));
+                paths.push(exe_dir.join(runtime_lib));
             }
         }
 
         // 2. Cargo workspace
         if let Some(root) = workspace_root() {
-            paths.push(root.join("target").join("debug").join("libkyc_runtime.a"));
-            paths.push(root.join("target").join("release").join("libkyc_runtime.a"));
+            paths.push(root.join("target").join("debug").join(runtime_lib));
+            paths.push(root.join("target").join("release").join(runtime_lib));
         }
 
         // 3. Current working directory
-        paths.push(PathBuf::from("./target/debug/libkyc_runtime.a"));
-        paths.push(PathBuf::from("./target/release/libkyc_runtime.a"));
-        paths.push(PathBuf::from("./libkyc_runtime.a"));
+        paths.push(PathBuf::from("./target/debug").join(runtime_lib));
+        paths.push(PathBuf::from("./target/release").join(runtime_lib));
+        paths.push(PathBuf::from(runtime_lib));
 
         for p in &paths {
             if p.exists() {
