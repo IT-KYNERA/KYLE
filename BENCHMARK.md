@@ -1,12 +1,22 @@
 # Kyle Benchmark Results
 
-Date: $(date '+%Y-%m-%d')
-Machine: Apple Silicon (M5)
+Date: 2026-07-09
+Machine: Apple Silicon M3 (macOS 26.5, ARM64)
 
-All Kyle benchmarks use `--release` (LLVM O3 pipeline with inline list ops).
-C/Rust use `-O3 -march=native`, Go uses `go build -o`.
+Kyle v0.6.0 — LLVM 18.1 O3 pipeline, inline list ops, struct-path TBAA, llvm.loop metadata
+C: Apple Clang 17 `-O3 -march=native`
+Rust: rustc 1.96.0 `-O`
+Go: go 1.26.4
+C#: .NET 10.0.301
 
 ## Results (average of 5 runs, 3 warmup)
+
+| Benchmark | C | Rust | Go | C# | Java | Python | **Kyle** | vs C |
+|-----------|---|------|----|----|------|--------|----------|------|
+| **Fib 500M** | 115ms | 116ms | 118ms | 245ms | 137ms | — | **179ms** | 1.55x |
+| **Primes 3M** | 7ms | 7ms | 8ms | 23ms | 29ms | 182ms | **20ms** | 2.85x |
+| **Concat 500k** | 7ms | 1ms | 3ms | 20ms | 32ms | 20ms | **9ms** | 1.28x |
+| **Matmul 100×100** | 6ms | 6ms | 13ms | 30ms | 36ms | 1130ms | **6ms** | 1.0x |
 
 | Benchmark | C | Rust | **Kyle** | vs C | 
 |-----------|---|---|----------|------|

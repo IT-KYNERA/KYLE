@@ -823,8 +823,15 @@ impl TypeChecker {
                                     for (i, (arg, param)) in arguments.iter().zip(fdecl.params.iter()).enumerate() {
                                         let has_borrow = matches!(arg, Expr::BorrowRef { mutable: false, .. });
                                         let has_mut_borrow = matches!(arg, Expr::BorrowRef { mutable: true, .. });
+                                        let type_name = match &param.type_ {
+                                            AstType::User { name, .. } | AstType::Primitive { name, .. } => Some(name.as_str()),
+                                            AstType::Array { .. } => Some("__array__"),
+                                            _ => None,
+                                        };
+                                        let is_copy_type = type_name.map_or(false, |n| n != "str" && n != "void" && n != "any" && n != "__array__")
+                                            || matches!(&param.type_, AstType::Array { .. });
                                         match param.mode {
-                                            ParamMode::Borrow if !has_borrow => {
+                                            ParamMode::Borrow if !has_borrow && !is_copy_type => {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
                                                         format!("argument {} to '{}' requires '&' (borrow), got plain value", i + 1, name))
