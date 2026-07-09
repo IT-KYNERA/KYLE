@@ -300,6 +300,10 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                 }
                 MirInst::Store { dest, value } => {
                     let val_id = resolve_value(value, &mut ssa, &stacks, &param_value_ids);
+                    // Track in alloca_current and stacks even for non-promotable allocas,
+                    // so later references to this MIR local find the correct SsaValueId.
+                    alloca_current.insert(*dest, val_id);
+                    stacks.entry(*dest).or_default().push(val_id);
                     ssa_block.insts.push(SsaInst::Store { dest: *dest, value: val_id });
                 }
                 MirInst::Load { dest, src } if promotable.contains(src) => {
@@ -892,7 +896,14 @@ fn resolve_value(
             id
         }
         MirValue::Local(id) => {
-            stacks.get(id).and_then(|s| s.last().copied()).unwrap_or(*id)
+            // For non-promotable locals, create a dummy SsaValue so
+            // SsaValueId is always valid. The codegen's resolve_mir!
+            // falls back to loading from the actual alloca.
+            stacks.get(id).and_then(|s| s.last().copied()).unwrap_or_else(|| {
+                let vid = ssa.values.len();
+                ssa.values.push(SsaValue { type_: MirType::I32, name: format!("_np{}", id) });
+                vid
+            })
         }
         MirValue::Param(id) => {
             param_ids.get(*id).copied().unwrap_or(*id)

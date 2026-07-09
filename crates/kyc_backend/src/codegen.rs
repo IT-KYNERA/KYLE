@@ -473,16 +473,21 @@ impl<'ctx> Codegen<'ctx> {
                         match val {
                             MirValue::Constant(c) => self.constant_to_llvm(c),
                             MirValue::Local(mir_id) => {
-                                // Map MIR local → SsaValueId using block_local_map
                                 if let Some(ssa_id) = func.block_local_map.get(bi).and_then(|m| m.get(mir_id)).copied() {
-                                    // ssa_read! searches block_vals (current + prior blocks by SsaValueId),
-                                    // then const_values, then default zero. This correctly finds the
-                                    // dominating value (e.g. loop header phi from a predecessor block).
                                     ssa_read!(ssa_id)
+                                } else if let Some(&v) = alloca_current.get(mir_id) {
+                                    v
+                                } else if let Some(Some(ptr)) = self.alloca_map.get(*mir_id) {
+                                    // Load from actual alloca as fallback (handles non-promotable)
+                                    if let Some(pointee_type) = self.alloca_types.get(mir_id) {
+                                        self.builder.build_load(*pointee_type, *ptr, "_ssaload")
+                                            .map_err(|e| format!("ssa-load {}: {}", mir_id, e))?
+                                            .as_basic_value_enum()
+                                    } else {
+                                        self.context.i32_type().const_zero().as_basic_value_enum()
+                                    }
                                 } else {
-                                    // Fallback: try alloca_current directly
-                                    alloca_current.get(mir_id).copied()
-                                        .unwrap_or_else(|| self.context.i32_type().const_zero().as_basic_value_enum())
+                                    self.context.i32_type().const_zero().as_basic_value_enum()
                                 }
                             }
                             MirValue::Param(id) => self.param_values.get(id).copied()
