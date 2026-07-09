@@ -1278,6 +1278,32 @@ impl TypeChecker {
             (Type::I32, Type::I64) | (Type::I64, Type::I32) => return true,
             (Type::F32, Type::F64) | (Type::F64, Type::F32) => return true,
             (Type::I8, Type::I16) | (Type::I16, Type::I8) => return true,
+            // Unsigned ↔ signed of same width
+            (Type::U8, Type::I8) | (Type::I8, Type::U8) => return true,
+            (Type::U16, Type::I16) | (Type::I16, Type::U16) => return true,
+            (Type::U32, Type::I32) | (Type::I32, Type::U32) => return true,
+            (Type::U64, Type::I64) | (Type::I64, Type::U64) => return true,
+            // Signed ↔ unsigned wider
+            (Type::U8, Type::I16) | (Type::I16, Type::U8) => return true,
+            (Type::U8, Type::I32) | (Type::I32, Type::U8) => return true,
+            (Type::U8, Type::I64) | (Type::I64, Type::U8) => return true,
+            (Type::U16, Type::I32) | (Type::I32, Type::U16) => return true,
+            (Type::U16, Type::I64) | (Type::I64, Type::U16) => return true,
+            (Type::U32, Type::I64) | (Type::I64, Type::U32) => return true,
+            // Unsigned ↔ wider unsigned
+            (Type::U8, Type::U16) | (Type::U16, Type::U8) => return true,
+            (Type::U8, Type::U32) | (Type::U32, Type::U8) => return true,
+            (Type::U8, Type::U64) | (Type::U64, Type::U8) => return true,
+            (Type::U16, Type::U32) | (Type::U32, Type::U16) => return true,
+            (Type::U16, Type::U64) | (Type::U64, Type::U16) => return true,
+            (Type::U32, Type::U64) | (Type::U64, Type::U32) => return true,
+            // Narrower signed → unsigned (need zero-extend)
+            (Type::I8, Type::U16) | (Type::U16, Type::I8) => return true,
+            (Type::I8, Type::U32) | (Type::U32, Type::I8) => return true,
+            (Type::I8, Type::U64) | (Type::U64, Type::I8) => return true,
+            (Type::I16, Type::U32) | (Type::U32, Type::I16) => return true,
+            (Type::I16, Type::U64) | (Type::U64, Type::I16) => return true,
+            (Type::I32, Type::U64) | (Type::U64, Type::I32) => return true,
             // Empty array [] matches any [T; N] (zero-init)
             (Type::Array(ia, 0), Type::Array(_, _)) |
             (Type::Array(_, _), Type::Array(ia, 0)) if **ia == Type::I32 => return true,

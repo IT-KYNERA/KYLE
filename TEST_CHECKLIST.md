@@ -62,9 +62,9 @@
 | 19 | `x: i16 = 32767` | Signed 16-bit | [x] |
 | 20 | `x: i32 = 2147483647` | Signed 32-bit | [x] |
 | 21 | `x: i64 = 9223372036854775807` | Signed 64-bit | [x] |
-| 22 | `x: u8 = 255` | Unsigned 8-bit | [b] |
-| 23 | `x: u16 = 65535` | Unsigned 16-bit | [b] |
-| 24 | `x: u32 = 4294967295` | Unsigned 32-bit | [b] |
+| 22 | `x: u8 = 255` | Unsigned 8-bit | [x] |
+| 23 | `x: u16 = 65535` | Unsigned 16-bit | [x] |
+| 24 | `x: u32 = 4294967295` | Unsigned 32-bit | [x] |
 | 25 | `x: u64 = 18446744073709551615` | Unsigned 64-bit | [b] |
 
 ### Float types

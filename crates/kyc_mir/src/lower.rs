@@ -3200,10 +3200,10 @@ impl Lowerer {
                     let left_local = ctx.next_local - 1;
                     let to_type = if let Expr::Identifier { name, .. } = right.as_ref() {
                         match name.as_str() {
-                            "i8" => MirType::I8,
-                            "i16" => MirType::I16,
-                            "i32" => MirType::I32,
-                            "i64" => MirType::I64,
+                            "i8" | "u8" => MirType::I8,
+                            "i16" | "u16" => MirType::I16,
+                            "i32" | "u32" => MirType::I32,
+                            "i64" | "u64" => MirType::I64,
                             "f32" => MirType::F32,
                             "f64" => MirType::F64,
                             "bool" => MirType::Bool,
@@ -7275,10 +7275,10 @@ fn extract_struct_inner(name: &str) -> MirType {
 fn extract_inner_type(struct_name: &str) -> MirType {
     if let Some(inner) = struct_name.strip_prefix("Option__") {
         match inner {
-            "i8" => MirType::I8,
-            "i16" => MirType::I16,
-            "i32" => MirType::I32,
-            "i64" => MirType::I64,
+            "i8" | "u8" => MirType::I8,
+            "i16" | "u16" => MirType::I16,
+            "i32" | "u32" => MirType::I32,
+            "i64" | "u64" => MirType::I64,
             "f32" => MirType::F32,
             "f64" => MirType::F64,
             "bool" => MirType::Bool,
@@ -7600,10 +7600,10 @@ fn ast_type_to_mir_with_subst(
         AstType::Primitive { name, .. } => {
             if let Some(t) = subst.get(name) { return t.clone(); }
             match name.as_str() {
-                "i8" => MirType::I8,
-                "i16" => MirType::I16,
-                "i32" => MirType::I32,
-                "i64" => MirType::I64,
+                "i8" | "u8" => MirType::I8,
+                "i16" | "u16" => MirType::I16,
+                "i32" | "u32" => MirType::I32,
+                "i64" | "u64" => MirType::I64,
                 "f32" => MirType::F32,
                 "f64" => MirType::F64,
                 "bool" => MirType::Bool,
@@ -7616,10 +7616,10 @@ fn ast_type_to_mir_with_subst(
         AstType::User { name, .. } => {
             if let Some(t) = subst.get(name) { return t.clone(); }
             match name.as_str() {
-                "i8" => MirType::I8,
-                "i16" => MirType::I16,
-                "i32" => MirType::I32,
-                "i64" => MirType::I64,
+                "i8" | "u8" => MirType::I8,
+                "i16" | "u16" => MirType::I16,
+                "i32" | "u32" => MirType::I32,
+                "i64" | "u64" => MirType::I64,
                 "f32" => MirType::F32,
                 "f64" => MirType::F64,
                 "bool" => MirType::Bool,
@@ -7729,10 +7729,10 @@ fn ast_type_to_mir_with_subst(
 fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap<String, Vec<(String, MirType)>>>) -> MirType {
     match ast {
         AstType::Primitive { name, .. } => match name.as_str() {
-            "i8" => MirType::I8,
-            "i16" => MirType::I16,
-            "i32" => MirType::I32,
-            "i64" => MirType::I64,
+            "i8" | "u8" => MirType::I8,
+            "i16" | "u16" => MirType::I16,
+            "i32" | "u32" => MirType::I32,
+            "i64" | "u64" => MirType::I64,
             "f32" => MirType::F32,
             "f64" => MirType::F64,
             "bool" => MirType::Bool,
@@ -7742,10 +7742,10 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
             _ => MirType::I32,
         },
         AstType::User { name, .. } => match name.as_str() {
-            "i8" => MirType::I8,
-            "i16" => MirType::I16,
-            "i32" => MirType::I32,
-            "i64" => MirType::I64,
+            "i8" | "u8" => MirType::I8,
+            "i16" | "u16" => MirType::I16,
+            "i32" | "u32" => MirType::I32,
+            "i64" | "u64" => MirType::I64,
             "f32" => MirType::F32,
             "f64" => MirType::F64,
             "bool" => MirType::Bool,
