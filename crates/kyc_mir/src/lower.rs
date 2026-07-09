@@ -442,6 +442,11 @@ impl Lowerer {
                     ev.insert(e.name.clone(), variant_map);
                 }
             }
+            // Register built-in Result enum (used by ok(v)/error(e) patterns)
+            let mut result_variants = std::collections::HashMap::new();
+            result_variants.insert("Ok".to_string(), 0);
+            result_variants.insert("Err".to_string(), 1);
+            ev.insert("Result".to_string(), result_variants);
         }
 
         // Pre-scan function declarations and class constructors to build a return-type map.
@@ -2131,12 +2136,6 @@ impl Lowerer {
                             }
                         }
                         Pattern::EnumVariant { enum_name, variant, args, .. } => {
-                            // Special case: ok(v)/error(e) for Result patterns — treat as wildcard
-                            if enum_name == "Result" {
-                                ctx.finish_block(MirTerminator::Br(arm_label.clone()));
-                                ctx.current_block = MirBasicBlock::new(arm_label.clone());
-                                return ctx;
-                            }
                             // Look up variant index from enum_variants map
                             let ev_map = self.enum_variants.borrow();
                             let variant_idx = ev_map.get(enum_name)
@@ -2144,10 +2143,13 @@ impl Lowerer {
                                 .copied()
                                 .unwrap_or(0);
 
-                            let struct_type = MirType::Struct(enum_name.clone(), vec![
-                                ("disc".to_string(), MirType::I32),
-                                ("payload".to_string(), MirType::I64),
-                            ]);
+                            let struct_type = MirType::Struct(
+                                if enum_name == "Result" { "__result".to_string() } else { enum_name.clone() },
+                                vec![
+                                    ("disc".to_string(), MirType::I32),
+                                    ("payload".to_string(), MirType::I64),
+                                ],
+                            );
 
                             // Load discriminant from match value
                             let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::Ptr(Box::new(MirType::I32)));
@@ -5041,11 +5043,21 @@ impl Lowerer {
                 // Special case: ok(val) — construct success result struct
                 if name == "ok" && arguments.len() == 1 {
                     let arg_val = &args[0];
-                    // disc = 0 (success)
+                    // Allocate temps FIRST, struct LAST so the result local is the struct
                     let disc_ptr = ctx.alloc_local("_odp", MirType::I32);
+                    let payload_val = ctx.alloc_local("_opv", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: payload_val,
+                        value: arg_val.clone(),
+                        to_type: MirType::I64,
+                    });
+                    let payload_ptr = ctx.alloc_local("_opp", MirType::I64);
+                    // Allocate struct LAST
+                    let result_local = ctx.alloc_local("_okres", call_type.clone());
+                    // disc = 0 (success)
                     ctx.current_block.insts.push(MirInst::FieldPtr {
                         dest: disc_ptr,
-                        ptr: dest,
+                        ptr: result_local,
                         field_index: 0,
                         struct_type: Box::new(call_type.clone()),
                     });
@@ -5054,18 +5066,11 @@ impl Lowerer {
                         value: MirValue::Constant(MirConstant::I32(0)),
                     });
                     // payload = value (extended to i64)
-                    let payload_val = ctx.alloc_local("_opv", MirType::I64);
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest: payload_val,
-                        value: arg_val.clone(),
-                        to_type: MirType::I64,
-                    });
-                    let payload_ptr = ctx.alloc_local("_opp", MirType::I64);
                     ctx.current_block.insts.push(MirInst::FieldPtr {
                         dest: payload_ptr,
-                        ptr: dest,
+                        ptr: result_local,
                         field_index: 1,
-                        struct_type: Box::new(call_type),
+                        struct_type: Box::new(call_type.clone()),
                     });
                     ctx.current_block.insts.push(MirInst::Store {
                         dest: payload_ptr,
@@ -5077,11 +5082,20 @@ impl Lowerer {
                 // Special case: error(msg) — construct error result struct
                 if name == "error" && arguments.len() == 1 {
                     let arg_val = &args[0];
-                    // disc = 1 (error)
+                    // Allocate temps FIRST, struct LAST
                     let disc_ptr = ctx.alloc_local("_edp", MirType::I32);
+                    let payload_val = ctx.alloc_local("_epv", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: payload_val,
+                        value: arg_val.clone(),
+                        to_type: MirType::I64,
+                    });
+                    let payload_ptr = ctx.alloc_local("_epp", MirType::I64);
+                    let result_local = ctx.alloc_local("_erres", call_type.clone());
+                    // disc = 1 (error)
                     ctx.current_block.insts.push(MirInst::FieldPtr {
                         dest: disc_ptr,
-                        ptr: dest,
+                        ptr: result_local,
                         field_index: 0,
                         struct_type: Box::new(call_type.clone()),
                     });
@@ -5090,18 +5104,11 @@ impl Lowerer {
                         value: MirValue::Constant(MirConstant::I32(1)),
                     });
                     // payload = argument (cast to i64 if possible)
-                    let payload_val = ctx.alloc_local("_epv", MirType::I64);
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest: payload_val,
-                        value: arg_val.clone(),
-                        to_type: MirType::I64,
-                    });
-                    let payload_ptr = ctx.alloc_local("_epp", MirType::I64);
                     ctx.current_block.insts.push(MirInst::FieldPtr {
                         dest: payload_ptr,
-                        ptr: dest,
+                        ptr: result_local,
                         field_index: 1,
-                        struct_type: Box::new(call_type),
+                        struct_type: Box::new(call_type.clone()),
                     });
                     ctx.current_block.insts.push(MirInst::Store {
                         dest: payload_ptr,
@@ -6728,33 +6735,18 @@ impl Lowerer {
                             }
                         }
                         Pattern::EnumVariant { enum_name, variant, args, .. } => {
-                            if enum_name == "Result" {
-                                for stmt in &arm.body.statements {
-                                    ctx = self.lower_stmt(ctx, stmt);
-                                }
-                                let last_val = ctx.next_local - 1;
-                                let last_type = ctx.local_types.get(&last_val).cloned().unwrap_or(MirType::I64);
-                                arm_types.push(last_type.clone());
-                                ctx.local_types.insert(result_local, last_type);
-                                ctx.current_block.insts.push(MirInst::Store {
-                                    dest: result_local,
-                                    value: MirValue::Local(last_val),
-                                });
-                                ctx.finish_block(MirTerminator::Br(merge_block.clone()));
-                                if !is_last {
-                                    ctx.current_block = MirBasicBlock::new(next_target);
-                                }
-                                continue;
-                            }
                             let ev_map = self.enum_variants.borrow();
                             let variant_idx = ev_map.get(enum_name)
                                 .and_then(|m| m.get(variant))
                                 .copied()
                                 .unwrap_or(0);
-                            let struct_type = MirType::Struct(enum_name.clone(), vec![
-                                ("disc".to_string(), MirType::I32),
-                                ("payload".to_string(), MirType::I64),
-                            ]);
+                            let struct_type = MirType::Struct(
+                                if enum_name == "Result" { "__result".to_string() } else { enum_name.clone() },
+                                vec![
+                                    ("disc".to_string(), MirType::I32),
+                                    ("payload".to_string(), MirType::I64),
+                                ],
+                            );
                             let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::Ptr(Box::new(MirType::I32)));
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: disc_ptr,

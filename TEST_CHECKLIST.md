@@ -177,7 +177,7 @@
 | 64 | `fn div(a,b) i32!:` | Fallible return | [x] |
 | 65 | `return error("msg")` | Error return | [x] |
 | 66 | `ok(val)` | Success return | [x] |
-| 67 | `match res: ok(v): ... error(e): ...` | Pattern match result | [ ] |
+| 67 | `match res: ok(v): ... error(e): ...` | Pattern match result | [x] |
 
 ---
 
