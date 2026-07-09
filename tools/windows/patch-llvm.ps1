@@ -159,7 +159,7 @@ if /i "%~1"=="--cflags"        echo -I%PREFIX_FWD%/include & goto :eof
 if /i "%~1"=="--cxxflags"      echo -I%PREFIX_FWD%/include & goto :eof
 if /i "%~1"=="--ldflags"       echo -LIBPATH:%PREFIX_FWD%/lib & goto :eof
 if /i "%~1"=="--libs"          echo -lLLVM-C & goto :eof
-if /i "%~1"=="--libnames"      echo LLVM-C & goto :eof
+if /i "%~1"=="--libnames"      echo LLVM-C.lib & goto :eof
 if /i "%~1"=="--libfiles"      echo %PREFIX_FWD%/lib/LLVM-C.lib & goto :eof
 if /i "%~1"=="--components"    echo all & goto :eof
 if /i "%~1"=="--shared-mode"   echo shared & goto :eof
@@ -214,7 +214,7 @@ class LlvmConfig {
         if (a == "--cxxflags")       { Console.WriteLine("-I" + fwd + "/include"); return 0; }
         if (a == "--ldflags")        { Console.WriteLine("-LIBPATH:" + fwd + "/lib"); return 0; }
         if (a == "--libs")           { Console.WriteLine("-lLLVM-C"); return 0; }
-        if (a == "--libnames")       { Console.WriteLine("LLVM-C"); return 0; }
+        if (a == "--libnames")       { Console.WriteLine("LLVM-C.lib"); return 0; }
         if (a == "--libfiles")       { Console.WriteLine(fwd + "/lib/LLVM-C.lib"); return 0; }
         if (a == "--components")     { Console.WriteLine("all"); return 0; }
         if (a == "--shared-mode")    { Console.WriteLine("shared"); return 0; }
