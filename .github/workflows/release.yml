@@ -118,24 +118,40 @@ jobs:
         shell: pwsh
         run: |
           # Download full clang+llvm tarball (936 MB) — includes headers, libs, and tools.
-          # The smaller LLVM-18.1.8-win64.exe only has the DLL, not the dev headers.
           $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-pc-windows-msvc.tar.xz"
           $out = "$env:TEMP\llvm-18.tar.xz"
           $dest = "$env:LLVM_SYS_181_PREFIX"
-          Write-Host "Downloading LLVM 18 (936 MB, may take ~2 min)..."
+          Write-Host "Downloading LLVM 18 (936 MB)..."
           Invoke-WebRequest -Uri $url -OutFile $out
           Write-Host "Extracting LLVM 18 to $dest..."
-          $extractDir = "$env:TEMP\llvm-extract"
-          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-          & "C:\Program Files\7-Zip\7z.exe" x $out -o"$extractDir" -y
-          if ($LASTEXITCODE -ne 0) { Write-Error "7z extraction failed"; exit 1 }
-          # The tarball contains a top-level clang+llvm-18.1.8-x86_64-pc-windows-msvc/ dir
-          $topDir = Get-ChildItem $extractDir -Directory | Select-Object -First 1
-          if (-not $topDir) { Write-Error "Expected top-level directory in tarball not found"; exit 1 }
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Get-ChildItem $topDir.FullName | Move-Item -Destination $dest -Force
-          Remove-Item -Recurse $extractDir -Force -ErrorAction SilentlyContinue
+
+          # 7z on Windows extracts .tar.xz in 2 steps: .xz -> .tar, then .tar -> files
+          $tmpDir = "$env:TEMP\llvm-extract"
+          New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+
+          # Step 1: decompress .xz -> .tar
+          & "C:\Program Files\7-Zip\7z.exe" x $out -o"$tmpDir" -y
+          if ($LASTEXITCODE -ne 0) { Write-Error "7z xz decompress failed"; exit 1 }
+
+          # Step 2: unpack .tar -> files
+          $tarFile = Get-ChildItem "$tmpDir\*.tar" | Select-Object -First 1
+          if (-not $tarFile) { Write-Error "No .tar file found after xz decompress"; Get-ChildItem $tmpDir; exit 1 }
+          & "C:\Program Files\7-Zip\7z.exe" x $tarFile.FullName -o"$dest" -y
+          if ($LASTEXITCODE -ne 0) { Write-Error "7z tar unpack failed"; exit 1 }
+
+          # The tarball wraps everything in a top-level clang+llvm-.../ directory.
+          # Move its contents up one level to $dest directly.
+          $topDir = Get-ChildItem $dest -Directory | Select-Object -First 1
+          if ($topDir) {
+            Get-ChildItem $topDir.FullName | Move-Item -Destination $dest -Force
+            Remove-Item $topDir.FullName -Recurse -Force
+          }
+
+          # Cleanup
+          Remove-Item -Recurse $tmpDir -Force -ErrorAction SilentlyContinue
           Remove-Item $out -Force
+          Remove-Item $tarFile.FullName -Force -ErrorAction SilentlyContinue
+
           # Verify dev headers exist
           if (-not (Test-Path "$dest\include\llvm-c\Core.h")) {
             Write-Error "LLVM headers not found after extraction"
