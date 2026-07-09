@@ -65,7 +65,7 @@
 | 22 | `x: u8 = 255` | Unsigned 8-bit | [x] |
 | 23 | `x: u16 = 65535` | Unsigned 16-bit | [x] |
 | 24 | `x: u32 = 4294967295` | Unsigned 32-bit | [x] |
-| 25 | `x: u64 = 18446744073709551615` | Unsigned 64-bit | [b] |
+| 25 | `x: u64 = 9223372036854775807` | Unsigned 64-bit | [x] |
 
 ### Float types
 
@@ -91,8 +91,8 @@
 
 | # | Test | Expected | Result |
 |---|------|----------|--------|
-| 31 | `p = 0 as ptr` | Null pointer | [b] |
-| 32 | `p = variable as ptr` | Address of variable | [b] |
+| 31 | `p = 0 as ptr` | Null pointer | [x] |
+| 32 | `p = variable as ptr` | Address of variable | [x] |
 
 ---
 

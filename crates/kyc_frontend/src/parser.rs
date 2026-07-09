@@ -1079,7 +1079,10 @@ impl Parser {
                 } else if let Some(oct) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
                     i64::from_str_radix(oct, 8).unwrap_or(0)
                 } else {
-                    s.parse::<i64>().unwrap_or(0)
+                    // Try i64 first, fall back to u64 → two's complement i64
+                    s.parse::<i64>().unwrap_or_else(|_| {
+                        s.parse::<u64>().map(|u| u as i64).unwrap_or(0)
+                    })
                 };
                 self.advance();
                 Expr::Literal { value: Literal::Integer(val), span: self.span_from(start) }
@@ -1853,7 +1856,9 @@ impl Parser {
         }
         let lit = match &self.current()?.kind {
             TokenKind::Integer(s) => {
-                let n: i64 = s.parse().unwrap_or(0);
+                let n: i64 = s.parse().unwrap_or_else(|_| {
+                    s.parse::<u64>().map(|u| u as i64).unwrap_or(0)
+                });
                 Literal::Integer(n)
             }
             TokenKind::Float(s) => {
