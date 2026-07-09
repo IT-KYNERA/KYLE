@@ -65,6 +65,10 @@ for val in arr:
 for val in &arr:
  println(val)
 
+# Array — itera por mut borrow (modificar elementos)
+for val in ^&arr:
+ val = val * 2
+
 # Inclusive range
 for i in 0..=5:
  println(i)

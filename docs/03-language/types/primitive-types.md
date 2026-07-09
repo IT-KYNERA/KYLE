@@ -60,13 +60,19 @@ p = 0 as ptr # ptr
 ### Array: `[T; N]` [x]
 
 Stack array, size fijo en compile-time. GEP directo, cero runtime calls.
+Soporta multidimensional via anidamiento `[[T; N]; M]`.
 
 ```ky
+# Unidimensional
 a = [1, 2, 3] # → [i32; 3]
 b = [0; 100] # → [i32; 100], repetido
 c = [1 as i64; 10000] # → [i64; 10000]
 first = a[0] # GEP + load
 a[0] = 99 # GEP + store
+
+# Multidimensional: [[T; N]; M]
+matriz: [[i32; 4]; 3] = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
+x = matriz[1][2] # → 7
 ```
 
 ### List: `{T}` [x]

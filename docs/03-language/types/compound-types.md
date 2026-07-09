@@ -7,6 +7,8 @@
 Array nativo en stack, tamaño fijo en compile-time.
 **Los arrays trabajan por índice** — acceso directo y óptimo vía GEP.
 
+### Unidimensional
+
 ```ky
 arr: [i32; 3] = [1, 2, 3]
 arr = [0; 100]    # repetir valor
@@ -15,6 +17,37 @@ arr[0] = 99       # set por índice (GEP + store)
 
 for i in 0..arr.len():
     println(arr[i].to_str())
+```
+
+### Multidimensional
+
+Sintaxis `[T; N]` anidada para arrays de 2+ dimensiones:
+
+```ky
+# 2D: matriz 3×4
+matriz: [[i32; 4]; 3] = [
+    [1, 2, 3, 4],
+    [5, 6, 7, 8],
+    [9, 10, 11, 12]
+]
+x = matriz[1][2]  # → 7
+
+# 3D: cubo 2×3×2
+cubo: [[[i32; 2]; 3]; 2] = [
+    [[1, 2], [3, 4], [5, 6]],
+    [[7, 8], [9, 10], [11, 12]]
+]
+y = cubo[1][2][0]  # → 11
+```
+
+### Pasaje por borrow vs mutable borrow
+
+```ky
+fn fn_borrow(arr: &[100]i32):     # solo lectura
+    println(arr[0].to_str())
+
+fn fn_mut(arr: ^&[100]i32):       # permite modificar
+    arr[0] = 99
 ```
 
 ## List: `{T}`
