@@ -401,22 +401,31 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                         })
                         .collect();
                     let dest_val = *dest;
-                        let new_dest = dest_val.map(|d| {
-                            let id = ssa.values.len();
-                            let call_type = func.basic_blocks.iter()
-                                .flat_map(|b| b.insts.iter())
-                                .find_map(|inst| {
-                                    if let MirInst::Call { dest: Some(dd), .. } = inst {
-                                        if *dd == d { Some(MirType::I64) } else { None }
-                                    } else { None }
-                                })
-                                .unwrap_or(MirType::I64);
-                            ssa.values.push(SsaValue { type_: call_type, name: format!("_c{}", d) });
-                            alloca_current.insert(d, id);
-                            stacks.entry(d).or_default().push(id);
-                            id
-                        });
+                    let new_dest = dest_val.map(|d| {
+                        let id = ssa.values.len();
+                        let call_type = func.basic_blocks.iter()
+                            .flat_map(|b| b.insts.iter())
+                            .find_map(|inst| {
+                                if let MirInst::Call { dest: Some(dd), .. } = inst {
+                                    if *dd == d { Some(MirType::I64) } else { None }
+                                } else { None }
+                            })
+                            .unwrap_or(MirType::I64);
+                        ssa.values.push(SsaValue { type_: call_type, name: format!("_c{}", d) });
+                        alloca_current.insert(d, id);
+                        stacks.entry(d).or_default().push(id);
+                        id
+                    });
                     ssa_block.insts.push(SsaInst::Call { dest: new_dest, name: name.clone(), args: arg_ids });
+                    // Emit Store for non-promotable call dests AFTER the Call instruction,
+                    // so codegen processes the Store after the Call has set block_vals.
+                    if let Some(d) = dest_val {
+                        if !promotable.contains(&d) {
+                            if let Some(nid) = new_dest {
+                                ssa_block.insts.push(SsaInst::Store { dest: d, value: nid });
+                            }
+                        }
+                    }
                 }
                 MirInst::Cast { dest, value, to_type } => {
                     let val_id = resolve_value(value, &mut ssa, &stacks, &param_value_ids);

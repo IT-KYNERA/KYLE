@@ -373,10 +373,7 @@ impl Pipeline {
         let mut codegen = Codegen::new(&context, "ky_module");
         // SSA codegen disabled — bugs with ptr/str propagation (null values)
         // Will be re-enabled after proper fix to resolve_mir! and Store tracking.
-        // SSA codegen disabled — bugs with ptr/str propagation (null values)
-        // and match expression terminator issues.
-        // See crates/kyc_mir/src/ssa.rs and crates/kyc_backend/src/codegen.rs
-        codegen.compile(&mir.module)?;
+        codegen.compile_with_ssa(&mir.module)?;
 
         // Ensure artifact directory exists
         std::fs::create_dir_all(artifact_dir)

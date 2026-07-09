@@ -509,6 +509,11 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("sfst2: {}", e))?;
                                 }
                              } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                let val = if let Some(dest_type) = self.alloca_types.get(dest) {
+                                    if val.get_type() != *dest_type {
+                                        self.ssa_cast(val, dest_type).unwrap_or(val)
+                                    } else { val }
+                                } else { val };
                                 self.builder.build_store(ptr, val)
                                     .map_err(|e| format!("ssast: {}", e))?;
                                 // Also track in block_vals so ssa_read! can find it for Call args
@@ -881,26 +886,27 @@ impl<'ctx> Codegen<'ctx> {
                     for &(val_id, ref pred_label) in &phi.incomings {
                         if let Some(pred_bb) = block_map.get(pred_label).copied() {
                             if let Some(pred_bi) = func.blocks.iter().position(|b| &b.label == pred_label) {
-                                let val = block_vals[pred_bi].get(&val_id).copied()
-                                    .or_else(|| {
-                                        func.const_values.get(&val_id)
-                                            .map(|c| self.constant_to_llvm(c))
-                                    })
-                                    .unwrap_or_else(|| {
-                                        // Fallback: zero-initialize the phi type
-                                        let phi_type = self.llvm_type(&phi.type_);
-                                        match phi_type {
-                                            BasicTypeEnum::IntType(it) => it.const_zero().as_basic_value_enum(),
-                                            BasicTypeEnum::FloatType(ft) => ft.const_zero().as_basic_value_enum(),
-                                            _ => self.context.i32_type().const_zero().as_basic_value_enum(),
-                                        }
-                                    });
-                                // Auto-cast phi incoming to match phi type (e.g. i32 literal → i64 phi)
-                                let phi_type = self.llvm_type(&phi.type_);
-                                let val = if val.get_type() != phi_type {
-                                    self.ssa_cast(val, &phi_type).unwrap_or(val)
-                                } else { val };
-                                incomings.push((val, pred_bb));
+                                 let mut val = block_vals[pred_bi].get(&val_id).copied()
+                                     .or_else(|| {
+                                         func.const_values.get(&val_id)
+                                             .map(|c| self.constant_to_llvm(c))
+                                     })
+                                     .unwrap_or_else(|| {
+                                         let phi_type = self.llvm_type(&phi.type_);
+                                         match phi_type {
+                                             BasicTypeEnum::IntType(it) => it.const_zero().as_basic_value_enum(),
+                                             BasicTypeEnum::FloatType(ft) => ft.const_zero().as_basic_value_enum(),
+                                             _ => self.context.i32_type().const_zero().as_basic_value_enum(),
+                                         }
+                                     });
+                                 let phi_type = self.llvm_type(&phi.type_);
+                                 if val.get_type() != phi_type {
+                                     if let Some(term) = pred_bb.get_terminator() {
+                                         self.builder.position_before(&term);
+                                     }
+                                     val = self.ssa_cast(val, &phi_type).unwrap_or(val);
+                                 }
+                                 incomings.push((val, pred_bb));
                             }
                         }
                     }
