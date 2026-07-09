@@ -122,6 +122,9 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
+# Re-sign ad-hoc: macOS kills CI-built binaries with invalid code signature
+codesign -f -s - ky 2>/dev/null || true
+
 chmod +x ky
 
 # ─── Install ─────────────────────────────────────────────────

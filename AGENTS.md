@@ -321,11 +321,12 @@ gh release create v0.X.X \
 "
 ```
 
-**The CI workflow (`.github/workflows/release.yml`) builds and uploads 4 bundles automatically:**
+**The CI workflow (`.github/workflows/release.yml`) builds and uploads 5 bundles automatically:**
 
 | Bundle | Platform | CI Runner |
 |--------|----------|-----------|
 | `ky-macos-arm64.tar.gz` | macOS Apple Silicon | `macos-latest` |
+| `ky-macos-x64.tar.gz` | macOS Intel | `macos-13` |
 | `ky-linux-arm64.tar.gz` | Linux ARM64 | `ubuntu-24.04-arm` |
 | `ky-linux-x64.tar.gz` | Linux x86_64 | `ubuntu-24.04` |
 | `ky-windows-x64.zip` | Windows x86_64 | `windows-2025` |
@@ -347,7 +348,7 @@ git push origin v0.X.X
 
 This triggers `.github/workflows/release.yml` which:
 1. Creates the release in GitHub
-2. Compiles `ky` + `kyc_runtime` for all 4 platforms in parallel
+2. Compiles `ky` + `kyc_runtime` for all 5 platforms in parallel
 3. Generates flat bundles + SHA-256 checksums
 4. Uploads assets to the release
 
@@ -503,7 +504,7 @@ Only `kyc_runtime` (pure Rust) can be freely cross-compiled.
 | Different OS | ❌ Needs CI runner | ✅ Cross-compile with `cargo-zigbuild` |
 
 **Recommended workflow:**
-1. Push tag → CI builds all 4 platforms natively (`.github/workflows/release.yml`)
+1. Push tag → CI builds all 5 platforms natively (`.github/workflows/release.yml`)
 2. OR build locally for host platform, use CI for the rest
 
 ### Known issues per platform
@@ -519,7 +520,7 @@ Only `kyc_runtime` (pure Rust) can be freely cross-compiled.
 
 ### Distribution model
 
-Each release publishes 4 platform-specific bundles (flat archives with `ky` + `libkyc_runtime.a` + `LICENSE`):
+Each release publishes 5 platform-specific bundles (flat archives with `ky` + `libkyc_runtime.a` + `LICENSE`):
 
 | Platform | Install command |
 |----------|----------------|
