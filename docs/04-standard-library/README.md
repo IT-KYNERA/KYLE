@@ -7,7 +7,6 @@
 | Module | Import | Description |
 |--------|--------|-------------|
 | `core` | `option`, `result` | `option<T>`, `result<T>` with methods |
-| `collections` | `list`, `set`, `iter` | Dynamic lists, sets, iterators |
 | `strings` | `str`, `str_builder` | String utilities, builder |
 | `io` | `print`, `println`, `input` | Console I/O |
 | `fs` | `file` | File operations |

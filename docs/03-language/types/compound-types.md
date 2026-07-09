@@ -62,7 +62,8 @@ val: i32 = d["key"]
 
 ## See also
 
+- `collections.md` — API completa con ejemplos de ownership, for loops, modificar durante iteración
 - `primitive-types.md` — Tipos primitivos
 - `structs.md` — Tipos usuario (class)
 - `generics.md` — Tipos genéricos
-- `variables.md` — Ownership con ejemplos de listas
+- `ownership.md` — Reglas de ownership
