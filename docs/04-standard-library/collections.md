@@ -1,162 +1,300 @@
-# collections — Lists, Sets, Iterators
+# Collections — Lists, Arrays, Sets, Iterators
 
-> Dynamic collections: lists, sets, iterators.
+> All collection types in Kyle: dynamic lists, fixed arrays, hash sets, and lazy iterators.
+> Every example includes ownership semantics (`&` borrow, `^&` mutable borrow, move).
+
+---
 
 ## List `{T}`
 
-Lista dinámica en heap. **Las listas trabajan por valor** — búsqueda, inserción y eliminación son por valor, no por índice. Si necesitas acceso por índice, usa arrays `[T; N]`.
+Lista dinámica en heap. **Trabaja por valor:** las operaciones buscan, agregan y eliminan por valor, no por posición. Si necesitas acceso por índice, usa arrays.
+
+### Creación
 
 ```ky
-libros: {str} = {}
+vacia: {i32} = {0}; vacia.pop()   # inicializar y vaciar
+nums: {i32} = {1, 2, 3}           # con valores
+nums.push(4)                       # → {1, 2, 3, 4}
+```
+
+### Iteración (`for`)
+
+Kyle tiene tres modos de iterar, cada uno con distintas semánticas de ownership:
+
+```ky
+libros: {str} = {0 as i64}; libros.pop()
 libros.push("El Quijote")
-libros.push("Cien Años de Soledad")
 libros.push("Rayuela")
+libros.push("Cien Años")
 
-# Iterar por valor
+# 1. ITERAR POR VALOR (move) — consume la lista
+for libro in libros:
+    println(libro)       # cada string se mueve a 'libro'
+    # 'libro' se libera al final de cada iteración
+# libros ya NO es accesible (move)
+
+# 2. ITERAR POR BORROW (inmutable) — solo lectura
 for libro in &libros:
-    println(libro)
+    println(libro)       # prestado, no consumido
+# libros sigue siendo accesible
 
-# Buscar por valor
-if libros.contains("Rayuela"):
+# 3. ITERAR POR MUT BORROW — para modificar elementos
+for libro in ^&libros:
+    # libro es ^&str — puedes mutarlo
+    if libro.contains("Quijote"):
+        libro.remove("Quijote")
+        libro.push("Quijote de la Mancha")
+```
+
+### Modificar durante la iteración
+
+Para modificar (agregar, eliminar, reemplazar) mientras recorres, usa un bucle `while` con índice:
+
+```ky
+fn limpiar_nombres(nombres: ^&{str}, suffix: str):
+    i = 0
+    while i < nombres.len():
+        nombre = nombres.get(i)
+        if nombre.endswith(suffix):
+            nombres.remove_at(i)   # eliminar este, no avanzar
+        else:
+            i = i + 1              # solo avanzar si no eliminamos
+
+fn duplicar_pares(numeros: ^&{i32}):
+    i = 0
+    while i < numeros.len():
+        val = numeros.get(i)
+        if val % 2 == 0:
+            numeros.set(i, val * 2)
+        i = i + 1
+```
+
+### Búsqueda por valor
+
+```ky
+fn encontrar_por_titulo(biblioteca: &{str}, titulo: str) bool:
+    for libro in &biblioteca:
+        if libro == titulo:
+            return true
+    false
+
+# O directamente:
+if biblioteca.contains(titulo):
     println("encontrado")
-
-# Eliminar por valor (primera ocurrencia)
-libros.remove("Cien Años de Soledad")
-
-# Eliminar por índice (solo cuando sabes la posición exacta)
-libros.remove_at(0)
-
-# Obtener y sacar del final (stack LIFO)
-ultimo = libros.pop()
 ```
 
-### Métodos
-
-| Método | Firma | Descripción |
-|--------|-------|-------------|
-| `push` | `fn(val: T)` | Agregar al final |
-| `pop` | `fn() T` | Sacar del final (LIFO) |
-| `pop_first` | `fn() T` | Sacar del inicio (FIFO) |
-| `len` | `fn() i64` | Cantidad de elementos |
-| `get` | `fn(idx: i64) T` | Obtener por índice (para compatibilidad) |
-| `set` | `fn(idx: i64, val: T)` | Asignar por índice (para compatibilidad) |
-| `contains` | `fn(val: T) bool` | `true` si el valor existe |
-| `remove` | `fn(val: T) i32` | Eliminar por valor (1=encontrado, 0=no) |
-| `remove_at` | `fn(idx: i64) T` | Eliminar por índice |
-| `insert` | `fn(idx: i64, val: T)` | Insertar en posición |
-| `clear` | `fn()` | Vaciar la lista |
-| `reserve` | `fn(capacity: i64)` | Pre-asignar capacidad |
-| `reverse` | `fn()` | Invertir orden |
-
-### Ejemplos con ownership
+### Eliminar por valor
 
 ```ky
-# Lista mutable (necesita ^& para mutar)
-fn agregar_libro(catalogo: ^&{str}, libro: str):
-    catalogo.push(libro)
-
-fn buscar_libro(catalogo: &{str}, titulo: str) bool:
-    catalogo.contains(titulo)   # borrow inmutable, no consume
-
-fn main():
-    mis_libros: ^_{str} = {}
-    mis_libros.push("El Quijote")
-    
-    agregar_libro(^&mis_libros, "Rayuela")
-    
-    if buscar_libro(&mis_libros, "Rayuela"):
-        println("lo tengo")
-    
-    # Eliminar por valor
-    mis_libros.remove("El Quijote")
+fn eliminar_ceros(nums: ^&{i32}):
+    nums.remove(0)      # elimina el primer 0 que encuentra
+    # Para eliminar TODOS los ceros:
+    while nums.contains(0):
+        nums.remove(0)
 ```
 
-### Stack (LIFO) via list
+### Ownership — Resumen
+
+| Operación | Firma | Ownership |
+|-----------|-------|-----------|
+| `list.push(val)` | `(^&{T}, T)` | Borrow mutable + move del valor |
+| `list.pop()` | `(^&{T}) T` | Borrow mutable, retorna valor movido |
+| `list.get(i)` | `(&{T}, i64) T` | Borrow inmutable |
+| `list.set(i, val)` | `(^&{T}, i64, T)` | Borrow mutable |
+| `list.contains(val)` | `(&{T}, T) bool` | Borrow inmutable |
+| `list.remove(val)` | `(^&{T}, T) i32` | Borrow mutable |
+| `for x in list` | — | **Move** (consume la lista) |
+| `for x in &list` | — | **Borrow** (no consume) |
+| `for x in ^&list` | — | **Mut borrow** (puedes mutar) |
+
+### Stack (LIFO) vía list
 
 ```ky
-pila: {i32} = {}
-pila.push(10)
-pila.push(20)
-valor = pila.pop()  # → 20
+pila: {i32} = {0}; pila.pop()
+pila.push(10); pila.push(20); pila.push(30)
+valor = pila.pop()  # → 30
 ```
 
-### Queue (FIFO) via list
+### Queue (FIFO) vía list
 
 ```ky
-cola: {i32} = {}
-cola.push(10)
-cola.push(20)
+cola: {i32} = {0}; cola.pop()
+cola.push(10); cola.push(20)
 valor = cola.pop_first()  # → 10
 ```
 
-### Búsqueda y eliminación por valor
+### Métodos completo
 
-```ky
-fn eliminar_usuario(usuarios: ^&{str}, nombre: str):
-    if usuarios.contains(nombre):
-        usuarios.remove(nombre)
-        println("eliminado")
-    else:
-        println("no encontrado")
-```
+| Método | Firma | Descripción | Ownership |
+|--------|-------|-------------|-----------|
+| `push` | `fn(val: T)` | Agregar al final | `^&` + move |
+| `pop` | `fn() T` | Sacar del final (LIFO) | `^&` |
+| `pop_first` | `fn() T` | Sacar del inicio (FIFO) | `^&` |
+| `len` | `fn() i64` | Cantidad de elementos | `&` |
+| `get` | `fn(idx: i64) T` | Obtener por índice | `&` |
+| `set` | `fn(idx: i64, val: T)` | Asignar por índice | `^&` |
+| `contains` | `fn(val: T) bool` | `true` si el valor existe | `&` |
+| `remove` | `fn(val: T) i32` | Eliminar por valor (1=encontrado) | `^&` |
+| `remove_at` | `fn(idx: i64) T` | Eliminar por índice | `^&` |
+| `insert` | `fn(idx: i64, val: T)` | Insertar en posición | `^&` |
+| `clear` | `fn()` | Vaciar la lista | `^&` |
+| `reserve` | `fn(capacity: i64)` | Pre-asignar capacidad | `^&` |
+| `reverse` | `fn()` | Invertir orden | `^&` |
+
+---
 
 ## Array `[T; N]`
 
-Array nativo en stack. **Acceso por índice únicamente** — para eso están los arrays, son más rápidos y contiguos.
+Array nativo en **stack**. Tamaño fijo en compile-time.
+**Acceso por índice únicamente** — es más rápido y contiguo que una lista.
 
 ```ky
+# Declaración
 arr: [5]i32 = [1, 2, 3, 4, 5]
-x = arr[2]      # get por índice (O(1))
-arr[2] = 99     # set por índice (O(1))
+repetido: [100]i32 = [0; 100]   # 100 ceros
+
+# Lectura/escritura por índice (O(1), GEP directo)
+x = arr[2]      # load
+arr[2] = 99     # store
+
+# Longitud
+n = arr.len()   # → 5
+
+# Iterar
+for i in 0..arr.len():
+    println(arr[i].to_str())
+
+# Los arrays se copian por valor (stack)
+arr2 = arr          # COPIA (no move)
+arr[0] = 0          # no afecta a arr2
+
+# Para evitar copia, usa borrow
+fn sumar(arr: &[100]i32) i64:
+    total = 0
+    for i in 0..arr.len():
+        total = total + arr[i]
+    total
 ```
 
+### Ownership
+
+| Operación | Ownership |
+|-----------|-----------|
+| `arr[i]` | Borrow inmutable (`&`) |
+| `arr[i] = val` | Borrow mutable (`^&`) |
+| `y = arr` | **Copia** (stack, no move) |
+| `fn f(a: [100]i32)` | Copia (pasaje por valor) |
+| `fn f(a: &[100]i32)` | Borrow (sin copia) |
+
+### Cuándo usar lista vs array
+
+| Criterio | Lista `{T}` | Array `[T; N]` |
+|----------|-------------|----------------|
+| Tamaño | Dinámico (crece/decrece) | Fijo (compile-time) |
+| Memoria | Heap | Stack |
+| Acceso | Por valor (contains, remove) | Por índice (`arr[i]`) |
+| Performance | O(1) amortizado push/pop | O(1) GEP directo |
+| Iteración | `for x in &list` | `for i in 0..n` |
+| Copia | Move por defecto | Copia (stack) |
+
+---
+
 ## Set `set<T>`
+
+Hash set sin duplicados. Búsqueda O(1) promedio.
 
 ```ky
 s: set<i32> = set{1, 2, 3}
 s.add(4)
-tiene = s.contains(1)
-s.remove(1)
+tiene = s.contains(1)   # true
+s.remove(1)              # elimina 1
 n = s.len()
-```
 
-### Métodos
-
-| Método | Firma | Descripción |
-|--------|-------|-------------|
-| `add` | `fn(val: T)` | Agregar elemento |
-| `contains` | `fn(val: T) bool` | `true` si existe |
-| `remove` | `fn(val: T) bool` | Eliminar elemento |
-| `len` | `fn() i64` | Cantidad |
-| `clear` | `fn()` | Vaciar |
-
-### Iteración
-
-```ky
+# Iterar
 for val in &s:
     println(val.to_str())
 ```
 
+### Métodos
+
+| Método | Firma | Descripción | Ownership |
+|--------|-------|-------------|-----------|
+| `add` | `fn(val: T)` | Agregar elemento | `^&` |
+| `contains` | `fn(val: T) bool` | `true` si existe | `&` |
+| `remove` | `fn(val: T) bool` | Eliminar por valor | `^&` |
+| `len` | `fn() i64` | Cantidad | `&` |
+| `clear` | `fn()` | Vaciar | `^&` |
+
+---
+
 ## Iterator
 
+Iterador **lazy** sobre listas. No asigna hasta `collect()`.
+
 ```ky
-it = list.iter()
-doblados = it.map(fn(x: i32): x * 2).collect()
-filtrados = it.filter(fn(x: i32): x > 5).collect()
-suma = it.sum()
-minimo = it.min()
-maximo = it.max()
+nums: {i32} = {0}; nums.pop()
+nums.push(1); nums.push(2); nums.push(3); nums.push(4); nums.push(5)
+
+# Crear iterador
+it = nums.iter()
+
+# Map (transformar cada elemento)
+dobles = it.map(fn(x: i32): x * 2).collect()  # asigna nueva lista
+
+# Filter (filtrar)
+pares = nums.iter().filter(fn(x: i32): x % 2 == 0).collect()
+
+# Fold (reducir)
+suma = nums.iter().fold(0, fn(acc: i64, x: i64): acc + x)
+
+# Chain
+resultado = nums.iter()
+    .map(fn(x: i32): x * 2)
+    .filter(fn(x: i32): x > 5)
+    .collect()
 ```
 
 ### Métodos
 
 | Método | Firma | Descripción |
 |--------|-------|-------------|
-| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada elemento |
-| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar elementos |
-| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un valor |
-| `collect` | `fn() {T}` | Recolectar en lista |
-| `next` | `fn() T?` | Siguiente elemento |
-| `sum` | `fn() i64` | Sumar todos |
-| `min` | `fn() T` | Mínimo |
-| `max` | `fn() T` | Máximo |
+| `next` | `fn() T?` | Siguiente elemento (None si termina) |
+| `map` | `fn(fn(T) U) iter<U>` | Transformar cada elemento |
+| `filter` | `fn(fn(T) bool) iter<T>` | Filtrar elementos |
+| `fold` | `fn(init: U, fn(U, T) U) U` | Reducir a un valor |
+| `collect` | `fn() {T}` | Recolectar en nueva lista |
+| `sum` | `fn() i64` | Sumar todos (numérico) |
+| `min` | `fn() T` | Mínimo valor |
+| `max` | `fn() T` | Máximo valor |
+
+---
+
+## Comparativa de ownership
+
+| Operación | Copy type (i32, f64, bool) | Move type (str, {T}, struct) |
+|-----------|---------------------------|------------------------------|
+| `for x in col` | Copia cada elemento | Move (consume) |
+| `for x in &col` | Borrow inmutable | Borrow inmutable |
+| `for x in ^&col` | Mut borrow | Mut borrow |
+| `fn f(col: {T})` | N/A (no Copy) | Move (ownership transfer) |
+| `fn f(col: &{T})` | N/A | Borrow |
+| `fn f(col: ^&{T})` | N/A | Mut borrow |
+| `y = col` | Copia | **Move** (source inválido) |
+| `y = col.clone()` | Copia | Copia explícita |
+
+---
+
+## Comparativa de rendimiento
+
+| Operación | Array `[T;N]` | Lista `{T}` | Set `set<T>` |
+|-----------|:------------:|:-----------:|:------------:|
+| Get por índice | O(1) GEP | O(1) GEP | — |
+| Set por índice | O(1) GEP | O(1) GEP | — |
+| Push al final | — | O(1)* | — |
+| Pop del final | — | O(1) | — |
+| Contains | O(n) for | O(n) for | **O(1)** hash |
+| Remove por valor | — | O(n) find+shift | **O(1)** hash |
+| Insert medio | — | O(n) shift | — |
+| Memoria | Stack (N × sizeof) | Heap + ptr | Heap + hash |
+
+*\* Amortizado, con crecimiento ocasional O(n).*
