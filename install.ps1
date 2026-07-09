@@ -8,7 +8,7 @@
 #   $env:KY_PREFIX = "C:\ky"       Install directory (default: ~\.ky)
 
 param(
-    [string]$Version = "v0.6.1",
+    [string]$Version = "v0.6.2",
     [string]$Prefix = ""
 )
 
@@ -87,31 +87,53 @@ if (Test-Path "$TmpDir\libkyc_runtime.a") {
 Remove-Item -Recurse -Force $TmpDir
 
 # ─── Install LLVM 18.1.8 (runtime dependency) ──────────────
-# ky.exe dynamically links against LLVM-C.dll at runtime
+# ky.exe dynamically links against LLVM-C.dll at runtime.
+# We download the NSIS installer and extract it with 7-Zip.
+# If 7-Zip is not available, warn the user to install LLVM manually.
 
 $LLVMDir = "$env:KY_PREFIX\llvm-18"
-$LLVMZip = "$env:TEMP\llvm-18.zip"
-$LLVMUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip"
+$LLVMExe = "$env:TEMP\LLVM-18.1.8-win64.exe"
+$LLVMUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
+
+function Find-7z {
+    $paths = @(
+        "C:\Program Files\7-Zip\7z.exe",
+        "C:\Program Files (x86)\7-Zip\7z.exe",
+        "$env:ProgramFiles\7-Zip\7z.exe",
+        "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
+    )
+    foreach ($p in $paths) { if (Test-Path $p) { return $p } }
+    $cmd = Get-Command "7z" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
 
 if (-not (Test-Path "$LLVMDir\bin\LLVM-C.dll")) {
-    Write-Host "Downloading LLVM 18.1.8 (required at runtime by ky)..."
-    try {
-        Invoke-WebRequest -Uri $LLVMUrl -OutFile $LLVMZip -UseBasicParsing
-    } catch {
-        Write-Host "Warning: failed to download LLVM. ky.exe needs LLVM-C.dll at runtime."
-        Write-Host "Install manually from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
+    $7zPath = Find-7z
+    if (-not $7zPath) {
+        Write-Host "Warning: LLVM 18.1.8 is required at runtime by ky.exe."
+        Write-Host "Install manually:"
+        Write-Host "  1. Download from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
+        Write-Host "  2. Run: LLVM-18.1.8-win64.exe"
+        Write-Host "  3. Or with Chocolatey: choco install llvm --version=18.1.8"
+        Write-Host "Then set:  `$env:LLVM_SYS_181_PREFIX = 'C:\Program Files\LLVM'"
         Write-Host ""
-    }
-    if (Test-Path $LLVMZip) {
-        Write-Host "Extracting LLVM 18.1.8..."
-        $extractDir = "$env:TEMP\llvm-extract"
-        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-        Expand-Archive -Path $LLVMZip -DestinationPath $extractDir -Force
-        New-Item -ItemType Directory -Force -Path $LLVMDir | Out-Null
-        Get-ChildItem "$extractDir\LLVM-18.1.8-win64" | Move-Item -Destination $LLVMDir -Force
-        Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
-        Remove-Item $LLVMZip -Force
-        Write-Host "  LLVM installed to $LLVMDir"
+    } else {
+        Write-Host "Downloading LLVM 18.1.8 (required at runtime by ky)..."
+        try {
+            Invoke-WebRequest -Uri $LLVMUrl -OutFile $LLVMExe -UseBasicParsing
+        } catch {
+            Write-Host "Warning: failed to download LLVM. ky.exe needs LLVM-C.dll at runtime."
+            Write-Host "Install manually from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
+            Write-Host ""
+        }
+        if (Test-Path $LLVMExe) {
+            Write-Host "Extracting LLVM 18.1.8 with 7-Zip..."
+            New-Item -ItemType Directory -Force -Path $LLVMDir | Out-Null
+            & $7zPath x $LLVMExe -o"$LLVMDir" -y | Out-Null
+            Remove-Item $LLVMExe -Force
+            Write-Host "  LLVM installed to $LLVMDir"
+        }
     }
 } else {
     Write-Host "LLVM 18.1.8 already installed at $LLVMDir"

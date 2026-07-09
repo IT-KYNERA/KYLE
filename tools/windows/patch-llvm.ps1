@@ -1,7 +1,20 @@
 param(
     [string]$LLVM_PREFIX = "",
-    [string]$LLVM_URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip"
+    [string]$LLVM_URL = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
 )
+
+function Find-7z {
+    $paths = @(
+        "C:\Program Files\7-Zip\7z.exe",
+        "C:\Program Files (x86)\7-Zip\7z.exe",
+        "$env:ProgramFiles\7-Zip\7z.exe",
+        "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
+    )
+    foreach ($p in $paths) { if (Test-Path $p) { return $p } }
+    $cmd = Get-Command "7z" -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return $null
+}
 
 # Find LLVM prefix
 if (-not $LLVM_PREFIX) {
@@ -12,18 +25,24 @@ if (-not $LLVM_PREFIX) {
     $LLVM_PREFIX = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) "llvm-18"
 }
 if (-not (Test-Path $LLVM_PREFIX)) {
+    $7zPath = Find-7z
+    if (-not $7zPath) {
+        Write-Host "LLVM prefix not found at: $LLVM_PREFIX"
+        Write-Host "7-Zip is required to extract LLVM. Install 7-Zip or download manually:"
+        Write-Host "  https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
+        exit 1
+    }
     Write-Host "LLVM prefix not found at: $LLVM_PREFIX"
     Write-Host "Downloading LLVM 18.1.8 for Windows..."
-    $tmpZip = "$env:TEMP\llvm-18.zip"
-    Invoke-WebRequest -Uri $LLVM_URL -OutFile $tmpZip -UseBasicParsing
+    $tmpExe = "$env:TEMP\LLVM-18.1.8-win64.exe"
+    Invoke-WebRequest -Uri $LLVM_URL -OutFile $tmpExe -UseBasicParsing
     New-Item -ItemType Directory -Force -Path $LLVM_PREFIX | Out-Null
-    $extractDir = "$env:TEMP\llvm-extract"
-    if (Test-Path $extractDir) { Remove-Item -Recurse -Force $extractDir }
-    Expand-Archive -Path $tmpZip -DestinationPath $extractDir
-    # The zip contains a top-level LLVM-18.1.8-win64/ dir
-    Get-ChildItem "$extractDir\LLVM-18.1.8-win64" | Move-Item -Destination $LLVM_PREFIX -Force
-    Remove-Item -Recurse $extractDir -Force -ErrorAction SilentlyContinue
-    Remove-Item $tmpZip -Force
+    & $7zPath x $tmpExe -o"$LLVM_PREFIX" -y | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: 7z extraction returned exit code $LASTEXITCODE"
+        Write-Host "LLVM may be partially installed."
+    }
+    Remove-Item $tmpExe -Force
     Write-Host "LLVM 18.1.8 installed to $LLVM_PREFIX"
 } else {
     Write-Host "LLVM prefix found at: $LLVM_PREFIX"

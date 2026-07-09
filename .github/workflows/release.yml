@@ -41,6 +41,7 @@ jobs:
           mkdir -p dist
           cp target/release/ky dist/
           cp target/release/libkyc_runtime.a dist/
+          cp LICENSE dist/
           cd dist && tar czf ky-linux-arm64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
           cd dist && shasum -a 256 ky-linux-arm64.tar.gz > ky-linux-arm64.tar.gz.sha256
       - name: Upload
@@ -105,34 +106,6 @@ jobs:
         run: |
           cd dist && gh release upload ${{ github.ref_name }} ky-macos-arm64.tar.gz ky-macos-arm64.tar.gz.sha256 --clobber
 
-  build-macos-x64:
-    needs: create-release
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install LLVM 18
-        run: |
-          brew install llvm@18
-          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
-          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
-      - name: Build ky
-        run: cargo build --bin ky --release
-      - name: Build runtime
-        run: cargo build -p kyc_runtime --release
-      - name: Package
-        run: |
-          mkdir -p dist
-          cp target/release/ky dist/
-          cp target/release/libkyc_runtime.a dist/
-          cp LICENSE dist/
-          cd dist && tar czf ky-macos-x64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
-          cd dist && shasum -a 256 ky-macos-x64.tar.gz > ky-macos-x64.tar.gz.sha256
-      - name: Upload
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd dist && gh release upload ${{ github.ref_name }} ky-macos-x64.tar.gz ky-macos-x64.tar.gz.sha256 --clobber
-
   build-windows-x64:
     needs: create-release
     runs-on: windows-2025
@@ -144,19 +117,17 @@ jobs:
       - name: Install LLVM 18 (Windows x64)
         shell: pwsh
         run: |
-          # Download LLVM 18.1.8 portable zip for Windows x64
-          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip"
-          $out = "$env:TEMP\llvm-18.zip"
+          # Download LLVM 18.1.8 NSIS installer and extract with 7z
+          # (7-Zip 26.x is pre-installed on windows-2025 runner)
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
+          $out = "$env:TEMP\LLVM-18.1.8-win64.exe"
           $dest = "$env:LLVM_SYS_181_PREFIX"
           Write-Host "Downloading LLVM 18..."
           Invoke-WebRequest -Uri $url -OutFile $out
           Write-Host "Extracting LLVM 18 to $dest..."
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          $extractDir = "$env:TEMP\llvm-extract"
-          Expand-Archive -Path $out -DestinationPath $extractDir
-          # The zip contains a top-level LLVM-18.1.8-win64/ dir
-          Get-ChildItem "$extractDir\LLVM-18.1.8-win64" | Move-Item -Destination $dest -Force
-          Remove-Item -Recurse $extractDir -Force -ErrorAction SilentlyContinue
+          & "C:\Program Files\7-Zip\7z.exe" x $out -o"$dest" -y | Out-Null
+          Remove-Item $out -Force
           Write-Host "LLVM 18 installed to $dest"
 
       - name: Add LLVM to PATH
@@ -168,7 +139,7 @@ jobs:
       - name: Patch LLVM headers & create llvm-config
         shell: pwsh
         run: |
-          # The official LLVM 18.1.8 Windows zip is missing:
+          # The official LLVM 18.1.8 Windows distribution is missing:
           #   - llvm/Config/llvm-config.h (needed by Target.h, etc.)
           #   - llvm-config.exe (needed by llvm-sys build script)
           # This script creates both from scratch.

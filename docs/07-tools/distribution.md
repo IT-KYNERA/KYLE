@@ -24,7 +24,6 @@ Sin necesidad de tener Rust, LLVM, ni ning&uacute;n otro requisito previo instal
 | Plataforma | Arquitectura | Triplete LLVM | Bundle |
 |------------|-------------|---------------|--------|
 | macOS | ARM64 (Apple Silicon) | `aarch64-apple-darwin` | `ky-macos-arm64.tar.gz` |
-| macOS | x86_64 (Intel) | `x86_64-apple-darwin` | `ky-macos-x64.tar.gz` |
 | Linux | ARM64 | `aarch64-unknown-linux-gnu` | `ky-linux-arm64.tar.gz` |
 | Linux | x86_64 | `x86_64-unknown-linux-gnu` | `ky-linux-x64.tar.gz` |
 | Windows | x86_64 | `x86_64-pc-windows-gnu` | `ky-windows-x64.zip` |
@@ -380,7 +379,7 @@ múltiples targets, debe buscar también en:
 
 ### Por release
 
-1. Ejecutar `scripts/build-release.sh` para generar los 5 bundles
+1. Ejecutar `scripts/build-release.sh` para generar los 4 bundles
 2. Subir bundles a GitHub Releases
 3. (Opcional) Actualizar install.sh si cambia la URL base
 
