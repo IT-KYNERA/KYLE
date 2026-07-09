@@ -9,7 +9,13 @@ thread_local! {
 /// Convert a Literal to (MirType, MirConstant).
 fn literal_to_mir(value: &Literal) -> (MirType, MirConstant) {
     match value {
-        Literal::Integer(n) => (MirType::I32, MirConstant::I32(*n as i32)),
+        Literal::Integer(n) => {
+            if *n >= i32::MIN as i64 && *n <= i32::MAX as i64 {
+                (MirType::I32, MirConstant::I32(*n as i32))
+            } else {
+                (MirType::I64, MirConstant::I64(*n))
+            }
+        }
         Literal::Float(n) => (MirType::F64, MirConstant::F64(*n)),
         Literal::String(s) => (MirType::Str, MirConstant::String(s.clone())),
         Literal::Boolean(b) => (MirType::Bool, MirConstant::Bool(*b)),
@@ -2696,7 +2702,13 @@ impl Lowerer {
             }
             Expr::Literal { value, .. } => {
                 let (mir_type, constant) = match value {
-                    Literal::Integer(n) => (MirType::I32, MirConstant::I32(*n as i32)),
+                    Literal::Integer(n) => {
+                        if *n >= i32::MIN as i64 && *n <= i32::MAX as i64 {
+                            (MirType::I32, MirConstant::I32(*n as i32))
+                        } else {
+                            (MirType::I64, MirConstant::I64(*n))
+                        }
+                    }
                     Literal::Float(n) => (MirType::F64, MirConstant::F64(*n)),
                     Literal::String(s) => (MirType::Str, MirConstant::String(s.clone())),
                     Literal::Boolean(b) => (MirType::Bool, MirConstant::Bool(*b)),
