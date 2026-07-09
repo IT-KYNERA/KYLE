@@ -436,5 +436,5 @@ fn is_namespace(name: &str) -> bool {
     matches!(name, "parallel" | "thread" | "assert" | "json" | "math"
         | "str" | "tcp" | "crypto" | "process" | "regex"
         | "date_time" | "date" | "time" | "console" | "random"
-        | "dict" | "str_builder" | "fs" | "set")
+        | "dict" | "str_builder" | "fs" | "set" | "file")
 }
