@@ -20,6 +20,11 @@ edition = "2024"
 authors = ["Kynera"]
 license = "MIT"
 
+[profile.release]
+# LTO disabled for now — LLVM version mismatch between Kyle (18.1) and Rust
+# makes cross-boundary LTO unreliable. Inline list ops in codegen provide
+# the performance gain without LTO complexity.
+
 [workspace.dependencies]
 # LLVM bindings — enabled when Phase 3 begins
 # inkwell = { version = "0.11", features = ["llvm22-0"] }

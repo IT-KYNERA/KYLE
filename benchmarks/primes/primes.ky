@@ -4,18 +4,18 @@ fn main() i32:
     sieve: {i32} = {0}
     i = 0
     while i < n + 1:
-        list_push(^&sieve, 0)
+        sieve.push(0)
         i = i + 1
     primes: {i32} = {0}
-    list_pop(^&primes)
+    primes.pop()
     i2 = 2
     while i2 <= n:
-        if list_get(&sieve, i2) == 0:
-            list_push(^&primes, i2)
+        if sieve.get(i2) == 0:
+            primes.push(i2)
             j = i2 + i2
             while j <= n:
-                list_set(^&sieve, j, 1)
+                sieve.set(j, 1)
                 j = j + i2
         i2 = i2 + 1
-    println(list_len(&primes).to_str())
+    println(primes.len().to_str())
     0

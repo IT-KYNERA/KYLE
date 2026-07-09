@@ -565,6 +565,19 @@ impl<'ctx> Codegen<'ctx> {
                             block_vals[bi].insert(*dest, result);
                         }
                         SsaInst::Call { dest, name, args } => {
+                            // Inline list operations in SSA path (same as MIR path)
+                            match name.as_str() {
+                                "ky_list_get" | "ky_list_set" | "ky_list_len" => {
+                                    let val = self.emit_ssa_inline_list_op(name, &block_vals[bi], args)?;
+                                    if let Some(d) = dest {
+                                        if let Some(v) = val {
+                                            block_vals[bi].insert(*d, v);
+                                        }
+                                    }
+                                    continue;
+                                }
+                                _ => {}
+                            }
                             let runtime_name = match name.as_str() {
                                 "print" => "ky_print", "println" => "ky_println",
                                 "contains" => "ky_str_contains", "to_upper" => "ky_str_to_upper",
@@ -1654,6 +1667,192 @@ impl<'ctx> Codegen<'ctx> {
         }
     }
 
+    /// Emit inline LLVM IR for list operations instead of calling FFI functions.
+    /// KlList layout (24 bytes): [ptr: data, i64: len, i64: cap] at offsets 0, 8, 16.
+    fn emit_inline_list_op(
+        &self,
+        name: &str,
+        dest: &Option<usize>,
+        args: &[MirValue],
+        last_value_map: &mut HashMap<usize, BasicValueEnum<'ctx>>,
+    ) -> Result<(), String> {
+        let i64_ty = self.context.i64_type();
+        let i8_ty = self.context.i8_type();
+        let ptr_ty = self.context.ptr_type(Default::default());
+
+        let list_arg = self.value_to_llvm(&args[0], last_value_map)?;
+        let list_i64 = match list_arg {
+            BasicValueEnum::IntValue(iv) => iv,
+            _ => return Err("inline list: expected i64 list pointer".to_string()),
+        };
+        let list_ptr = self.builder.build_int_to_ptr(list_i64, ptr_ty, "_lptr")
+            .map_err(|e| format!("inline list inttoptr: {}", e))?;
+
+        match name {
+            "ky_list_len" => {
+                let off8 = i64_ty.const_int(8, false);
+                let len_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[off8], "_lenp")
+                        .map_err(|e| format!("list_len gep: {}", e))?
+                };
+                let len_val = self.builder.build_load(i64_ty, len_ptr, "_len")
+                    .map_err(|e| format!("list_len load: {}", e))?;
+                if let Some(d) = dest {
+                    if let Some(alloca_ptr) = self.alloca_map.get(*d).and_then(|p| *p) {
+                        self.builder.build_store(alloca_ptr, len_val)
+                            .map_err(|e| format!("list_len store: {}", e))?;
+                    }
+                    last_value_map.insert(*d, len_val);
+                }
+            }
+            "ky_list_get" if args.len() >= 2 => {
+                let idx_arg = self.value_to_llvm(&args[1], last_value_map)?;
+                let idx_i64 = match idx_arg {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_get: expected i64 index".to_string()),
+                };
+                // Load data pointer at byte offset 0
+                let zero = i64_ty.const_int(0, false);
+                let data_ptr_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
+                        .map_err(|e| format!("list_get gep data: {}", e))?
+                };
+                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("list_get load data: {}", e))?
+                    .into_pointer_value();
+                // GEP into data array
+                let elem_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
+                        .map_err(|e| format!("list_get gep elem: {}", e))?
+                };
+                let val = self.builder.build_load(i64_ty, elem_ptr, "_val")
+                    .map_err(|e| format!("list_get load val: {}", e))?;
+                if let Some(d) = dest {
+                    if let Some(alloca_ptr) = self.alloca_map.get(*d).and_then(|p| *p) {
+                        self.builder.build_store(alloca_ptr, val)
+                            .map_err(|e| format!("list_get store: {}", e))?;
+                    }
+                    last_value_map.insert(*d, val);
+                }
+            }
+            "ky_list_set" if args.len() >= 3 => {
+                let idx_arg = self.value_to_llvm(&args[1], last_value_map)?;
+                let val_arg = self.value_to_llvm(&args[2], last_value_map)?;
+                let idx_i64 = match idx_arg {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_set: expected i64 index".to_string()),
+                };
+                let val_i64 = match val_arg {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_set: expected i64 value".to_string()),
+                };
+                let zero = i64_ty.const_int(0, false);
+                let data_ptr_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
+                        .map_err(|e| format!("list_set gep data: {}", e))?
+                };
+                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("list_set load data: {}", e))?
+                    .into_pointer_value();
+                let elem_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
+                        .map_err(|e| format!("list_set gep elem: {}", e))?
+                };
+                self.builder.build_store(elem_ptr, val_i64)
+                    .map_err(|e| format!("list_set store: {}", e))?;
+            }
+            _ => return Err(format!("unknown inline list op: {}", name)),
+        }
+        Ok(())
+    }
+
+    /// SSA version of inline list operations. Uses block_vals directly instead of last_value_map.
+    /// Reads SsaValueId from block_vals (same as ssa_read! macro).
+    fn emit_ssa_inline_list_op(
+        &self,
+        name: &str,
+        block_vals: &HashMap<usize, BasicValueEnum<'ctx>>,
+        args: &[SsaValueId],
+    ) -> Result<Option<BasicValueEnum<'ctx>>, String> {
+        let i64_ty = self.context.i64_type();
+        let i8_ty = self.context.i8_type();
+        let ptr_ty = self.context.ptr_type(Default::default());
+
+        let read_val = |id: SsaValueId| -> BasicValueEnum<'ctx> {
+            block_vals.get(&id).copied().unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum())
+        };
+        let list_val = read_val(args[0]);
+        let list_ptr = match &list_val {
+            BasicValueEnum::IntValue(iv) => self.builder.build_int_to_ptr(*iv, ptr_ty, "_lptr")
+                .map_err(|e| format!("ssa inline list inttoptr: {}", e))?,
+            BasicValueEnum::PointerValue(pv) => *pv,
+            _ => return Err("ssa inline list: expected ptr or i64".to_string()),
+        };
+
+        match name {
+            "ky_list_len" => {
+                let off8 = i64_ty.const_int(8, false);
+                let len_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[off8], "_lenp")
+                        .map_err(|e| format!("ssa list_len gep: {}", e))?
+                };
+                let len_val = self.builder.build_load(i64_ty, len_ptr, "_len")
+                    .map_err(|e| format!("ssa list_len load: {}", e))?;
+                Ok(Some(len_val))
+            }
+            "ky_list_get" if args.len() >= 2 => {
+                let idx_val = read_val(args[1]);
+                let idx_i64 = match idx_val {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_get: expected i64 index".to_string()),
+                };
+                let zero = i64_ty.const_int(0, false);
+                let data_ptr_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
+                        .map_err(|e| format!("ssa list_get gep data: {}", e))?
+                };
+                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("ssa list_get load data: {}", e))?
+                    .into_pointer_value();
+                let elem_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
+                        .map_err(|e| format!("ssa list_get gep elem: {}", e))?
+                };
+                let val = self.builder.build_load(i64_ty, elem_ptr, "_val")
+                    .map_err(|e| format!("ssa list_get load val: {}", e))?;
+                Ok(Some(val))
+            }
+            "ky_list_set" if args.len() >= 3 => {
+                let idx_val = read_val(args[1]);
+                let val_val = read_val(args[2]);
+                let idx_i64 = match idx_val {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_set: expected i64 index".to_string()),
+                };
+                let val_i64 = match val_val {
+                    BasicValueEnum::IntValue(iv) => iv,
+                    _ => return Err("ky_list_set: expected i64 value".to_string()),
+                };
+                let zero = i64_ty.const_int(0, false);
+                let data_ptr_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
+                        .map_err(|e| format!("ssa list_set gep data: {}", e))?
+                };
+                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("ssa list_set load data: {}", e))?
+                    .into_pointer_value();
+                let elem_ptr = unsafe {
+                    self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
+                        .map_err(|e| format!("ssa list_set gep elem: {}", e))?
+                };
+                self.builder.build_store(elem_ptr, val_i64)
+                    .map_err(|e| format!("ssa list_set store: {}", e))?;
+                Ok(None)
+            }
+            _ => Err(format!("unknown ssa inline list op: {}", name)),
+        }
+    }
+
     fn llvm_type(&self, mir_type: &MirType) -> BasicTypeEnum<'ctx> {
         match mir_type {
             MirType::I1 => self.context.bool_type().as_basic_type_enum(),
@@ -2244,6 +2443,14 @@ impl<'ctx> Codegen<'ctx> {
                             last_value_map.insert(*dest, result_val);
                         }
                         MirInst::Call { dest, name, args } => {
+                            // Inline list operations (avoid FFI overhead for tight loops)
+                            match name.as_str() {
+                                "ky_list_get" | "ky_list_set" | "ky_list_len" => {
+                                    self.emit_inline_list_op(name, dest, args, &mut last_value_map)?;
+                                    continue;
+                                }
+                                _ => {}
+                            }
                             let runtime_name = match name.as_str() {
                                 "print" => "ky_print",
                                 "println" => "ky_println",

@@ -110,7 +110,13 @@ impl BorrowAnalysis {
         let preds = Self::build_preds(func);
 
         let mut alive_in: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
-        let mut alive_out: Vec<BTreeSet<usize>> = vec![BTreeSet::new(); n];
+        // Initialize alive_out to ALL move-type locals (TOP of lattice).
+        // With intersection-at-joins semantics, TOP ensures that a local which
+        // is alive on at least one predecessor survives through the merge.
+        // Without this, loop back-edges cause false use-after-move errors:
+        // the body's alive_out starts empty, so the header intersection drops
+        // all locals from the entry block, making them dead inside the loop.
+        let mut alive_out: Vec<BTreeSet<usize>> = (0..n).map(|_| move_locals.clone()).collect();
         let mut worklist: VecDeque<usize> = (0..n).collect();
 
         while let Some(b) = worklist.pop_front() {
@@ -200,11 +206,13 @@ impl BorrowAnalysis {
                 }
                 MirInst::Call { dest, name, args } => {
                     // MOVE-BY-DEFAULT: args are consumed unless the param is Borrow/MutableBorrow
+                    // Functions NOT in func_map (runtime externs like ky_list_push) NEVER consume
+                    // their arguments — they only borrow. Must match process_inst logic below.
                     let modes = func_map.get(name);
                     for (i, arg) in args.iter().enumerate() {
                         if let MirValue::Local(l) = arg {
                             let is_borrow = modes.map_or(false, |m| i < m.len() && (m[i] == ParamMode::Borrow || m[i] == ParamMode::MutableBorrow));
-                            if !is_borrow {
+                            if modes.is_some() && !is_borrow {
                                 alive.remove(l);
                                 // Also mark the original source of a Load alias as consumed, if still alive
                                 if let Some(&orig) = load_map.get(l) {
@@ -486,7 +494,6 @@ impl BorrowAnalysis {
                         match mode {
                             Some(ParamMode::Borrow) => {
                                 self.check_alive(*l, alive, local_names, local_types, "borrow");
-                                // Determine the original source: prefer load_map, fallback to arg itself
                                 let orig = *load_map.get(l).unwrap_or(l);
                                 let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
                                 match state {
@@ -504,7 +511,6 @@ impl BorrowAnalysis {
                             }
                             Some(ParamMode::MutableBorrow) => {
                                 self.check_alive(*l, alive, local_names, local_types, "mut borrow");
-                                // Determine the original source
                                 let orig = *load_map.get(l).unwrap_or(l);
                                 let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
                                 match state {

@@ -1,4 +1,4 @@
-# Kyle — Matrix multiplication (100x100, 30 iterations)
+# Kyle — Matrix multiplication (100x100, 10 iterations)
 fn main() i32:
     n = 100
     total = n * n
@@ -7,9 +7,9 @@ fn main() i32:
     c: {i64} = {0 as i64}
     i = 1
     while i < total:
-        list_push(^&a, 1 as i64)
-        list_push(^&b, 2 as i64)
-        list_push(^&c, 0 as i64)
+        a.push(1 as i64)
+        b.push(2 as i64)
+        c.push(0 as i64)
         i = i + 1
     iter = 0
     while iter < 10:
@@ -17,17 +17,16 @@ fn main() i32:
         while i2 < n:
             j = 0
             while j < n:
-                sum = 0 as i64
+                sum = 0
                 k = 0
                 while k < n:
-                    a_val = list_get(&a, (i2 * n + k) as i64)
-                    b_val = list_get(&b, (k * n + j) as i64)
+                    a_val = a.get(i2 * n + k)
+                    b_val = b.get(k * n + j)
                     sum = sum + a_val * b_val
                     k = k + 1
-                list_set(^&c, (i2 * n + j) as i64, sum)
+                c.set(i2 * n + j, sum)
                 j = j + 1
             i2 = i2 + 1
         iter = iter + 1
-    last = list_get(&c, (n * n - 1) as i64)
-    println(last.to_str())
+    println(c.get(n * n - 1).to_str())
     0

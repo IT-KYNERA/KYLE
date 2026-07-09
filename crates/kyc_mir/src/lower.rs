@@ -1224,7 +1224,7 @@ impl Lowerer {
                 params.push(ast_type_to_mir(&p.type_, Some(&struct_defs)));
             }
             mir_func.params = params;
-            let mut param_modes = vec![ParamMode::Move];
+            let mut param_modes = vec![ParamMode::MutableBorrow];
             param_modes.extend(m.params.iter().enumerate().filter(|(i, p)| !(*i == 0 && (p.name == "this" || p.name == "self"))).map(|(_, p)| p.mode));
             mir_func.param_modes = param_modes;
         }
@@ -4328,6 +4328,40 @@ impl Lowerer {
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(result), name: "ky_list_remove_at".to_string(),
                                 args: vec![MirValue::Local(obj_local), MirValue::Local(idx_i64)],
+                            });
+                            return ctx;
+                        }
+                        // === GET / SET (direct element access) ===
+                        if is_list && property == "get" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let idx = ctx.next_local - 1;
+                            let idx_i64 = ctx.alloc_local("_gi64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: idx_i64, value: MirValue::Local(idx), to_type: MirType::I64,
+                            });
+                            let result = ctx.alloc_local("_get", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_list_get".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(idx_i64)],
+                            });
+                            return ctx;
+                        }
+                        if is_list && property == "set" && arguments.len() == 2 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let idx = ctx.next_local - 1;
+                            let idx_i64 = ctx.alloc_local("_si64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: idx_i64, value: MirValue::Local(idx), to_type: MirType::I64,
+                            });
+                            ctx = self.lower_expr(ctx, &arguments[1]);
+                            let val = ctx.next_local - 1;
+                            let val_i64 = ctx.alloc_local("_sv64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: val_i64, value: MirValue::Local(val), to_type: MirType::I64,
+                            });
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: None, name: "ky_list_set".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(idx_i64), MirValue::Local(val_i64)],
                             });
                             return ctx;
                         }

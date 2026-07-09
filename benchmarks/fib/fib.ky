@@ -12,5 +12,5 @@ fn fib(n: i32) i32:
 
 fn main() i32:
     result := fib(500000000)
-    println("Result: " + result.to_str())
+    println(result.to_str())
     0
