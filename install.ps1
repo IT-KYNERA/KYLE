@@ -4,11 +4,11 @@
 #   iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | iex
 #
 # Environment variables:
-#   $env:KY_VERSION = "v0.6.0"     Version to install (default: latest)
+#   $env:KY_VERSION = "v0.6.1"     Version to install (default: latest)
 #   $env:KY_PREFIX = "C:\ky"       Install directory (default: ~\.ky)
 
 param(
-    [string]$Version = "v0.6.0",
+    [string]$Version = "v0.6.1",
     [string]$Prefix = ""
 )
 

@@ -255,7 +255,7 @@ Update the version in ALL of these files (search for the old version string):
 | file | Field | Example |
 |------|-------|---------|
 | `Cargo.toml` | `version = "0.X.X"` | `version = "0.5.2"` |
-| `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.6.0` |
+| `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.6.1` |
 | `install.sh` | `VERSION="v0.X.X"` | `VERSION="v0.5.2"` |
 | `install.ps1` | `$Version = "v0.X.X"` | `$Version = "v0.6.0"` |
 | `vscode-ky/install-extension.sh` | `TAG="v0.X.X"` | `TAG="v0.5.2"` |
@@ -533,7 +533,7 @@ See `docs/07-tools/distribution.md` for full details.
 
 ---
 
-*Version: v0.6.0 · Last updated: 2026-07-09 — See sections above for release process and cross-platform guide.*
+*Version: v0.6.1 · Last updated: 2026-07-09 — See sections above for release process and cross-platform guide.*
 
 ---
 

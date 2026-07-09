@@ -2,7 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="${KY_VERSION:-v0.6.0}"
+VERSION="${KY_VERSION:-v0.6.1}"
 
 # ─── Functions ──────────────────────────────────────────────
 
