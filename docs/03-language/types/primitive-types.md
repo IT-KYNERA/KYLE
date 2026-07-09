@@ -153,13 +153,10 @@ st.len()
 
 ### Slice: `&[T]` [ ]
 
-Vista de un array existente (no copia). Similar a Rust `&[T]`.
-
-```ky
-a = [1, 2, 3, 4, 5]
-s: &[i32] = &a[1..3] # slice: [2, 3]
-first = s[0] # → 2
-```
+> **No implementado.** Está en roadmap para fase futura.
+>
+> Los slices permitirán vistas de arrays sin copiar: `&arr[0..n]`.
+> Mientras tanto, usa borrow `&[T, N]` para arrays del mismo tamaño.
 
 ---
 

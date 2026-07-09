@@ -367,10 +367,12 @@ impl<'ctx> Codegen<'ctx> {
 
         // Create LLVM basic blocks and phi nodes
         let mut block_map: HashMap<String, inkwell::basic_block::BasicBlock<'ctx>> = HashMap::new();
+        let mut block_indices: HashMap<String, usize> = HashMap::new();
         let mut phi_map: Vec<(usize, inkwell::values::PhiValue<'ctx>)> = Vec::new();
-        for block in &func.blocks {
+        for (i, block) in func.blocks.iter().enumerate() {
             let llvm_bb = self.context.append_basic_block(fn_value, &block.label);
             block_map.insert(block.label.clone(), llvm_bb);
+            block_indices.insert(block.label.clone(), i);
         }
 
         // Entry block: allocate non-promotable stack slots + params
@@ -909,8 +911,18 @@ impl<'ctx> Codegen<'ctx> {
                     }
                     MirTerminator::Br(label) => {
                         if let Some(&tb) = block_map.get(label) {
-                            self.builder.build_unconditional_branch(tb)
+                            let br = self.builder.build_unconditional_branch(tb)
                                 .map_err(|e| format!("ssabr: {}", e))?;
+                            // Mark loop back-edges for LLVM optimizations (vectorize, unroll)
+                            if let Some(target_idx) = block_indices.get(label) {
+                                if *target_idx < bi {
+                                    let loop_md = self.context.metadata_node(&[
+                                        self.context.metadata_string("llvm.loop.vectorize.enable").into(),
+                                    ]);
+                                    let kind = self.context.get_kind_id("llvm.loop");
+                                    let _ = br.set_metadata(loop_md, kind);
+                                }
+                            }
                         }
                     }
                     MirTerminator::CondBr { cond, true_block, false_block } => {
@@ -924,8 +936,27 @@ impl<'ctx> Codegen<'ctx> {
                             cond_int
                         };
                         if let (Some(&tb), Some(&fb)) = (block_map.get(true_block), block_map.get(false_block)) {
-                            self.builder.build_conditional_branch(i1_cond, tb, fb)
+                            let br = self.builder.build_conditional_branch(i1_cond, tb, fb)
                                 .map_err(|e| format!("ssacbr: {}", e))?;
+                            // Mark loop back-edges (conditional branch to previous block)
+                            if let Some(target_idx) = block_indices.get(true_block) {
+                                if *target_idx < bi {
+                                    let loop_md = self.context.metadata_node(&[
+                                        self.context.metadata_string("llvm.loop.vectorize.enable").into(),
+                                    ]);
+                                    let kind = self.context.get_kind_id("llvm.loop");
+                                    let _ = br.set_metadata(loop_md, kind);
+                                }
+                            }
+                            if let Some(target_idx) = block_indices.get(false_block) {
+                                if *target_idx < bi {
+                                    let loop_md = self.context.metadata_node(&[
+                                        self.context.metadata_string("llvm.loop.vectorize.enable").into(),
+                                    ]);
+                                    let kind = self.context.get_kind_id("llvm.loop");
+                                    let _ = br.set_metadata(loop_md, kind);
+                                }
+                            }
                         }
                     }
                     MirTerminator::Unreachable => {}

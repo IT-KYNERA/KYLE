@@ -1188,6 +1188,9 @@ impl Parser {
             }
             TokenKind::LBracket => {
                 self.advance();
+                while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                    self.advance();
+                }
                 if self.at(TokenKind::RBracket) {
                     self.advance();
                     Expr::Array { elements: vec![], span: self.span_from(start) }
@@ -1202,6 +1205,9 @@ impl Parser {
                         let mut elements = vec![first];
                         while self.at(TokenKind::Comma) {
                             self.advance();
+                            while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                                self.advance();
+                            }
                             if self.at(TokenKind::RBracket) { break; }
                             if self.at(TokenKind::DotDotDot) {
                                 let span_start = self.pos;
@@ -1220,6 +1226,9 @@ impl Parser {
             TokenKind::LBrace => {
                 let start = self.pos;
                 self.advance();
+                while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                    self.advance();
+                }
                 // {} → dict vacío (backward compatible)
                 if self.at(TokenKind::RBrace) {
                     self.advance();
@@ -1232,6 +1241,9 @@ impl Parser {
                         // {key: val, ...} → DICT
                         self.pos = saved;
                         let mut entries = Vec::new();
+                        while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                            self.advance();
+                        }
                         loop {
                             if self.at(TokenKind::RBrace) { break; }
                             let key = if let Ok(tok) = self.current() {
@@ -1243,7 +1255,12 @@ impl Parser {
                             self.expect(TokenKind::Colon)?;
                             let value = self.parse_expr()?;
                             entries.push((key, value));
-                            if self.at(TokenKind::Comma) { self.advance(); }
+                            if self.at(TokenKind::Comma) {
+                                self.advance();
+                                while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                                    self.advance();
+                                }
+                            }
                             else { break; }
                         }
                         self.expect(TokenKind::RBrace)?;
@@ -1251,9 +1268,15 @@ impl Parser {
                     } else {
                         // {val, val, ...} → LIST
                         self.pos = saved;
+                        while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                            self.advance();
+                        }
                         let mut elements = vec![self.parse_expr()?];
                         while self.at(TokenKind::Comma) {
                             self.advance();
+                            while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                                self.advance();
+                            }
                             if self.at(TokenKind::RBrace) { break; }
                             elements.push(self.parse_expr()?);
                         }
