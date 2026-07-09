@@ -57,21 +57,8 @@ See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 - **No `self`**: use `this.field` for field access
 - **Generic params**: uppercase `T` (only exception to snake_case)
 
-<<<<<<< Updated upstream
 **This file (AGENTS.md) does NOT contain syntax reference.**
 Do not guess Kyle syntax — always check the docs.
-=======
-### Sesión 11 — Fase 6: Fix auto-declared variable type inference (ident = expr)
-| Feature | Archivos | Estado |
-|---------|----------|--------|
-| Fix: type checker auto-declare `ident = expr` | `klc_semantic/src/type_checker.rs` | ✅ `check_stmt` intercepta `Stmt::Expression(Expr::Assignment)` con destino `Identifier`, infiere el tipo del valor y registra la variable en el scope actual |
-| Root cause | scope.rs / type_checker.rs | ✅ Scope resolver auto-declara variables dentro del scope de la función, pero `resolve_function` hace `pop_scope()` al terminar, eliminando las variables. El type checker arranca con un símbol table vacío (sin variables auto-declaradas). |
-| Fix detail | `klc_semantic/src/type_checker.rs` | ✅ Al encontrar `result = expr` en `check_stmt`, si `result` no existe en el símbol table, infiere el tipo de `expr` y lo inserta como variable inmutable. Así el type checker puede resolver `str(result)` en expresiones posteriores. |
-| Verificación | `examples/fibonacci.kl` | ✅ `klc run examples/fibonacci.kl` → `fibonacci(10) = 55` |
-| Tests | - | ✅ 84 tests, 0 failures |
-
-## Glossary — Abreviaciones Técnicas
->>>>>>> Stashed changes
 
 ---
 

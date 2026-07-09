@@ -45,7 +45,7 @@ kyc_tools/ ✅ LSP, formatter, package manager
 
 | Crate | When | Purpose |
 |-------|------|---------|
-| `kyc_platform` | After Phase 0 | Platform API (FS, net, time, env) — Rust crate |
+| `kyc_platform` | ✅ **Expanded** | FS (exists, copy, remove, create_dir, remove_dir, list_dir, is_dir, is_file, size, rename, read_to_string, write_string) + Time (now_ms, now_us). Exposed as `fs.*` / `time.*` APIs. |
 | `kyc_platform_macos` | After Phase 0 | macOS platform adapter |
 | `kyc_platform_linux` | future | Linux platform adapter |
 | Various `ky-*` | After Phase 0 | Kyle packagis (HTTP, SQLite, JSON, etc.) |
@@ -152,7 +152,7 @@ These use only arithmetic, raw pointers, and libc FFI. All doable with current K
 
 | Module | Count | Why |
 |--------|:-----:|-----|
-| `dict.rs` | 10 | **Needs hash map** — all 8 dict functions + 2 unimplemented (`ky_dict_contains`, `ky_dict_remove`). Dict is `HashMap<String, i64>` from Rust std. Kyle needs a hash table implementation (FNV-1a + open addressing, ~200 linis of Kyle). |
+| `dict.rs` | 10 | ✅ All 10 functions implemented (`ky_dict_contains`, `ky_dict_remove` added). Exposed as `dict.contains(d, key)` / `dict.remove(d, key)`. |
 | `thread.rs` | 2 | **Needs OS threads** — `ky_spawn_thread` needs `pthread_create` with a C-compatible trampoline. `ky_join_thread` needs `pthread_join`. The trampoline requiris codegen support for `extern "C"` closures. |
 | `async_.rs` | 2 | **Needs async executor** — `ky_spawn_task` and `ky_await_task` depend on threads, channels, mutexes, atomics, and a global executor singleton. This is the most complex piece. |
 

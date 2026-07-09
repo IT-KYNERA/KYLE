@@ -425,7 +425,7 @@ m = re.find("abc123") # → "123"
 result = re.replace("abc123", "X") # → "abcX"
 ```
 
-### env [ ]
+### env [x]
 
 ```ky
 val = env("PATH")
@@ -495,7 +495,7 @@ n4 = n * n2
 n.to_str()
 ```
 
-### str_builder [ ]
+### str_builder [x]
 
 ```ky
 sb = str_builder(50000)
