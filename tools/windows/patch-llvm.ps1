@@ -158,8 +158,8 @@ if /i "%~1"=="--bindir"        echo %PREFIX%\bin & goto :eof
 if /i "%~1"=="--cflags"        echo -I%PREFIX_FWD%/include & goto :eof
 if /i "%~1"=="--cxxflags"      echo -I%PREFIX_FWD%/include & goto :eof
 if /i "%~1"=="--ldflags"       echo -LIBPATH:%PREFIX_FWD%/lib & goto :eof
-if /i "%~1"=="--libs"          echo LLVM-C.lib & goto :eof
-if /i "%~1"=="--libnames"      echo LLVM-C.lib & goto :eof
+if /i "%~1"=="--libs"          echo -lLLVM-C & goto :eof
+if /i "%~1"=="--libnames"      echo LLVM-C & goto :eof
 if /i "%~1"=="--libfiles"      echo %PREFIX_FWD%/lib/LLVM-C.lib & goto :eof
 if /i "%~1"=="--components"    echo all & goto :eof
 if /i "%~1"=="--shared-mode"   echo shared & goto :eof
@@ -198,6 +198,7 @@ using System.IO;
 
 class LlvmConfig {
     static int Main(string[] args) {
+        Console.Out.NewLine = "\n";
         if (args.Length < 1) { Console.WriteLine("18.1.8"); return 0; }
         string me = System.Reflection.Assembly.GetEntryAssembly().Location;
         string bindir = Path.GetDirectoryName(me);
@@ -212,8 +213,8 @@ class LlvmConfig {
         if (a == "--cflags")         { Console.WriteLine("-I" + fwd + "/include"); return 0; }
         if (a == "--cxxflags")       { Console.WriteLine("-I" + fwd + "/include"); return 0; }
         if (a == "--ldflags")        { Console.WriteLine("-LIBPATH:" + fwd + "/lib"); return 0; }
-        if (a == "--libs")           { Console.WriteLine("LLVM-C.lib"); return 0; }
-        if (a == "--libnames")       { Console.WriteLine("LLVM-C.lib"); return 0; }
+        if (a == "--libs")           { Console.WriteLine("-lLLVM-C"); return 0; }
+        if (a == "--libnames")       { Console.WriteLine("LLVM-C"); return 0; }
         if (a == "--libfiles")       { Console.WriteLine(fwd + "/lib/LLVM-C.lib"); return 0; }
         if (a == "--components")     { Console.WriteLine("all"); return 0; }
         if (a == "--shared-mode")    { Console.WriteLine("shared"); return 0; }
