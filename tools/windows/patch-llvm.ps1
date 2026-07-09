@@ -168,71 +168,74 @@ if /i "%~1"=="--src-root"      echo %PREFIX_FWD% & goto :eof
 exit /b 1
 '@
 
-# ─── Compile llvm-config.exe (if C compiler available) ─────────
-$cSrcDir = Join-Path $LLVM_PREFIX "src"
-New-Item -ItemType Directory -Force -Path $cSrcDir | Out-Null
-$cSrc = Join-Path $cSrcDir "llvm-config.c"
+# ─── Compile llvm-config.exe (real .exe, needed by llvm-sys) ───
+# llvm-sys on Windows looks for llvm-config.exe in LLVM_SYS_181_PREFIX/bin/.
+# We compile a small C# program via csc.exe (always available on Windows with .NET).
 
-Set-Content -Path $cSrc -Encoding ASCII -Value @'
-#include <stdio.h>
-#include <string.h>
-#include <windows.h>
+$cscPaths = @(
+    "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+    "$env:SystemRoot\Microsoft.NET\Framework\v4.0.30319\csc.exe",
+    (Get-Command "csc.exe" -ErrorAction SilentlyContinue | ForEach-Object Source)
+)
+$cscPath = $cscPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) return 1;
-    char path[MAX_PATH];
-    GetModuleFileNameA(NULL, path, MAX_PATH);
-    char *p = strrchr(path, '\\');
-    if (p) *p = '\0';
-    char prefix[MAX_PATH];
-    strcpy(prefix, path);
-    p = strrchr(prefix, '\\');
-    if (p && _stricmp(p + 1, "bin") == 0) *p = '\0';
-    char fwd[MAX_PATH];
-    for (int i = 0; prefix[i]; i++) fwd[i] = (prefix[i] == '\\') ? '/' : prefix[i];
-    fwd[strlen(prefix)] = '\0';
-    const char *a = argv[1];
-    if (strcmp(a, "--version")==0)       { puts("18.1.8"); return 0; }
-    if (strcmp(a, "--prefix")==0)        { puts(prefix); return 0; }
-    if (strcmp(a, "--includedir")==0)    { printf("%s\\include\n", prefix); return 0; }
-    if (strcmp(a, "--libdir")==0)        { printf("%s\\lib\n", prefix); return 0; }
-    if (strcmp(a, "--bindir")==0)        { printf("%s\\bin\n", prefix); return 0; }
-    if (strcmp(a, "--cflags")==0)        { printf("-I%s/include\n", fwd); return 0; }
-    if (strcmp(a, "--cxxflags")==0)      { printf("-I%s/include\n", fwd); return 0; }
-    if (strcmp(a, "--ldflags")==0)       { printf("-LIBPATH:%s/lib\n", fwd); return 0; }
-    if (strcmp(a, "--libs")==0)          { puts("LLVM-C.lib"); return 0; }
-    if (strcmp(a, "--libnames")==0)      { puts("LLVM-C.lib"); return 0; }
-    if (strcmp(a, "--libfiles")==0)      { printf("%s/lib/LLVM-C.lib\n", fwd); return 0; }
-    if (strcmp(a, "--components")==0)    { puts("all"); return 0; }
-    if (strcmp(a, "--shared-mode")==0)   { puts("shared"); return 0; }
-    if (strcmp(a, "--system-libs")==0)   { putchar(10); return 0; }
-    if (strcmp(a, "--targets-built")==0) { puts("AArch64 ARM X86"); return 0; }
-    if (strcmp(a, "--host-target")==0)   { puts("x86_64-pc-windows-msvc"); return 0; }
-    if (strcmp(a, "--has-rtti")==0)      { puts("NO"); return 0; }
-    if (strcmp(a, "--assertion-mode")==0){ puts("OFF"); return 0; }
-    if (strcmp(a, "--build-mode")==0)    { puts("Release"); return 0; }
-    if (strcmp(a, "--link-shared")==0)   { puts("-DLLVM_LINK_SHARED=1"); return 0; }
-    if (strcmp(a, "--link-static")==0)   { putchar(10); return 0; }
-    if (strcmp(a, "--obj-root")==0)      { puts(fwd); return 0; }
-    if (strcmp(a, "--src-root")==0)      { puts(fwd); return 0; }
-    return 1;
+$csSrcDir = Join-Path $LLVM_PREFIX "src"
+New-Item -ItemType Directory -Force -Path $csSrcDir | Out-Null
+$csSrc = Join-Path $csSrcDir "llvm-config.cs"
+
+Set-Content -Path $csSrc -Encoding ASCII -Value @'
+using System;
+using System.IO;
+
+class LlvmConfig {
+    static int Main(string[] args) {
+        if (args.Length < 1) { Console.WriteLine("18.1.8"); return 0; }
+        string me = System.Reflection.Assembly.GetEntryAssembly().Location;
+        string bindir = Path.GetDirectoryName(me);
+        string prefix = Path.GetDirectoryName(bindir);
+        string fwd = prefix.Replace('\\', '/');
+        string a = args[0];
+        if (a == "--version")        { Console.WriteLine("18.1.8"); return 0; }
+        if (a == "--prefix")         { Console.WriteLine(prefix); return 0; }
+        if (a == "--includedir")     { Console.WriteLine(prefix + "\\include"); return 0; }
+        if (a == "--libdir")         { Console.WriteLine(prefix + "\\lib"); return 0; }
+        if (a == "--bindir")         { Console.WriteLine(prefix + "\\bin"); return 0; }
+        if (a == "--cflags")         { Console.WriteLine("-I" + fwd + "/include"); return 0; }
+        if (a == "--cxxflags")       { Console.WriteLine("-I" + fwd + "/include"); return 0; }
+        if (a == "--ldflags")        { Console.WriteLine("-LIBPATH:" + fwd + "/lib"); return 0; }
+        if (a == "--libs")           { Console.WriteLine("LLVM-C.lib"); return 0; }
+        if (a == "--libnames")       { Console.WriteLine("LLVM-C.lib"); return 0; }
+        if (a == "--libfiles")       { Console.WriteLine(fwd + "/lib/LLVM-C.lib"); return 0; }
+        if (a == "--components")     { Console.WriteLine("all"); return 0; }
+        if (a == "--shared-mode")    { Console.WriteLine("shared"); return 0; }
+        if (a == "--system-libs")    { Console.WriteLine(); return 0; }
+        if (a == "--targets-built")  { Console.WriteLine("AArch64 ARM X86"); return 0; }
+        if (a == "--host-target")    { Console.WriteLine("x86_64-pc-windows-msvc"); return 0; }
+        if (a == "--has-rtti")       { Console.WriteLine("NO"); return 0; }
+        if (a == "--assertion-mode") { Console.WriteLine("OFF"); return 0; }
+        if (a == "--build-mode")     { Console.WriteLine("Release"); return 0; }
+        if (a == "--link-shared")    { Console.WriteLine("-DLLVM_LINK_SHARED=1"); return 0; }
+        if (a == "--link-static")    { Console.WriteLine(); return 0; }
+        if (a == "--obj-root")       { Console.WriteLine(fwd); return 0; }
+        if (a == "--src-root")       { Console.WriteLine(fwd); return 0; }
+        return 1;
+    }
 }
 '@
 
-# Try to compile with cl.exe (MSVC)
-$clPath = Get-Command "cl.exe" -ErrorAction SilentlyContinue
-if ($clPath) {
-    Write-Host "Compiling llvm-config.exe..."
-    $clExe = Join-Path $binDir "llvm-config.exe"
-    $obj = "$env:TEMP\llvm-config.obj"
-    & $clPath.Source "/nologo" "/Fo:$obj" "/Fe:$clExe" $cSrc 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0 -and (Test-Path $clExe)) {
-        Write-Host "  → $clExe ($((Get-Item $clExe).Length / 1024) KB)"
+$llvmExe = Join-Path $binDir "llvm-config.exe"
+if ($cscPath) {
+    Write-Host "Compiling llvm-config.exe with csc.exe..."
+    & $cscPath /nologo /target:exe /out:$llvmExe $csSrc 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $llvmExe)) {
+        Write-Host "  -> $llvmExe ($([math]::Round((Get-Item $llvmExe).Length / 1KB)) KB)"
     } else {
-        Write-Host "  → cl.exe compile failed, using llvm-config.cmd fallback"
+        Write-Host "  -> csc.exe compile failed (exit $LASTEXITCODE), using llvm-config.cmd fallback"
+        Remove-Item $llvmExe -ErrorAction SilentlyContinue
     }
 } else {
-    Write-Host "  → no C compiler found, using llvm-config.cmd"
+    Write-Host "  -> csc.exe not found, using llvm-config.cmd"
+    Remove-Item $llvmExe -ErrorAction SilentlyContinue
 }
 
 Write-Host ""
