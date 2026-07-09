@@ -4100,7 +4100,6 @@ impl Lowerer {
                         return ctx;
                     }
                     if property == "to_f64" && arguments.is_empty() {
-                        // Note: F32→F64 cast (fpext) has Inkwell bug — use to_str instead
                         let result = ctx.alloc_local("_tf64", MirType::F64);
                         ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::F64 });
                         return ctx;

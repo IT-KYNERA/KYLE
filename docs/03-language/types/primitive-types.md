@@ -104,7 +104,7 @@ x = t.0 # → 1
 y = t.1 # → "hello"
 ```
 
-### set: `set<T>` [ ]
+### set: `set<T>` [x]
 
 Hash set. Construction via `set{...}` o constructor.
 
@@ -442,7 +442,7 @@ str = j.stringify() # serialize
 str = j.pretty() # pretty-print
 ```
 
-### file [ ]
+### file [x]
 
 ```ky
 f = file.open("/tmp/test.txt", "w")
@@ -511,8 +511,8 @@ result = sb.to_str()
 | Category | [x] Completo | [ ] Designed | ❌ No planned |
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitivis | 13 | 2 (`u8-u64` codegen, `never`) | 1 (`byte`) |
-| Compounds | 4 | 4 (tuple, set, slice) | 2 (Queue, Stack — usar `{T}`) |
+| Compounds | 5 | 3 (tuple, slice) | 2 (Queue, Stack — usar `{T}`) |
 | Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
-| Specialized | 1 (str_builder) | 14 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, file, socket, path) | 0 |
-| **Total** | **22** | **31** | **3** |
+| Specialized | 2 (str_builder, file) | 13 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path) | 0 |
+| **Total** | **24** | **29** | **3** |

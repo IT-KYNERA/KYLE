@@ -13,14 +13,9 @@ impl Optimizer {
     pub fn optimize(&self, module: &mut MirModule) {
         // First, evaluate const fn calls (replaces them with constants)
         self.const_eval(module);
-        // TODO: Inlining pass disabled — causes segfault, needs fixing
-        // self.inline_small_functions(module);
+        self.inline_small_functions(module);
         for func in &mut module.functions {
             self.constant_fold(func);
-            // Phase 15: GVN requires SSA Form (dest must be assigned once).
-            // On non-SSA MIR, a dest can be overwritten, making GVN incorrect.
-            // Enable only when SSA codegen is active.
-            // self.local_value_numbering(func);
             // Compute move_locals: locals with Move-type allocas
             let move_locals: HashSet<usize> = func.basic_blocks.iter()
                 .flat_map(|b| b.insts.iter())

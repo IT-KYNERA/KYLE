@@ -654,7 +654,7 @@ Cada type package → integration nativa requiere:
 
 | Type | Status | Necesita |
 |------|--------|----------|
-| `file` | ❌ fd i32 | `final class file` + methods read/write/close/seek |
+| `file` | ✅ | `final class file` with read/write/close/seek |
 | `socket` | ❌ fd i32 | `final class socket` + listen/accept/connect |
 | `path` | ❌ str | `final class path` + join/dirname/basename/exists |
 | `json` | ❌ functions | `final class json` + parse/stringify methods |
@@ -663,7 +663,7 @@ Cada type package → integration nativa requiere:
 
 | Type | Status | Notis |
 |------|--------|-------|
-| `set<T>` | 🔶 | Type enum existe. Falta: parser, MirType, runtime hash set |
+| `set<T>` | ✅ | Implementado |
 | `Queue<T>` | ❌ | FIFO. Runtime simple (ring buffer) |
 | `Stack<T>` | ❌ | LIFO. `{T}` with push/pop ya is stack |
 | `slice` | ❌ | Vista de array existente `&[T]`. Necesario for pasar arrays without copiar |
