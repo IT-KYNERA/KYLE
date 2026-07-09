@@ -1917,7 +1917,7 @@ impl Parser {
             if chars[i] == '\\' && i + 1 < chars.len() && (chars[i + 1] == '{' || chars[i + 1] == '}') {
                 current.push(chars[i + 1]);
                 i += 2;
-            } else if chars[i] == '{' {
+            } else if chars[i] == '{' && i + 1 < chars.len() && chars[i + 1] != '"' {
                 if !current.is_empty() {
                     parts.push(Expr::Literal {
                         value: Literal::String(std::mem::take(&mut current)),
