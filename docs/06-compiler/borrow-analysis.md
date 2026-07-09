@@ -29,7 +29,7 @@ El borrow analysis opera about MIR para:
 ```
 
 - **Copy**: i8-u64, f32-f64, bool, char, void, ptr — se copian, no se rastrean
-- **Move**: str, {T}, {K:V}, [T; N], structs — ownership tracking
+- **Move**: str, {T}, {K:V}, [T, N], structs — ownership tracking
 
 ## Algoritmo
 

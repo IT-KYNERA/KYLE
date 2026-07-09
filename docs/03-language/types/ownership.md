@@ -21,7 +21,7 @@
 | `i8`, `i16`, `i32`, `i64` | `str` |
 | `u8`, `u16`, `u32`, `u64` | `{T}` (list) |
 | `f32`, `f64` | `{K:V}` (dict) |
-| `bool`, `char` | `[T; N]` (array) |
+| `bool`, `char` | `[T, N]` (array) |
 | `ptr` | classes, structs, enums |
 
 ## Variables

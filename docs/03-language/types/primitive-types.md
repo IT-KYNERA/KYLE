@@ -10,7 +10,7 @@
 | Semantics | Typis |
 |-----------|-------|
 | **Copy** (automatic en `y = x`) | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` |
-| **Move** (ownership transfer en `y = x`) | `str`, `{T}`, `{K:V}`, `[T; N]`, classes, structs, enums |
+| **Move** (ownership transfer en `y = x`) | `str`, `{T}`, `{K:V}`, `[T, N]`, classes, structs, enums |
 
 ```ky
 x = 42; y = x # ambos vivos (Copy)
@@ -57,21 +57,21 @@ p = 0 as ptr # ptr
 
 ## Compound types
 
-### Array: `[T; N]` [x]
+### Array: `[T, N]` [x]
 
 Stack array, size fijo en compile-time. GEP directo, cero runtime calls.
-Soporta multidimensional via anidamiento `[[T; N]; M]`.
+Soporta multidimensional via anidamiento `[[T, N], M]`.
 
 ```ky
 # Unidimensional
-a = [1, 2, 3] # → [i32; 3]
-b = [0; 100] # → [i32; 100], repetido
-c = [1 as i64; 10000] # → [i64; 10000]
+a = [1, 2, 3] # → [i32, 3]
+b = [0; 100] # → [i32, 100], repetido
+c = [1 as i64; 10000] # → [i64, 10000]
 first = a[0] # GEP + load
 a[0] = 99 # GEP + store
 
-# Multidimensional: [[T; N]; M]
-matriz: [[i32; 4]; 3] = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
+# Multidimensional: [[T, N], M]
+matriz: [[i32, 4], 3] = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
 x = matriz[1][2] # → 7
 ```
 

@@ -554,7 +554,7 @@ Featuris identificadas en benchmarks que Kyle necesita for be competitivo as lan
 
 | Feature | Importancia | Dependencia | ETA |
 |---------|-------------|-------------|-----|
-| **Native Arrays `[T; N]`** | ⭐⭐⭐⭐⭐ | Parbe + typeck + MIR + codegen | 🚀 **En progreso** |
+| **Native Arrays `[T, N]`** | ⭐⭐⭐⭐⭐ | Parbe + typeck + MIR + codegen | 🚀 **En progreso** |
 | **Threads + Concurrency** | ⭐⭐⭐⭐⭐ | Runtime | 📅 Fase D |
 | **Async/Await en Kyle** | ⭐⭐⭐⭐ | Runtime + compiler | 📅 Fase D |
 | **HashMap completo** (String→any) | ⭐⭐⭐⭐ | Runtime | 📅 Fase C |
@@ -576,7 +576,7 @@ Featuris identificadas en benchmarks que Kyle necesita for be competitivo as lan
 | `[1, 2, 3]` | `[1, 2, 3]` | Array (before era list, ahora is array nativo) |
 | `[1, 2, 3]` | `{1, 2, 3}` | List (cambia de `[]` a `{}`) |
 | `list<T>` | `{T}` | List type (before `[T]`, ahora `{T}`) |
-| — | `[T; N]` | Array type (nuevo, repite value) |
+| — | `[T, N]` | Array type (nuevo, repite value) |
 | `{"key": val}` | `{key: val}` | Dict literal (se can omitir quotes) |
 | `fn f(^s: str)` = move | `y = x` = move by defecto | Ownership: move implicito |
 | `y = x` = borrow | `fn f(s: &str)` = borrow | Ownership: `&` is borrow |
@@ -607,12 +607,12 @@ Improvements identificadas en benchmarks que cierran brecha with C/Rust:
 |---|--------|-----------|-----------------|----------|
 | 1 | **Register alloc for `^i32`/`^i64`** — LLVM mem2reg no promueve allocas simplis with multiplis BB. Solution: identificar `^i32`/`^i64` en codegen y emitir valueis LLVM directo without alloca | Fib (1.6× → 1.0×) | ⭐⭐⭐ | 1-2 days |
 | 2 | **`list.reserve(n)` + batch push** — `reserve(n)` pre-asigna capacidad (✅ implemented). Batch push reduce N FFI calls a 1 | Primis (2.7× → 1.5×) | ⭐⭐ | 1 day |
-| 3 | **Arrays `[T; N]` pass-by-reference** — Los arrays hoy are copy-by-value. `fn f(a: &[i64; N])` evitaria copiar 80KB en cada acceso. Necesita `&[T; N]` as type de parameter | Matmul (7.8× → 1.0×) | ⭐⭐⭐⭐⭐ | 3-4 days |
+| 3 | **Arrays `[T, N]` pass-by-reference** — Los arrays hoy are copy-by-value. `fn f(a: &[i64, N])` evitaria copiar 80KB en cada acceso. Necesita `&[T, N]` as type de parameter | Matmul (7.8× → 1.0×) | ⭐⭐⭐⭐⭐ | 3-4 days |
 | 4 | **str_builder inline hints** — Marcar append with inlinehint for eliminar overhead de FFI call | Concat (1.1× → 0.5×) | ⭐ | 0.5 day |
 
 ### Notis de implementation
 
-**#3 Arrays pass-by-reference** is improvement more importante (matmul is benchmark more representstivo de computo real). Hoy cada `a[i]` en `[i64; 10000]`:
+**#3 Arrays pass-by-reference** is improvement more importante (matmul is benchmark more representstivo de computo real). Hoy cada `a[i]` en `[i64, 10000]`:
 1. (innecesario) Load del array completo (80KB)
 2. GEP about resultado
 3. Load del element

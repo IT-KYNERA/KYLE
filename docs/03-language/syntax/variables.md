@@ -46,7 +46,7 @@ a: f64 = 3.14
 b: f64 = a # COPY
 ```
 
-### Move (str, {T}, {K:V}, [T; N], clases)
+### Move (str, {T}, {K:V}, [T, N], clases)
 
 ```ky
 s: str = "hola"

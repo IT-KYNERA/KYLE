@@ -2,7 +2,7 @@
 
 > Tipos compuestos de Kyle: arrays, listas, tuplas, diccionarios.
 
-## Array: `[T; N]`
+## Array: `[T, N]`
 
 Array nativo en stack, tamaño fijo en compile-time.
 **Los arrays trabajan por índice** — acceso directo y óptimo vía GEP.
@@ -10,7 +10,7 @@ Array nativo en stack, tamaño fijo en compile-time.
 ### Unidimensional
 
 ```ky
-arr: [i32; 3] = [1, 2, 3]
+arr: [i32, 3] = [1, 2, 3]
 arr = [0; 100]    # repetir valor
 x: i32 = arr[0]   # get por índice (GEP + load)
 arr[0] = 99       # set por índice (GEP + store)
@@ -21,11 +21,11 @@ for i in 0..arr.len():
 
 ### Multidimensional
 
-Sintaxis `[T; N]` anidada para arrays de 2+ dimensiones:
+Sintaxis `[T, N]` anidada para arrays de 2+ dimensiones:
 
 ```ky
 # 2D: matriz 3×4
-matriz: [[i32; 4]; 3] = [
+matriz: [[i32, 4], 3] = [
     [1, 2, 3, 4],
     [5, 6, 7, 8],
     [9, 10, 11, 12]
@@ -33,7 +33,7 @@ matriz: [[i32; 4]; 3] = [
 x = matriz[1][2]  # → 7
 
 # 3D: cubo 2×3×2
-cubo: [[[i32; 2]; 3]; 2] = [
+cubo: [[[i32, 2], 3], 2] = [
     [[1, 2], [3, 4], [5, 6]],
     [[7, 8], [9, 10], [11, 12]]
 ]
@@ -43,10 +43,10 @@ y = cubo[1][2][0]  # → 11
 ### Pasaje por borrow vs mutable borrow
 
 ```ky
-fn fn_borrow(arr: &[i32; 100]):     # solo lectura
+fn fn_borrow(arr: &[i32, 100]):     # solo lectura
     println(arr[0].to_str())
 
-fn fn_mut(arr: ^&[i32; 100]):       # permite modificar
+fn fn_mut(arr: ^&[i32, 100]):       # permite modificar
     arr[0] = 99
 ```
 
@@ -88,7 +88,7 @@ val: i32 = d["key"]
 
 | Type | Heap/Stack | Size | Acceso primario |
 |------|-----------|--------|-----------------|
-| `[T; N]` | Stack | Fijo | Por índice (GEP) |
+| `[T, N]` | Stack | Fijo | Por índice (GEP) |
 | `{T}` | Heap | Dinámico | Por valor (push/pop/remove/contains) |
 | `(T1, T2)` | Stack | Fijo | Por campo (.0, .1) |
 | `{K: V}` | Heap | Dinámico | Por clave (set/get) |

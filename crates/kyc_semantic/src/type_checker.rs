@@ -1006,8 +1006,14 @@ impl TypeChecker {
                 Type::List(Box::new(self.infer_expr(&elements[0])))
             }
             Expr::Array { elements, .. } => {
-                for e in elements { self.infer_expr(e); }
-                Type::Array(Box::new(Type::I32), elements.len())
+                let et = if elements.is_empty() {
+                    Type::I32
+                } else {
+                    let first_type = self.infer_expr(&elements[0]);
+                    for e in elements.iter().skip(1) { self.infer_expr(e); }
+                    first_type
+                };
+                Type::Array(Box::new(et), elements.len())
             }
             Expr::ArrayRepeat { value, count, .. } => {
                 let val_type = self.infer_expr(value);
@@ -1087,6 +1093,7 @@ impl TypeChecker {
                 self.infer_expr(index);
                 match tt {
                     Type::List(et) => *et,
+                    Type::Array(et, _) => *et,
                     Type::Str => Type::Str,
                     Type::Dict(_, vt) => *vt,
                     _ => Type::I32,
@@ -1313,7 +1320,7 @@ impl TypeChecker {
             (Type::I16, Type::U32) | (Type::U32, Type::I16) => return true,
             (Type::I16, Type::U64) | (Type::U64, Type::I16) => return true,
             (Type::I32, Type::U64) | (Type::U64, Type::I32) => return true,
-            // Empty array [] matches any [T; N] (zero-init)
+            // Empty array [] matches any [T, N] (zero-init)
             (Type::Array(ia, 0), Type::Array(_, _)) |
             (Type::Array(_, _), Type::Array(ia, 0)) if **ia == Type::I32 => return true,
             _ => {}

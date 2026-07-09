@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Los typis Move (`str`, `{T}`, `{K:V}`, `[T; N]`, clases) no se can copiar
+Los typis Move (`str`, `{T}`, `{K:V}`, `[T, N]`, clases) no se can copiar
 implicitamente with `y = x`. Para create una copia independiente se usa `.clone()`.
 
 ## Uso
@@ -29,8 +29,8 @@ println(original.len().to_str()) # 4
 ## Clone en arrays
 
 ```ky
-arr: [i32; 3] = [1, 2, 3]
-copia: [i32; 3] = arr.clone()
+arr: [i32, 3] = [1, 2, 3]
+copia: [i32, 3] = arr.clone()
 ```
 
 ## Clone en clases

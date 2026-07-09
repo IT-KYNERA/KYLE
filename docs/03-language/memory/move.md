@@ -8,7 +8,7 @@
 | Type | Semantics en `y = x` |
 |------|---------------------|
 | `i8..u64`, `f32..f64`, `bool`, `char`, `ptr` | **Copy** — ambos vivos |
-| `str`, `{T}`, `{K:V}`, `[T; N]`, clasis | **Move** — `x` invalido |
+| `str`, `{T}`, `{K:V}`, `[T, N]`, clasis | **Move** — `x` invalido |
 
 ## Comportamiento
 

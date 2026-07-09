@@ -399,6 +399,15 @@ impl<'ctx> Codegen<'ctx> {
                                 );
                             }
                         }
+                        if let SsaInst::ArrayElemPtr { dest, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *dest { self.field_ptr_allocas.push(None); }
+                            if self.field_ptr_allocas[*dest].is_none() {
+                                self.field_ptr_allocas[*dest] = Some(
+                                    self.builder.build_alloca(ptr_ty, "_aelem")
+                                        .map_err(|e| format!("ssa aep: {}", e))?
+                                );
+                            }
+                        }
                     }
                 }
                 self.param_values.clear();
@@ -809,6 +818,7 @@ impl<'ctx> Codegen<'ctx> {
                                 let arr_llvm = self.llvm_type(arr_type);
                                 let zero = self.context.i32_type().const_zero();
                                 let idx_val = block_vals[bi].get(index).copied()
+                                    .or_else(|| func.const_values.get(index).map(|c| self.constant_to_llvm(c)))
                                     .or_else(|| self.alloca_map.get(*index).and_then(|p| *p).map(|p| p.as_basic_value_enum()))
                                     .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum());
                                 let idx_i32 = if let BasicValueEnum::IntValue(iv) = idx_val {
@@ -824,6 +834,14 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("ssaelem: {}", e))?
                                 };
                                 block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                                if *dest < self.field_ptr_allocas.len() {
+                                    if let Some(fpa) = self.field_ptr_allocas[*dest] {
+                                        self.builder.build_store(fpa, gep)
+                                            .map_err(|e| format!("aelem fpa store: {}", e))?;
+                                    }
+                                }
+                                let elem_llvm = self.llvm_type(elem_type);
+                                self.field_ptr_types.insert(*dest, elem_llvm);
                             }
                         }
                         SsaInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {

@@ -11,7 +11,7 @@ Es rapido (solo mover un pointer) y automatic.
 fn example() i32:
  x: i32 = 42 # stack
  y: f64 = 3.14 # stack
- z: [i32; 3] = [1, 2, 3] # stack (array de size fijo)
+ z: [i32, 3] = [1, 2, 3] # stack (array de size fijo)
  x + y as i32 + z[0]
 ```
 
@@ -24,7 +24,7 @@ fn example() i32:
 | `f64` | 8 bytis |
 | `bool` | 1 byte |
 | `ptr` | 8 bytis |
-| `[T; N]` | `N * size(T)` |
+| `[T, N]` | `N * size(T)` |
 | `str` | 8 bytis (pointer al heap) |
 | `{T}` | 8 bytis (pointer al heap) |
 
@@ -55,8 +55,8 @@ fn example() str:
 Stack:
 ┌─────────────┐
 │ s: ptr ─────┼─────► ┌──────────────────────┐
-│ v: ptr ─────┼──┐ │ "Hola, mundo!\0" │
-│ x: i32 = 42 │ │ └──────────────────────┘
+│ v: ptr ─────┼─┐  │ "Hola, mundo!\0" │
+│ x: i32 = 42 │ │  └─────────────────────────┘
 │ │ │ ┌──────────────────────┐
 └─────────────┘ └──►│ data: ptr ──► [1,2,3] │
  │ len: 3 │

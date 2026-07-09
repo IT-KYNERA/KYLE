@@ -38,7 +38,7 @@ pub enum AstType {
     Mutable { inner: Box<AstType>, span: Span },
     /// `&T` — borrow type
     Borrow { inner: Box<AstType>, span: Span },
-    /// `[T; N]` — fixed-size native array type
+    /// `[T, N]` — fixed-size native array type
     Array { inner: Box<AstType>, size: usize, span: Span },
     /// `ptr` — raw pointer type (for FFI/unsafe)
     Ptr { span: Span },

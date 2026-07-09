@@ -820,7 +820,7 @@ impl Parser {
         if self.at(TokenKind::LBracket) {
             self.advance();
             let inner = self.parse_type()?;
-            if self.at(TokenKind::Semicolon) {
+            if self.at(TokenKind::Comma) {
                 self.advance();
                 let size = self.parse_expr()?;  // parse integer expression for size
                 let size_val = if let Expr::Literal { value: Literal::Integer(n), .. } = &size {
@@ -830,8 +830,8 @@ impl Parser {
                 return Ok(AstType::Array { inner: Box::new(inner), size: size_val, span: self.span_from(start) });
             }
             self.expect(TokenKind::RBracket)?;
-            // [T] sin ; N ya no es válido — usa {T} para lista o [T; N] para array
-            return Err("[T] no es válido. Usa {T} para lista o [T; N] para array".to_string());
+            // [T] sin , N ya no es válido — usa {T} para lista o [T, N] para array
+            return Err("[T] no es válido. Usa {T} para lista o [T, N] para array".to_string());
         }
         // Handle function pointer type: fn(T, U) V
         if self.at(TokenKind::Fn) {

@@ -5,7 +5,7 @@
 
 ---
 
-## Array `[T; N]`
+## Array `[T, N]`
 
 Array nativo en **stack**. Tamaño fijo en compile-time.
 **Acceso por índice únicamente** — es más rápido y contiguo que una lista.
@@ -14,13 +14,13 @@ Array nativo en **stack**. Tamaño fijo en compile-time.
 
 ```ky
 # Declaración con tipo explícito
-arr: [i32; 5] = [1, 2, 3, 4, 5]
+arr: [i32, 5] = [1, 2, 3, 4, 5]
 
 # Inferencia de tipo
-nums = [1, 2, 3]         # → [i32; 3]
+nums = [1, 2, 3]         # → [i32, 3]
 
 # Repetir valor
-repetido = [0; 100]      # → [i32; 100]
+repetido = [0; 100]      # → [i32, 100]
 
 # Lectura/escritura por índice (O(1), GEP directo)
 x = arr[2]               # load
@@ -32,11 +32,11 @@ n = arr.len()            # → 5
 
 ### Multidimensional
 
-Arrays de arrays vía sintaxis `[T; N]` anidada:
+Arrays de arrays vía sintaxis `[T, N]` anidada:
 
 ```ky
 # 2D: matriz 3×4
-matriz: [[i32; 4]; 3] = [
+matriz: [[i32, 4], 3] = [
     [1, 2, 3, 4],
     [5, 6, 7, 8],
     [9, 10, 11, 12]
@@ -47,7 +47,7 @@ x = matriz[0][2]         # → 3 (fila 0, columna 2)
 matriz[1][1] = 99        # modificar elemento
 
 # 3D: cubo 2×3×2
-cubo: [[[i32; 2]; 3]; 2] = [
+cubo: [[[i32, 2], 3], 2] = [
     [[1, 2], [3, 4], [5, 6]],
     [[7, 8], [9, 10], [11, 12]]
 ]
@@ -78,7 +78,7 @@ Los arrays son **Copy** porque están en stack. Pero para arrays grandes convien
 
 ```ky
 fn main():
-    nums: [i32; 1000] = [0; 1000]
+    nums: [i32, 1000] = [0; 1000]
     nums[0] = 1
 
     # 1. PASAR POR VALOR — COPIA el array completo (1000 × 4 bytes)
@@ -92,19 +92,19 @@ fn main():
     duplicar_todo(^&nums)
     println(nums[1].to_str())  # 2
 
-fn sumar_valor(arr: [i32; 1000]) i64:
+fn sumar_valor(arr: [i32, 1000]) i64:
     total = 0
     for i in 0..arr.len():
         total = total + arr[i]
     total
 
-fn sumar_borrow(arr: &[i32; 1000]) i64:
+fn sumar_borrow(arr: &[i32, 1000]) i64:
     total = 0
     for i in 0..arr.len():
         total = total + arr[i]
     total
 
-fn duplicar_todo(arr: ^&[i32; 1000]):
+fn duplicar_todo(arr: ^&[i32, 1000]):
     for i in 0..arr.len():
         arr[i] = arr[i] * 2
 ```
@@ -124,7 +124,7 @@ fn duplicar_todo(arr: ^&[i32; 1000]):
 
 ### Cuándo usar array vs lista
 
-| Criterio | Array `[T; N]` | Lista `{T}` |
+| Criterio | Array `[T, N]` | Lista `{T}` |
 |----------|----------------|-------------|
 | Tamaño | Fijo (compile-time) | Dinámico (crece/decrece) |
 | Memoria | Stack | Heap |
@@ -446,13 +446,13 @@ resultado = nums.iter()
 | `y = col` | Copia | **Move** (source inválido) |
 | `y = col.clone()` | Copia | Copia explícita |
 
-*\* Los arrays `[T; N]` son siempre Copy porque están en stack, independientemente de T.*
+*\* Los arrays `[T, N]` son siempre Copy porque están en stack, independientemente de T.*
 
 ---
 
 ## Comparativa de rendimiento
 
-| Operación | Array `[T;N]` | Lista `{T}` | Set `set<T>` | Dict `{K: V}` |
+| Operación | Array `[T,N]` | Lista `{T}` | Set `set<T>` | Dict `{K: V}` |
 |-----------|:------------:|:-----------:|:------------:|:--------------:|
 | Get por índice/clave | O(1) GEP | O(1) GEP | — | O(1) hash |
 | Set por índice/clave | O(1) GEP | O(1) GEP | — | O(1) hash |

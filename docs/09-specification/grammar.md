@@ -29,7 +29,7 @@ type = primitive_type | user_type | generic_type
  | "!" type -- fallible (T!)
  | "&" type -- borrow
  | "^" type -- mutable
- | "[" type ";" NUMBER "]" -- array
+ | "[" type "," NUMBER "]" -- array
  | "{" type "}" -- list
  | "{" type ":" type "}" -- dict
  | "(" type { "," type } ")" -- tuple

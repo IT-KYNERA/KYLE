@@ -42,7 +42,7 @@ Module
  FnPtr { params: Vec<AstType>, return_: Box<AstType>, span: Span },
  Mutable { inner: Box<AstType>, span: Span }, // ^T
  Borrow { inner: Box<AstType>, span: Span }, // &T
- Array { inner: Box<AstType>, size: usize, span: Span }, // [T; N]
+ Array { inner: Box<AstType>, size: usize, span: Span }, // [T, N]
  Ptr { span: Span },
 }
 ```

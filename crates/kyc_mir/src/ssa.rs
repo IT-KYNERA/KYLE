@@ -455,11 +455,12 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     let index_id = match index {
                         MirValue::Local(id) => alloca_current.get(id).copied().unwrap_or(*id),
                         MirValue::Param(id) => param_value_ids.get(*id).copied().unwrap_or(*id),
-                        MirValue::Constant(_) => {
+                        MirValue::Constant(c) => {
                             let val_id = ssa.values.len();
                             ssa.values.push(SsaValue {
                                 type_: MirType::I32, name: format!("_idx{}", *dest)
                             });
+                            ssa.const_values.insert(val_id, c.clone());
                             stacks.entry(*dest).or_default().push(val_id);
                             val_id
                         }

@@ -18,7 +18,7 @@ call, branch, etc. Esta is fase more grande y compleja del compiler.
  Bool, Char, // Boolean, character
  Str, // String pointer
  Void, Ptr(Box<MirType>), // Void, typed pointer
- Array(Box<MirType>, usize), // [T; N]
+ Array(Box<MirType>, usize), // [T, N]
  List(Box<MirType>), // {T}
  Dict(Box<MirType>, Box<MirType>), // {K: V}
  Struct(String, Vec<(String, MirType)>), // Named struct
