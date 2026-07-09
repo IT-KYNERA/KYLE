@@ -53,6 +53,9 @@ $configDir = Join-Path $LLVM_PREFIX "include\llvm\Config"
 New-Item -ItemType Directory -Force -Path $configDir | Out-Null
 
 $configH = Join-Path $configDir "llvm-config.h"
+if (Test-Path $configH) {
+    Write-Host "llvm-config.h already exists"
+} else {
 Write-Host "Creating $configH..."
 Set-Content -Path $configH -Encoding ASCII -Value @'
 #ifndef LLVM_CONFIG_H
@@ -115,6 +118,7 @@ Set-Content -Path $configH -Encoding ASCII -Value @'
 
 #endif
 '@
+}
 
 # ─── Create .def files ──────────────────────────────────────────
 $defs = @{
@@ -125,6 +129,7 @@ $defs = @{
 }
 foreach ($name in $defs.Keys) {
     $path = Join-Path $configDir $name
+    if (Test-Path $path) { continue }
     Write-Host "Creating $path..."
     Set-Content -Path $path -Value $defs[$name] -Encoding ASCII
 }
@@ -134,6 +139,9 @@ $binDir = Join-Path $LLVM_PREFIX "bin"
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
 $llvmConfigCmd = Join-Path $binDir "llvm-config.cmd"
+if (Test-Path $llvmConfigCmd) {
+    Write-Host "llvm-config.cmd already exists"
+} else {
 Write-Host "Creating $llvmConfigCmd..."
 Set-Content -Path $llvmConfigCmd -Encoding ASCII -Value @'
 @echo off
@@ -167,6 +175,7 @@ if /i "%~1"=="--obj-root"      echo %PREFIX_FWD% & goto :eof
 if /i "%~1"=="--src-root"      echo %PREFIX_FWD% & goto :eof
 exit /b 1
 '@
+}
 
 # ─── Compile llvm-config.exe (real .exe, needed by llvm-sys) ───
 # llvm-sys on Windows looks for llvm-config.exe in LLVM_SYS_181_PREFIX/bin/.
@@ -224,7 +233,9 @@ class LlvmConfig {
 '@
 
 $llvmExe = Join-Path $binDir "llvm-config.exe"
-if ($cscPath) {
+if (Test-Path $llvmExe) {
+    Write-Host "llvm-config.exe already exists (provided by tarball)"
+} elseif ($cscPath) {
     Write-Host "Compiling llvm-config.exe with csc.exe..."
     & $cscPath /nologo /target:exe /out:$llvmExe $csSrc 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0 -and (Test-Path $llvmExe)) {
