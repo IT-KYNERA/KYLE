@@ -217,7 +217,7 @@ impl fmt::Display for MirType {
                 }
                 write!(f, " }}")
             }
-            MirType::Dict(key, val) => write!(f, "Dict<{}, {}>", key, val),
+            MirType::Dict(key, val) => write!(f, "dict<{}, {}>", key, val),
         }
     }
 }

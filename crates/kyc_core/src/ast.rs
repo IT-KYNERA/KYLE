@@ -1354,7 +1354,7 @@ impl fmt::Display for AstType {
             }
             AstType::Optional { inner, .. } => write!(f, "Option<{}>", inner),
             AstType::Error { inner, .. } => write!(f, "Result<{}>", inner),
-            AstType::Dict { key, value, .. } => write!(f, "Dict<{}, {}>", key, value),
+            AstType::Dict { key, value, .. } => write!(f, "dict<{}, {}>", key, value),
             AstType::FnPtr { params, return_, .. } => {
                 write!(f, "(")?;
                 for (i, p) in params.iter().enumerate() {

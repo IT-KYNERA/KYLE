@@ -1603,7 +1603,7 @@ impl LanguageServer {
             }
             AstType::Optional { inner, .. } => format!("{}?", Self::fmt_ast_type(inner)),
             AstType::Error { inner, .. } => format!("{}!", Self::fmt_ast_type(inner)),
-            AstType::Dict { key, value, .. } => format!("Dict<{}, {}>", Self::fmt_ast_type(key), Self::fmt_ast_type(value)),
+            AstType::Dict { key, value, .. } => format!("dict<{}, {}>", Self::fmt_ast_type(key), Self::fmt_ast_type(value)),
             AstType::FnPtr { params, return_, .. } => {
                 let args: Vec<String> = params.iter().map(Self::fmt_ast_type).collect();
                 format!("fn({}) {}", args.join(", "), Self::fmt_ast_type(return_))

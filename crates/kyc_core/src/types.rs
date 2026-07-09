@@ -190,7 +190,7 @@ impl fmt::Display for Type {
             Type::Option(inner) => write!(f, "Option<{}>", inner),
             Type::Array(inner, size) => write!(f, "[{}; {}]", inner, size),
             Type::List(inner) => write!(f, "list<{}>", inner),
-            Type::Dict(k, v) => write!(f, "Dict<{}, {}>", k, v),
+            Type::Dict(k, v) => write!(f, "dict<{}, {}>", k, v),
             Type::Set(inner) => write!(f, "Set<{}>", inner),
             Type::Object(fields) => {
                 write!(f, "{{")?;

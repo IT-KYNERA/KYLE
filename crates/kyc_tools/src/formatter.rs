@@ -169,7 +169,7 @@ impl Formatter {
                 out.push('!');
             }
             AstType::Dict { key, value, .. } => {
-                out.push_str("Dict<");
+                out.push_str("dict<");
                 self.write_type(out, key);
                 out.push_str(", ");
                 self.write_type(out, value);
