@@ -51,9 +51,9 @@
 
 | Syntax | Meaning | Status |
 |--------|---------|--------|
-| `^T` | Mutable marker | [ ] |
-| `&T` | Immutable borrow | [ ] |
-| `^&T` | Mutable borrow | [ ] |
+| `^T` | Mutable marker | [x] |
+| `&T` | Immutable borrow | [x] |
+| `^&T` | Mutable borrow | [x] |
 | `box<T>` | Heap pointer | [-] |
 | `rc<T>` | Ref count | [-] |
 | `arc<T>` | Atomic refcount | [-] |
@@ -62,11 +62,11 @@
 
 | Feature | Status | Usage |
 |---------|--------|-------|
-| `async fn` | [ ] | `async fn f(p: T) R:` |
-| `await` | [ ] | `await task` |
-| `async:` block | [ ] | `t = async: ...` |
-| `parallel_for` | [ ] | `parallel_for(fn, 0, N)` |
-| `spawn_thread` | [ ] | `spawn_thread(fn, arg)` |
+| `async fn` | [x] | `async fn f(p: T) R:` |
+| `await` | [x] | `await task` |
+| `async:` block | [x] | `t = async: ...` |
+| `parallel_for` | [x] | `parallel.for(fn, 0, N)` |
+| `spawn_thread` | [x] | `thread.spawn(fn, arg)` |
 | `future<T>`, `channel<T>`, `mutex<T>` | [-] | Not yet |
 
 ## Standard Library (native)
