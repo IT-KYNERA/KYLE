@@ -3835,15 +3835,30 @@ impl Lowerer {
                             }
                     }
 
-                    // Built-in type method dispatch (str, list, dict, char)
+                    // Built-in type method dispatch (str, list, array, dict, char)
                     let is_str = obj_type.as_ref().map(|t| *t == MirType::Str).unwrap_or(false);
                     let is_list = obj_type.as_ref().map(|t| matches!(t, MirType::List(_))).unwrap_or(false);
+                    let is_array = obj_type.as_ref().map(|t| matches!(t, MirType::Array(_, _))).unwrap_or(false);
                     let is_char = obj_type.as_ref().map(|t| *t == MirType::Char).unwrap_or(false);
 
                     // === UNIVERSAL METHOD: .type() on any value ===
                     if property == "type" && arguments.is_empty() {
                         if let Some(ref obj_t) = obj_type {
                             build_typeinfo_struct(obj_t, &mut ctx);
+                            return ctx;
+                        }
+                    }
+
+                    // === ARRAY METHODS ===
+                    if is_array && property == "len" && arguments.is_empty() {
+                        // Array length is compile-time constant (N in [T, N])
+                        // Return as I32 to match loop variable type in for-range
+                        if let MirType::Array(_, size) = obj_type.as_ref().unwrap() {
+                            let result = ctx.alloc_local("_arrlen", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: result,
+                                value: MirValue::Constant(MirConstant::I32(*size as i32)),
+                            });
                             return ctx;
                         }
                     }

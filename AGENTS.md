@@ -222,7 +222,7 @@ Update the version in ALL of these files (search for the old version string):
 | file | Field | Example |
 |------|-------|---------|
 | `Cargo.toml` | `version = "0.X.X"` | `version = "0.5.2"` |
-| `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.5.3` |
+| `AGENTS.md` | `Version: v0.X.X` (line 232) | `Version: v0.6.0` |
 | `install.sh` | `VERSION="v0.X.X"` | `VERSION="v0.5.2"` |
 | `vscode-ky/install-extension.sh` | `TAG="v0.X.X"` | `TAG="v0.5.2"` |
 | `vscode-ky/package.json` | `"version": "0.X.X"` | `"version": "0.5.2"` |
@@ -355,7 +355,7 @@ rm -rf /tmp/verify_release_*
 
 ---
 
-*Version: v0.5.3 · Last updated: 2026-07-06 — Ver `AGENTS.md` > "How to publish a new release" para proceso completo de release.*
+*Version: v0.6.0 · Last updated: 2026-07-06 — Ver `AGENTS.md` > "How to publish a new release" para proceso completo de release.*
 
 ---
 

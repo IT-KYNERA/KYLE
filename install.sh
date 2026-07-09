@@ -2,7 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="v0.5.3"
+VERSION="v0.6.0"
 
 # --- Uninstall mode ---
 if [ "${1:-}" = "uninstall" ]; then
