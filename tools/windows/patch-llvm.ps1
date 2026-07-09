@@ -54,7 +54,7 @@ New-Item -ItemType Directory -Force -Path $configDir | Out-Null
 
 $configH = Join-Path $configDir "llvm-config.h"
 Write-Host "Creating $configH..."
-Set-Content -Path $configH -Value @'
+Set-Content -Path $configH -Encoding ASCII -Value @'
 #ifndef LLVM_CONFIG_H
 #define LLVM_CONFIG_H
 
@@ -114,7 +114,7 @@ Set-Content -Path $configH -Value @'
 #define LLVM_BIG_ENDIAN 0
 
 #endif
-'@ -Encoding ASCII
+'@
 
 # ─── Create .def files ──────────────────────────────────────────
 $defs = @{
@@ -135,7 +135,8 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
 $llvmConfigCmd = Join-Path $binDir "llvm-config.cmd"
 Write-Host "Creating $llvmConfigCmd..."
-Set-Content -Path $llvmConfigCmd -Value '@echo off
+Set-Content -Path $llvmConfigCmd -Encoding ASCII -Value @'
+@echo off
 setlocal EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "PREFIX=%%~fI"
@@ -165,14 +166,14 @@ if /i "%~1"=="--link-static"   echo( & goto :eof
 if /i "%~1"=="--obj-root"      echo %PREFIX_FWD% & goto :eof
 if /i "%~1"=="--src-root"      echo %PREFIX_FWD% & goto :eof
 exit /b 1
-'@ -Encoding ASCII
+'@
 
 # ─── Compile llvm-config.exe (if C compiler available) ─────────
 $cSrcDir = Join-Path $LLVM_PREFIX "src"
 New-Item -ItemType Directory -Force -Path $cSrcDir | Out-Null
 $cSrc = Join-Path $cSrcDir "llvm-config.c"
 
-Set-Content -Path $cSrc -Value @'
+Set-Content -Path $cSrc -Encoding ASCII -Value @'
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
@@ -216,7 +217,7 @@ int main(int argc, char *argv[]) {
     if (strcmp(a, "--src-root")==0)      { puts(fwd); return 0; }
     return 1;
 }
-'@ -Encoding ASCII
+'@
 
 # Try to compile with cl.exe (MSVC)
 $clPath = Get-Command "cl.exe" -ErrorAction SilentlyContinue
