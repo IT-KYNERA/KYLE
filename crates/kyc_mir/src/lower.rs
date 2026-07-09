@@ -3640,11 +3640,8 @@ impl Lowerer {
                                         _ => None,
                                     }
                                 };
-                                let fn_name = resolve_namespace(mod_name, property)
+                                let mut fn_name = resolve_namespace(mod_name, property)
                                     .unwrap_or_else(|| property.clone());
-                                let call_type = builtin_return_type(&fn_name)
-                                    .or_else(|| self.fn_returns.borrow().get(&fn_name).cloned())
-                                    .unwrap_or(MirType::Void);
                                 let mut args = Vec::new();
                                 for arg in arguments {
                                     if let Expr::Identifier { name, .. } = arg {
@@ -3660,6 +3657,38 @@ impl Lowerer {
                                     ctx = self.lower_expr(ctx, arg);
                                     args.push(MirValue::Local(ctx.next_local - 1));
                                 }
+                                // Special handling for json.deserialize<T>(str)
+                                if fn_name == "deserialize" && args.len() == 1 {
+                                    if let Some(first_type_arg) = type_args.first() {
+                                        let struct_defs = ctx.struct_defs.clone();
+                                        let mir_type = ast_type_to_mir(first_type_arg, Some(&struct_defs));
+                                        if let MirType::Struct(_, fields) = &mir_type {
+                                            let descriptor = build_descriptor(fields);
+                                            let json_arg = args.remove(0);
+                                            let out_local = ctx.alloc_local("_dout", mir_type.clone());
+                                            args.push(json_arg);
+                                            args.push(MirValue::Constant(MirConstant::String(descriptor)));
+                                            args.push(MirValue::Local(out_local));
+                                            let ret_local = ctx.alloc_local("_dret", MirType::I32);
+                                            ctx.current_block.insts.push(MirInst::Call {
+                                                dest: Some(ret_local),
+                                                name: "ky_json_to_struct".to_string(),
+                                                args,
+                                            });
+                                            let load = ctx.alloc_local("_dval", mir_type.clone());
+                                            ctx.current_block.insts.push(MirInst::Load {
+                                                dest: load,
+                                                src: out_local,
+                                            });
+                                            return ctx;
+                                        }
+                                    }
+                                    // Without type args, fall back to json_parse (returns Dict<str,i64>)
+                                    fn_name = "json_parse".to_string();
+                                }
+                                let call_type = builtin_return_type(&fn_name)
+                                    .or_else(|| self.fn_returns.borrow().get(&fn_name).cloned())
+                                    .unwrap_or(MirType::Void);
                                 let dest = ctx.alloc_local("_modcall", call_type.clone());
                                 if call_type == MirType::Str {
                                     ctx.string_locals.push(dest);
@@ -4858,22 +4887,6 @@ impl Lowerer {
 
                 // Handle serialize(val) and deserialize<T>(str) before call_type setup
                 {
-                    fn build_descriptor(fields: &[(String, MirType)]) -> String {
-                        let mut parts: Vec<String> = Vec::new();
-                        for (fname, ftype) in fields {
-                            let type_name = match ftype {
-                                MirType::Str => "str",
-                                MirType::I32 => "i32",
-                                MirType::I64 => "i64",
-                                MirType::Bool => "bool",
-                                MirType::F64 => "f64",
-                                _ => "i32",
-                            };
-                            parts.push(format!("{}:{}", fname, type_name));
-                        }
-                        parts.join(",")
-                    }
-
                     // type<T>() — return TypeInfo for a type
                     if resolved_name == "type" && type_args.len() == 1 {
                         if let Some(first_type_arg) = type_args.first() {
@@ -6944,6 +6957,24 @@ impl Lowerer {
     }
 }
 
+/// Build a struct descriptor string for JSON serialize/deserialize.
+/// Format: "field1:type1,field2:type2" where type is str/i32/i64/bool/f64.
+fn build_descriptor(fields: &[(String, MirType)]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for (fname, ftype) in fields {
+        let type_name = match ftype {
+            MirType::Str => "str",
+            MirType::I32 => "i32",
+            MirType::I64 => "i64",
+            MirType::Bool => "bool",
+            MirType::F64 => "f64",
+            _ => "i32",
+        };
+        parts.push(format!("{}:{}", fname, type_name));
+    }
+    parts.join(",")
+}
+
 /// Check if a call name refers to a builtin that returns a string.
 #[allow(dead_code)]
 fn is_string_builtin_name(name: &str) -> bool {
@@ -6981,7 +7012,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("size".into(), MirType::I32),
         ])),
         "ceil" | "floor" | "round" => Some(MirType::F64),
-        "ky_getenv" | "ky_setenv" => Some(MirType::Str),
+        "ky_getenv" | "ky_setenv" | "ky_base64_encode" | "ky_sha1" => Some(MirType::Str),
         "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Some(MirType::I64),
         "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Some(MirType::I64),
         "ky_channel_close" => Some(MirType::Void),

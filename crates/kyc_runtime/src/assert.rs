@@ -25,3 +25,19 @@ pub extern "C" fn ky_assert_ne(a: i64, b: i64) {
         ky_failed(&format!("assertion failed: {} == {}", a, b));
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_assert_str_eq(a: *const u8, b: *const u8) {
+    if a.is_null() || b.is_null() {
+        ky_failed("assertion failed: string is null");
+    }
+    let a_str = unsafe { std::ffi::CStr::from_ptr(a as *const i8) };
+    let b_str = unsafe { std::ffi::CStr::from_ptr(b as *const i8) };
+    if a_str.to_bytes() != b_str.to_bytes() {
+        ky_failed(&format!(
+            "assertion failed: \"{}\" != \"{}\"",
+            a_str.to_string_lossy(),
+            b_str.to_string_lossy()
+        ));
+    }
+}

@@ -57,8 +57,21 @@ See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 - **No `self`**: use `this.field` for field access
 - **Generic params**: uppercase `T` (only exception to snake_case)
 
+<<<<<<< Updated upstream
 **This file (AGENTS.md) does NOT contain syntax reference.**
 Do not guess Kyle syntax — always check the docs.
+=======
+### Sesión 11 — Fase 6: Fix auto-declared variable type inference (ident = expr)
+| Feature | Archivos | Estado |
+|---------|----------|--------|
+| Fix: type checker auto-declare `ident = expr` | `klc_semantic/src/type_checker.rs` | ✅ `check_stmt` intercepta `Stmt::Expression(Expr::Assignment)` con destino `Identifier`, infiere el tipo del valor y registra la variable en el scope actual |
+| Root cause | scope.rs / type_checker.rs | ✅ Scope resolver auto-declara variables dentro del scope de la función, pero `resolve_function` hace `pop_scope()` al terminar, eliminando las variables. El type checker arranca con un símbol table vacío (sin variables auto-declaradas). |
+| Fix detail | `klc_semantic/src/type_checker.rs` | ✅ Al encontrar `result = expr` en `check_stmt`, si `result` no existe en el símbol table, infiere el tipo de `expr` y lo inserta como variable inmutable. Así el type checker puede resolver `str(result)` en expresiones posteriores. |
+| Verificación | `examples/fibonacci.kl` | ✅ `klc run examples/fibonacci.kl` → `fibonacci(10) = 55` |
+| Tests | - | ✅ 84 tests, 0 failures |
+
+## Glossary — Abreviaciones Técnicas
+>>>>>>> Stashed changes
 
 ---
 
@@ -205,6 +218,7 @@ LLVM 18.1 required.
 
 ---
 
+<<<<<<< Updated upstream
 ## How to publish a new release
 
 ### 1. Pre-flight checklist
@@ -238,6 +252,34 @@ cargo build --release --bin ky
 ```
 
 ### 4. Rebuild package tarballs (if packages changed)
+=======
+FASE 6 — Self-Hosting (⏳ In Progress)
+├── [x] Runtime char ops + ord() builtin
+├── [x] Fixes: if_then block collision, elif chain, string escapes, string return type, string concat type, break lowering
+├── [x] Lexer escrito en KL (examples/lexer.kl) — tokeniza archivos reales
+├── [x] Fix: char/int comparison + type widening en lowering
+├── [x] Fix: RAII alloc en todas las funciones string runtime (kl_alloc)
+├── [x] Codegen Cast ptr↔int via ptrtoint/inttoptr
+├── [x] String lists: `["a", "b"]` → List(Str), `tokens[0]` → str
+├── [x] Parser escrito en KL
+├── [x] Fix: auto-declared variable type inference (`result = expr` → type checker registra variable)
+├── [ ] Compilador completo en KL
+│   Hito: kl build klc
+```
+
+### Phase 4/5 Bugfixes
+- `codegen.rs`: MirValue::Param(id) devolvía 0 siempre → ahora resuelve al parámetro LLVM real
+- `lower.rs`: str() pasaba i32 a kl_i64_to_str (espera i64) → añadido Cast i32→i64
+- `lower.rs`: Stmt::Variable/TypedVariable no emitían Store para literales → arreglado
+- `optimize.rs`: DCE eliminaba Store si solo Return lo usaba → añadido collect_terminator_refs
+- `symbol_table.rs`: println faltaba de builtins → añadido
+- `lexer.rs`: make_token() usaba Span::dummy() → ahora usa posición real (line, column, offset)
+- `parser.rs`: todos los AST nodos usaban Span::dummy() → ahora propagan spans desde tokens
+- `formatter.rs`: conservación de comentarios usando last_comment_line tracking + source_lines
+- `parser.rs`: `parse_block` ahora para tras 1 statement si no hay Newline (single-line bodies)
+- `parser.rs`: `parse_if` consume Newlines entre if-body y elif/else (blank lines entre branches)
+- `type_checker.rs`: auto-declara `ident = expr` con el tipo inferido del valor (para que `str(result)` funcione)
+>>>>>>> Stashed changes
 
 If you modified any package source (`packages/<name>/src/`), rebuild its tarball:
 

@@ -125,25 +125,31 @@ pub extern "C" fn ky_tcp_close(fd: i32) -> i32 {
 /// `data` must be null-terminated. `out` must be 20 bytes.
 /// Returns 0 on success.
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_sha1(data: *const u8, data_len: i32, out: *mut u8) -> i32 {
-    if data.is_null() || out.is_null() || data_len <= 0 {
-        return -1;
+pub extern "C" fn ky_sha1(data: *const u8) -> *mut u8 {
+    if data.is_null() {
+        return std::ptr::null_mut();
     }
-    let data_slice = unsafe { std::slice::from_raw_parts(data, data_len as usize) };
+    let len = crate::ky_strlen(data);
+    let data_slice = unsafe { std::slice::from_raw_parts(data, len as usize) };
     let hash = ring::digest::digest(&ring::digest::SHA1_FOR_LEGACY_USE_ONLY, data_slice);
     let hash_bytes = hash.as_ref();
+    let out_len = hash_bytes.len();
+    let buf = crate::ky_alloc((out_len + 1) as i64);
+    if buf.is_null() { return std::ptr::null_mut(); }
     unsafe {
-        std::ptr::copy_nonoverlapping(hash_bytes.as_ptr(), out, hash_bytes.len().min(20));
+        std::ptr::copy_nonoverlapping(hash_bytes.as_ptr(), buf, out_len);
+        *buf.add(out_len) = 0;
     }
-    0
+    buf
 }
 
 /// Base64 encode bytes. Returns heap-allocated string.
 #[unsafe(no_mangle)]
-pub extern "C" fn ky_base64_encode(data: *const u8, data_len: i32) -> *mut u8 {
-    if data.is_null() || data_len <= 0 {
+pub extern "C" fn ky_base64_encode(data: *const u8) -> *mut u8 {
+    if data.is_null() {
         return std::ptr::null_mut();
     }
+    let data_len = crate::ky_strlen(data);
     let data_slice = unsafe { std::slice::from_raw_parts(data, data_len as usize) };
     use base64::Engine;
     let encoded = base64::engine::general_purpose::STANDARD.encode(data_slice);

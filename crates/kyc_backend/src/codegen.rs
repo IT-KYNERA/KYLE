@@ -570,7 +570,7 @@ impl<'ctx> Codegen<'ctx> {
                                 "substr" => "ky_substr",
                                 "json_parse" => "ky_json_parse", "json_stringify" => "ky_json_stringify",
                                 "assert" => "ky_assert", "assert_eq" => "ky_assert_eq",
-                                "assert_ne" => "ky_assert_ne", "assert_str" => "ky_assert_eq",
+                                "assert_ne" => "ky_assert_ne", "assert_str" => "ky_assert_str_eq",
                                 _ => name,
                             };
                              if self.module.get_function(runtime_name).is_none() {
@@ -2203,8 +2203,8 @@ impl<'ctx> Codegen<'ctx> {
                                 "assert" => "ky_assert",
                                 "assert_eq" => "ky_assert_eq",
                                 "assert_ne" => "ky_assert_ne",
-                                "assert_str" => "ky_assert_eq",
-                                _ => name,
+                                "assert_str" => "ky_assert_str_eq",
+                            _ => name,
                             };
                              if self.module.get_function(runtime_name).is_none() {
                                 // Auto-declare extern function on first use with inferred types
