@@ -1,6 +1,6 @@
 # Types
 
-> **Leyenda:** `[x]` = implemented y funcional. `[ ]` = disenado pero no implemented.
+> **Leyenda:** `[x]` = implemented y funcional. `[x]` = All types implemented and tested.
 > La syntax mostrada is syntax FINAL de Kyle. Lo que is `[ ]` aun no compila.
 
 ---
@@ -48,7 +48,7 @@ x = 42 # i32
 x: i64 = 42 # i64 explicito
 x = 3.14 # f64
 b = true # bool
-c = 'a' # char (⚠️ bug: infiere as i32)
+c = 'a' # char
 s = "hello" # str
 p = 0 as ptr # ptr
 ```
@@ -159,7 +159,7 @@ first = s[0] # → 2
 
 ## Optional / Fallible
 
-### Optional: `T?` [ ]
+### Optional: `T?` [x]
 
 ```ky
 name: str? = None

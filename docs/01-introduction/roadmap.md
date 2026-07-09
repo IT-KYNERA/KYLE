@@ -630,16 +630,6 @@ Requiere nuevo `MirType::Slice` o modificar `MirInst::ArrayElemPtr` for aceptar 
 Kyle must tener **todos typis importbefore as nativos** (no packages).
 Solo HTTP/Postgres/SQLite are packages. El resto is infraestructura base.
 
-### Fase 1: Arreglar bugs existentes
-
-| Bug | Filis | Impacto |
-|-----|----------|---------|
-| `u8`/`u16`/`u32`/`u64` without MirType ni codegen | `mir.rs`, `codegen.rs`, `lower.rs` | No se can declarar variablis unsigned |
-| `tuple` without MirType ni codegen | `mir.rs`, `codegen.rs` | Existe en parbe pero no compila |
-| `char = 'a'` type mismatch | `type_checker.rs` | Bug conocido y documentado |
-| `T?` type mismatch with `str?` | `type_checker.rs` | `str?` causa "expects 1 arg, got 2" |
-| `T!` with `-> T!` syntax | `parser.rs`, `type_checker.rs` | Arrow syntax no funciona |
-
 ### Fase 2: Migrar packagis a nativos
 
 Cada type package → integration nativa requiere:

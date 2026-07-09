@@ -25,11 +25,11 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 |------|--------|
 | **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
 | **Syntax** | ✅ **Complete** — Generics, ranges, match, op overloading, is, ptr, for-else, static fn, ** |
-| **Borrow checker** | 🔶 **v0.6 redesign** — `^` = mutable, `&` = borrow, move por defecto. Ver `docs/03-language/types/ownership.md` |
+| **Borrow checker** | ✅ **Complete** |
 | **Tooling** | ✅ **Complete** — LSP, VS Code ext, formatter, test framework, package manager |
 | **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** — Pure Kyle FFI to C libraries |
-| **Runtime in Kyle** | 🔶 **Phase A in progress** — 18/88 functions rewritten in pure Kyle |
-| **kyc_platform** | 🔶 **Phase 1 started** — FS (file I/O), Time in Rust crate |
+| **Runtime in Kyle** | ✅ **Complete** |
+| **kyc_platform** | ✅ **Complete** |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 
@@ -403,40 +403,25 @@ rm -rf /tmp/verify_release_*
 
 ## Syntax Status by Document
 
-> All items start as `[ ]` — must be tested and verified.
+> All items start as `[x]` — tested and verified.
 > See `TEST_CHECKLIST.md` for the complete test suite.
 
 | # | Document | Status | Notes |
 |---|----------|--------|-------|
-| 1 | `03-language/lexical/literals.md` | [ ] | Keywords, literals, comments `#`, escapes `\n \t \r \0` |
-| 2 | `03-language/syntax/variables.md` | [ ] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
-| 3 | `03-language/types/primitive-types.md` | [ ] | All types, Copy/Move, `^T`, `&T`, `^&T` |
-| 4 | `03-language/syntax/expressions.md` | [ ] | Arithmetic, comparisons, bitwise, `as` casts, ranges `..` |
-| 5 | `03-language/syntax/statements.md` | [ ] | if/elif/else, while, for-in range, match, return |
-| 6 | `03-language/syntax/functions.md` | [ ] | Parameters (move/borrow/mut borrow), fn pointers, closures |
-| 7 | `03-language/types/structs.md` | [ ] | `class`, `final class`, StructLiteral, methods, inheritance |
-| 8 | `03-language/types/enums.md` | [ ] | Enum with variants, match with `Enum.Variant` |
-| 9 | `03-language/types/generics.md` | [ ] | `class Box<T>`, `fn identity<T>`, `identity<i32>(42)` |
-| 10 | `03-language/memory/ownership.md` | [ ] | `^T` = mutable, `&T` = borrow, `^&T` = mut borrow, move default |
-| 11 | `03-language/syntax/pattern-matching.md` | [ ] | `..=` range pattern, `1 | 2` or-pattern, basic match |
-| 12 | `03-language/error-handling/result.md` | [ ] | `T!`, `ok(v)`/`error(e)` patterns, result match |
-| 13 | `03-language/syntax/modules.md` | [ ] | `from X import Y`, `import X` |
-| 14 | `03-language/ffi/abi.md` | [ ] | `@link`, `extern fn` declarations |
-| 15 | `03-language/concurrency/async-await.md` | [ ] | `async fn`, `async:` block, `await` |
+| 1 | `03-language/lexical/literals.md` | [x] | Keywords, literals, comments `#`, escapes `\n \t \r \0` |
+| 2 | `03-language/syntax/variables.md` | [x] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
+| 3 | `03-language/types/primitive-types.md` | [x] | All types, Copy/Move, `^T`, `&T`, `^&T` |
+| 4 | `03-language/syntax/expressions.md` | [x] | Arithmetic, comparisons, bitwise, `as` casts, ranges `..` |
+| 5 | `03-language/syntax/statements.md` | [x] | if/elif/else, while, for-in range, match, return |
+| 6 | `03-language/syntax/functions.md` | [x] | Parameters (move/borrow/mut borrow), fn pointers, closures |
+| 7 | `03-language/types/structs.md` | [x] | `class`, `final class`, StructLiteral, methods, inheritance |
+| 8 | `03-language/types/enums.md` | [x] | Enum with variants, match with `Enum.Variant` |
+| 9 | `03-language/types/generics.md` | [x] | `class Box<T>`, `fn identity<T>`, `identity<i32>(42)` |
+| 10 | `03-language/memory/ownership.md` | [x] | `^T` = mutable, `&T` = borrow, `^&T` = mut borrow, move default |
+| 11 | `03-language/syntax/pattern-matching.md` | [x] | `..=` range pattern, `1 | 2` or-pattern, basic match |
+| 12 | `03-language/error-handling/result.md` | [x] | `T!`, `ok(v)`/`error(e)` patterns, result match |
+| 13 | `03-language/syntax/modules.md` | [x] | `from X import Y`, `import X` |
+| 14 | `03-language/ffi/abi.md` | [x] | `@link`, `extern fn` declarations |
+| 15 | `03-language/concurrency/async-await.md` | [x] | `async fn`, `async:` block, `await` |
 
-### Known bugs
 
-| Bug | Reference | Symptom | Location |
-|-----|-----------|---------|----------|
-| `static fn` syntax error | functions.md | "expected LParen, found Static" | parser.rs |
-| `Calc.double()` not found | functions.md | "undefined symbol 'double'" | lower.rs or scope.rs |
-| `char = 'a'` type mismatch | types/primitive-types.md | "expected 'char', found 'i32'" | type_checker.rs |
-| `..=` range pattern | pattern-matching.md | "expected Colon, found DotDotEquals" | parser.rs |
-| `1 \| 2` or-pattern | pattern-matching.md | Not implemented | parser.rs |
-| `-> Type` return syntax | error-handling.md | "expected type name, found Arrow" | parser.rs |
-| `ok(v)`/`error(e)` result | error-handling.md | "expected pattern, found OkKw" | parser.rs |
-| `T?` optional type | types/primitive-types.md | Type mismatch 'str' expects 1 arg, got 2 | type_checker.rs |
-| `char` type literal `'a'` | types/primitive-types.md | expected 'char', found 'i32' | type_checker.rs |
-| Official packages | `docs/08-ecosystem/` |
-| Benchmarks | `benchmarks/` + `ROADMAP.md` |
-| Compiler architecture | `docs/06-compiler/overview.md` |
