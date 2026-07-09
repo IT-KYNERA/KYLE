@@ -814,34 +814,44 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         SsaInst::ArrayElemPtr { dest, ptr, index, arr_type, elem_type } => {
-                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
-                                let arr_llvm = self.llvm_type(arr_type);
-                                let zero = self.context.i32_type().const_zero();
-                                let idx_val = block_vals[bi].get(index).copied()
-                                    .or_else(|| func.const_values.get(index).map(|c| self.constant_to_llvm(c)))
-                                    .or_else(|| self.alloca_map.get(*index).and_then(|p| *p).map(|p| p.as_basic_value_enum()))
-                                    .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum());
-                                let idx_i32 = if let BasicValueEnum::IntValue(iv) = idx_val {
-                                    if iv.get_type().get_bit_width() != 32 {
-                                        self.builder.build_int_truncate(iv, self.context.i32_type(), "_ssaetrunc")
-                                            .map_err(|e| format!("ssaetrunc: {}", e))?
-                                    } else { iv }
-                                } else {
-                                    self.context.i32_type().const_zero()
-                                };
-                                let gep = unsafe {
-                                    self.builder.build_in_bounds_gep(arr_llvm, base, &[zero, idx_i32], "_ssaelem")
-                                        .map_err(|e| format!("ssaelem: {}", e))?
-                                };
-                                block_vals[bi].insert(*dest, gep.as_basic_value_enum());
-                                if *dest < self.field_ptr_allocas.len() {
-                                    if let Some(fpa) = self.field_ptr_allocas[*dest] {
-                                        self.builder.build_store(fpa, gep)
-                                            .map_err(|e| format!("aelem fpa store: {}", e))?;
+                            let base_ptr = if *ptr < self.field_ptr_allocas.len() && self.field_ptr_allocas[*ptr].is_some() {
+                                let p = self.field_ptr_allocas[*ptr].unwrap();
+                                Some(self.builder.build_load(
+                                    self.context.ptr_type(Default::default()), p, "_ssaebase"
+                                ).map_err(|e| format!("ssaebase: {}", e))?.as_basic_value_enum())
+                            } else {
+                                self.alloca_map.get(*ptr).and_then(|p| *p).map(|p| p.as_basic_value_enum())
+                            };
+                            if let Some(base) = base_ptr {
+                                if let BasicValueEnum::PointerValue(base_pv) = base {
+                                    let arr_llvm = self.llvm_type(arr_type);
+                                    let zero = self.context.i32_type().const_zero();
+                                    let idx_val = block_vals[bi].get(index).copied()
+                                        .or_else(|| func.const_values.get(index).map(|c| self.constant_to_llvm(c)))
+                                        .or_else(|| self.alloca_map.get(*index).and_then(|p| *p).map(|p| p.as_basic_value_enum()))
+                                        .unwrap_or(self.context.i32_type().const_zero().as_basic_value_enum());
+                                    let idx_i32 = if let BasicValueEnum::IntValue(iv) = idx_val {
+                                        if iv.get_type().get_bit_width() != 32 {
+                                            self.builder.build_int_truncate(iv, self.context.i32_type(), "_ssaetrunc")
+                                                .map_err(|e| format!("ssaetrunc: {}", e))?
+                                        } else { iv }
+                                    } else {
+                                        self.context.i32_type().const_zero()
+                                    };
+                                    let gep = unsafe {
+                                        self.builder.build_in_bounds_gep(arr_llvm, base_pv, &[zero, idx_i32], "_ssaelem")
+                                            .map_err(|e| format!("ssaelem: {}", e))?
+                                    };
+                                    block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                                    if *dest < self.field_ptr_allocas.len() {
+                                        if let Some(fpa) = self.field_ptr_allocas[*dest] {
+                                            self.builder.build_store(fpa, gep)
+                                                .map_err(|e| format!("aelem fpa store: {}", e))?;
+                                        }
                                     }
+                                    let elem_llvm = self.llvm_type(elem_type);
+                                    self.field_ptr_types.insert(*dest, elem_llvm);
                                 }
-                                let elem_llvm = self.llvm_type(elem_type);
-                                self.field_ptr_types.insert(*dest, elem_llvm);
                             }
                         }
                         SsaInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
@@ -2723,7 +2733,19 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         MirInst::ArrayElemPtr { dest, ptr, index, arr_type, elem_type } => {
-                            if let Some(base_ptr) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                            // Check if ptr is a previously-computed GEP pointer (chained GEP)
+                            let fpa_found = *ptr < self.field_ptr_allocas.len() && self.field_ptr_allocas[*ptr].is_some();
+                            let alloca_found = self.alloca_map.get(*ptr).and_then(|p| *p);
+                            let base_ptr = if fpa_found {
+                                let p = self.field_ptr_allocas[*ptr].unwrap();
+                                let loaded = self.builder.build_load(
+                                    self.context.ptr_type(Default::default()), p, "_aebase"
+                                ).map_err(|e| format!("aebase load: {}", e))?;
+                                loaded.as_basic_value_enum()
+                            } else if let Some(p) = alloca_found {
+                                p.as_basic_value_enum()
+                            } else { continue; };
+                            if let BasicValueEnum::PointerValue(base_ptr) = base_ptr {
                                 let arr_llvm = self.llvm_type(arr_type);
                                 let zero = self.context.i32_type().const_zero();
                                 let idx_val = self.value_to_llvm(index, &last_value_map)

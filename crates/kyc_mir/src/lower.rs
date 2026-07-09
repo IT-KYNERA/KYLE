@@ -2926,6 +2926,21 @@ impl Lowerer {
                                 (tv, tv, ctx.local_types.get(&tv).cloned())
                             }
                         } else {
+                            // Nested array assignment like m[i][j] = val.
+                            let indices = self.collect_array_indices(left);
+                            if let Some((root_name, idx_exprs)) = indices {
+                                if let Some(&root_local) = ctx.locals.get(&root_name) {
+                                    ctx = self.lower_nested_array_geps(ctx, &idx_exprs, root_local);
+                                    ctx = self.lower_expr(ctx, right);
+                                    let val_local2 = ctx.next_local - 1;
+                                    let gep_ptr = ctx.next_local - 2;
+                                    ctx.current_block.insts.push(MirInst::Store {
+                                        dest: gep_ptr,
+                                        value: MirValue::Local(val_local2),
+                                    });
+                                    return ctx;
+                                }
+                            }
                             ctx = self.lower_expr(ctx, index_target);
                             let tv = ctx.next_local - 1;
                             (tv, tv, ctx.local_types.get(&tv).cloned())
@@ -5271,9 +5286,31 @@ impl Lowerer {
                             (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
                         }
                     } else {
-                        ctx = self.lower_expr(ctx, list_expr);
-                        let tv = ctx.next_local - 1;
-                        (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                        // Nested array assignment like m[i][j] = val.
+                        // Walk the index chain to emit GEPs into the root array.
+                        let indices = self.collect_array_indices(target);
+                        if let Some((root_name, idx_exprs)) = indices {
+                            if let Some(&root_local) = ctx.locals.get(&root_name) {
+                                ctx = self.lower_nested_array_geps(ctx, &idx_exprs, root_local);
+                                // Emit Store directly — GEP chain already computed
+                                ctx = self.lower_expr(ctx, value);
+                                let val_local = ctx.next_local - 1;
+                                let gep_ptr = ctx.next_local - 2;
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: gep_ptr,
+                                    value: MirValue::Local(val_local),
+                                });
+                                return ctx;
+                            } else {
+                                ctx = self.lower_expr(ctx, list_expr);
+                                let tv = ctx.next_local - 1;
+                                (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                            }
+                        } else {
+                            ctx = self.lower_expr(ctx, list_expr);
+                            let tv = ctx.next_local - 1;
+                            (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                        }
                     };
                     ctx = self.lower_expr(ctx, index);
                     let idx_val = ctx.next_local - 1;
@@ -6039,7 +6076,19 @@ impl Lowerer {
                 } else {
                     ctx = self.lower_expr(ctx, target);
                     let tv = ctx.next_local - 1;
-                    (tv, tv, ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32))
+                    let t = ctx.local_types.get(&tv).cloned().unwrap_or(MirType::I32);
+                    // For non-identity array targets (e.g., nested mat[i][j]), the value
+                    // needs a temp alloca so ArrayElemPtr can GEP into it
+                    if matches!(t, MirType::Array(_, _)) {
+                        let arr_tmp = ctx.alloc_local("_arrtmp", t.clone());
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: arr_tmp,
+                            value: MirValue::Local(tv),
+                        });
+                        (tv, arr_tmp, t)
+                    } else {
+                        (tv, tv, t)
+                    }
                 };
                 ctx = self.lower_expr(ctx, index);
                 let index_val = ctx.next_local - 1;
@@ -7045,6 +7094,46 @@ impl Lowerer {
                 ctx
             }
         }
+    }
+
+    /// Collect root identifier and all index expressions from a nested Index chain.
+    /// e.g., m[i][j] → Some(("m", [i_expr, j_expr]))
+    fn collect_array_indices<'a>(&self, expr: &'a Expr) -> Option<(String, Vec<&'a Expr>)> {
+        match expr {
+            Expr::Index { target, index, .. } => {
+                let mut result = self.collect_array_indices(target)?;
+                result.1.push(index);
+                Some(result)
+            }
+            Expr::Identifier { name, .. } => Some((name.clone(), vec![])),
+            _ => None,
+        }
+    }
+
+    /// Given a root array local and a list of index expressions (innermost first),
+    /// compute the final element pointer via nested GEP into the root array.
+    /// Uses the original Expr::Index lowering logic which correctly handles array
+    /// identifiers by using their alloca directly.
+    fn lower_nested_array_geps(&self, mut ctx: LowerCtx, idx_exprs: &[&Expr], root_local: usize) -> LowerCtx {
+        let mut ptr = root_local;
+        let mut cur_type = ctx.local_types.get(&root_local).cloned().unwrap_or(MirType::I32);
+        for idx_expr in idx_exprs {
+            ctx = self.lower_expr(ctx, idx_expr);
+            let idx_val = ctx.next_local - 1;
+            if let MirType::Array(ref inner, _) = cur_type {
+                let elem_ptr = ctx.alloc_local("_nested_aep", MirType::Ptr(Box::new(MirType::I8)));
+                ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                    dest: elem_ptr,
+                    ptr: ptr,
+                    index: MirValue::Local(idx_val),
+                    arr_type: Box::new(cur_type.clone()),
+                    elem_type: Box::new(inner.as_ref().clone()),
+                });
+                ptr = elem_ptr;
+                cur_type = inner.as_ref().clone();
+            }
+        }
+        ctx
     }
 }
 
