@@ -581,6 +581,13 @@ impl<'ctx> Codegen<'ctx> {
                                 "json_parse" => "ky_json_parse", "json_stringify" => "ky_json_stringify",
                                 "assert" => "ky_assert", "assert_eq" => "ky_assert_eq",
                                 "assert_ne" => "ky_assert_ne", "assert_str" => "ky_assert_str_eq",
+                                "list_new" => "ky_list_new", "list_push" => "ky_list_push",
+                                "list_get" => "ky_list_get", "list_set" => "ky_list_set",
+                                "list_len" => "ky_list_len", "list_pop" => "ky_list_pop", "reserve" => "ky_list_reserve",
+                                "ky_str_builder_new" => "ky_str_builder_new",
+                                "ky_str_builder_append" => "ky_str_builder_append",
+                                "ky_str_builder_to_str" => "ky_str_builder_to_str",
+                                "ky_str_builder_free" => "ky_str_builder_free",
                                 _ => name,
                             };
                              if self.module.get_function(runtime_name).is_none() {
@@ -1369,6 +1376,30 @@ impl<'ctx> Codegen<'ctx> {
             let params = [i64_ty.into()];
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_iter_collect", ft, None);
+        }
+        // ptr kl_str_builder_new(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_builder_new", ft, None);
+        }
+        // void kl_str_builder_append(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_builder_append", ft, None);
+        }
+        // ptr kl_str_builder_to_str(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_builder_to_str", ft, None);
+        }
+        // void kl_str_builder_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_builder_free", ft, None);
         }
         // ptr kl_dict_new()
         {

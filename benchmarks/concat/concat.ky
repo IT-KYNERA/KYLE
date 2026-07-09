@@ -1,17 +1,11 @@
 # Kyle — String concatenation via strBuilder
-extern fn ky_str_builder_new(capacity: i64) ptr
-extern fn ky_str_builder_append(builder: ptr, data: ptr, len: i64)
-extern fn ky_str_builder_to_str(builder: ptr) ptr
-extern fn ky_str_builder_free(builder: ptr)
-extern fn ky_strlen(s: ptr) i32
-
 fn main() i32:
-    sb := ky_str_builder_new(500000)
+    sb = str_builder.new(500000)
     i: ^i32 = 0
     while i < 500000:
-        ky_str_builder_append(sb, "x", 1)
+        str_builder.append(sb, "x")
         i = i + 1
-    result := ky_str_builder_to_str(sb)
-    println(ky_strlen(result).to_str())
-    ky_str_builder_free(sb)
+    result = str_builder.to_str(sb)
+    println(result.len().to_str())
+    str_builder.free(sb)
     0

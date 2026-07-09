@@ -1,21 +1,21 @@
-# Kyle — Sieve of Eratosthenes via native list {i32} with reserve
+# Kyle — Sieve of Eratosthenes (3M)
 fn main() i32:
-    n := 3000000
+    n = 3000000
     sieve: {i32} = {0}
-    sieve.reserve(n + 1)
-    i: ^i32 = 0
-    while i < n:
-        sieve.push(0)
+    i = 0
+    while i < n + 1:
+        list_push(^&sieve, 0)
         i = i + 1
-    count: ^i32 = 0
-    i2: ^i32 = 2
+    primes: {i32} = {0}
+    list_pop(^&primes)
+    i2 = 2
     while i2 <= n:
-        if sieve[i2] == 0:
-            count = count + 1
-            j: ^i32 = i2 + i2
+        if list_get(&sieve, i2) == 0:
+            list_push(^&primes, i2)
+            j = i2 + i2
             while j <= n:
-                sieve[j] = 1
+                list_set(^&sieve, j, 1)
                 j = j + i2
         i2 = i2 + 1
-    println("Primes: " + count.to_str())
+    println(list_len(&primes).to_str())
     0
