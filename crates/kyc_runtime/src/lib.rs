@@ -14,6 +14,7 @@ pub mod net;
 pub mod datetime;
 pub mod uuid;
 pub mod bytes;
+pub mod set;
 pub mod date;
 pub mod decimal;
 pub mod channel;

@@ -1337,18 +1337,28 @@ impl Lowerer {
                 }
                 let has_init = !matches!(v.value.as_ref(), Expr::Literal { value: Literal::None, .. });
                 let mut is_list = false;
+                let mut is_set = false;
                 if !has_init {
                     if let Some(AstType::Generic { name, .. }) = &v.type_ {
                         if name == "list" {
                             is_list = true;
+                        } else if name == "set" {
+                            is_set = true;
                         }
                     }
                 }
                 let val_local = if has_init {
                     ctx = self.lower_expr(ctx, &v.value);
                     Some(ctx.next_local - 1)
+                } else if is_set {
+                    let set_ptr = ctx.alloc_local("_setv", ast_type_to_mir(v.type_.as_ref().unwrap(), Some(&ctx.struct_defs)));
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(set_ptr),
+                        name: "ky_set_new".to_string(),
+                        args: vec![],
+                    });
+                    Some(set_ptr)
                 } else if is_list {
-                    // Auto-initialize list<T> variables with kl_list_new()
                     let list_ptr = ctx.alloc_local("_listv", ast_type_to_mir(v.type_.as_ref().unwrap(), Some(&ctx.struct_defs)));
                     ctx.current_block.insts.push(MirInst::Call {
                         dest: Some(list_ptr),
@@ -3657,6 +3667,12 @@ impl Lowerer {
                                         ("fs", "read_to_string") => Some("ky_fs_read_to_string".into()),
                                         ("fs", "write_string") => Some("ky_fs_write_string".into()),
                                         ("fs", "list_dir") => Some("ky_fs_list_dir".into()),
+                                        ("set", "new") => Some("ky_set_new".into()),
+                                        ("set", "free") => Some("ky_set_free".into()),
+                                        ("set", "add") => Some("ky_set_add".into()),
+                                        ("set", "contains") => Some("ky_set_contains".into()),
+                                        ("set", "remove") => Some("ky_set_remove".into()),
+                                        ("set", "len") => Some("ky_set_len".into()),
                                         ("time", "now_ms") => Some("ky_time_now_ms".into()),
                                         ("time", "now_us") => Some("ky_time_now_us".into()),
                                         _ => None,
@@ -7051,7 +7067,10 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "ky_fs_exists" | "ky_fs_is_dir" | "ky_fs_is_file"
             | "ky_fs_copy" | "ky_fs_remove" | "ky_fs_create_dir"
             | "ky_fs_remove_dir" | "ky_fs_rename" | "ky_fs_write_string" => Some(MirType::I32),
-        "ky_fs_size" | "ky_time_now_ms" | "ky_time_now_us" | "ky_fs_list_dir" => Some(MirType::I64),
+        "ky_fs_size" | "ky_time_now_ms" | "ky_time_now_us" | "ky_fs_list_dir" | "ky_set_len" => Some(MirType::I64),
+        "ky_set_new" => Some(MirType::Set(Box::new(MirType::I32))),
+        "ky_set_add" | "ky_set_free" => Some(MirType::Void),
+        "ky_set_contains" | "ky_set_remove" => Some(MirType::I32),
         "ky_fs_read_to_string" => Some(MirType::Str),
         _ => None,
     }
@@ -7294,6 +7313,7 @@ fn mir_type_to_type_name(t: &MirType) -> String {
         MirType::List(inner) => format!("list<{}>", mir_type_to_type_name(inner)),
         MirType::Struct(name, _) => name.clone(),
         MirType::Dict(k, v) => format!("dict<{},{}>", mir_type_to_type_name(k), mir_type_to_type_name(v)),
+        MirType::Set(inner) => format!("set<{}>", mir_type_to_type_name(inner)),
         MirType::Array(inner, _size) => format!("[{}]", mir_type_to_type_name(inner)),
     }
 }
@@ -7308,6 +7328,7 @@ fn mir_type_to_kind(t: &MirType) -> String {
         MirType::List(_) => "list".into(),
         MirType::Struct(_, _) => "struct".into(),
         MirType::Dict(_, _) => "dict".into(),
+        MirType::Set(_) => "set".into(),
         MirType::Array(_, _) => "array".into(),
     }
 }
@@ -7322,7 +7343,7 @@ fn mir_type_to_size(t: &MirType) -> i32 {
         MirType::I64 => 8,
         MirType::F32 => 4,
         MirType::F64 => 8,
-        MirType::Str | MirType::Ptr(_) | MirType::List(_) | MirType::Dict(_, _) => 8,
+        MirType::Str | MirType::Ptr(_) | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => 8,
         MirType::Void => 0,
         MirType::Struct(_, fields) => {
             // Estimate size: sum of field sizes (approximately, without padding)
@@ -7351,6 +7372,7 @@ fn mir_type_to_string(t: &MirType) -> String {
         MirType::I1 => "i1".into(),
         MirType::Array(inner, _) => format!("arr_{}", mir_type_to_string(inner)),
         MirType::Dict(key, val) => format!("dict_{}_{}", mir_type_to_string(key), mir_type_to_string(val)),
+        MirType::Set(inner) => format!("set_{}", mir_type_to_string(inner)),
     }
 }
 
@@ -7523,6 +7545,11 @@ fn mir_type_to_ast_type(t: &MirType, _span: kyc_core::span::Span) -> AstType {
         MirType::Dict(key, value) => AstType::Dict {
             key: Box::new(mir_type_to_ast_type(key, _span)),
             value: Box::new(mir_type_to_ast_type(value, _span)),
+            span: _span,
+        },
+        MirType::Set(inner) => AstType::Generic {
+            name: "set".into(),
+            args: vec![mir_type_to_ast_type(inner, _span)],
             span: _span,
         },
         MirType::I1 => AstType::Primitive { name: "bool".into(), span: _span },
@@ -7735,7 +7762,10 @@ fn ast_type_to_mir_with_subst(
         }
         AstType::Generic { name, args, .. } => {
             if let Some(t) = subst.get(name) { return t.clone(); }
-            if name == "list" {
+            if name == "set" {
+                if args.is_empty() { MirType::Set(Box::new(MirType::I32)) }
+                else { MirType::Set(Box::new(ast_type_to_mir_with_subst(&args[0], struct_defs, subst))) }
+            } else if name == "list" {
                 if args.is_empty() { MirType::List(Box::new(MirType::I32)) }
                 else { MirType::List(Box::new(ast_type_to_mir_with_subst(&args[0], struct_defs, subst))) }
             } else if name == "tuple" {
@@ -7906,7 +7936,10 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
             }
         },
         AstType::Generic { name, args, .. } => {
-            if name == "list" {
+            if name == "set" {
+                if args.is_empty() { MirType::Set(Box::new(MirType::I32)) }
+                else { MirType::Set(Box::new(ast_type_to_mir(&args[0], struct_defs))) }
+            } else if name == "list" {
                 if args.is_empty() { MirType::List(Box::new(MirType::I32)) }
                 else { MirType::List(Box::new(ast_type_to_mir(&args[0], struct_defs))) }
             } else if name == "tuple" {

@@ -386,6 +386,13 @@ impl ScopeResolver {
             }
             AstType::Generic { name, args, .. } => {
                 match name.as_str() {
+                    "set" => {
+                        if let Some(inner) = args.first() {
+                            Type::Set(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::Set(Box::new(Type::I32))
+                        }
+                    }
                     "list" => {
                         if let Some(inner) = args.first() {
                             Type::List(Box::new(self.resolve_ast_type(inner)))
@@ -429,5 +436,5 @@ fn is_namespace(name: &str) -> bool {
     matches!(name, "parallel" | "thread" | "assert" | "json" | "math"
         | "str" | "tcp" | "crypto" | "process" | "regex"
         | "date_time" | "date" | "time" | "console" | "random"
-        | "dict" | "str_builder" | "fs")
+        | "dict" | "str_builder" | "fs" | "set")
 }

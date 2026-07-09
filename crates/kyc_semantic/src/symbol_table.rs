@@ -92,6 +92,8 @@ impl SymbolTable {
             "ky_fs_create_dir", "ky_fs_remove_dir", "ky_fs_rename",
             "ky_fs_read_to_string", "ky_fs_write_string", "ky_fs_list_dir",
             "ky_time_now_ms", "ky_time_now_us",
+            "ky_set_new", "ky_set_free", "ky_set_add",
+            "ky_set_contains", "ky_set_remove", "ky_set_len",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {

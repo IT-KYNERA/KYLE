@@ -42,6 +42,7 @@ pub enum MirType {
     Struct(String, Vec<(String, MirType)>),
     /// A dictionary/map type with key and value types.
     Dict(Box<MirType>, Box<MirType>),
+    Set(Box<MirType>),
 }
 
 /// Binary operators in MIR.
@@ -161,6 +162,7 @@ pub fn is_move_type(t: &MirType) -> bool {
         MirType::Str => true,
         MirType::List(_) => true,
         MirType::Dict(_, _) => true,
+        MirType::Set(_) => true,
         // Array is NOT heap-allocated — value type on stack. No ky_free.
         // Struct is NOT heap-allocated — it's a value type on the stack.
         // Excluding it from Move prevents kl_free of stack addresses (crash).
@@ -218,6 +220,7 @@ impl fmt::Display for MirType {
                 write!(f, " }}")
             }
             MirType::Dict(key, val) => write!(f, "dict<{}, {}>", key, val),
+            MirType::Set(inner) => write!(f, "set<{}>", inner),
         }
     }
 }

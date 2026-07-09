@@ -191,7 +191,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64 | MirType::I1
             | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
             MirType::F32 | MirType::F64 => self.tbaa_nodes.get("float").copied(),
-            MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Ptr(_)
+            MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)
             | MirType::Struct(_, _) | MirType::Array(_, _) => self.tbaa_nodes.get("ptr").copied(),
             MirType::Void => None,
         }
@@ -318,7 +318,7 @@ impl<'ctx> Codegen<'ctx> {
                 fn_value.add_attribute(AttributeLoc::Param(idx), attr);
             }
             if noalias_kind > 0 {
-                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Ptr(_)) {
+                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)) {
                     let attr = self.context.create_enum_attribute(noalias_kind, 0);
                     fn_value.add_attribute(AttributeLoc::Param(idx), attr);
                 }
@@ -1500,6 +1500,41 @@ impl<'ctx> Codegen<'ctx> {
             let ft = self.context.i64_type().fn_type(&params, false);
             self.module.add_function("ky_dict_remove", ft, None);
         }
+        // ptr kl_set_new()
+        {
+            let ft = ptr_ty.fn_type(&[], false);
+            self.module.add_function("ky_set_new", ft, None);
+        }
+        // void kl_set_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_set_free", ft, None);
+        }
+        // void kl_set_add(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_set_add", ft, None);
+        }
+        // i32 kl_set_contains(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.add_runtime_extern("ky_set_contains", ft, &[("memory", "read")]);
+        }
+        // i32 kl_set_remove(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_set_remove", ft, None);
+        }
+        // i64 kl_set_len(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.add_runtime_extern("ky_set_len", ft, &[("memory", "read")]);
+        }
         // ptr kl_json_parse(ptr) — parse JSON string into dict
         {
             let params = [ptr_ty.into()];
@@ -1589,7 +1624,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
             MirType::Char => self.context.i32_type().as_basic_type_enum(),
             MirType::Str => self.context.ptr_type(Default::default()).as_basic_type_enum(),
-            MirType::List(_) | MirType::Dict(_, _) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
+            MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Void => self.context.i32_type().as_basic_type_enum(),
             MirType::Ptr(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Array(inner, size) => {
@@ -1648,7 +1683,7 @@ impl<'ctx> Codegen<'ctx> {
                 fn_value.add_attribute(AttributeLoc::Param(idx), attr);
             }
             if noalias_kind > 0 {
-                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Ptr(_)) {
+                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)) {
                     let attr = self.context.create_enum_attribute(noalias_kind, 0);
                     fn_value.add_attribute(AttributeLoc::Param(idx), attr);
                 }

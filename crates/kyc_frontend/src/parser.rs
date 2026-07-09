@@ -1127,6 +1127,10 @@ impl Parser {
                 self.advance();
                 Expr::Identifier { name: val, span: self.span_from(start) }
             }
+            TokenKind::Set => {
+                self.advance();
+                Expr::Identifier { name: "set".to_string(), span: self.span_from(start) }
+            }
             TokenKind::Type => {
                 self.advance();
                 Expr::Identifier { name: "type".to_string(), span: self.span_from(start) }
@@ -1991,7 +1995,10 @@ impl Parser {
 
     /// Returns true if the current token is an Identifier.
     fn at_identifier(&self) -> bool {
-        self.current().map_or(false, |t| matches!(t.kind, TokenKind::Identifier(_)))
+        self.current().map_or(false, |t| matches!(t.kind,
+            TokenKind::Identifier(_)
+            | TokenKind::Set
+        ))
     }
 
     /// Returns true if the current and next token look like `ident =`.
