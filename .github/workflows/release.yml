@@ -109,8 +109,6 @@ jobs:
   build-windows-x64:
     needs: create-release
     runs-on: windows-2025
-    env:
-      LLVM_SYS_181_PREFIX: ${{ github.workspace }}\llvm-18
     steps:
       - uses: actions/checkout@v4
 
@@ -121,7 +119,7 @@ jobs:
           # (7-Zip 26.x is pre-installed on windows-2025 runner)
           $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
           $out = "$env:TEMP\LLVM-18.1.8-win64.exe"
-          $dest = "$env:LLVM_SYS_181_PREFIX"
+          $dest = "${{ github.workspace }}\llvm-18"
           Write-Host "Downloading LLVM 18..."
           Invoke-WebRequest -Uri $url -OutFile $out
           Write-Host "Extracting LLVM 18 to $dest..."
@@ -133,8 +131,9 @@ jobs:
       - name: Add LLVM to PATH
         shell: pwsh
         run: |
-          echo "$env:LLVM_SYS_181_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "LLVM_SYS_181_PREFIX=$env:LLVM_SYS_181_PREFIX" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # llvm-sys searches PATH for llvm-config when LLVM_SYS_181_PREFIX is unset.
+          # On Windows, PATHEXT includes .cmd, so llvm-config.cmd is found via PATH.
+          echo "${{ github.workspace }}\llvm-18\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Patch LLVM headers & create llvm-config
         shell: pwsh
@@ -143,7 +142,7 @@ jobs:
           #   - llvm/Config/llvm-config.h (needed by Target.h, etc.)
           #   - llvm-config.exe (needed by llvm-sys build script)
           # This script creates both from scratch.
-          .\tools\windows\patch-llvm.ps1 -LLVM_PREFIX "$env:LLVM_SYS_181_PREFIX"
+          .\tools\windows\patch-llvm.ps1 -LLVM_PREFIX "${{ github.workspace }}\llvm-18"
 
       - name: Build ky
         run: cargo build --bin ky --release
