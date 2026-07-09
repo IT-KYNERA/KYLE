@@ -893,6 +893,9 @@ fn print_usage() {
     eprintln!("Project creation:");
     eprintln!("  {name} new   <project>     Create new KL project");
     eprintln!();
+    eprintln!("System:");
+    eprintln!("  {name} uninstall           Remove ky and LLVM files");
+    eprintln!();
     eprintln!("Tools:");
     eprintln!("  {name} lsp                 Start LSP server (stdio)");
     eprintln!("  {name} completions <shell>  Generate shell completions (bash, zsh, fish, powershell)");
@@ -1441,29 +1444,64 @@ fn cmd_outdated(_args: &[String]) {
 }
 
 fn cmd_uninstall() {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let targets = [
-        "/usr/local/bin/ky",
-        "/usr/local/lib/ky/libkyc_runtime.a",
-        &format!("{}/.ky/bin/ky", home),
-        &format!("{}/.ky/lib/ky/libkyc_runtime.a", home),
-        &format!("{}/.ky/lib/libkyc_runtime.a", home),
-        &format!("{}/.kl/bin/ky", home),
-        &format!("{}/.kl/lib/ky/libkyc_runtime.a", home),
-        &format!("{}/.kl/lib/libkyc_runtime.a", home),
-    ];
     let mut uninstalled = false;
-    for target in &targets {
-        if Path::new(target).exists() {
-            let _ = fs::remove_file(target);
-            println!("Removed {}", target);
-            uninstalled = true;
+
+    if cfg!(target_os = "windows") {
+        let home = std::env::var("USERPROFILE").unwrap_or_default();
+        let appdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        let targets = [
+            format!("{}/.ky/bin/ky.exe", home),
+            format!("{}/.ky/lib/kyc_runtime.lib", home),
+            format!("{}/.ky/bin/ky.exe", appdata),
+            format!("{}/.ky/lib/kyc_runtime.lib", appdata),
+        ];
+        for t in &targets {
+            let p = Path::new(t);
+            if p.exists() {
+                let _ = fs::remove_file(p);
+                println!("  removed {}", t);
+                uninstalled = true;
+            }
+        }
+        // LLVM directory (~/.ky/llvm-18 or similar)
+        let ky_dirs = [
+            format!("{}/.ky", home),
+            format!("{}/.ky", appdata),
+        ];
+        for d in &ky_dirs {
+            let llvm_dir = Path::new(d).join("llvm-18");
+            if llvm_dir.exists() {
+                let _ = fs::remove_dir_all(&llvm_dir);
+                println!("  removed {}", llvm_dir.display());
+                uninstalled = true;
+            }
+        }
+    } else {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let targets = [
+            "/usr/local/bin/ky",
+            "/usr/local/lib/ky/libkyc_runtime.a",
+            &format!("{}/.ky/bin/ky", home),
+            &format!("{}/.ky/lib/ky/libkyc_runtime.a", home),
+            &format!("{}/.ky/lib/libkyc_runtime.a", home),
+            &format!("{}/.kl/bin/ky", home),
+            &format!("{}/.kl/lib/ky/libkyc_runtime.a", home),
+            &format!("{}/.kl/lib/libkyc_runtime.a", home),
+        ];
+        for target in &targets {
+            if Path::new(target).exists() {
+                let _ = fs::remove_file(target);
+                println!("  removed {}", target);
+                uninstalled = true;
+            }
         }
     }
+
     if uninstalled {
         println!("ky uninstalled.");
+        println!("NOTE: Remove the install directories from your PATH manually.");
     } else {
-        println!("ky is not installed.");
+        println!("ky is not installed, or installation path is unknown.");
     }
 }
 
