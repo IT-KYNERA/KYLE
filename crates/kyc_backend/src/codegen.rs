@@ -1343,6 +1343,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_list_remove_at", ft, None);
         }
+        // i32 ky_list_remove_value(ptr, i64) — remove first occurrence by value
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_list_remove_value", ft, None);
+        }
         // ptr kl_list_map(ptr, ptr) — map with fn pointer
         {
             let params = [ptr_ty.into(), ptr_ty.into()];

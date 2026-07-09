@@ -77,6 +77,31 @@ y: f64 = x as f64 # ✅ cast explicito
 # y = x # ❌ type mismatch
 ```
 
+## Borrow con listas
+
+```ky
+# &T para borrow inmutable (solo lectura)
+fn contar_libros(biblioteca: &{str}) i64:
+    biblioteca.len()
+
+# ^&T para borrow mutable (lectura + escritura)
+fn agregar_libro(biblioteca: ^&{str}, libro: str):
+    biblioteca.push(libro)
+
+# Move por defecto (transferencia de ownership)
+fn tomar_lista(biblioteca: {str}):
+    # biblioteca es dueña de los datos ahora
+    println(biblioteca.len())
+
+# Uso:
+libros: ^{str} = {}
+agregar_libro(^&libros, "El Quijote")
+n = contar_libros(&libros)  # solo prestamos
+println(n.to_str())
+tomar_lista(libros)  # movemos ownership
+# libros ya no es accesible aqui (use-after-move)
+```
+
 ## Scope
 
 Las variablis pertenecen al bloque where se declaran:

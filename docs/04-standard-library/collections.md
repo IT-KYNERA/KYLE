@@ -1,112 +1,162 @@
-# collections — Lists, Sets
+# collections — Lists, Sets, Iterators
 
-> Module for collections: dynamic lists, sets, iterators.
-> Imbyt: `from collections imbyt list, set, iter`
+> Dynamic collections: lists, sets, iterators.
 
-## list: `{T}`
+## List `{T}`
 
-List dynamic en heap. It is the main collection principal de Kyle.
+Lista dinámica en heap. **Las listas trabajan por valor** — búsqueda, inserción y eliminación son por valor, no por índice. Si necesitas acceso por índice, usa arrays `[T; N]`.
 
 ```ky
-from collections imbyt list
+libros: {str} = {}
+libros.push("El Quijote")
+libros.push("Cien Años de Soledad")
+libros.push("Rayuela")
 
-v: {i32} = {1, 2, 3}
-v.push(4)
-v.reserve(100) # pre-asigna capacity
-x: i32 = v[0] # acceso by index
-v[0] = 99 # allocation by index
-ultimo: i32 = v.pop() # removis st (LIFO)
-first: i32 = v.pop_first() # removis first (FIFO)
-n: i64 = v.len()
-tiene: bool = v.withtains(10)
+# Iterar por valor
+for libro in &libros:
+    println(libro)
+
+# Buscar por valor
+if libros.contains("Rayuela"):
+    println("encontrado")
+
+# Eliminar por valor (primera ocurrencia)
+libros.remove("Cien Años de Soledad")
+
+# Eliminar por índice (solo cuando sabes la posición exacta)
+libros.remove_at(0)
+
+# Obtener y sacar del final (stack LIFO)
+ultimo = libros.pop()
 ```
 
-### Methods
+### Métodos
 
-| Method | Firma | Description |
+| Método | Firma | Descripción |
 |--------|-------|-------------|
-| `push` | `fn(val: T)` | Agregar al end |
-| `pop` | `fn() T` | Sacar st |
-| `pop_first` | `fn() T` | Sacar first |
-| `len` | `fn() i64` | Count de ements |
-| `get` | `fn(idx: i32) T` | Obtener ement |
-| `set` | `fn(idx: i32, val: T)` | Asignar ement |
-| `withtains` | `fn(val: T) bool` | `true` si existe |
-| `insert` | `fn(idx: i32, val: T)` | Insert en position |
-| `remove_at` | `fn(idx: i32) T` | Remove en position |
-| `clear` | `fn()` | Clear list |
-| `reserve` | `fn(capacity: i64)` | Pre-allocate capacity |
-| `reverse` | `fn()` | Invertir order |
+| `push` | `fn(val: T)` | Agregar al final |
+| `pop` | `fn() T` | Sacar del final (LIFO) |
+| `pop_first` | `fn() T` | Sacar del inicio (FIFO) |
+| `len` | `fn() i64` | Cantidad de elementos |
+| `get` | `fn(idx: i64) T` | Obtener por índice (para compatibilidad) |
+| `set` | `fn(idx: i64, val: T)` | Asignar por índice (para compatibilidad) |
+| `contains` | `fn(val: T) bool` | `true` si el valor existe |
+| `remove` | `fn(val: T) i32` | Eliminar por valor (1=encontrado, 0=no) |
+| `remove_at` | `fn(idx: i64) T` | Eliminar por índice |
+| `insert` | `fn(idx: i64, val: T)` | Insertar en posición |
+| `clear` | `fn()` | Vaciar la lista |
+| `reserve` | `fn(capacity: i64)` | Pre-asignar capacidad |
+| `reverse` | `fn()` | Invertir orden |
 
-### Stack via list
+### Ejemplos con ownership
 
 ```ky
-st: {i32} = {}
-st.push(10)
-st.push(20)
-val: i32 = st.pop() # → 20 (LIFO)
+# Lista mutable (necesita ^& para mutar)
+fn agregar_libro(catalogo: ^&{str}, libro: str):
+    catalogo.push(libro)
+
+fn buscar_libro(catalogo: &{str}, titulo: str) bool:
+    catalogo.contains(titulo)   # borrow inmutable, no consume
+
+fn main():
+    mis_libros: ^_{str} = {}
+    mis_libros.push("El Quijote")
+    
+    agregar_libro(^&mis_libros, "Rayuela")
+    
+    if buscar_libro(&mis_libros, "Rayuela"):
+        println("lo tengo")
+    
+    # Eliminar por valor
+    mis_libros.remove("El Quijote")
 ```
 
-### Queue via list
+### Stack (LIFO) via list
 
 ```ky
-q: {i32} = {}
-q.push(10)
-q.push(20)
-val: i32 = q.pop_first() # → 10 (FIFO)
+pila: {i32} = {}
+pila.push(10)
+pila.push(20)
+valor = pila.pop()  # → 20
 ```
 
-## set: `set<T>`
+### Queue (FIFO) via list
 
 ```ky
-from collections imbyt set
+cola: {i32} = {}
+cola.push(10)
+cola.push(20)
+valor = cola.pop_first()  # → 10
+```
 
+### Búsqueda y eliminación por valor
+
+```ky
+fn eliminar_usuario(usuarios: ^&{str}, nombre: str):
+    if usuarios.contains(nombre):
+        usuarios.remove(nombre)
+        println("eliminado")
+    else:
+        println("no encontrado")
+```
+
+## Array `[T; N]`
+
+Array nativo en stack. **Acceso por índice únicamente** — para eso están los arrays, son más rápidos y contiguos.
+
+```ky
+arr: [5]i32 = [1, 2, 3, 4, 5]
+x = arr[2]      # get por índice (O(1))
+arr[2] = 99     # set por índice (O(1))
+```
+
+## Set `set<T>`
+
+```ky
 s: set<i32> = set{1, 2, 3}
 s.add(4)
-tiene: bool = s.withtains(1)
+tiene = s.contains(1)
 s.remove(1)
-n: i64 = s.len()
+n = s.len()
 ```
 
-### Methods
+### Métodos
 
-| Method | Firma | Description |
+| Método | Firma | Descripción |
 |--------|-------|-------------|
-| `add` | `fn(val: T)` | Agregar ement |
-| `withtains` | `fn(val: T) bool` | `true` si existe |
-| `remove` | `fn(val: T) bool` | Remove ement |
-| `len` | `fn() i64` | Count |
-| `clear` | `fn()` | Clear |
+| `add` | `fn(val: T)` | Agregar elemento |
+| `contains` | `fn(val: T) bool` | `true` si existe |
+| `remove` | `fn(val: T) bool` | Eliminar elemento |
+| `len` | `fn() i64` | Cantidad |
+| `clear` | `fn()` | Vaciar |
 
-### Iteration
+### Iteración
 
 ```ky
-for val in s:
- println(val.to_str())
+for val in &s:
+    println(val.to_str())
 ```
 
-## iter: iterator
+## Iterator
 
 ```ky
-from collections imbyt iter
-
-it: iter = list.iter()
-doubled: {i32} = it.map(fn(x: i32): x * 2).collect()
-filtered: {i32} = it.filter(fn(x: i32): x > 5).collect()
-suma: i64 = it.sum()
-minimo: i64 = it.min()
-maximo: i64 = it.max()
+it = list.iter()
+doblados = it.map(fn(x: i32): x * 2).collect()
+filtrados = it.filter(fn(x: i32): x > 5).collect()
+suma = it.sum()
+minimo = it.min()
+maximo = it.max()
 ```
 
-### Methods
+### Métodos
 
-| Method | Firma | Description |
+| Método | Firma | Descripción |
 |--------|-------|-------------|
-| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada ement |
-| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar ements |
-| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un value |
-| `collect` | `fn() {T}` | Recolectar en list |
-| `next` | `fn() T?` | Siguiente ement |
-| `sum` | `fn() i64` | Sumar todos (si is numerico) |
-| `min` | `fn() T` | Minimum |
-| `max` | `fn() T` | Maximum |
+| `map` | `fn(fn: fn(T) U) iter<U>` | Transformar cada elemento |
+| `filter` | `fn(fn: fn(T) bool) iter<T>` | Filtrar elementos |
+| `fold` | `fn(init: U, fn: fn(U, T) U) U` | Reducir a un valor |
+| `collect` | `fn() {T}` | Recolectar en lista |
+| `next` | `fn() T?` | Siguiente elemento |
+| `sum` | `fn() i64` | Sumar todos |
+| `min` | `fn() T` | Mínimo |
+| `max` | `fn() T` | Máximo |

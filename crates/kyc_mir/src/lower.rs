@@ -4331,6 +4331,21 @@ impl Lowerer {
                             });
                             return ctx;
                         }
+                        // Remove by VALUE (find first occurrence, remove it, return 0/1)
+                        if is_list && property == "remove" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let val = ctx.next_local - 1;
+                            let val_i64 = ctx.alloc_local("_rv64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: val_i64, value: MirValue::Local(val), to_type: MirType::I64,
+                            });
+                            let result = ctx.alloc_local("_rres", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_list_remove_value".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(val_i64)],
+                            });
+                            return ctx;
+                        }
                         // === GET / SET (direct element access) ===
                         if is_list && property == "get" && arguments.len() == 1 {
                             ctx = self.lower_expr(ctx, &arguments[0]);
@@ -7096,6 +7111,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ])),
+        "ky_list_remove_value" => Some(MirType::I32),
         "ky_dict_contains" => Some(MirType::I32),
         "ky_dict_remove" => Some(MirType::I64),
         "ky_str_builder_new" => Some(MirType::Str),

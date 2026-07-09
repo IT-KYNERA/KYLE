@@ -1,26 +1,39 @@
 # Compound Types
 
-> Typis compuestos de Kyle: arrays, lists, tuplas, dictionarys, slices.
+> Tipos compuestos de Kyle: arrays, listas, tuplas, diccionarios.
 
 ## Array: `[T; N]`
 
-Array nativo en stack, size fijo en compile-time.
+Array nativo en stack, tamaño fijo en compile-time.
+**Los arrays trabajan por índice** — acceso directo y óptimo vía GEP.
 
 ```ky
 arr: [i32; 3] = [1, 2, 3]
-arr = [0; 100] # repetir value
-x: i32 = arr[0] # GEP + load
-arr[0] = 99 # GEP + store
+arr = [0; 100]    # repetir valor
+x: i32 = arr[0]   # get por índice (GEP + load)
+arr[0] = 99       # set por índice (GEP + store)
+
+for i in 0..arr.len():
+    println(arr[i].to_str())
 ```
 
 ## List: `{T}`
 
-List dynamic en heap.
+Lista dinámica en heap.
+**Las listas trabajan por valor** — búsqueda, inserción, eliminación son por valor, no por posición.
 
 ```ky
 v: {i32} = {1, 2, 3}
 v.push(4)
-x: i32 = v[0]
+
+# Operaciones por valor
+if v.contains(2):
+    println("está")
+v.remove(2)           # eliminar por valor (no por índice)
+
+# Indexar solo si sabes la posición exacta
+x = v.get(0)
+v.set(0, 99)
 ```
 
 ## Tuple: `(T1, T2, ...)`
@@ -38,24 +51,18 @@ d: {str: i32} = {"key": 42}
 val: i32 = d["key"]
 ```
 
-## Slice: `&[T]`
-
-```ky
-arr: [i32; 5] = [1, 2, 3, 4, 5]
-s: &[i32] = &arr[1..3] # [2, 3]
-```
-
 ## Comparison
 
-| Type | Heap/Stack | Size | Mutabilidad |
-|------|-----------|--------|-------------|
-| `[T; N]` | Stack | Fijo | Elements mutablis |
-| `{T}` | Heap | Dynamic | push/pop |
-| `(T1, T2)` | Stack | Fijo | Inmutable |
-| `{K: V}` | Heap | Dynamic | set/get |
+| Type | Heap/Stack | Size | Acceso primario |
+|------|-----------|--------|-----------------|
+| `[T; N]` | Stack | Fijo | Por índice (GEP) |
+| `{T}` | Heap | Dinámico | Por valor (push/pop/remove/contains) |
+| `(T1, T2)` | Stack | Fijo | Por campo (.0, .1) |
+| `{K: V}` | Heap | Dinámico | Por clave (set/get) |
 
 ## See also
 
-- `primitive-types.md` — Typis primitivos
-- `structs.md` — Typis usuario (class)
-- `generics.md` — Typis genericos
+- `primitive-types.md` — Tipos primitivos
+- `structs.md` — Tipos usuario (class)
+- `generics.md` — Tipos genéricos
+- `variables.md` — Ownership con ejemplos de listas

@@ -329,6 +329,30 @@ pub extern "C" fn ky_list_remove_at(list: *mut KlList, index: i64) -> i64 {
     }
 }
 
+/// Remove first occurrence of `val` from the list (by value, not index).
+/// Returns 1 if found and removed, 0 if not found.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_list_remove_value(list: *mut KlList, val: i64) -> i32 {
+    if list.is_null() { return 0; }
+    unsafe {
+        let len = (*list).len;
+        for i in 0..len {
+            let v = std::ptr::read((*list).data.add(i as usize));
+            if v == val {
+                // Found it — shift remaining elements left
+                for j in (i as usize + 1)..len as usize {
+                    let src = (*list).data.add(j);
+                    let dst = (*list).data.add(j - 1);
+                    std::ptr::write(dst, std::ptr::read(src));
+                }
+                (*list).len -= 1;
+                return 1;
+            }
+        }
+        0
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_list_sum(list: *const KlList) -> i64 {
     if list.is_null() { return 0; }
