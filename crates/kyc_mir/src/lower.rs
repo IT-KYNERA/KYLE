@@ -3645,6 +3645,20 @@ impl Lowerer {
                                         ("str_builder", "append") => Some("ky_str_builder_append".into()),
                                         ("str_builder", "to_str") => Some("ky_str_builder_to_str".into()),
                                         ("str_builder", "free") => Some("ky_str_builder_free".into()),
+                                        ("fs", "exists") => Some("ky_fs_exists".into()),
+                                        ("fs", "is_dir") => Some("ky_fs_is_dir".into()),
+                                        ("fs", "is_file") => Some("ky_fs_is_file".into()),
+                                        ("fs", "size") => Some("ky_fs_size".into()),
+                                        ("fs", "copy") => Some("ky_fs_copy".into()),
+                                        ("fs", "remove") => Some("ky_fs_remove".into()),
+                                        ("fs", "create_dir") => Some("ky_fs_create_dir".into()),
+                                        ("fs", "remove_dir") => Some("ky_fs_remove_dir".into()),
+                                        ("fs", "rename") => Some("ky_fs_rename".into()),
+                                        ("fs", "read_to_string") => Some("ky_fs_read_to_string".into()),
+                                        ("fs", "write_string") => Some("ky_fs_write_string".into()),
+                                        ("fs", "list_dir") => Some("ky_fs_list_dir".into()),
+                                        ("time", "now_ms") => Some("ky_time_now_ms".into()),
+                                        ("time", "now_us") => Some("ky_time_now_us".into()),
                                         _ => None,
                                     }
                                 };
@@ -7034,6 +7048,11 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "ky_str_builder_new" => Some(MirType::Str),
         "ky_str_builder_append" | "ky_str_builder_free" => Some(MirType::Void),
         "ky_str_builder_to_str" => Some(MirType::Str),
+        "ky_fs_exists" | "ky_fs_is_dir" | "ky_fs_is_file"
+            | "ky_fs_copy" | "ky_fs_remove" | "ky_fs_create_dir"
+            | "ky_fs_remove_dir" | "ky_fs_rename" | "ky_fs_write_string" => Some(MirType::I32),
+        "ky_fs_size" | "ky_time_now_ms" | "ky_time_now_us" | "ky_fs_list_dir" => Some(MirType::I64),
+        "ky_fs_read_to_string" => Some(MirType::Str),
         _ => None,
     }
 }

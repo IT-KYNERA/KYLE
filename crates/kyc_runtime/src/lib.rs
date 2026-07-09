@@ -9,6 +9,7 @@ pub mod async_;
 pub mod assert;
 pub mod error;
 pub mod panic;
+pub mod platform;
 pub mod net;
 pub mod datetime;
 pub mod uuid;

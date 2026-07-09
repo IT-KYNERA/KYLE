@@ -603,6 +603,7 @@ version = "0.5.3"
 dependencies = [
  "base64",
  "chrono",
+ "kyc_platform",
  "libc",
  "regex",
  "ring",

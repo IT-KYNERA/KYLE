@@ -69,3 +69,125 @@ pub fn write_string(path: &str, data: &str) -> Result<(), String> {
     close(fd);
     Ok(())
 }
+
+/// Copy a file from src to dst. Returns Ok(()) on success.
+pub fn copy(src: &str, dst: &str) -> Result<(), String> {
+    let data = read_to_string(src)?;
+    write_string(dst, &data)
+}
+
+/// Remove a file. Returns Ok(()) on success.
+pub fn remove(path: &str) -> Result<(), String> {
+    let cpath = CString::new(path).map_err(|e| format!("invalid path: {}", e))?;
+    let r = unsafe { libc::unlink(cpath.as_ptr()) };
+    if r != 0 {
+        Err(format!("cannot remove '{}'", path))
+    } else {
+        Ok(())
+    }
+}
+
+/// Create a directory. Returns Ok(()) on success.
+pub fn create_dir(path: &str) -> Result<(), String> {
+    let cpath = CString::new(path).map_err(|e| format!("invalid path: {}", e))?;
+    let mode = (libc::S_IRWXU | libc::S_IRGRP | libc::S_IXGRP | libc::S_IROTH | libc::S_IXOTH) as libc::c_uint;
+    let r = unsafe { libc::mkdir(cpath.as_ptr(), mode as libc::mode_t) };
+    if r != 0 {
+        Err(format!("cannot create dir '{}'", path))
+    } else {
+        Ok(())
+    }
+}
+
+/// Remove a directory. Returns Ok(()) on success.
+pub fn remove_dir(path: &str) -> Result<(), String> {
+    let cpath = CString::new(path).map_err(|e| format!("invalid path: {}", e))?;
+    let r = unsafe { libc::rmdir(cpath.as_ptr()) };
+    if r != 0 {
+        Err(format!("cannot remove dir '{}'", path))
+    } else {
+        Ok(())
+    }
+}
+
+/// List directory entries. Returns a vector of entry names (without full path).
+pub fn list_dir(path: &str) -> Result<Vec<String>, String> {
+    let cpath = CString::new(path).map_err(|e| format!("invalid path: {}", e))?;
+    let dir = unsafe { libc::opendir(cpath.as_ptr()) };
+    if dir.is_null() {
+        return Err(format!("cannot open dir '{}'", path));
+    }
+    let mut entries = Vec::new();
+    loop {
+        let entry = unsafe { libc::readdir(dir) };
+        if entry.is_null() { break; }
+        let name_ptr = unsafe { (*entry).d_name.as_ptr() };
+        let name = unsafe { std::ffi::CStr::from_ptr(name_ptr) }
+            .to_str().unwrap_or("").to_string();
+        if name != "." && name != ".." {
+            entries.push(name);
+        }
+    }
+    unsafe { libc::closedir(dir); }
+    Ok(entries)
+}
+
+/// Returns true if path is a directory.
+pub fn is_dir(path: &str) -> bool {
+    let cpath = match CString::new(path) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    unsafe {
+        let mut stat: libc::stat = std::mem::zeroed();
+        if libc::stat(cpath.as_ptr(), &mut stat) == 0 {
+            stat.st_mode & libc::S_IFMT == libc::S_IFDIR
+        } else {
+            false
+        }
+    }
+}
+
+/// Returns true if path is a regular file.
+pub fn is_file(path: &str) -> bool {
+    let cpath = match CString::new(path) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+    unsafe {
+        let mut stat: libc::stat = std::mem::zeroed();
+        if libc::stat(cpath.as_ptr(), &mut stat) == 0 {
+            stat.st_mode & libc::S_IFMT == libc::S_IFREG
+        } else {
+            false
+        }
+    }
+}
+
+/// Get file size in bytes. Returns -1 on error.
+pub fn size(path: &str) -> i64 {
+    let cpath = match CString::new(path) {
+        Ok(p) => p,
+        Err(_) => return -1,
+    };
+    unsafe {
+        let mut stat: libc::stat = std::mem::zeroed();
+        if libc::stat(cpath.as_ptr(), &mut stat) == 0 {
+            stat.st_size
+        } else {
+            -1
+        }
+    }
+}
+
+/// Rename/move a file. Returns Ok(()) on success.
+pub fn rename(src: &str, dst: &str) -> Result<(), String> {
+    let csrc = CString::new(src).map_err(|e| format!("invalid src: {}", e))?;
+    let cdst = CString::new(dst).map_err(|e| format!("invalid dst: {}", e))?;
+    let r = unsafe { libc::rename(csrc.as_ptr(), cdst.as_ptr()) };
+    if r != 0 {
+        Err(format!("cannot rename '{}' to '{}'", src, dst))
+    } else {
+        Ok(())
+    }
+}
