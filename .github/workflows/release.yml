@@ -165,6 +165,15 @@ jobs:
           echo "$env:LLVM_SYS_181_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "LLVM_SYS_181_PREFIX=$env:LLVM_SYS_181_PREFIX" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Patch LLVM headers & create llvm-config
+        shell: pwsh
+        run: |
+          # The official LLVM 18.1.8 Windows zip is missing:
+          #   - llvm/Config/llvm-config.h (needed by Target.h, etc.)
+          #   - llvm-config.exe (needed by llvm-sys build script)
+          # This script creates both from scratch.
+          .\tools\windows\patch-llvm.ps1 -LLVM_PREFIX "$env:LLVM_SYS_181_PREFIX"
+
       - name: Build ky
         run: cargo build --bin ky --release
 

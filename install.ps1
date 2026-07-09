@@ -83,18 +83,55 @@ if (Test-Path "$TmpDir\libkyc_runtime.a") {
     Copy-Item "$TmpDir\libkyc_runtime.a" "$LibDir\libkyc_runtime.a" -Force
 }
 
-# Clean up
+# Clean up ky install temp
 Remove-Item -Recurse -Force $TmpDir
+
+# ─── Install LLVM 18.1.8 (runtime dependency) ──────────────
+# ky.exe dynamically links against LLVM-C.dll at runtime
+
+$LLVMDir = "$env:KY_PREFIX\llvm-18"
+$LLVMZip = "$env:TEMP\llvm-18.zip"
+$LLVMUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip"
+
+if (-not (Test-Path "$LLVMDir\bin\LLVM-C.dll")) {
+    Write-Host "Downloading LLVM 18.1.8 (required at runtime by ky)..."
+    try {
+        Invoke-WebRequest -Uri $LLVMUrl -OutFile $LLVMZip -UseBasicParsing
+    } catch {
+        Write-Host "Warning: failed to download LLVM. ky.exe needs LLVM-C.dll at runtime."
+        Write-Host "Install manually from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
+        Write-Host ""
+    }
+    if (Test-Path $LLVMZip) {
+        Write-Host "Extracting LLVM 18.1.8..."
+        $extractDir = "$env:TEMP\llvm-extract"
+        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+        Expand-Archive -Path $LLVMZip -DestinationPath $extractDir -Force
+        New-Item -ItemType Directory -Force -Path $LLVMDir | Out-Null
+        Get-ChildItem "$extractDir\LLVM-18.1.8-win64" | Move-Item -Destination $LLVMDir -Force
+        Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+        Remove-Item $LLVMZip -Force
+        Write-Host "  LLVM installed to $LLVMDir"
+    }
+} else {
+    Write-Host "LLVM 18.1.8 already installed at $LLVMDir"
+}
+
+$LLVMBin = "$LLVMDir\bin"
+$env:LLVM_SYS_181_PREFIX = $LLVMDir
 
 # ─── Add to PATH ────────────────────────────────────────────
 
 $UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-if ($UserPath -notlike "*$BinDir*") {
-    $NewPath = "$BinDir;$UserPath"
+$addedDirs = @()
+if ($UserPath -notlike "*$BinDir*") { $addedDirs += $BinDir }
+if ($UserPath -notlike "*$LLVMBin*") { $addedDirs += $LLVMBin }
+if ($addedDirs.Count -gt 0) {
+    $NewPath = ($addedDirs -join ';') + ";" + $UserPath
     [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
-    # Update current session too
-    $env:PATH = "$BinDir;$env:PATH"
-    Write-Host "  Added $BinDir to PATH (User)"
+    $env:PATH = ($addedDirs -join ';') + ";" + $env:PATH
+    Write-Host "  Added to PATH:"
+    foreach ($d in $addedDirs) { Write-Host "    $d" }
 } else {
     Write-Host "  PATH already configured"
 }
@@ -110,6 +147,11 @@ try {
         Write-Host "  Binary:  $BinDir\ky.exe"
         if (Test-Path "$LibDir\libkyc_runtime.a") {
             Write-Host "  Runtime: installed"
+        }
+        if (Test-Path "$LLVMDir\bin\LLVM-C.dll") {
+            Write-Host "  LLVM:    $LLVMDir"
+        } else {
+            Write-Host "  LLVM:    NOT INSTALLED — ky.exe needs LLVM-C.dll at runtime"
         }
         Write-Host ""
         Write-Host "  Use now:  ky --version"
