@@ -756,6 +756,7 @@ impl Parser {
                 AstType::Primitive { name: "i64".into(), span: self.span_from(param_start) }
             };
             // Determine param mode from type prefix
+            // Kyle: parameters are BORROWED by default (different from Rust's move-by-default)
             let mode = if is_move {
                 ParamMode::Move
             } else if matches!(type_, AstType::Borrow { .. }) {
@@ -766,7 +767,7 @@ impl Parser {
                     _ => false,
                 };
                 if is_mut_borrow { ParamMode::MutableBorrow }
-                else { ParamMode::Move }
+                else { ParamMode::Borrow }
             };
             let default = if self.at(TokenKind::Equals) {
                 self.advance();

@@ -160,40 +160,65 @@ impl<'ctx> Codegen<'ctx> {
 
     /// Initialize TBAA metadata nodes for type-based alias analysis.
     fn init_tbaa(&mut self) {
-        // TBAA tree:
-        //   root ("any level")
-        //     ├─ int (i8, i16, i32, i64, bool, char)
-        //     ├─ float (f32, f64)
-        //     └─ ptr (str, list, dict, struct pointers)
-        let root = self.context.metadata_node(&[
-            self.context.metadata_string("any level").into(),
-        ]);
-        let int_node = self.context.metadata_node(&[
-            self.context.metadata_string("int").into(),
-            root.into(),
-        ]);
-        let float_node = self.context.metadata_node(&[
-            self.context.metadata_string("float").into(),
-            root.into(),
-        ]);
-        let ptr_node = self.context.metadata_node(&[
-            self.context.metadata_string("ptr").into(),
-            root.into(),
-        ]);
+        // Create access tags for struct-path TBAA (LLVM 18+).
+        // Type descriptor: {name, parent, i64_offset}
+        // Access tag: {type_descriptor, type_descriptor, 0}
+        // The !tbaa metadata on loads/stores references the ACCESS TAG.
+        let md_str = |s: &str| self.context.metadata_string(s);
+        let i64_0 = || self.context.i64_type().const_int(0, false);
+
+        let root = self.context.metadata_node(&[md_str("any level").into()]);
+        let int_desc = self.context.metadata_node(&[md_str("int").into(), root.into(), i64_0().into()]);
+        let float_desc = self.context.metadata_node(&[md_str("float").into(), root.into(), i64_0().into()]);
+        let ptr_desc = self.context.metadata_node(&[md_str("ptr").into(), root.into(), i64_0().into()]);
+        let list_desc = self.context.metadata_node(&[md_str("list").into(), root.into(), i64_0().into()]);
+        let list_data_desc = self.context.metadata_node(&[md_str("list_data").into(), list_desc.into(), i64_0().into()]);
+        let list_len_desc = self.context.metadata_node(&[md_str("list_len").into(), list_desc.into(), i64_0().into()]);
+
+        // Access tags (what !tbaa references)
+        let int_tag = self.context.metadata_node(&[int_desc.into(), int_desc.into(), i64_0().into()]);
+        let float_tag = self.context.metadata_node(&[float_desc.into(), float_desc.into(), i64_0().into()]);
+        let ptr_tag = self.context.metadata_node(&[ptr_desc.into(), ptr_desc.into(), i64_0().into()]);
+        let list_data_tag = self.context.metadata_node(&[list_data_desc.into(), list_data_desc.into(), i64_0().into()]);
+        let list_len_tag = self.context.metadata_node(&[list_len_desc.into(), list_len_desc.into(), i64_0().into()]);
+
         self.tbaa_nodes.insert("root".to_string(), root);
-        self.tbaa_nodes.insert("int".to_string(), int_node);
-        self.tbaa_nodes.insert("float".to_string(), float_node);
-        self.tbaa_nodes.insert("ptr".to_string(), ptr_node);
+        self.tbaa_nodes.insert("int.desc".to_string(), int_desc);
+        self.tbaa_nodes.insert("int".to_string(), int_tag);
+        self.tbaa_nodes.insert("float".to_string(), float_tag);
+        self.tbaa_nodes.insert("ptr".to_string(), ptr_tag);
+        self.tbaa_nodes.insert("list_data".to_string(), list_data_tag);
+        self.tbaa_nodes.insert("list_len".to_string(), list_len_tag);
     }
 
-    /// Get the TBAA metadata node for a given MirType.
+    fn tbaa_md(&self, name: &str) -> Option<inkwell::values::MetadataValue<'ctx>> {
+        self.tbaa_nodes.get(name).copied()
+    }
+
+    /// Add struct-path TBAA metadata to a load instruction.
+    fn tbaa_load(&self, val: inkwell::values::BasicValueEnum<'ctx>, node: &str) {
+        if let Some(n) = self.tbaa_md(node) {
+            if let Ok(inst) = inkwell::values::InstructionValue::try_from(inkwell::values::AnyValueEnum::from(val)) {
+                self.add_tbaa(inst, n);
+            }
+        }
+    }
+
+    /// Add struct-path TBAA metadata to a store instruction.
+    fn tbaa_store(&self, sv: impl Into<inkwell::values::InstructionValue<'ctx>>, node: &str) {
+        if let Some(n) = self.tbaa_md(node) {
+            self.add_tbaa(sv.into(), n);
+        }
+    }
+
+    /// Get the TBAA access tag for a given MirType.
     fn tbaa_for_type(&self, ty: &MirType) -> Option<inkwell::values::MetadataValue<'ctx>> {
         match ty {
             MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64 | MirType::I1
             | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
             MirType::F32 | MirType::F64 => self.tbaa_nodes.get("float").copied(),
-            MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)
-            | MirType::Struct(_, _) | MirType::Array(_, _) => self.tbaa_nodes.get("ptr").copied(),
+            MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.tbaa_nodes.get("ptr").copied(),
+            MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) => self.tbaa_nodes.get("ptr").copied(),
             MirType::Void => None,
         }
     }
@@ -1769,10 +1794,12 @@ impl<'ctx> Codegen<'ctx> {
                 };
                 let len_val = self.builder.build_load(i64_ty, len_ptr, "_len")
                     .map_err(|e| format!("list_len load: {}", e))?;
+                self.tbaa_load(len_val, "list_len");
                 if let Some(d) = dest {
                     if let Some(alloca_ptr) = self.alloca_map.get(*d).and_then(|p| *p) {
-                        self.builder.build_store(alloca_ptr, len_val)
+                        let sv = self.builder.build_store(alloca_ptr, len_val)
                             .map_err(|e| format!("list_len store: {}", e))?;
+                        self.tbaa_store(sv, "int");
                     }
                     last_value_map.insert(*d, len_val);
                 }
@@ -1783,15 +1810,16 @@ impl<'ctx> Codegen<'ctx> {
                     BasicValueEnum::IntValue(iv) => iv,
                     _ => return Err("ky_list_get: expected i64 index".to_string()),
                 };
-                // Load data pointer at byte offset 0
+                // Load data pointer (TBAA list_data — doesn't alias with array elements)
                 let zero = i64_ty.const_int(0, false);
                 let data_ptr_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
                         .map_err(|e| format!("list_get gep data: {}", e))?
                 };
-                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
-                    .map_err(|e| format!("list_get load data: {}", e))?
-                    .into_pointer_value();
+                let data_load = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("list_get load data: {}", e))?;
+                self.tbaa_load(data_load, "list_data");
+                let data = data_load.into_pointer_value();
                 // GEP into data array
                 let elem_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
@@ -1799,10 +1827,12 @@ impl<'ctx> Codegen<'ctx> {
                 };
                 let val = self.builder.build_load(i64_ty, elem_ptr, "_val")
                     .map_err(|e| format!("list_get load val: {}", e))?;
+                self.tbaa_load(val, "int");
                 if let Some(d) = dest {
                     if let Some(alloca_ptr) = self.alloca_map.get(*d).and_then(|p| *p) {
-                        self.builder.build_store(alloca_ptr, val)
+                        let sv = self.builder.build_store(alloca_ptr, val)
                             .map_err(|e| format!("list_get store: {}", e))?;
+                        self.tbaa_store(sv, "int");
                     }
                     last_value_map.insert(*d, val);
                 }
@@ -1818,20 +1848,23 @@ impl<'ctx> Codegen<'ctx> {
                     BasicValueEnum::IntValue(iv) => iv,
                     _ => return Err("ky_list_set: expected i64 value".to_string()),
                 };
+                // Load data pointer (TBAA list_data — doesn't alias with element stores)
                 let zero = i64_ty.const_int(0, false);
                 let data_ptr_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
                         .map_err(|e| format!("list_set gep data: {}", e))?
                 };
-                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
-                    .map_err(|e| format!("list_set load data: {}", e))?
-                    .into_pointer_value();
+                let data_load = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("list_set load data: {}", e))?;
+                self.tbaa_load(data_load, "list_data");
+                let data = data_load.into_pointer_value();
                 let elem_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
                         .map_err(|e| format!("list_set gep elem: {}", e))?
                 };
-                self.builder.build_store(elem_ptr, val_i64)
+                let sv = self.builder.build_store(elem_ptr, val_i64)
                     .map_err(|e| format!("list_set store: {}", e))?;
+                self.tbaa_store(sv, "int");
             }
             _ => return Err(format!("unknown inline list op: {}", name)),
         }
@@ -1870,6 +1903,7 @@ impl<'ctx> Codegen<'ctx> {
                 };
                 let len_val = self.builder.build_load(i64_ty, len_ptr, "_len")
                     .map_err(|e| format!("ssa list_len load: {}", e))?;
+                self.tbaa_load(len_val, "list_len");
                 Ok(Some(len_val))
             }
             "ky_list_get" if args.len() >= 2 => {
@@ -1883,15 +1917,17 @@ impl<'ctx> Codegen<'ctx> {
                     self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
                         .map_err(|e| format!("ssa list_get gep data: {}", e))?
                 };
-                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
-                    .map_err(|e| format!("ssa list_get load data: {}", e))?
-                    .into_pointer_value();
+                let data_load = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("ssa list_get load data: {}", e))?;
+                self.tbaa_load(data_load, "list_data");
+                let data = data_load.into_pointer_value();
                 let elem_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
                         .map_err(|e| format!("ssa list_get gep elem: {}", e))?
                 };
                 let val = self.builder.build_load(i64_ty, elem_ptr, "_val")
                     .map_err(|e| format!("ssa list_get load val: {}", e))?;
+                self.tbaa_load(val, "int");
                 Ok(Some(val))
             }
             "ky_list_set" if args.len() >= 3 => {
@@ -1910,15 +1946,17 @@ impl<'ctx> Codegen<'ctx> {
                     self.builder.build_in_bounds_gep(i8_ty, list_ptr, &[zero], "_dpp")
                         .map_err(|e| format!("ssa list_set gep data: {}", e))?
                 };
-                let data = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
-                    .map_err(|e| format!("ssa list_set load data: {}", e))?
-                    .into_pointer_value();
+                let data_load = self.builder.build_load(ptr_ty, data_ptr_ptr, "_data")
+                    .map_err(|e| format!("ssa list_set load data: {}", e))?;
+                self.tbaa_load(data_load, "list_data");
+                let data = data_load.into_pointer_value();
                 let elem_ptr = unsafe {
                     self.builder.build_in_bounds_gep(i64_ty, data, &[idx_i64], "_elem")
                         .map_err(|e| format!("ssa list_set gep elem: {}", e))?
                 };
-                self.builder.build_store(elem_ptr, val_i64)
+                let sv = self.builder.build_store(elem_ptr, val_i64)
                     .map_err(|e| format!("ssa list_set store: {}", e))?;
+                self.tbaa_store(sv, "int");
                 Ok(None)
             }
             _ => Err(format!("unknown ssa inline list op: {}", name)),
