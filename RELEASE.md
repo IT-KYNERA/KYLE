@@ -1,146 +1,157 @@
-# Release Guide — Kyle Compiler
+# Release Guide — Kyle Multi-Platform Distribution
 
-## Prerrequisitos
+## Plataformas objetivo
+
+| Bundle | Plataforma | Origen |
+|--------|------------|--------|
+| `ky-macos-arm64.tar.gz` | macOS Apple Silicon | `macos-latest` (CI) o nativo |
+| `ky-macos-x64.tar.gz` | macOS Intel | `macos-13` (CI) |
+| `ky-linux-arm64.tar.gz` | Linux ARM64 | `ubuntu-24.04-arm` (CI) |
+| `ky-linux-x64.tar.gz` | Linux x86_64 | `ubuntu-24.04` (CI) |
+| `ky-windows-x64.zip` | Windows x86_64 | `windows-2025` (CI) |
+
+Cada bundle contiene:
+```
+ky (o ky.exe)
+libkyc_runtime.a
+LICENSE
+```
+
+---
+
+## Opción A: GitHub Actions (automática, recomendada)
+
+Solo hacer push del tag:
 
 ```bash
-# Ubuntu ARM (la máquina actual)
-sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
+git tag -a v0.6.0 -m "v0.6.0"
+git push origin v0.6.0
+```
 
-# macOS ARM (Apple Silicon)
+Esto dispara `.github/workflows/release.yml` que:
+1. Crea el release en GitHub
+2. Compila `ky` + `kyc_runtime` para las 5 plataformas (en paralelo)
+3. Genera los bundles + checksums
+4. Sube los assets al release
+
+**No requiere nada local.** Esperar ~30 min a que termine CI.
+
+---
+
+## Opción B: Local + CI (híbrida)
+
+Compilar localmente solo macOS ARM64 y dejar que CI genere el resto:
+
+```bash
+# 1. Compilar local (macOS ARM64)
 brew install llvm@18
 export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
+./scripts/build-release.sh
+
+# 2. Push tag → CI genera el resto
+git tag -a v0.7.0 -m "v0.7.0"
+git push origin v0.7.0
 ```
 
-## 1. Compilar el binario release
+---
+
+## Opción C: Todo local (Windows requiere mingw)
 
 ```bash
-# Desde la raíz del proyecto
-cargo build --release --bin ky
+# Prerrequisitos (una vez)
+rustup target add x86_64-apple-darwin
+rustup target add x86_64-unknown-linux-gnu
+rustup target add x86_64-pc-windows-gnu
+brew install mingw-w64
+brew install x86_64-linux-gnu-gcc   # Linux x64 cross-linker
+
+# Compilar todo
+./scripts/build-release.sh
+
+# Los bundles quedan en dist/
+ls dist/*.tar.gz dist/*.zip
 ```
 
-Esto genera: `target/release/ky`
+---
 
-## 2. Verificar que funciona
+## Script de build local
 
 ```bash
-./target/release/ky build --release examples/src/main.ky
-./target/release/ky run examples/src/main.ky
+./scripts/build-release.sh
 ```
 
-## URL del release actual
+Variables de entorno:
 
-**v0.4.0:** https://github.com/IT-KYNERA/KYLE/releases/tag/v0.4.0
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `KY_VERSION` | (de Cargo.toml) | Versión para nombrar bundles |
+| `CARGO_PROFILE` | `release` | Perfil de compilación |
 
-**Descargas directas:**
-- Linux ARM64: `ky-v0.4.0-linux-arm64.tar.gz`
-- macOS ARM64: `ky-v0.4.0-macos-arm64.tar.gz`
+Solo compila targets con el toolchain instalado. Omite los que faltan.
 
-## 3. Subir release a GitHub
+---
 
-### Opción A: Manual (rápida)
+## Verificar bundles localmente
 
 ```bash
-# 1. Crear tag
-git tag -a v0.4.0 -m "v0.4.0 — Kyle language compiler"
-git push origin v0.4.0
-
-# 2. Ir a GitHub → Releases → Create Release
-#    Tag: v0.4.0
-#    Title: "Kyle v0.4.0"
-#    Description: (copiar de CHANGELOG.md o escribir resumen)
-
-# 3. Subir el binario comprimido
-cd target/release
-tar -czf ky-v0.4.0-linux-arm64.tar.gz ky
-# Subir este archivo al release en GitHub
-
-# 4. Si estás en macOS ARM:
-tar -czf ky-v0.4.0-macos-arm64.tar.gz ky
-# Subir también
+# Extraer y probar
+mkdir -p /tmp/test-ky
+tar xzf dist/ky-macos-arm64.tar.gz -C /tmp/test-ky
+/tmp/test-ky/ky --version
+/tmp/test-ky/ky build examples/hello.ky
 ```
 
-### Opción B: Con GitHub Actions (automática)
+---
 
-Crear `.github/workflows/release.yml`:
+## Scripts de instalación
 
-```yaml
-name: Release
+| Script | Plataforma | Comando |
+|--------|------------|---------|
+| `install.sh` | macOS / Linux | `curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh \| sh` |
+| `install.ps1` | Windows | `iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" \| iex` |
 
-on:
-  push:
-    tags:
-      - 'v*'
+Ambos scripts:
+1. Detectan SO + arquitectura automáticamente
+2. Descargan el bundle correcto desde GitHub Releases
+3. Verifican checksum SHA-256
+4. Instalan `ky` + `libkyc_runtime.a`
+5. Configuran PATH automáticamente
 
-jobs:
-  build:
-    strategy:
-      matrix:
-        os: [ubuntu-24.04-arm, macos-15-arm64]
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - uses: actions/checkout@v4
+---
 
-      - name: Install LLVM 18 (Linux ARM)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm-18-dev libpolly-18-dev libzstd-dev
-          echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+## Notas técnicas
 
-      - name: Install LLVM 18 (macOS ARM)
-        if: runner.os == 'macOS'
-        run: |
-          brew install llvm@18
-          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+### Linker por plataforma
 
-      - name: Build
-        run: cargo build --release --bin ky
+El linker se selecciona en tiempo de compilación del compilador (`cfg!(target_os)`):
 
-      - name: Package
-        run: |
-          cd target/release
-          tar -czf ../../ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz ky
+| Binario compilado para | Usa linker |
+|------------------------|------------|
+| macOS | `clang` |
+| Linux | `clang` (fallback `cc`) |
+| Windows | `link.exe` |
 
-      - name: Upload
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz
-          asset_name: ky-${{ github.ref_name }}-${{ runner.os }}.tar.gz
-          asset_content_type: application/gzip
+Esto es correcto: cada binario `ky` usa el linker nativo de su plataforma.
+
+### Windows + LLVM 18
+
+GitHub Actions `windows-2025` tiene LLVM 20 pre-instalado, pero inkwell requiere LLVM 18.
+El workflow descarga e instala LLVM 18.1 explícitamente.
+
+### Checksums
+
+Cada bundle tiene su SHA-256 (`bundle.tar.gz.sha256`). `install.sh` verifica automáticamente.
+
+### Directorio de instalación
+
+```
+~/.ky/                       # (o /usr/local/)
+  bin/ky                     # Compilador
+  lib/libkyc_runtime.a       # Runtime estático
 ```
 
-## 4. Instalar localmente
-
-```bash
-# Descomprimir
-tar -xzf ky-v0.4.0-linux-arm64.tar.gz
-
-# Instalar en el sistema
-sudo cp ky /usr/local/bin/ky
-
-# Verificar
-ky --help
-kl build --release mi_proyecto/src/main.ky
-kl run mi_proyecto/src/main.ky
-```
-
-## 5. Probar el compilador instalado
-
-```bash
-# Crear un proyecto de prueba
-mkdir -p test_project/src
-cat > test_project/src/main.ky << 'EOF'
-fn main() i32:
-    println("Hello from Kyle!")
-    0
-EOF
-
-# Compilar y ejecutar
-kl build --release test_project/src/main.ky
-./target/release/main
-```
+El linker `ky` busca `libkyc_runtime.a` automáticamente en orden:
+1. `../lib/kl/libkyc_runtime.a` (junto al binario)
+2. `../lib/libkyc_runtime.a`  ← este es el que usamos
+3. Mismo directorio que el binario
+4. `./target/debug/` y `./target/release/`

@@ -18,7 +18,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
-            --title "ky ${{ github.ref_name }}" \
+            --title "Kyle ${{ github.ref_name }}" \
             --notes "See commit history for changes." \
             --repo ${{ github.repository }} 2>/dev/null || true
 
@@ -27,97 +27,157 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install LLVM 18 (Linux ARM)
+      - name: Install LLVM 18
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
-
-      - name: Build ky (release)
+      - name: Build ky
         run: cargo build --bin ky --release
-
-      - name: Build runtime library
+      - name: Build runtime
         run: cargo build -p kyc_runtime --release
-
-      - name: Package tarball
+      - name: Package
         run: |
-          mkdir -p dist/ky/lib
-          cp target/release/ky dist/ky/ky
-          chmod +x dist/ky/ky
-          cp target/release/libkyc_runtime.a dist/ky/lib/
-          cd dist && tar czf ky-${{ github.ref_name }}-linux-arm64.tar.gz ky
-
-      - name: Upload Release Asset
+          mkdir -p dist
+          cp target/release/ky dist/
+          cp target/release/libkyc_runtime.a dist/
+          cd dist && tar czf ky-linux-arm64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
+          cd dist && shasum -a 256 ky-linux-arm64.tar.gz > ky-linux-arm64.tar.gz.sha256
+      - name: Upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
+          cd dist && gh release upload ${{ github.ref_name }} ky-linux-arm64.tar.gz ky-linux-arm64.tar.gz.sha256 --clobber
 
   build-linux-x64:
     needs: create-release
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install LLVM 18 (Linux x64)
+      - name: Install LLVM 18
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq llvm-18-dev libpolly-18-dev libzstd-dev
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
-
-      - name: Build ky (release)
+      - name: Build ky
         run: cargo build --bin ky --release
-
-      - name: Build runtime library
+      - name: Build runtime
         run: cargo build -p kyc_runtime --release
-
-      - name: Package tarball
+      - name: Package
         run: |
-          mkdir -p dist/ky/lib
-          cp target/release/ky dist/ky/ky
-          chmod +x dist/ky/ky
-          cp target/release/libkyc_runtime.a dist/ky/lib/
-          cd dist && tar czf ky-${{ github.ref_name }}-linux-x64.tar.gz ky
-
-      - name: Upload Release Asset
+          mkdir -p dist
+          cp target/release/ky dist/
+          cp target/release/libkyc_runtime.a dist/
+          cp LICENSE dist/
+          cd dist && tar czf ky-linux-x64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
+          cd dist && shasum -a 256 ky-linux-x64.tar.gz > ky-linux-x64.tar.gz.sha256
+      - name: Upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
+          cd dist && gh release upload ${{ github.ref_name }} ky-linux-x64.tar.gz ky-linux-x64.tar.gz.sha256 --clobber
 
   build-macos-arm64:
     needs: create-release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install LLVM 18
         run: |
           brew install llvm@18
-          brew link --overwrite llvm@18
           echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
           echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
-
-      - name: Build ky (release)
+      - name: Build ky
         run: cargo build --bin ky --release
-
-      - name: Build runtime library
+      - name: Build runtime
         run: cargo build -p kyc_runtime --release
-
-      - name: Package tarball
+      - name: Package
         run: |
-          mkdir -p dist/ky/lib
-          cp target/release/ky dist/ky/ky
-          chmod +x dist/ky/ky
-          cp target/release/libkyc_runtime.a dist/ky/lib/
-          cd dist && tar czf ky-${{ github.ref_name }}-macos-arm64.tar.gz ky
-
-      - name: Upload Release Asset
+          mkdir -p dist
+          cp target/release/ky dist/
+          cp target/release/libkyc_runtime.a dist/
+          cp LICENSE dist/
+          cd dist && tar czf ky-macos-arm64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
+          cd dist && shasum -a 256 ky-macos-arm64.tar.gz > ky-macos-arm64.tar.gz.sha256
+      - name: Upload
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} dist/ky-*.tar.gz --clobber
+          cd dist && gh release upload ${{ github.ref_name }} ky-macos-arm64.tar.gz ky-macos-arm64.tar.gz.sha256 --clobber
 
-  # Windows: disabled — runner has LLVM 20 pre-installed, but inkwell requires LLVM 18.
-  # To fix: either update inkwell to support LLVM 20, or downgrade runner's LLVM.
+  build-macos-x64:
+    needs: create-release
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LLVM 18
+        run: |
+          brew install llvm@18
+          echo "LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
+      - name: Build ky
+        run: cargo build --bin ky --release
+      - name: Build runtime
+        run: cargo build -p kyc_runtime --release
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp target/release/ky dist/
+          cp target/release/libkyc_runtime.a dist/
+          cp LICENSE dist/
+          cd dist && tar czf ky-macos-x64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
+          cd dist && shasum -a 256 ky-macos-x64.tar.gz > ky-macos-x64.tar.gz.sha256
+      - name: Upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist && gh release upload ${{ github.ref_name }} ky-macos-x64.tar.gz ky-macos-x64.tar.gz.sha256 --clobber
+
+  build-windows-x64:
+    needs: create-release
+    runs-on: windows-2025
+    env:
+      LLVM_SYS_181_PREFIX: ${{ github.workspace }}\llvm-18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 18 (Windows x64)
+        shell: pwsh
+        run: |
+          # Download LLVM 18.1 MSI for Windows x64
+          $url = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
+          $out = "$env:TEMP\llvm-18.exe"
+          Write-Host "Downloading LLVM 18..."
+          Invoke-WebRequest -Uri $url -OutFile $out
+          Write-Host "Installing LLVM 18..."
+          Start-Process -Wait -FilePath $out -ArgumentList "/S /D=$env:LLVM_SYS_181_PREFIX"
+          Write-Host "LLVM 18 installed to $env:LLVM_SYS_181_PREFIX"
+
+      - name: Add LLVM to PATH
+        shell: pwsh
+        run: |
+          echo "$env:LLVM_SYS_181_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "LLVM_SYS_181_PREFIX=$env:LLVM_SYS_181_PREFIX" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build ky
+        run: cargo build --bin ky --release
+
+      - name: Build runtime
+        run: cargo build -p kyc_runtime --release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          mkdir dist
+          Copy-Item target/release/ky.exe dist/
+          Copy-Item target/release/libkyc_runtime.a dist/
+          Copy-Item LICENSE dist/
+          Compress-Archive -Path dist/ky.exe, dist/libkyc_runtime.a, dist/LICENSE -DestinationPath dist/ky-windows-x64.zip
+
+      - name: Upload
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          gh release upload ${{ github.ref_name }} ky-windows-x64.zip --clobber

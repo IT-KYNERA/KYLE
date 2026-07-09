@@ -2,63 +2,206 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="v0.6.0"
+VERSION="${KY_VERSION:-v0.6.0}"
 
-# --- Uninstall mode ---
+# ─── Functions ──────────────────────────────────────────────
+
+usage() {
+    echo "Usage: curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh"
+    echo ""
+    echo "Environment variables:"
+    echo "  KY_VERSION=v0.6.0     Version to install (default: v0.6.0)"
+    echo "  KY_PREFIX=/custom/path Install directory (default: ~/.ky or /usr/local)"
+    echo ""
+    echo "  install.sh uninstall   Remove Kyle from the system"
+    exit 0
+}
+
+detect_platform() {
+    local os arch
+    case "$(uname -s)" in
+        Darwin) os="macos" ;;
+        Linux)  os="linux" ;;
+        *)      echo "Error: unsupported OS ($(uname -s))"; exit 1 ;;
+    esac
+    case "$(uname -m)" in
+        arm64|aarch64) arch="arm64" ;;
+        x86_64|amd64)  arch="x64" ;;
+        *)      echo "Error: unsupported architecture ($(uname -m))"; exit 1 ;;
+    esac
+    echo "${os}-${arch}"
+}
+
+cleanup() {
+    rm -rf "/tmp/ky-install" 2>/dev/null || true
+}
+
+# ─── Uninstall ──────────────────────────────────────────────
+
 if [ "${1:-}" = "uninstall" ]; then
-  echo "Removing Kyle..."
-  for f in /usr/local/bin/ky "$HOME/.ky/bin/ky" "$HOME/.kl/bin/ky"; do
-    if [ -f "$f" ]; then rm -f "$f" && echo "  Removed $f"; fi
-  done
-  for d in "$HOME/.ky" "$HOME/.kl"; do
-    if [ -d "$d" ]; then rm -rf "$d" && echo "  Removed $d"; fi
-  done
-  for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
-    if [ -f "$rc" ]; then
-      sed -i '' '/\.ky\/bin/d' "$rc" 2>/dev/null || true
-      sed -i '/\.ky\/bin/d' "$rc" 2>/dev/null || true
+    echo "Removing Kyle..."
+    for f in /usr/local/bin/ky "$HOME/.ky/bin/ky" "$HOME/.kl/bin/ky"; do
+        if [ -f "$f" ]; then rm -f "$f" && echo "  Removed $f"; fi
+    done
+    for d in "$HOME/.ky" "$HOME/.kl"; do
+        if [ -d "$d" ]; then rm -rf "$d" && echo "  Removed $d"; fi
+    done
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
+        if [ -f "$rc" ]; then
+            sed -i '' '/\.ky\/bin/d' "$rc" 2>/dev/null || true
+            sed -i '/\.ky\/bin/d' "$rc" 2>/dev/null || true
+        fi
+    done
+    echo "ky uninstalled."
+    exit 0
+fi
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    usage
+fi
+
+# ─── Detect platform ────────────────────────────────────────
+
+PLATFORM=$(detect_platform)
+echo "Detected: $PLATFORM"
+
+BUNDLE="ky-${PLATFORM}.tar.gz"
+BUNDLE_URL="https://github.com/$REPO/releases/download/$VERSION/$BUNDLE"
+SHA256_URL="$BUNDLE_URL.sha256"
+
+# ─── Download ───────────────────────────────────────────────
+
+cleanup
+mkdir -p /tmp/ky-install
+cd /tmp/ky-install
+
+echo "Downloading Kyle $VERSION for $PLATFORM..."
+echo "  $BUNDLE_URL"
+
+curl -fsSL "$BUNDLE_URL" -o "$BUNDLE" || {
+    echo "Error: failed to download $BUNDLE"
+    echo "Check that $VERSION exists at:"
+    echo "  https://github.com/$REPO/releases"
+    exit 1
+}
+
+# ─── Verify checksum ────────────────────────────────────────
+
+if curl -fsSL "$SHA256_URL" -o "${BUNDLE}.sha256" 2>/dev/null; then
+    echo "Verifying checksum..."
+    if command -v shasum &>/dev/null; then
+        shasum -a 256 -c "${BUNDLE}.sha256" || {
+            echo "Error: checksum verification failed"
+            exit 1
+        }
+    elif command -v sha256sum &>/dev/null; then
+        sha256sum -c "${BUNDLE}.sha256" || {
+            echo "Error: checksum verification failed"
+            exit 1
+        }
     fi
-  done
-  echo "ky uninstalled."
-  exit 0
-fi
-
-echo "Downloading Kyle $VERSION..."
-
-# Download compressed binary from GitHub Releases
-curl -fsSL "https://github.com/$REPO/releases/download/$VERSION/ky.gz" -o "/tmp/ky.gz"
-gunzip -f "/tmp/ky.gz"
-chmod +x "/tmp/ky"
-
-# --- Install ---
-if [ -w /usr/local/bin ]; then
-  mkdir -p /usr/local/lib/ky
-  mv /tmp/ky /usr/local/bin/ky
-  INSTALL_DIR="/usr/local/bin"
 else
-  mkdir -p "$HOME/.ky/bin"
-  mv /tmp/ky "$HOME/.ky/bin/ky"
-  INSTALL_DIR="$HOME/.ky/bin"
+    echo "Warning: no checksum file found, skipping verification"
 fi
 
-# --- Add to PATH automatically ---
+# ─── Extract ────────────────────────────────────────────────
+
+tar xzf "$BUNDLE"
+
+if [ ! -f "ky" ]; then
+    echo "Error: 'ky' not found in archive"
+    ls -la
+    exit 1
+fi
+if [ ! -f "libkyc_runtime.a" ]; then
+    echo "Warning: libkyc_runtime.a not found in archive"
+fi
+
+chmod +x ky
+
+# ─── Install ─────────────────────────────────────────────────
+
+INSTALL_TO_USR=false
+if [ "${KY_PREFIX:-}" = "" ]; then
+    if [ -w /usr/local/bin ]; then
+        INSTALL_TO_USR=true
+    else
+        # Try with sudo
+        if command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
+            INSTALL_TO_USR=true
+        fi
+    fi
+fi
+
+if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
+    echo "Installing to /usr/local..."
+    sudo mkdir -p /usr/local/bin /usr/local/lib/ky
+    sudo cp ky /usr/local/bin/ky
+    if [ -f libkyc_runtime.a ]; then
+        sudo cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+    fi
+    INSTALL_DIR="/usr/local/bin"
+    KY_PREFIX="/usr/local"
+elif [ -n "${KY_PREFIX:-}" ]; then
+    echo "Installing to $KY_PREFIX..."
+    mkdir -p "$KY_PREFIX/bin" "$KY_PREFIX/lib/ky"
+    cp ky "$KY_PREFIX/bin/ky"
+    if [ -f libkyc_runtime.a ]; then
+        cp libkyc_runtime.a "$KY_PREFIX/lib/ky/libkyc_runtime.a"
+    fi
+    INSTALL_DIR="$KY_PREFIX/bin"
+else
+    echo "Installing to $HOME/.ky..."
+    mkdir -p "$HOME/.ky/bin" "$HOME/.ky/lib"
+    cp ky "$HOME/.ky/bin/ky"
+    if [ -f libkyc_runtime.a ]; then
+        cp libkyc_runtime.a "$HOME/.ky/lib/libkyc_runtime.a"
+    fi
+    INSTALL_DIR="$HOME/.ky/bin"
+    KY_PREFIX="$HOME/.ky"
+fi
+
+# ─── Add to PATH ─────────────────────────────────────────────
+
 SHELL_NAME=$(basename "${SHELL:-}")
 case "$SHELL_NAME" in
-  zsh) SHELL_CONFIG="$HOME/.zshrc" ;;
-  bash) SHELL_CONFIG="$HOME/.bashrc" ;;
-  *) SHELL_CONFIG="" ;;
+    zsh)  SHELL_CONFIG="$HOME/.zshrc" ;;
+    bash) SHELL_CONFIG="$HOME/.bashrc" ;;
+    *)    SHELL_CONFIG="" ;;
 esac
-if [ -n "$SHELL_CONFIG" ] && [ -f "$SHELL_CONFIG" ]; then
-  if ! grep -q "$INSTALL_DIR" "$SHELL_CONFIG" 2>/dev/null; then
-    echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_CONFIG"
-    echo "  Added $INSTALL_DIR to PATH in $SHELL_CONFIG"
-  fi
+
+if [ -n "$SHELL_CONFIG" ] && [ -w "$SHELL_CONFIG" ]; then
+    if ! grep -q "$INSTALL_DIR" "$SHELL_CONFIG" 2>/dev/null; then
+        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_CONFIG"
+        echo "  Added $INSTALL_DIR to PATH in $SHELL_CONFIG"
+    else
+        echo "  PATH already configured in $SHELL_CONFIG"
+    fi
+elif [ -n "$SHELL_CONFIG" ]; then
+    echo "  Warning: $SHELL_CONFIG not writable, add to PATH manually:"
+    echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
 fi
 
 export PATH="$INSTALL_DIR:$PATH"
 
+# ─── Verify ──────────────────────────────────────────────────
+
 echo ""
-echo "✅ Kyle $VERSION installed. PATH added to $SHELL_CONFIG"
-echo ""
-echo "  Use now:     source ~/.zshrc && ky -v"
-echo "  Or (faster): export PATH=\"$INSTALL_DIR:\$PATH\" && ky -v"
+if ky --version 2>/dev/null; then
+    echo ""
+    echo "✅ Kyle $VERSION installed successfully!"
+    echo ""
+    echo "  Binary:  $INSTALL_DIR/ky"
+    if [ -f "$KY_PREFIX/lib/ky/libkyc_runtime.a" ] || [ -f "$KY_PREFIX/lib/libkyc_runtime.a" ]; then
+        echo "  Runtime: installed"
+    fi
+    echo ""
+    echo "  Use now:     source ${SHELL_CONFIG:-~/.profile} && ky -v"
+    echo "  Or (faster): export PATH=\"$INSTALL_DIR:\$PATH\" && ky -v"
+    echo "  Try:         ky run examples/hello.ky"
+else
+    echo "⚠️  Installation completed but 'ky --version' failed."
+    echo "   Check that $INSTALL_DIR is in your PATH."
+fi
+
+cleanup

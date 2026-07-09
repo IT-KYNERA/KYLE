@@ -84,7 +84,7 @@ ky/
 │   ├── json/             # JSON parse + stringify
 │   └── sqlite/           # SQLite database bindings
 │
-├── docs/                 # Documentation (72 files, reorganized)
+├── docs/                 # Documentation (158 files, reorganized)
 ├── vscode-ky/            # VS Code extension
 ├── examples/             # Example .ky project
 ├── tests/                # End-to-end type-check test files
@@ -105,7 +105,7 @@ ky/
 | [04-standard-library/](docs/04-standard-library/README.md) | 22 | Standard library modules |
 | [05-runtime/](docs/05-runtime/README.md) | 6 | Runtime internals (memory, scheduler, panic, startup) |
 | [06-compiler/](docs/06-compiler/README.md) | 17 | Compiler pipeline (lexer, parser, MIR, codegen, linker) |
-| [07-tools/](docs/07-tools/README.md) | 10 | CLI, formatter, LSP, VSCode, build system |
+| [07-tools/](docs/07-tools/README.md) | 11 | CLI, formatter, LSP, VSCode, build system, distribution |
 | [08-ecosystem/](docs/08-ecosystem/README.md) | 9 | Registry, packages (http, json, sqlite) |
 | [09-specification/](docs/09-specification/README.md) | 7 | Grammar, precedence, type system references |
 | [10-design/](docs/10-design/README.md) | 2 | ADRs, RFCs (architecture decisions, move semantics) |
@@ -125,6 +125,9 @@ ky/
 | VS Code extension | `docs/07-tools/vscode.md` |
 | Performance tips | `docs/02-getting-started/performance.md` |
 | FFI (extern fn, @link, ptr) | `docs/03-language/ffi/abi.md` |
+| UI framework (.kyx) | `docs/03-language/syntax/ui-syntax.md` |
+| UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |
+| Multi-platform install | `docs/07-tools/distribution.md` |
 | Runtime internals | `docs/05-runtime/` |
 | Compiler pipeline | `docs/06-compiler/` |
 

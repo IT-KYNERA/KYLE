@@ -3,6 +3,9 @@
 **Version:** 1.0 
 **Status:** Specification
 
+> **Arquitectura e implementaci&oacute;n:** Ver [`docs/10-design/rfc/0002-ui-architecture.md`](../../10-design/rfc/0002-ui-architecture.md) para el roadmap t&eacute;cnico completo (WASM, multiplataforma, custom OS).  
+> **Distribuci&oacute;n:** Ver [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) para el plan de instalaci&oacute;n multi-plataforma.
+
 ---
 
 ## 1. Philosophy

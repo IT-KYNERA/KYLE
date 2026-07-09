@@ -4,6 +4,7 @@
 
 | File | Description |
 |---------|-------------|
+| `distribution.md` | Distribuci&oacute;n multi-plataforma (Fase 0) |
 | `compiler-cli.md` | CLI `ky` |
 | `compiler-flags.md` | Flags del compiler |
 | `formatter.md` | Formateador de code |
