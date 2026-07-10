@@ -307,15 +307,29 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     ssa_block.insts.push(SsaInst::Store { dest: *dest, value: val_id });
                 }
                 MirInst::Load { dest, src } if promotable.contains(src) => {
-                    // Load from promotable alloca → read current SSA value
-                    let cur = alloca_current.get(src).copied().unwrap_or(0);
-                    // Track the loaded value in stacks so subsequent instructions can find it
-                    stacks.entry(*dest).or_default().push(cur);
-                    alloca_current.insert(*dest, cur);
-                    // Emit a Store that codegen treats as promoted update
-                    // Codegen: not in alloca_map → alloca_current.insert(dest, val); block_vals[bi].insert(value, val)
-                    // where dest = *dest (MIR value id, not alloca id)
-                    ssa_block.insts.push(SsaInst::Store { dest: *dest, value: cur });
+                    // Check if the src is a FieldPtr dest — if so, the codegen handles
+                    // it via field_ptr_allocas, not through promoted SSA values.
+                    let is_field_ptr_dest = func.basic_blocks.iter()
+                        .flat_map(|b| b.insts.iter())
+                        .any(|inst| matches!(inst, MirInst::FieldPtr { dest: d, .. } if *d == *src));
+                    if is_field_ptr_dest {
+                        // Emit Load instruction so codegen uses field_ptr_allocas.
+                        // The codegen stores the loaded value in block_vals[dest].
+                        // Create a fresh SSA value for the result and track it.
+                        let new_dest = ssa.values.len();
+                        ssa.values.push(SsaValue { type_: MirType::I64, name: format!("_fl{}", dest) });
+                        ssa_block.insts.push(SsaInst::Load { dest: new_dest, src: *src });
+                        stacks.entry(*dest).or_default().push(new_dest);
+                        alloca_current.insert(*dest, new_dest);
+                    } else {
+                        // Load from promotable alloca → read current SSA value
+                        let cur = alloca_current.get(src).copied().unwrap_or(0);
+                        // Track the loaded value in stacks so subsequent instructions can find it
+                        stacks.entry(*dest).or_default().push(cur);
+                        alloca_current.insert(*dest, cur);
+                        // Emit a Store that codegen treats as promoted update
+                        ssa_block.insts.push(SsaInst::Store { dest: *dest, value: cur });
+                    }
                 }
                 MirInst::Load { dest, src } => {
                     let load_type = func.basic_blocks.iter()

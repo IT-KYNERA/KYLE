@@ -5215,6 +5215,12 @@ impl Lowerer {
                         dest: payload_ptr,
                         value: MirValue::Local(payload_val),
                     });
+                    // Load the struct from alloca to return the value (not the pointer)
+                    let result_load = ctx.alloc_local("_okres_v", call_type.clone());
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: result_load,
+                        src: result_local,
+                    });
                     return ctx;
                 }
 
@@ -5252,6 +5258,12 @@ impl Lowerer {
                     ctx.current_block.insts.push(MirInst::Store {
                         dest: payload_ptr,
                         value: MirValue::Local(payload_val),
+                    });
+                    // Load the struct from alloca to return the value (not the pointer)
+                    let result_load = ctx.alloc_local("_erres_v", call_type.clone());
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: result_load,
+                        src: result_local,
                     });
                     return ctx;
                 }
