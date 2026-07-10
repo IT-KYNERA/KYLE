@@ -45,19 +45,27 @@ cleanup() {
 
 if [ "${1:-}" = "uninstall" ]; then
     echo "Removing Kyle..."
+    # Remove binary from all known locations
     for f in /usr/local/bin/ky "$HOME/.ky/bin/ky" "$HOME/.kl/bin/ky"; do
         if [ -f "$f" ]; then rm -f "$f" && echo "  Removed $f"; fi
     done
-    for d in "$HOME/.ky" "$HOME/.kl"; do
+    # Remove runtime library from all known locations
+    for f in /usr/local/lib/libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a "$HOME/.ky/lib/libkyc_runtime.a" "$HOME/.kl/lib/libkyc_runtime.a"; do
+        if [ -f "$f" ]; then rm -f "$f" && echo "  Removed $f"; fi
+    done
+    # Remove install directories
+    for d in "$HOME/.ky" "$HOME/.kl" /usr/local/lib/ky; do
         if [ -d "$d" ]; then rm -rf "$d" && echo "  Removed $d"; fi
     done
+    # Remove PATH additions from shell configs
     for rc in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
         if [ -f "$rc" ]; then
-            sed -i '' '/\.ky\/bin/d' "$rc" 2>/dev/null || true
-            sed -i '/\.ky\/bin/d' "$rc" 2>/dev/null || true
+            sed -i '' '/\.ky\/bin/d' "$rc" 2>/dev/null || true  # macOS
+            sed -i '/\.ky\/bin/d' "$rc" 2>/dev/null || true     # Linux
         fi
     done
     echo "ky uninstalled."
+    echo "Close and reopen your terminal, or run: source ~/.zshrc (or ~/.bashrc)"
     exit 0
 fi
 
@@ -107,6 +115,14 @@ if curl -fsSL "$SHA256_URL" -o "${BUNDLE}.sha256" 2>/dev/null; then
     fi
 else
     echo "Warning: no checksum file found, skipping verification"
+fi
+
+# ─── Pre-install cleanup ────────────────────────────────────
+
+# Remove legacy runtime from old /ky/ subdirectory
+if [ -f /usr/local/lib/ky/libkyc_runtime.a ]; then
+    rm -f /usr/local/lib/ky/libkyc_runtime.a 2>/dev/null
+    rmdir /usr/local/lib/ky 2>/dev/null || true
 fi
 
 # ─── Extract ────────────────────────────────────────────────
