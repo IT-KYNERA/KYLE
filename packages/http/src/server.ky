@@ -14,7 +14,7 @@
 extern fn ky_tcp_listen(port: i32) i32
 extern fn ky_tcp_accept(fd: i32) i32
 extern fn ky_tcp_read(fd: i32, count: i32) ptr
-extern fn ky_tcp_write(fd: i32, buf: ptr, len: i32) i32
+extern fn ky_tcp_write(i32, ptr, i32) i32
 extern fn ky_tcp_close(fd: i32) i32
 
 M_GET := 0
@@ -37,7 +37,7 @@ final class Request:
                     ne = ne + 1
                 pname = substr(this._pattern, i + 1, ne - i - 1)
                 if pname == name:
-                    return extract_param(this.path, this._pattern, i)
+                    return extract_param(&this.path, &this._pattern, i)
             i = i + 1
         ""
 
@@ -139,13 +139,13 @@ final class Router:
                 ky_tcp_close(client)
 
     fn serve(client: i32, raw: str):
-        mcode = code_from_raw(raw)
-        method = method_from_raw(raw)
-        req_path = path_from_raw(raw)
-        req_body = body_from_raw(raw)
+        mcode = code_from_raw(&raw)
+        method = method_from_raw(&raw)
+        req_path = path_from_raw(&raw)
+        req_body = body_from_raw(&raw)
         i: ^i32 = 0
         while i < len(this.rmethods):
-            if mcode == this.rmethods[i] and match_route(this.rpatterns[i], req_path):
+            if mcode == this.rmethods[i] and match_route(&this.rpatterns[i], &req_path):
                 req = Request {
                     method: method,
                     path: req_path,

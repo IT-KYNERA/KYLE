@@ -18,19 +18,19 @@ SQLITE_INTEGER := 1
 SQLITE_TEXT := 3
 
 # Core API
-extern fn sqlite3_open(filename: ptr, ppdb: ptr) i32
-extern fn sqlite3_close(db: ptr) i32
-extern fn sqlite3_exec(db: ptr, sql: ptr, callback: ptr, arg: ptr, errmsg: ptr) i32
-extern fn sqlite3_errmsg(db: ptr) ptr
-extern fn sqlite3_prepare_v2(db: ptr, sql: ptr, nbytes: i32, stmt: ptr, tail: ptr) i32
-extern fn sqlite3_step(stmt: ptr) i32
-extern fn sqlite3_finalize(stmt: ptr) i32
-extern fn sqlite3_column_count(stmt: ptr) i32
-extern fn sqlite3_column_type(stmt: ptr, icol: i32) i32
-extern fn sqlite3_column_int(stmt: ptr, icol: i32) i32
-extern fn sqlite3_column_text(stmt: ptr, icol: i32) ptr
-extern fn sqlite3_bind_int(stmt: ptr, idx: i32, val: i32) i32
-extern fn sqlite3_bind_text(stmt: ptr, idx: i32, val: ptr, len: i32, destructor: ptr) i32
+extern fn sqlite3_open(ptr, ptr) i32
+extern fn sqlite3_close(ptr) i32
+extern fn sqlite3_exec(ptr, ptr, ptr, ptr, ptr) i32
+extern fn sqlite3_errmsg(ptr) ptr
+extern fn sqlite3_prepare_v2(ptr, ptr, i32, ptr, ptr) i32
+extern fn sqlite3_step(ptr) i32
+extern fn sqlite3_finalize(ptr) i32
+extern fn sqlite3_column_count(ptr) i32
+extern fn sqlite3_column_type(ptr, i32) i32
+extern fn sqlite3_column_int(ptr, i32) i32
+extern fn sqlite3_column_text(ptr, i32) ptr
+extern fn sqlite3_bind_int(ptr, i32, i32) i32
+extern fn sqlite3_bind_text(ptr, i32, ptr, i32, ptr) i32
 
 fn open(path: str) ptr:
     ppdb: ^ptr = 0 as ptr

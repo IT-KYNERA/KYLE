@@ -21,10 +21,10 @@
 
 @link "c"
 
-extern fn ky_ws_accept(key: ptr) ptr
+extern fn ky_ws_accept(ptr) ptr
 extern fn ky_ws_read_frame(fd: i32) ptr
-extern fn ky_ws_send_frame(fd: i32, opcode: i32, payload: ptr, len: i32) i32
-extern fn ky_tcp_write(fd: i32, buf: ptr, len: i32) i32
+extern fn ky_ws_send_frame(i32, i32, ptr, i32) i32
+extern fn ky_tcp_write(i32, ptr, i32) i32
 extern fn ky_ptr_read_i32(ptr) i32
 extern fn ky_ptr_read_ptr(ptr) ptr
 extern fn ky_free(ptr)
@@ -34,7 +34,7 @@ extern fn ky_free(ptr)
 # ═══════════════════════════════════════════════════════════
 
 fn ws_upgrade(client_fd: i32, raw_request: str) bool:
-    key = extract_header(raw_request, "Sec-WebSocket-Key")
+    key = extract_header(&raw_request, &"Sec-WebSocket-Key")
     if len(key) == 0:
         return false
 

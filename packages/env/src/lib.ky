@@ -7,13 +7,13 @@
 #   from env import env
 #   home = env("HOME")
 
-extern fn getenv(name: ptr) ptr
+extern fn getenv(ptr) ptr
 
 fn env(key: str) str:
     getenv(key as ptr) as str
 
 fn env_or(key: str, default: str) str:
-    val = env(key)
+    val = env(&key)
     if len(val) == 0:
         default
     else:
