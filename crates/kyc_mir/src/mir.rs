@@ -94,6 +94,8 @@ pub enum MirInst {
     Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
     /// Load address of a named function into a local (for closures).
     FnAddr { dest: usize, name: String },
+    /// Get the address (alloca pointer) of a local variable.
+    AddressOf { dest: usize, local_id: usize },
     /// Call through a function pointer.
     CallIndirect { dest: Option<usize>, fn_ptr: usize, ret_type: MirType, param_types: Vec<MirType>, args: Vec<MirValue> },
     /// Create a slice struct {ptr, len} from a pointer and length.
@@ -336,6 +338,9 @@ impl fmt::Display for MirInst {
             }
             MirInst::FnAddr { dest, name } => {
                 write!(f, "  %{} = fn_addr {}", dest, name)
+            }
+            MirInst::AddressOf { dest, local_id } => {
+                write!(f, "  %{} = addr_of %{}", dest, local_id)
             }
             MirInst::CallIndirect { dest, fn_ptr, ret_type: _, param_types: _, args } => {
                 if let Some(d) = dest {

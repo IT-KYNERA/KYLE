@@ -43,6 +43,8 @@ pub enum SsaInst {
     Cast { dest: SsaValueId, value: SsaValueId, to_type: MirType },
     /// dest = &function (for closures)
     FnAddr { dest: SsaValueId, name: String },
+    /// dest = address of local (alloca pointer)
+    AddressOf { dest: SsaValueId, local_id: usize },
     /// dest = call_indirect(fn_ptr, args)
     CallIndirect { dest: Option<SsaValueId>, fn_ptr: SsaValueId, ret_type: MirType, param_types: Vec<MirType>, args: Vec<SsaValueId> },
     /// dest = spawn_task(func_name, arg)
@@ -497,6 +499,13 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }
+                MirInst::AddressOf { dest, local_id } => {
+                    let new_dest = ssa.values.len();
+                    ssa.values.push(SsaValue { type_: MirType::Ptr(Box::new(MirType::I8)), name: format!("_ad{}", dest) });
+                    ssa_block.insts.push(SsaInst::AddressOf { dest: new_dest, local_id: *local_id });
+                    alloca_current.insert(*dest, new_dest);
+                    stacks.entry(*dest).or_default().push(new_dest);
+                }
                 MirInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
                     let fn_ptr_id = alloca_current.get(fn_ptr).copied().unwrap_or(*fn_ptr);
                     let arg_ids: Vec<SsaValueId> = args.iter()
@@ -715,6 +724,7 @@ fn gvn_replace_inst(inst: &mut SsaInst, replacements: &HashMap<SsaValueId, SsaVa
         SsaInst::PtrStore { index, value, .. } => { replace(index); replace(value); }
         SsaInst::AsyncSpawn { arg, .. } => { replace(arg); }
         SsaInst::AsyncAwait { handle, .. } => { replace(handle); }
+        SsaInst::AddressOf { .. } => {}
         _ => {}
     }
 }
@@ -746,6 +756,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                     // These reference heap-allocated memory, not promotable
                 }
                 MirInst::SliceMake { dest, .. } => { escaped.insert(*dest); }
+                MirInst::AddressOf { local_id, .. } => { escaped.insert(*local_id); }
                 _ => {}
             }
         }

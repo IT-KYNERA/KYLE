@@ -244,6 +244,10 @@ impl Optimizer {
             MirInst::FnAddr { dest, .. } => {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
             }
+            MirInst::AddressOf { dest, local_id } => {
+                if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
+                if let Some(new_id) = map.get(local_id) { *local_id = *new_id; }
+            }
             MirInst::CallIndirect { dest, fn_ptr, args, .. } => {
                 if let Some(d) = dest {
                     if let Some(new_dest) = map.get(d) { *dest = Some(*new_dest); }
@@ -640,6 +644,10 @@ impl Optimizer {
                     }
                     MirInst::FnAddr { dest, .. } => {
                         used.insert(*dest);
+                    }
+                    MirInst::AddressOf { dest, local_id } => {
+                        used.insert(*dest);
+                        used.insert(*local_id);
                     }
                     MirInst::CallIndirect { dest, fn_ptr, args, .. } => {
                         if let Some(d) = dest {

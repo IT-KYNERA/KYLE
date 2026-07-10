@@ -119,6 +119,7 @@ impl<'ctx> Codegen<'ctx> {
                 callback(*src_alloca_local);
             }
             MirInst::FnAddr { .. } => {}
+            MirInst::AddressOf { local_id, .. } => { callback(*local_id); }
             MirInst::CallIndirect { fn_ptr, args, .. } => {
                 callback(*fn_ptr);
                 for a in args { if let MirValue::Local(id) = a { callback(*id); } }
@@ -699,9 +700,19 @@ impl<'ctx> Codegen<'ctx> {
                                 _ => name,
                             };
                              if self.module.get_function(runtime_name).is_none() {
-                                let fn_type = self.context.i64_type().fn_type(&[], false);
-                                self.module.add_function(runtime_name, fn_type, None);
-                            }
+                                 let ret_type = if let Some(d) = dest {
+                                     let mir_type = func.values.get(*d).map(|v| &v.type_).unwrap_or(&MirType::I64);
+                                     self.llvm_type(mir_type).as_basic_type_enum()
+                                 } else {
+                                     self.context.i64_type().as_basic_type_enum()
+                                 };
+                                 let param_tys: Vec<inkwell::types::BasicMetadataTypeEnum<'ctx>> = args.iter()
+                                     .filter_map(|a| func.values.get(*a))
+                                     .map(|v| self.llvm_type(&v.type_).into())
+                                     .collect();
+                                 let fn_type = ret_type.fn_type(&param_tys, false);
+                                 self.module.add_function(runtime_name, fn_type, None);
+                             }
                             if let Some(callee) = self.module.get_function(runtime_name) {
                                 let fn_ty = callee.get_type();
                                 let param_tys = fn_ty.get_param_types();
@@ -759,6 +770,11 @@ impl<'ctx> Codegen<'ctx> {
                         SsaInst::FnAddr { dest, name } => {
                             if let Some(fv) = self.fn_value_map.get(name) {
                                 block_vals[bi].insert(*dest, fv.as_global_value().as_basic_value_enum());
+                            }
+                        }
+                        SsaInst::AddressOf { dest, local_id } => {
+                            if let Some(Some(ptr)) = self.alloca_map.get(*local_id) {
+                                block_vals[bi].insert(*dest, ptr.as_basic_value_enum());
                             }
                         }
                         SsaInst::CallIndirect { dest, fn_ptr, ret_type, param_types, args } => {
@@ -2536,6 +2552,7 @@ impl<'ctx> Codegen<'ctx> {
                     MirInst::FieldPtr { dest, .. } => Some(*dest),
                     MirInst::ArrayElemPtr { dest, .. } => Some(*dest),
                     MirInst::FnAddr { dest, .. } => Some(*dest),
+                    MirInst::AddressOf { dest, .. } => Some(*dest),
                     MirInst::AsyncSpawn { dest, .. } => Some(*dest),
                     MirInst::AsyncAwait { dest, .. } => Some(*dest),
                     MirInst::SliceMake { dest, .. } => Some(*dest),
@@ -3385,6 +3402,15 @@ impl<'ctx> Codegen<'ctx> {
                                 if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                     self.builder.build_store(alloca, ptr)
                                         .map_err(|e| format!("fnaddr store: {}", e))?;
+                                }
+                                last_value_map.insert(*dest, ptr.as_basic_value_enum());
+                            }
+                        }
+                        MirInst::AddressOf { dest, local_id } => {
+                            if let Some(ptr) = self.alloca_map.get(*local_id).and_then(|p| *p) {
+                                if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    self.builder.build_store(alloca, ptr)
+                                        .map_err(|e| format!("addr store: {}", e))?;
                                 }
                                 last_value_map.insert(*dest, ptr.as_basic_value_enum());
                             }

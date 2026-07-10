@@ -7217,7 +7217,28 @@ impl Lowerer {
                 });
                 ctx
             }
-            Expr::BorrowRef { expression, .. } => self.lower_expr(ctx, expression),
+            Expr::BorrowRef { expression, .. } => {
+                if let Expr::Identifier { name, .. } = expression.as_ref() {
+                    if let Some(&local_id) = ctx.locals.get(name) {
+                        let ptr_type = MirType::Ptr(Box::new(MirType::I8));
+                        let dest = ctx.alloc_local("_addr", ptr_type);
+                        ctx.current_block.insts.push(MirInst::AddressOf {
+                            dest,
+                            local_id,
+                        });
+                        return ctx;
+                    }
+                }
+                ctx = self.lower_expr(ctx, expression);
+                let inner_local = ctx.next_local - 1;
+                let ptr_type = MirType::Ptr(Box::new(MirType::I8));
+                let dest = ctx.alloc_local("_addr", ptr_type);
+                ctx.current_block.insts.push(MirInst::AddressOf {
+                    dest,
+                    local_id: inner_local,
+                });
+                ctx
+            }
             Expr::NullCoalesce { left, right, .. } => {
                 // Lower left expression (Option<T>)
                 ctx = self.lower_expr(ctx, left);
