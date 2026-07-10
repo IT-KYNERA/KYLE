@@ -102,12 +102,12 @@ curl -fsSL "$BUNDLE_URL" -o "$BUNDLE" || {
 
 if curl -fsSL "$SHA256_URL" -o "${BUNDLE}.sha256" 2>/dev/null; then
     echo "Verifying checksum..."
-    if command -v shasum &>/dev/null; then
+    if command -v shasum >/dev/null 2>&1; then
         shasum -a 256 -c "${BUNDLE}.sha256" || {
             echo "Error: checksum verification failed"
             exit 1
         }
-    elif command -v sha256sum &>/dev/null; then
+    elif command -v sha256sum >/dev/null 2>&1; then
         sha256sum -c "${BUNDLE}.sha256" || {
             echo "Error: checksum verification failed"
             exit 1
@@ -151,7 +151,7 @@ if [ "${KY_PREFIX:-}" = "" ]; then
         INSTALL_TO_USR=true
     else
         # Try with sudo
-        if command -v sudo &>/dev/null && sudo -n true 2>/dev/null; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
             INSTALL_TO_USR=true
         fi
     fi
