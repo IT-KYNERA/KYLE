@@ -123,24 +123,24 @@ for val in s:
  println(val.to_str())
 ```
 
-### Queue via list [ ]
+### Queue via list [x]
 
 No there is type `Queue<T>` dedicado. Usar `{T}` with `.push()` / `.pop_first()`:
 
 ```ky
-q: {i32} = {}
+q = list_new()
 q.push(10) # enqueue
 q.push(20)
 val = q.pop_first() # dequeue → 10 (FIFO)
 q.len()
 ```
 
-### Stack via list [ ]
+### Stack via list [x]
 
 No there is type `Stack<T>` dedicado. Usar `{T}` with `.push()` / `.pop()` — ya funciona:
 
 ```ky
-st: {i32} = {}
+st = list_new()
 st.push(10) # push
 st.push(20)
 val = st.pop() # → 20 (LIFO)

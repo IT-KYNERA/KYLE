@@ -86,9 +86,11 @@ struct LowerCtx {
     /// When set, the next Stmt::Match should store each arm's result to this local.
     match_result_local: Option<usize>,
     /// When true, the current function returns a result struct. Return values
-    /// are automatically wrapped in {disc: 1, payload: value}, and the `?`
+    /// are automatically wrapped in {disc: 0, payload: value}, and the `?`
     /// operator propagates errors by early-returning the struct.
     is_fallible: bool,
+    /// The MIR return type of the current function (used for fallible result wrapping).
+    return_type: MirType,
     /// Deferred call expressions (AST) to execute before function return.
     /// Stored in definition order; emitted in reverse (LIFO).
     deferred_exprs: Vec<Box<Expr>>,
@@ -116,6 +118,7 @@ impl LowerCtx {
             tail_if_as_return: false,
             match_result_local: None,
             is_fallible: false,
+            return_type: MirType::Void,
             deferred_exprs: Vec::new(),
             break_flag_local: None,
             if_result_alloca: None,
@@ -159,18 +162,15 @@ impl LowerCtx {
             // If the value is already a __result struct (e.g. from error()), return as-is
             if let MirValue::Local(id) = &value {
                 if let Some(MirType::Struct(name, _)) = self.local_types.get(id) {
-                    if name == "__result" {
+                    if name == "Result" {
                         self.finish_block(MirTerminator::Return(value));
                         return;
                     }
                 }
             }
-            let result_struct = MirType::Struct("__result".to_string(), vec![
-                ("disc".to_string(), MirType::I32),
-                ("payload".to_string(), MirType::I64),
-            ]);
+            let result_struct = self.return_type.clone();
             let result_local = self.alloc_local("_ret", result_struct.clone());
-            // Set disc = 1 (success)
+            // Set disc = 0 (success/ok)
             let disc_ptr = self.alloc_local("_rsp", MirType::I32);
             self.current_block.insts.push(MirInst::FieldPtr {
                 dest: disc_ptr,
@@ -180,7 +180,7 @@ impl LowerCtx {
             });
             self.current_block.insts.push(MirInst::Store {
                 dest: disc_ptr,
-                value: MirValue::Constant(MirConstant::I32(1)),
+                value: MirValue::Constant(MirConstant::I32(0)),
             });
             // Set payload (widened to I64)
             let payload_ptr = self.alloc_local("_rpp", MirType::I64);
@@ -188,7 +188,7 @@ impl LowerCtx {
                 dest: payload_ptr,
                 ptr: result_local,
                 field_index: 1,
-                struct_type: Box::new(result_struct),
+                struct_type: Box::new(result_struct.clone()),
             });
             let widened = if let MirValue::Local(id) = &value {
                 if self.local_types.get(id).map(|t| *t != MirType::I64).unwrap_or(true) {
@@ -447,6 +447,14 @@ impl Lowerer {
             result_variants.insert("Ok".to_string(), 0);
             result_variants.insert("Err".to_string(), 1);
             ev.insert("Result".to_string(), result_variants);
+            // Also register Result in struct_defs so ast_type_to_mir can find its fields
+            let mut struct_defs = self.struct_defs.borrow_mut();
+            if !struct_defs.contains_key("Result") {
+                struct_defs.insert("Result".to_string(), vec![
+                    ("disc".to_string(), MirType::I32),
+                    ("payload".to_string(), MirType::I64),
+                ]);
+            }
         }
 
         // Pre-scan function declarations and class constructors to build a return-type map.
@@ -1021,6 +1029,7 @@ impl Lowerer {
         let mut ctx = LowerCtx::new();
         ctx.struct_defs = self.struct_defs.borrow().clone();
         ctx.is_fallible = is_fallible;
+        ctx.return_type = mir_func.return_type.clone();
 
         // Allocate and store params
         for (i, param) in f.params.iter().enumerate() {
@@ -1236,6 +1245,7 @@ impl Lowerer {
 
         ctx.struct_defs = struct_defs;
         ctx.is_fallible = is_fallible;
+        ctx.return_type = mir_func.return_type.clone();
 
         if is_static {
             // Static method: bind explicit params directly (no `this`)
@@ -2154,7 +2164,7 @@ impl Lowerer {
                                 .unwrap_or(0);
 
                             let struct_type = MirType::Struct(
-                                if enum_name == "Result" { "__result".to_string() } else { enum_name.clone() },
+                                if enum_name == "Result" { "Result".to_string() } else { enum_name.clone() },
                                 vec![
                                     ("disc".to_string(), MirType::I32),
                                     ("payload".to_string(), MirType::I64),
@@ -5738,7 +5748,7 @@ impl Lowerer {
                 ctx = self.lower_expr(ctx, target);
                 let target_local = ctx.next_local - 1;
                 let target_type = ctx.local_types.get(&target_local).cloned()
-                    .unwrap_or(MirType::Struct("__result".to_string(), vec![
+                    .unwrap_or(MirType::Struct("Result".to_string(), vec![
                         ("disc".to_string(), MirType::I32),
                         ("payload".to_string(), MirType::I64),
                     ]));
@@ -5911,7 +5921,7 @@ impl Lowerer {
                 ctx = self.lower_expr(ctx, expression);
                 let result_local = ctx.next_local - 1;
                 let result_type = ctx.local_types.get(&result_local).cloned()
-                    .unwrap_or(MirType::Struct("__result".to_string(), vec![
+                    .unwrap_or(MirType::Struct("Result".to_string(), vec![
                         ("disc".to_string(), MirType::I32),
                         ("payload".to_string(), MirType::I64),
                     ]));
@@ -6904,7 +6914,7 @@ impl Lowerer {
                                 .copied()
                                 .unwrap_or(0);
                             let struct_type = MirType::Struct(
-                                if enum_name == "Result" { "__result".to_string() } else { enum_name.clone() },
+                                if enum_name == "Result" { "Result".to_string() } else { enum_name.clone() },
                                 vec![
                                     ("disc".to_string(), MirType::I32),
                                     ("payload".to_string(), MirType::I64),
@@ -7010,7 +7020,7 @@ impl Lowerer {
                 ctx = self.lower_expr(ctx, left);
                 let left_local = ctx.next_local - 1;
                 let left_type = ctx.local_types.get(&left_local).cloned()
-                    .unwrap_or(MirType::Struct("__result".to_string(), vec![
+                    .unwrap_or(MirType::Struct("Result".to_string(), vec![
                         ("disc".to_string(), MirType::I32),
                         ("payload".to_string(), MirType::I64),
                     ]));
@@ -7211,7 +7221,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
         "ky_spawn_thread" | "ky_join_thread" | "ky_parallel_for" => Some(MirType::I64),
         "ky_channel_new" | "ky_channel_send" | "ky_channel_recv" | "ky_channel_len" | "ky_channel_free" => Some(MirType::I64),
         "ky_channel_close" => Some(MirType::Void),
-        "ok" | "error" => Some(MirType::Struct("__result".to_string(), vec![
+        "ok" | "error" => Some(MirType::Struct("Result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ])),
@@ -8002,7 +8012,7 @@ fn ast_type_to_mir_with_subst(
             Box::new(ast_type_to_mir_with_subst(key, struct_defs, subst)),
             Box::new(ast_type_to_mir_with_subst(value, struct_defs, subst)),
         ),
-        AstType::Error { inner: _, .. } => MirType::Struct("__result".to_string(), vec![
+        AstType::Error { inner: _, .. } => MirType::Struct("Result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ]),
@@ -8175,7 +8185,7 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
             Box::new(ast_type_to_mir(key, struct_defs)),
             Box::new(ast_type_to_mir(value, struct_defs)),
         ),
-        AstType::Error { inner: _, .. } => MirType::Struct("__result".to_string(), vec![
+        AstType::Error { inner: _, .. } => MirType::Struct("Result".to_string(), vec![
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ]),

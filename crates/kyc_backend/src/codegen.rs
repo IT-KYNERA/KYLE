@@ -927,6 +927,13 @@ impl<'ctx> Codegen<'ctx> {
                                                 .as_basic_value_enum()
                                         }
                                     }
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::StructType(st)) => {
+                                        let ptr_ty = self.context.ptr_type(Default::default());
+                                        let ptr_val = self.builder.build_int_to_ptr(*iv, ptr_ty, "_retptr")
+                                            .map_err(|e| format!("ssa ret inttoptr: {}", e))?;
+                                        self.builder.build_load(*st, ptr_val, "_retstruct")
+                                            .map_err(|e| format!("ssa ret load struct: {}", e))?
+                                    }
                                     _ => ret,
                                 }
                             } else { ret }

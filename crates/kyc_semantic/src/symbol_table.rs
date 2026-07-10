@@ -79,7 +79,7 @@ impl SymbolTable {
             "ord",
             "error",
             "ceil", "floor", "round",
-            "push", "list_len", "list_get", "list_set", "list_pop", "list_push", "reserve",
+            "push", "list_new", "list_len", "list_get", "list_set", "list_pop", "list_push", "reserve",
 
             "ky_spawn_thread", "ky_join_thread", "ky_parallel_for", "ok", "some",
             "ky_channel_new", "ky_channel_send", "ky_channel_recv",
