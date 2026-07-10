@@ -84,11 +84,28 @@ d: {str: i32} = {"key": 42}
 val: i32 = d["key"]
 ```
 
+## Slice: `&[T]`
+
+```ky
+arr: [i32, 5] = [10, 20, 30, 40, 50]
+s: &[i32] = arr[1..4]    # slice: [20, 30, 40]
+println(s.len().to_str()) # → 3
+println(s[0].to_str())    # → 20
+```
+
+Fat pointer `{ptr, len}`. Copy semantics. No ownership.
+
+```ky
+d: {str: i32} = {"key": 42}
+val: i32 = d["key"]
+```
+
 ## Comparison
 
 | Type | Heap/Stack | Size | Acceso primario |
 |------|-----------|--------|-----------------|
 | `[T, N]` | Stack | Fijo | Por índice (GEP) |
+| `&[T]` | Stack (fat ptr) | 16 (ptr+len) | Por índice + len |
 | `{T}` | Heap | Dinámico | Por valor (push/pop/remove/contains) |
 | `(T1, T2)` | Stack | Fijo | Por campo (.0, .1) |
 | `{K: V}` | Heap | Dinámico | Por clave (set/get) |

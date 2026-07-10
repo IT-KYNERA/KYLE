@@ -151,12 +151,29 @@ st.len()
 > todas operacionis necesarias with methods `.push()`, `.pop()`, `.pop_first()`.
 > Esto sigue enfoque de Go y JavaScript, where arrays/lists cubren ambos roles.
 
-### Slice: `&[T]` [ ]
+### Slice: `&[T]` [x]
 
-> **No implementado.** Está en roadmap para fase futura.
->
-> Los slices permitirán vistas de arrays sin copiar: `&arr[0..n]`.
-> Mientras tanto, usa borrow `&[T, N]` para arrays del mismo tamaño.
+> Vista de secuencia contigua. Un fat pointer (ptr + len), Copy semantics.
+
+```ky
+arr: [i32, 5] = [10, 20, 30, 40, 50]
+s: &[i32] = arr[1..4]    # slice: [20, 30, 40]
+println(s.len().to_str()) # → 3
+println(s[0].to_str())    # → 20
+s2: &[i32] = arr[..]      # full slice: [10, 20, 30, 40, 50]
+```
+
+**Copy semantics:** `&[T]` es Copy → `s2 = s1` deja ambos vivos.
+
+**Creación:** `&arr[range]`:
+| Expresión | Resultado |
+|-----------|-----------|
+| `arr[0..n]` | Slice de arr[0] a arr[n-1] |
+| `arr[..]` | Slice completo |
+| `arr[i..]` | Desde i hasta el final |
+| `arr[..j]` | Desde 0 hasta j-1 |
+
+**Métodos:** `.len()`, indexación `[i]`.
 
 ---
 
@@ -513,9 +530,9 @@ result = sb.to_str()
 
 | Category | [x] Completo | [ ] Designed | ❌ No planned |
 |-----------|:-----------:|:-----------:|:-------------:|
-| Primitivis | 13 | 2 (u8-u64 codegen, never) | 1 (byte) |
-| Compounds | 5 | 3 (tuple, slice) | 0 |
+| Primitivis | 13 | 2 (u8-u64 codegen, never) | 0 |
+| Compounds | 6 | 2 (tuple) | 0 |
 | Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
 | Specialized | 2 (str_builder, file) | 13 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path) | 0 |
-| **Total** | **24** | **29** | **0** |
+| **Total** | **25** | **28** | **0** |
