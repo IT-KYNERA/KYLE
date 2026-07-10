@@ -143,10 +143,18 @@ fi
 
 if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
     echo "Installing to /usr/local..."
-    sudo mkdir -p /usr/local/bin /usr/local/lib/ky
-    sudo cp ky /usr/local/bin/ky
-    if [ -f libkyc_runtime.a ]; then
-        sudo cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+    if [ "$(id -u)" -eq 0 ]; then
+        mkdir -p /usr/local/bin /usr/local/lib/ky
+        cp ky /usr/local/bin/ky
+        if [ -f libkyc_runtime.a ]; then
+            cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+        fi
+    else
+        sudo mkdir -p /usr/local/bin /usr/local/lib/ky
+        sudo cp ky /usr/local/bin/ky
+        if [ -f libkyc_runtime.a ]; then
+            sudo cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+        fi
     fi
     INSTALL_DIR="/usr/local/bin"
     KY_PREFIX="/usr/local"
