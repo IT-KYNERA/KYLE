@@ -144,26 +144,26 @@ fi
 if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
     echo "Installing to /usr/local..."
     if [ "$(id -u)" -eq 0 ]; then
-        mkdir -p /usr/local/bin /usr/local/lib/ky
+        mkdir -p /usr/local/bin /usr/local/lib
         cp ky /usr/local/bin/ky
         if [ -f libkyc_runtime.a ]; then
-            cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+            cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
     else
-        sudo mkdir -p /usr/local/bin /usr/local/lib/ky
+        sudo mkdir -p /usr/local/bin /usr/local/lib
         sudo cp ky /usr/local/bin/ky
         if [ -f libkyc_runtime.a ]; then
-            sudo cp libkyc_runtime.a /usr/local/lib/ky/libkyc_runtime.a
+            sudo cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
     fi
     INSTALL_DIR="/usr/local/bin"
     KY_PREFIX="/usr/local"
 elif [ -n "${KY_PREFIX:-}" ]; then
     echo "Installing to $KY_PREFIX..."
-    mkdir -p "$KY_PREFIX/bin" "$KY_PREFIX/lib/ky"
+    mkdir -p "$KY_PREFIX/bin" "$KY_PREFIX/lib"
     cp ky "$KY_PREFIX/bin/ky"
     if [ -f libkyc_runtime.a ]; then
-        cp libkyc_runtime.a "$KY_PREFIX/lib/ky/libkyc_runtime.a"
+        cp libkyc_runtime.a "$KY_PREFIX/lib/libkyc_runtime.a"
     fi
     INSTALL_DIR="$KY_PREFIX/bin"
 else
@@ -208,7 +208,7 @@ if ky --version 2>/dev/null; then
     echo "✅ Kyle $VERSION installed successfully!"
     echo ""
     echo "  Binary:  $INSTALL_DIR/ky"
-    if [ -f "$KY_PREFIX/lib/ky/libkyc_runtime.a" ] || [ -f "$KY_PREFIX/lib/libkyc_runtime.a" ]; then
+    if [ -f "$KY_PREFIX/lib/libkyc_runtime.a" ] || [ -f "$KY_PREFIX/lib/ky/libkyc_runtime.a" ]; then
         echo "  Runtime: installed"
     fi
     echo ""

@@ -171,10 +171,10 @@ impl Linker {
         // 1. Relative to the running binary
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                // /usr/local/bin/kl → /usr/local/lib/kl/libkyc_runtime.a
-                paths.push(exe_dir.join("../lib/kl").join(runtime_lib));
-                // ~/.ky/bin/kl → ~/.ky/lib/libkyc_runtime.a
+                // /usr/local/bin/ky → /usr/local/lib/libkyc_runtime.a
                 paths.push(exe_dir.join("../lib").join(runtime_lib));
+                // /usr/local/bin/ky → /usr/local/lib/ky/libkyc_runtime.a (legacy)
+                paths.push(exe_dir.join("../lib/ky").join(runtime_lib));
                 // Alongside binary
                 paths.push(exe_dir.join(runtime_lib));
             }

@@ -556,7 +556,7 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
     });
 
     let main_kl = format!(
-        "# {} — entry point\nfrom lib import greet\n\nfn main():\n    println(greet(\"World\"))\n",
+        "# {} — entry point\nfrom lib import greet\n\nfn main():\n    greeting = \"Hello\"\n    name = \"World\"\n    println(greet(&greeting, &name))\n",
         project_name
     );
     fs::write(project_dir.join("src").join("main.ky"), &main_kl).unwrap_or_else(|e| {
@@ -565,7 +565,7 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
     });
 
     let lib_kl = format!(
-        "# {} — library module\nfn greet(name: str) str:\n    \"Hello, \" + name + \"!\"\n",
+        "# {} — library module\nfn greet(greeting: str, name: str) str:\n    greeting + \", \" + name + \"!\"\n",
         project_name
     );
     fs::write(project_dir.join("src").join("lib.ky"), &lib_kl).unwrap_or_else(|e| {
@@ -622,8 +622,8 @@ fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
     let bare_kl = format!(
-        "# {} — bare script\nprintln(\"Hello from {}\")\n",
-        project_name, project_name
+        "# {} — bare script\nfn main():\n    name := \"Kyle\"  # compile-time constant\n    println(\"Hello from \" + name)\n",
+        project_name
     );
     let file = format!("{}.ky", project_name);
     fs::write(project_dir.join(&file), &bare_kl).unwrap_or_else(|e| {
