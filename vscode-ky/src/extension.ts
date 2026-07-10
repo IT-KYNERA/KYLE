@@ -15,34 +15,47 @@ function findKlBinary(): string | null {
         if (fs.existsSync(configured)) return configured;
     }
 
+    const isWindows = process.platform === 'win32';
+    const exeName = isWindows ? 'ky.exe' : 'ky';
+
+    // 1. Search PATH
     const envPath = process.env.PATH || '';
     const dirs = envPath.split(path.delimiter);
     for (const dir of dirs) {
-        for (const name of ['ky', 'ky']) {
-            const candidate = path.join(dir, name);
-            if (fs.existsSync(candidate)) return candidate;
-        }
+        const candidate = path.join(dir, exeName);
+        if (fs.existsSync(candidate)) return candidate;
     }
 
-    const home = process.env.HOME || '';
-    const locations = [
-        path.join(home, '.ky', 'bin', 'ky'),
-        path.join(home, '.ky', 'bin', 'ky'),
-        path.join(home, '.cargo', 'bin', 'ky'),
-        path.join(home, '.cargo', 'bin', 'ky'),
-        '/usr/local/bin/ky',
-        '/usr/local/bin/ky',
-        '/opt/homebrew/bin/kl',
-        '/opt/homebrew/bin/ky',
-        '/usr/bin/kl',
-    ];
+    // 2. Search common install locations
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const locations: string[] = [];
+
+    if (isWindows) {
+        locations.push(
+            path.join(home, '.ky', 'bin', 'ky.exe'),
+            path.join(process.env.LOCALAPPDATA || '', '.ky', 'bin', 'ky.exe'),
+        );
+    } else {
+        locations.push(
+            path.join(home, '.ky', 'bin', 'ky'),
+            path.join(home, '.cargo', 'bin', 'ky'),
+            '/usr/local/bin/ky',
+            '/opt/homebrew/bin/ky',
+            '/usr/bin/ky',
+        );
+    }
     for (const loc of locations) {
         if (fs.existsSync(loc)) return loc;
     }
 
+    // 3. Try 'which' / 'where' command
     try {
-        const which = require('child_process').execSync('which kl', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-        if (which && fs.existsSync(which)) return which;
+        const cmd = isWindows ? 'where' : 'which';
+        const result = require('child_process')
+            .execSync(`${cmd} ${exeName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+            .trim()
+            .split('\n')[0]; // take first match on Windows
+        if (result && fs.existsSync(result)) return result;
     } catch (_) {}
 
     return null;

@@ -39,13 +39,13 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const child_process_1 = require("child_process");
 function findKlBinary() {
-    const config = vscode.workspace.getConfiguration('kl');
+    const config = vscode.workspace.getConfiguration('ky');
     const configured = config.get('klcPath');
-    if (configured && configured !== 'kl') {
+    if (configured && configured !== 'ky') {
         if (fs.existsSync(configured))
             return configured;
     }
-    return 'kl';
+    return 'ky';
 }
 const testFnRegex = /#\[test\]\s*\n\s*fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
 class KyleTestController {
@@ -172,7 +172,7 @@ class KyleTestController {
         }
         const testName = item.label;
         const source = fs.readFileSync(filePath, 'utf-8');
-        const tempDir = path.join(path.dirname(filePath), '.kl-test');
+        const tempDir = path.join(path.dirname(filePath), '.ky-test');
         if (!fs.existsSync(tempDir)) {
             fs.mkdirSync(tempDir, { recursive: true });
         }

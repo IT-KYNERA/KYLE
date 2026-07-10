@@ -36,14 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.KyleTaskProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
-function findKlBinary() {
-    const config = vscode.workspace.getConfiguration('kl');
-    const configured = config.get('klcPath');
-    if (configured && configured !== 'kl') {
+function findKyBinary() {
+    const config = vscode.workspace.getConfiguration('ky');
+    const configured = config.get('kycPath');
+    if (configured && configured !== 'ky') {
         if (require('fs').existsSync(configured))
             return configured;
     }
-    return 'kl';
+    return 'ky';
 }
 class KyleTaskProvider {
     async provideTasks() {
@@ -70,15 +70,15 @@ class KyleTaskProvider {
         return tasks;
     }
     makeTask(kind, subcommand, filePath, label, folder) {
-        const klPath = findKlBinary() || 'kl';
-        const execution = new vscode.ProcessExecution(klPath, [subcommand, filePath]);
-        const task = new vscode.Task({ type: 'kl', subcommand }, folder, `${kind}: ${label}`, 'KL', execution);
+        const kyPath = findKyBinary() || 'ky';
+        const execution = new vscode.ProcessExecution(kyPath, [subcommand, filePath]);
+        const task = new vscode.Task({ type: 'ky', subcommand }, folder, `${kind}: ${label}`, 'KL', execution);
         task.group = subcommand === 'run'
             ? vscode.TaskGroup.Build
             : subcommand === 'check'
                 ? vscode.TaskGroup.Test
                 : vscode.TaskGroup.Rebuild;
-        task.problemMatchers = ['$kyc'];
+        task.problemMatchers = [''];
         return task;
     }
     async resolveTask(task) {

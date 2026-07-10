@@ -197,7 +197,7 @@ class KyleDebugSession extends events_1.EventEmitter {
     }
     doLaunch(args) {
         const program = args.program || '';
-        const klcPath = args.kycPath || 'kl';
+        const klcPath = args.kycPath || 'ky';
         const { execSync } = require('child_process');
         try {
             execSync(`${klcPath} build "${program}"`, { stdio: 'pipe' });

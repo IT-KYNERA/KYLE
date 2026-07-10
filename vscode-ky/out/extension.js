@@ -44,41 +44,44 @@ const testUI_1 = require("./testUI");
 let client = null;
 let testController = null;
 function findKlBinary() {
-    const config = vscode.workspace.getConfiguration('kl');
-    const configured = config.get('klcPath');
-    if (configured && configured !== 'kl') {
+    const config = vscode.workspace.getConfiguration('ky');
+    const configured = config.get('kycPath');
+    if (configured && configured !== 'ky') {
         if (fs.existsSync(configured))
             return configured;
     }
+    const isWindows = process.platform === 'win32';
+    const exeName = isWindows ? 'ky.exe' : 'ky';
+    // 1. Search PATH
     const envPath = process.env.PATH || '';
     const dirs = envPath.split(path.delimiter);
     for (const dir of dirs) {
-        for (const name of ['kl', 'ky']) {
-            const candidate = path.join(dir, name);
-            if (fs.existsSync(candidate))
-                return candidate;
-        }
+        const candidate = path.join(dir, exeName);
+        if (fs.existsSync(candidate))
+            return candidate;
     }
-    const home = process.env.HOME || '';
-    const locations = [
-        path.join(home, '.ky', 'bin', 'kl'),
-        path.join(home, '.ky', 'bin', 'ky'),
-        path.join(home, '.cargo', 'bin', 'kl'),
-        path.join(home, '.cargo', 'bin', 'ky'),
-        '/usr/local/bin/kl',
-        '/usr/local/bin/ky',
-        '/opt/homebrew/bin/kl',
-        '/opt/homebrew/bin/ky',
-        '/usr/bin/kl',
-    ];
+    // 2. Search common install locations
+    const home = process.env.HOME || process.env.USERPROFILE || '';
+    const locations = [];
+    if (isWindows) {
+        locations.push(path.join(home, '.ky', 'bin', 'ky.exe'), path.join(process.env.LOCALAPPDATA || '', '.ky', 'bin', 'ky.exe'));
+    }
+    else {
+        locations.push(path.join(home, '.ky', 'bin', 'ky'), path.join(home, '.cargo', 'bin', 'ky'), '/usr/local/bin/ky', '/opt/homebrew/bin/ky', '/usr/bin/ky');
+    }
     for (const loc of locations) {
         if (fs.existsSync(loc))
             return loc;
     }
+    // 3. Try 'which' / 'where' command
     try {
-        const which = require('child_process').execSync('which kl', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-        if (which && fs.existsSync(which))
-            return which;
+        const cmd = isWindows ? 'where' : 'which';
+        const result = require('child_process')
+            .execSync(`${cmd} ${exeName}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+            .trim()
+            .split('\n')[0]; // take first match on Windows
+        if (result && fs.existsSync(result))
+            return result;
     }
     catch (_) { }
     return null;
@@ -89,13 +92,13 @@ function activate(context) {
     testController = new testUI_1.KyleTestController();
     context.subscriptions.push({ dispose: () => testController?.dispose() });
     // Register task provider
-    context.subscriptions.push(vscode.tasks.registerTaskProvider('kl', new tasks_1.KyleTaskProvider()));
+    context.subscriptions.push(vscode.tasks.registerTaskProvider('ky', new tasks_1.KyleTaskProvider()));
     // Register commands
     context.subscriptions.push(vscode.commands.registerCommand('ky.run', () => runFile('run')), vscode.commands.registerCommand('ky.build', () => runFile('build')), vscode.commands.registerCommand('ky.check', () => runFile('check')), vscode.commands.registerCommand('ky.test', () => runFile('test')), vscode.commands.registerCommand('ky.runTest', (fileUri, testName) => {
         runSpecificTest(fileUri, testName);
     }));
     // Register diagnostics collection
-    const diagnosticCollection = vscode.languages.createDiagnosticCollection('kl');
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('ky');
     context.subscriptions.push(diagnosticCollection);
     // Parse output for diagnostics
     context.subscriptions.push(vscode.commands.registerCommand('ky.handleOutput', (output) => {
@@ -104,9 +107,9 @@ function activate(context) {
     // Start LSP client
     let klPath = findKlBinary();
     if (!klPath) {
-        klPath = 'kl';
+        klPath = 'ky';
     }
-    if (fs.existsSync(klPath) || klPath === 'kl') {
+    if (fs.existsSync(klPath) || klPath === 'ky') {
         try {
             startLanguageClient(context, klPath);
             console.log('KY language server started:', klPath);
@@ -118,7 +121,7 @@ function activate(context) {
     }
     else {
         console.warn('kl binary not found in PATH or common install locations');
-        vscode.window.showWarningMessage('KY language server not available. Install kl or set "ky.klcPath" in settings.');
+        vscode.window.showWarningMessage('KY language server not available. Install kl or set "ky.kycPath" in settings.');
     }
 }
 function startLanguageClient(context, klPath) {
@@ -150,7 +153,7 @@ async function runFile(subcommand) {
     }
     let klPath = findKlBinary();
     if (!klPath) {
-        klPath = 'kl';
+        klPath = 'ky';
     }
     const terminal = vscode.window.createTerminal('KL');
     terminal.show();
@@ -160,7 +163,7 @@ function runSpecificTest(fileUri, testName) {
     const filePath = fileUri.replace(/^file:\/\//, '');
     let klPath = findKlBinary();
     if (!klPath) {
-        klPath = 'kl';
+        klPath = 'ky';
     }
     // Create wrapper to run just this test
     const fs = require('fs');
@@ -168,7 +171,7 @@ function runSpecificTest(fileUri, testName) {
     const source = fs.readFileSync(filePath, 'utf-8');
     const dir = path.dirname(filePath);
     const ext = path.extname(filePath);
-    const tempDir = path.join(dir, '.kl-test');
+    const tempDir = path.join(dir, '.ky-test');
     if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
     }

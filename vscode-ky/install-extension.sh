@@ -9,7 +9,7 @@ TMP_DIR="/tmp/kl-extension-$$"
 # --- Uninstall mode ---
 if [ "${1:-}" = "uninstall" ]; then
   echo "Removing Kyle VS Code extension..."
-  if command -v code &>/dev/null; then
+  if command -v code >/dev/null 2>&1; then
     code --uninstall-extension kynera.ky 2>/dev/null || true
     echo "Extension uninstalled."
   else

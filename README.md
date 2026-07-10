@@ -39,16 +39,24 @@ iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | i
 | Platform | Arch | Direct link |
 | :--- | :--- | :--- |
 | **macOS** | ARM64 | [ky-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.6.3/ky-macos-arm64.tar.gz) |
-| **macOS** | x64 | [ky-macos-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.6.3/ky-macos-x64.tar.gz) |
 | **Linux** | ARM64 | [ky-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.6.3/ky-linux-arm64.tar.gz) |
 | **Linux** | x64 | [ky-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.6.3/ky-linux-x64.tar.gz) |
 | **Windows** | x64 | [ky-windows-x64.zip](https://github.com/IT-KYNERA/KYLE/releases/download/v0.6.3/ky-windows-x64.zip) |
 
 ### VS Code Extension
 
+**macOS / Linux**:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
 ```
+
+**Windows** (PowerShell):
+```powershell
+iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.ps1" | iex
+```
+
+> **Platform note**: macOS Intel (x64) is no longer supported. Apple stopped shipping Intel Macs.
+> Use Apple Silicon (ARM64) on all modern Macs.
 
 ---
 
