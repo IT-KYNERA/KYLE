@@ -26,12 +26,36 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
 | **Syntax** | ✅ **Complete** — Generics, ranges, match, op overloading, is, ptr, for-else, static fn, ** |
 | **Borrow checker** | ✅ **Complete** |
-| **Tooling** | ✅ **Complete** — LSP, VS Code ext, formatter, test framework, package manager |
+| **Cross-platform** | ✅ **Complete** — macOS ARM, Linux ARM/x64, Windows x64 (4 platforms via CI) |
+| **Tooling** | ✅ **Complete** — LSP, cross-platform VS Code ext, formatter, test framework, package manager |
 | **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** — Pure Kyle FFI to C libraries |
 | **Runtime in Kyle** | ✅ **Complete** |
 | **kyc_platform** | ✅ **Complete** |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.
+
+---
+
+## CRITICAL — CI & Platform Configuration
+
+**DO NOT modify these files unless you fully understand the cross-platform implications.**
+These configurations are the result of extensive debugging across 4 platforms and are
+known to work. Any change can break Windows, Linux ARM, Linux x64, or macOS ARM builds.
+
+| File | What it does | Risk if modified |
+|------|-------------|------------------|
+| `.github/workflows/release.yml` | CI build + release for all 4 platforms + VSIX packaging | Breaks CI, broken releases |
+| `.github/workflows/ci.yml` | CI test runner | Breaks test CI |
+| `.cargo/config.toml` | Per-platform LLVM prefix (empty — CI sets it) | Can override LLVM path |
+| `tools/windows/patch-llvm.ps1` | Creates missing LLVM headers + `llvm-config.exe` for Windows | Breaks Windows build |
+| `tools/windows/llvm-config.cmd` | Batch fallback for llvm-config queries | Breaks Windows build |
+| `crates/kyc_backend/src/linker.rs` | Platform-specific linker flags (CRT, system libs) | Breaks linking on any platform |
+| `install.sh` / `install.ps1` | One-command installers | Broken user experience |
+| `vscode-ky/src/extension.ts` | VS Code extension binary discovery | Extension stops working |
+| `vscode-ky/install-extension.sh` / `.ps1` | Extension installers | Users can't install extension |
+
+**If you must change these:** test on ALL 4 platforms before merging. Use `cargo check`
+locally per-platform and let CI verify any changes via a tagged release.
 
 ---
 
@@ -321,20 +345,23 @@ gh release create v0.X.X \
 "
 ```
 
-**The CI workflow (`.github/workflows/release.yml`) builds and uploads 5 bundles automatically:**
+**The CI workflow (`.github/workflows/release.yml`) builds and uploads 4 platform bundles + VSIX automatically:**
 
 | Bundle | Platform | CI Runner |
 |--------|----------|-----------|
 | `ky-macos-arm64.tar.gz` | macOS Apple Silicon | `macos-latest` |
-| `ky-macos-x64.tar.gz` | macOS Intel | `macos-13` |
 | `ky-linux-arm64.tar.gz` | Linux ARM64 | `ubuntu-24.04-arm` |
 | `ky-linux-x64.tar.gz` | Linux x86_64 | `ubuntu-24.04` |
 | `ky-windows-x64.zip` | Windows x86_64 | `windows-2025` |
+| `ky-extension.vsix` | VS Code extension | `ubuntu-24.04` |
+
+> **macOS Intel (x64) is no longer supported.** Apple stopped shipping Intel Macs.
+> The `macos-13` runner was removed from CI in v0.6.2.
 
 Each bundle contains (flat structure, no top-level dir):
 ```
 ky (or ky.exe)
-libkyc_runtime.a
+libkyc_runtime.a (or kyc_runtime.lib on Windows)
 LICENSE
 ```
 
@@ -347,10 +374,11 @@ git push origin v0.X.X
 ```
 
 This triggers `.github/workflows/release.yml` which:
-1. Creates the release in GitHub
-2. Compiles `ky` + `kyc_runtime` for all 5 platforms in parallel
-3. Generates flat bundles + SHA-256 checksums
-4. Uploads assets to the release
+ 1. Creates the release in GitHub
+2. Packages VS Code extension (`.vsix`)
+3. Compiles `ky` + `kyc_runtime` for all 4 platforms in parallel
+4. Generates flat bundles + SHA-256 checksums
+5. Uploads assets to the release
 
 **No local build needed.** CI handles all cross-compilation via native runners.
 
@@ -420,7 +448,7 @@ rm -rf /tmp/verify_release_*
 
 ### Setting up a development environment
 
-#### macOS (Apple Silicon / Intel)
+#### macOS (Apple Silicon)
 
 ```bash
 # 1. Install LLVM 18
@@ -469,10 +497,11 @@ ky run examples/hello.ky
 choco install llvm --version=18.1.8
 $env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
 
-# Or Option B — portable zip (no admin needed)
-Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip" -OutFile "$env:TEMP\llvm-18.zip"
-Expand-Archive -Path "$env:TEMP\llvm-18.zip" -DestinationPath "$env:USERPROFILE\llvm-18"
-$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18\LLVM-18.1.8-win64"
+# Or Option B — download installer + extract with 7-Zip (no admin needed)
+Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe" -OutFile "$env:TEMP\llvm-18.exe"
+& "C:\Program Files\7-Zip\7z.exe" x "$env:TEMP\llvm-18.exe" -o"$env:USERPROFILE\llvm-18" -y
+$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18"
+# Then run tools\windows\patch-llvm.ps1 to create missing headers
 
 # 2. Install Rust (https://rustup.rs)
 #    Default MSVC toolchain is recommended (requires Visual Studio Build Tools)
@@ -504,7 +533,7 @@ Only `kyc_runtime` (pure Rust) can be freely cross-compiled.
 | Different OS | ❌ Needs CI runner | ✅ Cross-compile with `cargo-zigbuild` |
 
 **Recommended workflow:**
-1. Push tag → CI builds all 5 platforms natively (`.github/workflows/release.yml`)
+1. Push tag → CI builds all 4 platforms natively (`.github/workflows/release.yml`)
 2. OR build locally for host platform, use CI for the rest
 
 ### Known issues per platform
@@ -513,14 +542,13 @@ Only `kyc_runtime` (pure Rust) can be freely cross-compiled.
 |----------|-------|--------|
 | **macOS** | None | ✅ Fully supported |
 | **Linux** | None | ✅ Fully supported |
-| **Windows** | Socket ops use `std::net` handle table (not raw `libc` fd) | ✅ Implemented |
+| **Windows** | Build requires `clang+llvm` tarball (936 MB) for headers | ✅ CI handles it |
 | **Windows** | VS Build Tools required for `link.exe` (MSVC toolchain) | ⚠️ Documented |
-| **Windows** | WebSocket over Windows sockets not tested on real Windows | 🔜 Needs testing |
-| **Windows** | CI runner `windows-2025` has LLVM 20 pre-installed; workflow installs LLVM 18 separately | ⚠️ Works with zip extraction |
+| **Windows** | CI runner `windows-2025` has LLVM 20 pre-installed; workflow installs LLVM 18 separately via tarball + 7z | ✅ Works |
 
 ### Distribution model
 
-Each release publishes 5 platform-specific bundles (flat archives with `ky` + `libkyc_runtime.a` + `LICENSE`):
+Each release publishes 4 platform-specific bundles + VSIX extension (flat archives with `ky` + `libkyc_runtime.a` + `LICENSE`):
 
 | Platform | Install command |
 |----------|----------------|
@@ -533,7 +561,7 @@ See `docs/07-tools/distribution.md` for full details.
 
 ---
 
-*Version: v0.6.3 · Last updated: 2026-07-10 — See sections above for release process and cross-platform guide.*
+*Version: v0.6.4 · Last updated: 2026-07-10 — See sections above for release process and cross-platform guide.*
 
 ---
 

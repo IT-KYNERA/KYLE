@@ -251,10 +251,9 @@ for target in "${TARGETS[@]}"; do
     local bundle_name
     case "$target" in
         aarch64-apple-darwin)       bundle_name="ky-macos-arm64" ;;
-        x86_64-apple-darwin)        bundle_name="ky-macos-x64" ;;
         x86_64-unknown-linux-gnu)   bundle_name="ky-linux-x64" ;;
         aarch64-unknown-linux-gnu)  bundle_name="ky-linux-arm64" ;;
-        x86_64-pc-windows-gnu)      bundle_name="ky-windows-x64" ;;
+        x86_64-pc-windows-gnu)      bundle_name="ky-windows-x64" ;;  # or msvc
     esac
 
     mkdir -p "dist/$bundle_name"

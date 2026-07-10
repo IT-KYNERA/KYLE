@@ -64,10 +64,12 @@ $env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
 
 **Option C — Portable (no admin):**
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.zip" -OutFile "$env:TEMP\llvm-18.zip"
-Expand-Archive -Path "$env:TEMP\llvm-18.zip" -DestinationPath "$env:USERPROFILE\llvm-18"
-$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18\LLVM-18.1.8-win64"
+Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe" -OutFile "$env:TEMP\llvm-18.exe"
+& "C:\Program Files\7-Zip\7z.exe" x "$env:TEMP\llvm-18.exe" -o"$env:USERPROFILE\llvm-18" -y
+$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18"
 ```
+> **Note:** The official LLVM 18.1.8 release for Windows does not include a `.zip` file, only `.exe` installers.
+> Use 7-Zip to extract the NSIS installer. If 7-Zip is not available, use Option A or B.
 
 ---
 
@@ -97,15 +99,32 @@ cp target/release/libkyc_runtime.a ~/.ky/lib/
 
 # Windows (PowerShell)
 Copy-Item target/release/ky.exe "$env:USERPROFILE\.ky\bin\"
-Copy-Item target/release/libkyc_runtime.a "$env:USERPROFILE\.ky\lib\"
+Copy-Item target/release/kyc_runtime.lib "$env:USERPROFILE\.ky\lib\"
 ```
+
+---
+
+## VS Code Extension
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.ps1" | iex
+```
+
+The VS Code extension provides syntax highlighting, LSP integration (diagnostics, autocomplete,
+go-to-definition, hover, rename), debugging, and a color theme.
 
 ---
 
 ## Verify Installation
 
 ```bash
-ky --version    # Should show v0.6.0
+ky --version    # Should show v0.6.4
 ky check --help # Should show help
 ky run examples/hello.ky  # Should print "Hello, World!"
 ```

@@ -3,7 +3,7 @@ set -eu
 
 REPO="IT-KYNERA/KYLE"
 BRANCH="main"
-TAG="v0.6.3"
+TAG="v0.6.4"
 TMP_DIR="/tmp/kl-extension-$$"
 
 # --- Uninstall mode ---
