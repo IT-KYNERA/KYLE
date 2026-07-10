@@ -665,6 +665,14 @@ impl<'ctx> Codegen<'ctx> {
                                                             return pv.into();
                                                         }
                                                     }
+                                                    // Struct value → temp alloca, pass pointer (pass-by-ref ABI)
+                                                    if let BasicValueEnum::StructValue(sv) = v {
+                                                        let st = sv.get_type();
+                                                        if let Ok(temp) = self.builder.build_alloca(st, "_stmp") {
+                                                            let _ = self.builder.build_store(temp, sv);
+                                                            return temp.as_basic_value_enum().into();
+                                                        }
+                                                    }
                                                 }
                                                 inkwell::types::BasicMetadataTypeEnum::IntType(it) if it.get_bit_width() > 32 => {
                                                     if let BasicValueEnum::IntValue(iv) = v {
@@ -777,7 +785,22 @@ impl<'ctx> Codegen<'ctx> {
                             }
                         }
                         SsaInst::FieldPtr { dest, ptr, field_index, struct_type } => {
-                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
+                            let base_ptr = self.alloca_map.get(*ptr).and_then(|p| *p)
+                                .or_else(|| {
+                                    let val = block_vals.get(bi).and_then(|m| {
+                                        func.block_local_map.get(bi)
+                                            .and_then(|m2| m2.get(ptr))
+                                            .and_then(|sid| m.get(sid))
+                                    }).or_else(|| alloca_current.get(ptr));
+                                    match val.copied() {
+                                        Some(BasicValueEnum::StructValue(sv)) => {
+                                            let st = sv.get_type();
+                                            self.builder.build_alloca(st, "_stmp").ok()
+                                        }
+                                        _ => None,
+                                    }
+                                });
+                            if let Some(base) = base_ptr {
                                 if let Some(fpa) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
                                     let st = self.llvm_type(struct_type);
                                     if let BasicTypeEnum::StructType(s) = st {
