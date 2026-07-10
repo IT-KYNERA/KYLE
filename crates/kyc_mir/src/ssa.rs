@@ -474,11 +474,10 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                                 type_: MirType::I32, name: format!("_idx{}", *dest)
                             });
                             ssa.const_values.insert(val_id, c.clone());
-                            stacks.entry(*dest).or_default().push(val_id);
                             val_id
                         }
                     };
-                    // Create an SSA value for the result pointer so resolve_value can find it
+                    // Create a new SsaValueId to avoid ID collision between MIR locals and SSA values
                     let result_id = ssa.values.len();
                     ssa.values.push(SsaValue {
                         type_: MirType::Ptr(Box::new(MirType::I8)),

@@ -955,6 +955,10 @@ impl<'ctx> Codegen<'ctx> {
                                                 .map_err(|e| format!("aelem fpa store: {}", e))?;
                                         }
                                     }
+                                    // Also store to alloca_map for ssa_read! fallback
+                                    if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                        let _ = self.builder.build_store(dest_ptr, gep.as_basic_value_enum());
+                                    }
                                     let elem_llvm = self.llvm_type(elem_type);
                                     self.field_ptr_types.insert(*dest, elem_llvm);
                                 }

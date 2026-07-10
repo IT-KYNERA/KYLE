@@ -371,8 +371,8 @@ impl Pipeline {
 
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "ky_module");
-        // SSA codegen — faster, but needs proper handling for ArrayElemPtr results.
-        codegen.compile(&mir.module)?;
+        // SSA codegen — faster optimization pipeline
+        codegen.compile_with_ssa(&mir.module)?;
 
         // Ensure artifact directory exists
         std::fs::create_dir_all(artifact_dir)
