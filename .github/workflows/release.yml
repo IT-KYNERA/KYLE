@@ -180,9 +180,20 @@ jobs:
         run: |
           mkdir dist
           Copy-Item target/release/ky.exe dist/
-          Copy-Item target/release/libkyc_runtime.a dist/
+          # MSVC names the static lib kyc_runtime.lib (no 'lib' prefix, .lib extension)
+          if (Test-Path target/release/libkyc_runtime.a) {
+            Copy-Item target/release/libkyc_runtime.a dist/
+            $runtimeFile = "libkyc_runtime.a"
+          } elseif (Test-Path target/release/kyc_runtime.lib) {
+            Copy-Item target/release/kyc_runtime.lib dist/
+            $runtimeFile = "kyc_runtime.lib"
+          } else {
+            Write-Error "Runtime library not found (tried libkyc_runtime.a and kyc_runtime.lib)"
+            Get-ChildItem target/release/*runtime*
+            exit 1
+          }
           Copy-Item LICENSE dist/
-          Compress-Archive -Path dist/ky.exe, dist/libkyc_runtime.a, dist/LICENSE -DestinationPath dist/ky-windows-x64.zip
+          Compress-Archive -Path dist/ky.exe, dist/$runtimeFile, dist/LICENSE -DestinationPath dist/ky-windows-x64.zip
 
       - name: Upload
         shell: pwsh
