@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "kyc_backend"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "inkwell",
  "kyc_core",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "kyc_cli"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "flate2",
  "kyc_core",
@@ -551,14 +551,14 @@ dependencies = [
 
 [[package]]
 name = "kyc_core"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "semver",
 ]
 
 [[package]]
 name = "kyc_driver"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "inkwell",
  "kyc_backend",
@@ -572,21 +572,21 @@ dependencies = [
 
 [[package]]
 name = "kyc_frontend"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "kyc_core",
 ]
 
 [[package]]
 name = "kyc_hir"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "kyc_core",
 ]
 
 [[package]]
 name = "kyc_mir"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "kyc_core",
 ]
@@ -600,7 +600,7 @@ dependencies = [
 
 [[package]]
 name = "kyc_runtime"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "base64",
  "chrono",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "kyc_semantic"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "kyc_core",
  "kyc_frontend",
@@ -622,7 +622,7 @@ dependencies = [
 
 [[package]]
 name = "kyc_tools"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "flate2",
  "kyc_core",
