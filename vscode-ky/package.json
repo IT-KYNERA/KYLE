@@ -29,11 +29,11 @@
   },
   "activationEvents": [
     "onLanguage:kl",
-    "onCommand:kl.run",
-    "onCommand:kl.build",
-    "onCommand:kl.check",
-    "onCommand:kl.test",
-    "onCommand:kl.runTest",
+    "onCommand:ky.run",
+    "onCommand:ky.build",
+    "onCommand:ky.check",
+    "onCommand:ky.test",
+    "onCommand:ky.runTest",
     "onDebugInitialConfigurations",
     "onDebugResolve:kl"
   ],
@@ -171,7 +171,7 @@
             "type": "kl",
             "request": "launch",
             "program": "${workspaceFolder}/src/main.ky",
-            "klcPath": "kl"
+            "klcPath": "ky"
           }
         ],
         "configurationSnippets": [

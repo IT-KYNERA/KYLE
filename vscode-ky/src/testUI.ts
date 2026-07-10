@@ -5,7 +5,7 @@ import { execSync, spawn } from 'child_process';
 
 function findKlBinary(): string {
     const config = vscode.workspace.getConfiguration('ky');
-    const configured = config.get<string>('klcPath');
+    const configured = config.get<string>('kycPath');
     if (configured && configured !== 'ky') {
         if (fs.existsSync(configured)) return configured;
     }

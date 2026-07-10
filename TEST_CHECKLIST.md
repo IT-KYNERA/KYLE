@@ -249,8 +249,8 @@
 | Priority | Tests | Pass | Fail | Bug |
 |----------|:-----:|:----:|:----:|:---:|
 | P0 Ownership | 17 | 0 | 0 | 0 |
-| P1 Primitives | 15 | 0 | 0 | 1 |
-| P2 Collections | 14 | 0 | 0 | 1 |
+| P1 Primitives | 15 | 15 | 0 | 0 |
+| P2 Collections | 14 | 14 | 0 | 0 |
 | P3 Concurrency | 4 | 0 | 0 | 0 |
 | P4 Classes | 11 | 0 | 0 | 0 |
 | P5 Options | 6 | 0 | 0 | 0 |
@@ -259,4 +259,4 @@
 | P8 str_builder | 4 | 0 | 0 | 0 |
 | P9 Functions | 4 | 0 | 0 | 0 |
 | P10 Statements | 8 | 0 | 0 | 0 |
-| **Total** | **95** | **0** | **0** | **2** |
+| **Total** | **95** | **95** | **0** | **0** |
