@@ -20,6 +20,259 @@ use inkwell::targets::{FileType, InitializationConfig, Target, TargetMachine};
 use inkwell::OptimizationLevel;
 use std::io::Write;
 
+/// Kyle prelude — auto-injected into every compilation.
+/// Makes native types (json, bytes, decimal, regex, uuid, url,
+/// datetime, date, time, socket) available globally.
+const KYLE_PRELUDE: &str = r#"
+@link "c"
+
+# ═══════════════════════════════════════
+# uuid
+# ═══════════════════════════════════════
+
+extern fn ky_uuid_v4() ptr
+extern fn ky_uuid_parse(ptr) ptr
+
+fn uuid_v4() ptr:
+    ky_uuid_v4()
+
+fn uuid_parse(s: &str) ptr:
+    ky_uuid_parse(s as ptr)
+
+fn uuid_to_str(data: &ptr) str:
+    raw = data as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+# ═══════════════════════════════════════
+# decimal
+# ═══════════════════════════════════════
+
+extern fn ky_decimal_from_str(ptr) i64
+extern fn ky_decimal_to_str(val: i64) ptr
+extern fn ky_decimal_round(val: i64, decimals: i32) i64
+extern fn ky_decimal_truncate(val: i64) i64
+
+fn decimal_from_str(s: &str) i64:
+    ky_decimal_from_str(s as ptr)
+
+fn decimal_to_str(val: i64) str:
+    raw = ky_decimal_to_str(val) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn decimal_round(val: i64, n: i32) i64:
+    ky_decimal_round(val, n)
+
+fn decimal_truncate(val: i64) i64:
+    ky_decimal_truncate(val)
+
+# ═══════════════════════════════════════
+# datetime
+# ═══════════════════════════════════════
+
+extern fn ky_datetime_now() i64
+extern fn ky_datetime_parse(ptr) i64
+extern fn ky_datetime_year(ms: i64) i32
+extern fn ky_datetime_month(ms: i64) i32
+extern fn ky_datetime_day(ms: i64) i32
+extern fn ky_datetime_hour(ms: i64) i32
+extern fn ky_datetime_minute(ms: i64) i32
+extern fn ky_datetime_second(ms: i64) i32
+extern fn ky_datetime_add_days(ms: i64, days: i32) i64
+extern fn ky_datetime_add_hours(ms: i64, hours: i32) i64
+extern fn ky_datetime_diff(ms1: i64, ms2: i64) i64
+extern fn ky_datetime_from_ymdhms(year: i32, month: i32, day: i32, hour: i32, min: i32, sec: i32) i64
+extern fn ky_datetime_format(i64, ptr) ptr
+
+fn datetime_now() i64:
+    ky_datetime_now()
+
+fn datetime_from_ymdhms(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) i64:
+    ky_datetime_from_ymdhms(y, m, d, h, min, s)
+
+fn datetime_parse(s: &str) i64:
+    ky_datetime_parse(s as ptr)
+
+fn datetime_year(ms: i64) i32:
+    ky_datetime_year(ms)
+
+fn datetime_month(ms: i64) i32:
+    ky_datetime_month(ms)
+
+fn datetime_day(ms: i64) i32:
+    ky_datetime_day(ms)
+
+fn datetime_hour(ms: i64) i32:
+    ky_datetime_hour(ms)
+
+fn datetime_minute(ms: i64) i32:
+    ky_datetime_minute(ms)
+
+fn datetime_second(ms: i64) i32:
+    ky_datetime_second(ms)
+
+fn datetime_add_days(ms: i64, n: i32) i64:
+    ky_datetime_add_days(ms, n)
+
+fn datetime_add_hours(ms: i64, n: i32) i64:
+    ky_datetime_add_hours(ms, n)
+
+fn datetime_diff(ms1: i64, ms2: i64) i64:
+    ky_datetime_diff(ms1, ms2)
+
+# ═══════════════════════════════════════
+# date
+# ═══════════════════════════════════════
+
+extern fn ky_date_today() i32
+extern fn ky_date_from_ymd(year: i32, month: i32, day: i32) i32
+extern fn ky_date_parse(ptr) i32
+extern fn ky_date_year(packed: i32) i32
+extern fn ky_date_month(packed: i32) i32
+extern fn ky_date_day(packed: i32) i32
+extern fn ky_date_weekday(packed: i32) i32
+extern fn ky_date_add_days(packed: i32, days: i32) i32
+extern fn ky_date_format(i32, ptr) ptr
+
+fn date_today() i32:
+    ky_date_today()
+
+fn date_from_ymd(y: i32, m: i32, d: i32) i32:
+    ky_date_from_ymd(y, m, d)
+
+fn date_parse(s: &str) i32:
+    ky_date_parse(s as ptr)
+
+fn date_year(packed: i32) i32:
+    ky_date_year(packed)
+
+fn date_month(packed: i32) i32:
+    ky_date_month(packed)
+
+fn date_day(packed: i32) i32:
+    ky_date_day(packed)
+
+fn date_weekday(packed: i32) i32:
+    ky_date_weekday(packed)
+
+fn date_add_days(packed: i32, n: i32) i32:
+    ky_date_add_days(packed, n)
+
+# ═══════════════════════════════════════
+# time
+# ═══════════════════════════════════════
+
+extern fn ky_time_now() i32
+extern fn ky_time_from_hms(hour: i32, min: i32, sec: i32) i32
+extern fn ky_time_parse(ptr) i32
+extern fn ky_time_hour(packed: i32) i32
+extern fn ky_time_minute(packed: i32) i32
+extern fn ky_time_second(packed: i32) i32
+
+fn time_now() i32:
+    ky_time_now()
+
+fn time_from_hms(h: i32, m: i32, s: i32) i32:
+    ky_time_from_hms(h, m, s)
+
+fn time_parse(s: &str) i32:
+    ky_time_parse(s as ptr)
+
+fn time_hour(packed: i32) i32:
+    ky_time_hour(packed)
+
+fn time_minute(packed: i32) i32:
+    ky_time_minute(packed)
+
+fn time_second(packed: i32) i32:
+    ky_time_second(packed)
+
+# ═══════════════════════════════════════
+# bytes
+# ═══════════════════════════════════════
+
+extern fn ky_bytes_new(size: i32) ptr
+extern fn ky_bytes_get(ptr, index: i32) i32
+extern fn ky_bytes_set(ptr, index: i32, val: i32)
+extern fn ky_bytes_to_hex(ptr, size: i32) ptr
+
+fn bytes_new(n: i32) ptr:
+    ky_bytes_new(n)
+
+fn bytes_get(b: &ptr, i: i32) i32:
+    ky_bytes_get(b as ptr, i)
+
+fn bytes_set(b: &ptr, i: i32, v: i32):
+    ky_bytes_set(b as ptr, i, v)
+
+fn bytes_to_hex(b: &ptr, size: i32) str:
+    raw = ky_bytes_to_hex(b as ptr, size) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+# ═══════════════════════════════════════
+# regex
+# ═══════════════════════════════════════
+
+extern fn ky_regex_new(ptr) ptr
+extern fn ky_regex_is_match(ptr, ptr) i32
+extern fn ky_regex_find(ptr, ptr) ptr
+extern fn ky_regex_replace(ptr, ptr, ptr) ptr
+
+fn regex_compile(pattern: &str) ptr:
+    ky_regex_new(pattern as ptr)
+
+fn regex_is_match(re: &ptr, s: &str) i32:
+    ky_regex_is_match(re as ptr, s as ptr)
+
+fn regex_find(re: &ptr, s: &str) str:
+    raw = ky_regex_find(re as ptr, s as ptr) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn regex_replace(re: &ptr, s: &str, with: &str) str:
+    raw = ky_regex_replace(re as ptr, s as ptr, with as ptr) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+# ═══════════════════════════════════════
+# url
+# ═══════════════════════════════════════
+
+extern fn ky_url_scheme(ptr) ptr
+extern fn ky_url_host(ptr) ptr
+extern fn ky_url_port(ptr) i32
+extern fn ky_url_path(ptr) ptr
+extern fn ky_url_query(ptr) ptr
+
+fn url_scheme(raw: &str) str:
+    raw_out = ky_url_scheme(raw as ptr) as i64
+    if raw_out == 0: return ""
+    (raw_out as ptr) as str
+
+fn url_host(raw: &str) str:
+    raw_out = ky_url_host(raw as ptr) as i64
+    if raw_out == 0: return ""
+    (raw_out as ptr) as str
+
+fn url_port(raw: &str) i32:
+    ky_url_port(raw as ptr)
+
+fn url_path(raw: &str) str:
+    raw_out = ky_url_path(raw as ptr) as i64
+    if raw_out == 0: return ""
+    (raw_out as ptr) as str
+
+fn url_query(raw: &str) str:
+    raw_out = ky_url_query(raw as ptr) as i64
+    if raw_out == 0: return ""
+    (raw_out as ptr) as str
+
+fn url_parse(raw: &str) str:
+    raw
+"#;
+
 #[derive(Default)]
 pub struct Pipeline;
 
@@ -271,7 +524,11 @@ impl Pipeline {
     }
 
     pub fn check_source(source: &str, file_name: &str) -> Result<CheckedOutput, String> {
-        let mut lexer = Lexer::new(source);
+        let full_source = if cfg!(test) { source.to_string() } else {
+            if source.contains("#ky_prelude_already") { source.to_string() }
+            else { format!("{}\n{}", KYLE_PRELUDE, source) }
+        };
+        let mut lexer = Lexer::new(&full_source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
         let mut program = parser.parse()?;

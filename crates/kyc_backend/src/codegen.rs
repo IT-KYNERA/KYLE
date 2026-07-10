@@ -1877,6 +1877,300 @@ impl<'ctx> Codegen<'ctx> {
             self.module.add_function("llvm.lifetime.start.p0", lifetime_ft, None);
             self.module.add_function("llvm.lifetime.end.p0", lifetime_ft, None);
         }
+
+        // === Prelude types: bytes ===
+        // ptr ky_bytes_new(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_new", ft, None);
+        }
+        // i32 ky_bytes_get(ptr, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_get", ft, None);
+        }
+        // void ky_bytes_set(ptr, i32, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into(), i32_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_set", ft, None);
+        }
+        // ptr ky_bytes_to_hex(ptr, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_to_hex", ft, None);
+        }
+
+        // === Prelude types: decimal ===
+        // i64 ky_decimal_from_str(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_decimal_from_str", ft, None);
+        }
+        // ptr ky_decimal_to_str(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_decimal_to_str", ft, None);
+        }
+        // i64 ky_decimal_round(i64, i32)
+        {
+            let params = [i64_ty.into(), i32_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_decimal_round", ft, None);
+        }
+        // i64 ky_decimal_truncate(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_decimal_truncate", ft, None);
+        }
+
+        // === Prelude types: regex ===
+        // ptr ky_regex_new(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_regex_new", ft, None);
+        }
+        // i32 ky_regex_is_match(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_regex_is_match", ft, None);
+        }
+        // ptr ky_regex_find(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_regex_find", ft, None);
+        }
+        // ptr ky_regex_replace(ptr, ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_regex_replace", ft, None);
+        }
+
+        // === Prelude types: uuid ===
+        // ptr ky_uuid_v4()
+        {
+            let ft = ptr_ty.fn_type(&[], false);
+            self.module.add_function("ky_uuid_v4", ft, None);
+        }
+        // ptr ky_uuid_parse(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_uuid_parse", ft, None);
+        }
+
+        // === Prelude types: url ===
+        // ptr ky_url_scheme(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_url_scheme", ft, None);
+        }
+        // ptr ky_url_host(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_url_host", ft, None);
+        }
+        // i32 ky_url_port(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_url_port", ft, None);
+        }
+        // ptr ky_url_path(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_url_path", ft, None);
+        }
+        // ptr ky_url_query(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_url_query", ft, None);
+        }
+
+        // === Prelude types: datetime ===
+        // i64 ky_datetime_now()
+        {
+            let ft = i64_ty.fn_type(&[], false);
+            self.module.add_function("ky_datetime_now", ft, None);
+        }
+        // i64 ky_datetime_parse(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_parse", ft, None);
+        }
+        // ptr ky_datetime_format(i64, ptr)
+        {
+            let params = [i64_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_format", ft, None);
+        }
+        // i32 ky_datetime_year(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_year", ft, None);
+        }
+        // i32 ky_datetime_month(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_month", ft, None);
+        }
+        // i32 ky_datetime_day(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_day", ft, None);
+        }
+        // i32 ky_datetime_hour(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_hour", ft, None);
+        }
+        // i32 ky_datetime_minute(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_minute", ft, None);
+        }
+        // i32 ky_datetime_second(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_second", ft, None);
+        }
+        // i64 ky_datetime_add_days(i64, i32)
+        {
+            let params = [i64_ty.into(), i32_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_add_days", ft, None);
+        }
+        // i64 ky_datetime_add_hours(i64, i32)
+        {
+            let params = [i64_ty.into(), i32_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_add_hours", ft, None);
+        }
+        // i64 ky_datetime_diff(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_diff", ft, None);
+        }
+        // i64 ky_datetime_from_ymdhms(i32, i32, i32, i32, i32, i32)
+        {
+            let params = [i32_ty.into(), i32_ty.into(), i32_ty.into(), i32_ty.into(), i32_ty.into(), i32_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_datetime_from_ymdhms", ft, None);
+        }
+
+        // === Prelude types: date ===
+        // i32 ky_date_today()
+        {
+            let ft = i32_ty.fn_type(&[], false);
+            self.module.add_function("ky_date_today", ft, None);
+        }
+        // i32 ky_date_from_ymd(i32, i32, i32)
+        {
+            let params = [i32_ty.into(), i32_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_from_ymd", ft, None);
+        }
+        // i32 ky_date_parse(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_parse", ft, None);
+        }
+        // i32 ky_date_year(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_year", ft, None);
+        }
+        // i32 ky_date_month(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_month", ft, None);
+        }
+        // i32 ky_date_day(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_day", ft, None);
+        }
+        // i32 ky_date_weekday(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_weekday", ft, None);
+        }
+        // i32 ky_date_add_days(i32, i32)
+        {
+            let params = [i32_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_add_days", ft, None);
+        }
+        // ptr ky_date_format(i32, ptr)
+        {
+            let params = [i32_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_date_format", ft, None);
+        }
+
+        // === Prelude types: time ===
+        // i32 ky_time_now()
+        {
+            let ft = i32_ty.fn_type(&[], false);
+            self.module.add_function("ky_time_now", ft, None);
+        }
+        // i32 ky_time_from_hms(i32, i32, i32)
+        {
+            let params = [i32_ty.into(), i32_ty.into(), i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_time_from_hms", ft, None);
+        }
+        // i32 ky_time_parse(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_time_parse", ft, None);
+        }
+        // i32 ky_time_hour(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_time_hour", ft, None);
+        }
+        // i32 ky_time_minute(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_time_minute", ft, None);
+        }
+        // i32 ky_time_second(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_time_second", ft, None);
+        }
     }
 
     /// Emit inline LLVM IR for list operations instead of calling FFI functions.
