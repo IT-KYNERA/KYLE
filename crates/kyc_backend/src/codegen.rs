@@ -390,6 +390,24 @@ impl<'ctx> Codegen<'ctx> {
             }
         }
 
+        // Ref params: change struct param allocas from struct type to ptr
+        for block in &func.blocks {
+            for inst in &block.insts {
+                if let SsaInst::Store { dest, value } = inst {
+                    if let Some(param_idx) = func.param_value_ids.iter().position(|&p| p == *value) {
+                        if matches!(&func.params[param_idx], MirType::Struct(_, _)) {
+                            if let Some(&llvm_type) = self.alloca_types.get(dest) {
+                                if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
+                                    let orig_type = self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum()).unwrap();
+                                    self.ref_param_struct_types.insert(*dest, orig_type);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Create LLVM basic blocks and phi nodes
         let mut block_map: HashMap<String, inkwell::basic_block::BasicBlock<'ctx>> = HashMap::new();
         let mut block_indices: HashMap<String, usize> = HashMap::new();
