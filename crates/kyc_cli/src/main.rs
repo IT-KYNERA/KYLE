@@ -1481,16 +1481,15 @@ fn cmd_uninstall() {
         for t in &reinstall_targets {
             let ky_exe = Path::new(t);
             if ky_exe.exists() {
-                // Write a .cmd that deletes ky.exe, the .ky dir, and itself
+                let ky_dir = ky_exe.parent().unwrap().parent().unwrap();
+                // Write a .cmd that deletes ky.exe, empty dirs, and itself
                 let clean_script = format!(
                     "@echo off\r\n\
                      ping -n 2 127.0.0.1 >nul\r\n\
                      del /f /q \"{}\" 2>nul\r\n\
-                     del /f /q \"{}\" 2>nul\r\n\
-                     rmdir /s /q \"{}\\..\\lib\" 2>nul\r\n\
-                     rmdir /s /q \"{}\\..\" 2>nul\r\n\
+                     rmdir /s /q \"{}\" 2>nul\r\n\
                      del /f /q \"%~f0\" 2>nul\r\n",
-                    t, t, t, t
+                    t, ky_dir.display()
                 );
                 let batch_path = ky_exe.parent().unwrap().join("ky_cleanup.cmd");
                 let _ = fs::write(&batch_path, &clean_script);
