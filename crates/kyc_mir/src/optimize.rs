@@ -222,7 +222,7 @@ impl Optimizer {
                 }
                 *value = Self::map_value(value, map);
             }
-            MirInst::PtrOffset { dest, ptr, index } => {
+            MirInst::PtrOffset { dest, ptr, index, .. } => {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
                 if let Some(new_ptr) = map.get(ptr) { *ptr = *new_ptr; }
                 *index = Self::map_value(index, map);
@@ -610,7 +610,7 @@ impl Optimizer {
                             Self::collect_value_refs(arg, &mut used);
                         }
                     }
-                    MirInst::PtrOffset { dest, ptr, index } => {
+                    MirInst::PtrOffset { dest, ptr, index, .. } => {
                         used.insert(*dest);
                         used.insert(*ptr);
                         Self::collect_value_refs(index, &mut used);
@@ -657,6 +657,11 @@ impl Optimizer {
                     MirInst::AsyncAwait { dest, handle } => {
                         used.insert(*dest);
                         used.insert(*handle);
+                    }
+                    MirInst::SliceMake { dest, ptr, len, .. } => {
+                        used.insert(*dest);
+                        Self::collect_value_refs(ptr, &mut used);
+                        Self::collect_value_refs(len, &mut used);
                     }
                 }
             }

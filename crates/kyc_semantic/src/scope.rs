@@ -427,6 +427,7 @@ impl ScopeResolver {
             }
             AstType::Ptr { .. } => Type::Ptr,
             AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
+            AstType::Slice { inner, .. } => Type::Slice(Box::new(self.resolve_ast_type(inner))),
         }
     }
 }

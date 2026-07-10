@@ -61,19 +61,14 @@ impl<'ctx> Codegen<'ctx> {
         id: usize,
         last_values: &HashMap<usize, BasicValueEnum<'ctx>>,
     ) -> Result<BasicValueEnum<'ctx>, String> {
-        // Check if this is a field pointer: load GEP first, then load field value
+        // Check if this is a field pointer: single-load (get the pointer, not the value at it)
         if id < self.field_ptr_allocas.len() && self.field_ptr_allocas[id].is_some() {
             if let Some(field_ptr_alloca) = self.field_ptr_allocas[id] {
                 let gep = self.builder.build_load(
                     self.context.ptr_type(Default::default()),
                     field_ptr_alloca, "_fgepload"
                 ).map_err(|e| format!("load_value fptr {}: {}", id, e))?;
-                let field_type = self.field_ptr_types.get(&id).or_else(|| self.alloca_types.get(&id));
-                if let Some(pointee_type) = field_type {
-                    let loaded = self.builder.build_load(*pointee_type, gep.into_pointer_value(), "")
-                        .map_err(|e| format!("load_value field {}: {}", id, e))?;
-                    return Ok(loaded);
-                }
+                return Ok(gep);  // Return the POINTER, not the value at the pointer
             }
         }
         if let Some(Some(ptr)) = self.alloca_map.get(id) {
@@ -132,6 +127,10 @@ impl<'ctx> Codegen<'ctx> {
                 if let MirValue::Local(id) = arg { callback(*id); }
             }
             MirInst::AsyncAwait { handle, .. } => { callback(*handle); }
+            MirInst::SliceMake { ptr, len, .. } => {
+                if let MirValue::Local(id) = ptr { callback(*id); }
+                if let MirValue::Local(id) = len { callback(*id); }
+            }
         }
     }
 
@@ -218,7 +217,7 @@ impl<'ctx> Codegen<'ctx> {
             | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
             MirType::F32 | MirType::F64 => self.tbaa_nodes.get("float").copied(),
             MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.tbaa_nodes.get("ptr").copied(),
-            MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) => self.tbaa_nodes.get("ptr").copied(),
+            MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) | MirType::Slice(_) => self.tbaa_nodes.get("ptr").copied(),
             MirType::Void => None,
         }
     }
@@ -453,6 +452,18 @@ impl<'ctx> Codegen<'ctx> {
                                 );
                             }
                         }
+                        if let SsaInst::PtrOffset { dest, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *dest { self.field_ptr_allocas.push(None); }
+                            if self.field_ptr_allocas[*dest].is_none() {
+                                self.field_ptr_allocas[*dest] = Some(
+                                    self.builder.build_alloca(ptr_ty, "_pgep")
+                                        .map_err(|e| format!("ssa pgep: {}", e))?
+                                );
+                            }
+                        }
+                        if let SsaInst::Load { src, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *src { self.field_ptr_allocas.push(None); }
+                        }
                     }
                 }
                 self.param_values.clear();
@@ -521,7 +532,13 @@ impl<'ctx> Codegen<'ctx> {
                             if found { val }
                             // 3. Constant values from const_values
                             else if let Some(c) = func.const_values.get(&id) { self.constant_to_llvm(c) }
-                            // 4. Default zero
+                            // 4. Fallback to alloca_map (non-promotable allocas like structs, slices)
+                            else if let Some(Some(ptr)) = self.alloca_map.get(id) {
+                                self.alloca_types.get(&id).and_then(|pointee_type| {
+                                    self.builder.build_load(*pointee_type, *ptr, "_ssaload").ok()
+                                }).unwrap_or_else(|| self.context.i32_type().const_zero().as_basic_value_enum())
+                            }
+                            // 5. Default zero
                             else { self.context.i32_type().const_zero().as_basic_value_enum() }
                         }
                     }};
@@ -592,9 +609,17 @@ impl<'ctx> Codegen<'ctx> {
                                 if let Some(fpa) = self.field_ptr_allocas[*src] {
                                     let gep = self.builder.build_load(ptr_ty, fpa, "_fgepl")
                                         .map_err(|e| format!("sfld: {}", e))?;
-                                    let lt = self.field_ptr_types.get(src)
-                                        .or_else(|| self.alloca_types.get(src))
-                                        .copied().unwrap_or(self.context.i64_type().as_basic_type_enum());
+                                    let ft = self.field_ptr_types.get(src).copied();
+                                    let lt = ft.or_else(|| {
+                                        let t = func.values.get(*dest).map(|sv| {
+                                            eprintln!("DBG Load fallback: dest={} sv_type={}", dest, sv.type_);
+                                            self.llvm_type(&sv.type_)
+                                        });
+                                        if t.is_some() { eprintln!("DBG Load fallback FOUND"); }
+                                        t
+                                    }).or_else(|| {
+                                        self.alloca_types.get(src).copied()
+                                    }).unwrap_or(self.context.i64_type().as_basic_type_enum());
                                     Some(self.builder.build_load(lt, gep.into_pointer_value(), "")
                                         .map_err(|e| format!("sfld2: {}", e))?)
                                 } else { None }
@@ -604,8 +629,9 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("ssald: {}", e))?)
                                 } else { None }
                             } else {
-                                // Promoted alloca: read from global map (no LLVM load)
-                                alloca_current.get(src).copied()
+                                // Promoted alloca: read from block_vals or global map
+                                block_vals[bi].get(src).copied()
+                                    .or_else(|| alloca_current.get(src).copied())
                             };
                             if let Some(v) = loaded {
                                 block_vals[bi].insert(*dest, v);
@@ -780,15 +806,27 @@ impl<'ctx> Codegen<'ctx> {
                                 block_vals[bi].insert(*dest, rv);
                             }
                         }
-                        SsaInst::PtrOffset { dest, ptr, index } => {
-                            if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
-                                let idx = ssa_read!(*index);
-                                let gep = unsafe {
-                                    self.builder.build_in_bounds_gep(self.context.i8_type(), base, &[self.to_int_value(idx)], "_ssgep")
-                                        .map_err(|e| format!("ssgep: {}", e))?
-                                };
-                                block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                        SsaInst::PtrOffset { dest, ptr, index, elem_type } => {
+                            let base_val = ssa_read!(*ptr);
+                            let idx_val = ssa_read!(*index);
+                            let ptr_val = match base_val {
+                                BasicValueEnum::IntValue(iv) => self.builder.build_int_to_ptr(iv, self.context.ptr_type(Default::default()), "_ptttr")
+                                    .map_err(|e| format!("ptroff inttoptr: {}", e))?,
+                                BasicValueEnum::PointerValue(pv) => pv,
+                                _ => return Err(format!("ptroff: unexpected base for ptr={}", ptr)),
+                            };
+                            let gep = unsafe {
+                                self.builder.build_in_bounds_gep(self.context.i8_type(), ptr_val, &[self.to_int_value(idx_val)], "_ssgep")
+                                    .map_err(|e| format!("ssgep: {}", e))?
+                            };
+                            block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                            if *dest < self.field_ptr_allocas.len() {
+                                if let Some(fpa) = self.field_ptr_allocas[*dest] {
+                                    let _ = self.builder.build_store(fpa, gep.as_basic_value_enum());
+                                }
                             }
+                            let elem_llvm = self.llvm_type(elem_type);
+                            self.field_ptr_types.insert(*dest, elem_llvm);
                         }
                         SsaInst::PtrStore { ptr, index, value } => {
                             if let Some(base) = self.alloca_map.get(*ptr).and_then(|p| *p) {
@@ -933,6 +971,23 @@ impl<'ctx> Codegen<'ctx> {
                                     self.builder.build_store(dst_gep.into_pointer_value(), src_val)
                                         .map_err(|e| format!("ssmcst: {}", e))?;
                                 }
+                            }
+                        }
+                        SsaInst::SliceMake { dest, ptr, len, elem_type } => {
+                            let ptr_val = ssa_read!(*ptr);
+                            let len_val = ssa_read!(*len);
+                            let slice_type = self.llvm_type(&MirType::Slice(elem_type.clone()));
+                            if let BasicTypeEnum::StructType(st) = slice_type {
+                                let undef = st.get_undef();
+                                let sv = unsafe {
+                                    self.builder.build_insert_value(undef, ptr_val, 0, "_smi0")
+                                        .map_err(|e| format!("smi0: {}", e))?
+                                };
+                                let sv = unsafe {
+                                    self.builder.build_insert_value(sv, len_val, 1, "_smi1")
+                                        .map_err(|e| format!("smi1: {}", e))?
+                                };
+                                block_vals[bi].insert(*dest, sv.as_basic_value_enum());
                             }
                         }
                     }
@@ -2044,6 +2099,19 @@ impl<'ctx> Codegen<'ctx> {
                     });
                 struct_ty.as_basic_type_enum()
             }
+            MirType::Slice(inner) => {
+                let inner_str = format!("{}", inner);
+                let name = format!("__slice_{}", inner_str);
+                let struct_ty = self.module.get_struct_type(&name)
+                    .unwrap_or_else(|| {
+                        let ty = self.context.opaque_struct_type(&name);
+                        let ptr_ty = self.llvm_type(inner).ptr_type(Default::default());
+                        let len_ty = self.context.i64_type();
+                        ty.set_body(&[ptr_ty.into(), len_ty.into()], false);
+                        ty
+                    });
+                struct_ty.as_basic_type_enum()
+            }
         }
     }
 
@@ -2145,6 +2213,7 @@ impl<'ctx> Codegen<'ctx> {
                     }
                     MirInst::PtrStore { ptr, .. } => { escaping.insert(*ptr); }
                     MirInst::Memcpy { dest_ptr_local, .. } => { escaping.insert(*dest_ptr_local); }
+                    MirInst::SliceMake { dest, .. } => { escaping.insert(*dest); }
                     _ => {}
                 }
                 // Track definitions (any instruction writing to dest)
@@ -2163,6 +2232,7 @@ impl<'ctx> Codegen<'ctx> {
                     MirInst::FnAddr { dest, .. } => Some(*dest),
                     MirInst::AsyncSpawn { dest, .. } => Some(*dest),
                     MirInst::AsyncAwait { dest, .. } => Some(*dest),
+                    MirInst::SliceMake { dest, .. } => Some(*dest),
                     _ => None,
                 };
                 if let Some(d) = dest_opt {
@@ -2276,6 +2346,16 @@ impl<'ctx> Codegen<'ctx> {
                             if self.field_ptr_allocas[*dest].is_none() {
                                 let alloca = self.builder.build_alloca(ptr_ty, "_aelem")
                                     .map_err(|e| format!("aelem alloca {}: {}", dest, e))?;
+                                self.field_ptr_allocas[*dest] = Some(alloca);
+                            }
+                        }
+                        if let MirInst::PtrOffset { dest, .. } = inst {
+                            while self.field_ptr_allocas.len() <= *dest {
+                                self.field_ptr_allocas.push(None);
+                            }
+                            if self.field_ptr_allocas[*dest].is_none() {
+                                let alloca = self.builder.build_alloca(ptr_ty, "_pgep")
+                                    .map_err(|e| format!("pgep alloca {}: {}", dest, e))?;
                                 self.field_ptr_allocas[*dest] = Some(alloca);
                             }
                         }
@@ -2748,7 +2828,7 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             }
                         }
-                        MirInst::PtrOffset { dest, ptr, index } => {
+                        MirInst::PtrOffset { dest, ptr, index, elem_type } => {
                             let base_val = self.load_value(*ptr, &last_value_map)?;
                             let idx = self.value_to_llvm(index, &last_value_map)?;
                             let int_idx = idx.into_int_value();
@@ -2763,12 +2843,18 @@ impl<'ctx> Codegen<'ctx> {
                                 self.builder.build_in_bounds_gep(pointee_type, ptr_val, &[int_idx], "")
                                     .map_err(|e| format!("ptroff gep: {}", e))?
                             };
-                            // Store GEP result in BOTH last_value_map AND the dest alloca
+                            // Store GEP result in last_value_map, dest alloca, AND field_ptr_allocas
                             last_value_map.insert(*dest, gep.as_basic_value_enum());
                             if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
                                 self.builder.build_store(dest_ptr, gep.as_basic_value_enum())
                                     .map_err(|e| format!("ptroff-store: {}", e))?;
                             }
+                            if let Some(fpa) = self.field_ptr_allocas.get(*dest).and_then(|p| *p) {
+                                self.builder.build_store(fpa, gep.as_basic_value_enum())
+                                    .map_err(|e| format!("ptroff-fpa: {}", e))?;
+                            }
+                            let elem_llvm = self.llvm_type(elem_type);
+                            self.field_ptr_types.insert(*dest, elem_llvm);
                         }
                         MirInst::PtrStore { dest, ptr, index, value } => {
                             let base_val = self.load_value(*ptr, &last_value_map)?;
@@ -3084,6 +3170,28 @@ impl<'ctx> Codegen<'ctx> {
                                         .map_err(|e| format!("async_spawn store: {}", e))?;
                                 }
                                 last_value_map.insert(*dest, ret_val);
+                            }
+                        }
+                        MirInst::SliceMake { dest, ptr, len, elem_type } => {
+                            let ptr_val = self.value_to_llvm(ptr, &last_value_map)?;
+                            let len_val = self.value_to_llvm(len, &last_value_map)?;
+                            let slice_type = self.llvm_type(&MirType::Slice(elem_type.clone()));
+                            if let BasicTypeEnum::StructType(st) = slice_type {
+                                let undef = st.get_undef();
+                                let sv = unsafe {
+                                    self.builder.build_insert_value(undef, ptr_val, 0, "_msmi0")
+                                        .map_err(|e| format!("msmi0: {}", e))?
+                                };
+                                let sv = unsafe {
+                                    self.builder.build_insert_value(sv, len_val, 1, "_msmi1")
+                                        .map_err(|e| format!("msmi1: {}", e))?
+                                };
+                                let bv = sv.as_basic_value_enum();
+                                if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    self.builder.build_store(alloca, bv)
+                                        .map_err(|e| format!("msmst: {}", e))?;
+                                }
+                                last_value_map.insert(*dest, bv);
                             }
                         }
                         MirInst::AsyncAwait { dest, handle } => {

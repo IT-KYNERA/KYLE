@@ -201,6 +201,11 @@ impl Formatter {
                 write!(out, "; {}", size).unwrap();
                 out.push(']');
             }
+            AstType::Slice { inner, .. } => {
+                out.push_str("&[");
+                self.write_type(out, inner);
+                out.push(']');
+            }
         }
     }
 

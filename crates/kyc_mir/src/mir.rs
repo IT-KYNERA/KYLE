@@ -43,6 +43,8 @@ pub enum MirType {
     /// A dictionary/map type with key and value types.
     Dict(Box<MirType>, Box<MirType>),
     Set(Box<MirType>),
+    /// Slice view: `&[T]` — fat pointer {ptr, len}, Copy semantics.
+    Slice(Box<MirType>),
 }
 
 /// Binary operators in MIR.
@@ -75,8 +77,9 @@ pub enum MirInst {
     UnaryOp { dest: usize, op: MirUnaryOp, operand: MirValue },
     /// Call a function: dest = func(args...).
     Call { dest: Option<usize>, name: String, args: Vec<MirValue> },
-    /// Get pointer to array element.
-    PtrOffset { dest: usize, ptr: usize, index: MirValue },
+    /// Get pointer to array element: dest = ptr + index * sizeof(elem_type).
+    /// elem_type determines the pointee type for subsequent Load instructions.
+    PtrOffset { dest: usize, ptr: usize, index: MirValue, elem_type: Box<MirType> },
     /// Store value through computed pointer: ptr[index] = val
     PtrStore { dest: usize, ptr: usize, index: MirValue, value: MirValue },
     /// Get pointer to a struct field by index.
@@ -91,6 +94,8 @@ pub enum MirInst {
     FnAddr { dest: usize, name: String },
     /// Call through a function pointer.
     CallIndirect { dest: Option<usize>, fn_ptr: usize, ret_type: MirType, param_types: Vec<MirType>, args: Vec<MirValue> },
+    /// Create a slice struct {ptr, len} from a pointer and length.
+    SliceMake { dest: usize, ptr: MirValue, len: MirValue, elem_type: Box<MirType> },
     /// Spawn an async function on a thread: dest = kl_spawn_thread(func_name, arg).
     AsyncSpawn { dest: usize, function_name: String, arg: MirValue },
     /// Await (join) an async thread handle: dest = kl_join_thread(handle).
@@ -221,6 +226,7 @@ impl fmt::Display for MirType {
             }
             MirType::Dict(key, val) => write!(f, "dict<{}, {}>", key, val),
             MirType::Set(inner) => write!(f, "set<{}>", inner),
+            MirType::Slice(inner) => write!(f, "&[{}]", inner),
         }
     }
 }
@@ -307,7 +313,7 @@ impl fmt::Display for MirInst {
                     write!(f, "  call {}({})", name, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
                 }
             }
-            MirInst::PtrOffset { dest, ptr, index } => {
+            MirInst::PtrOffset { dest, ptr, index, .. } => {
                 write!(f, "  {} = ptr_offset {}[{}]", dest, ptr, index)
             }
             MirInst::PtrStore { dest, ptr, index, value } => {
@@ -340,6 +346,9 @@ impl fmt::Display for MirInst {
             }
             MirInst::AsyncAwait { dest, handle } => {
                 write!(f, "  %{} = async_await %{}", dest, handle)
+            }
+            MirInst::SliceMake { dest, ptr, len, elem_type } => {
+                write!(f, "  %{} = slice_make({}, {}, {})", dest, ptr, len, elem_type)
             }
         }
     }

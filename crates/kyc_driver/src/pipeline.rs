@@ -371,9 +371,8 @@ impl Pipeline {
 
         let context = Context::create();
         let mut codegen = Codegen::new(&context, "ky_module");
-        // SSA codegen disabled — bugs with ptr/str propagation (null values)
-        // Will be re-enabled after proper fix to resolve_mir! and Store tracking.
-        codegen.compile_with_ssa(&mir.module)?;
+        // SSA codegen — faster, but needs proper handling for ArrayElemPtr results.
+        codegen.compile(&mir.module)?;
 
         // Ensure artifact directory exists
         std::fs::create_dir_all(artifact_dir)

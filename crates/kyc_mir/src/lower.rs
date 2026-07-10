@@ -3774,7 +3774,7 @@ impl Lowerer {
                     let obj_local = if let Expr::Identifier { name, .. } = object.as_ref() {
                         if let Some(&local) = ctx.locals.get(name) {
                             let lt = ctx.local_types.get(&local);
-                            if matches!(lt, Some(MirType::Struct(_, _)) | Some(MirType::Ptr(_))) {
+                            if matches!(lt, Some(MirType::Struct(_, _)) | Some(MirType::Ptr(_)) | Some(MirType::Slice(_))) {
                                 local
                             } else {
                                 ctx = self.lower_expr(ctx, object);
@@ -3850,6 +3850,7 @@ impl Lowerer {
                     let is_list = obj_type.as_ref().map(|t| matches!(t, MirType::List(_))).unwrap_or(false);
                     let is_array = obj_type.as_ref().map(|t| matches!(t, MirType::Array(_, _))).unwrap_or(false);
                     let is_char = obj_type.as_ref().map(|t| *t == MirType::Char).unwrap_or(false);
+                    let is_slice = obj_type.as_ref().map(|t| matches!(t, MirType::Slice(_))).unwrap_or(false);
 
                     // === UNIVERSAL METHOD: .type() on any value ===
                     if property == "type" && arguments.is_empty() {
@@ -3868,6 +3869,33 @@ impl Lowerer {
                             ctx.current_block.insts.push(MirInst::Store {
                                 dest: result,
                                 value: MirValue::Constant(MirConstant::I32(*size as i32)),
+                            });
+                            return ctx;
+                        }
+                    }
+
+                    // === SLICE METHODS ===
+                    if is_slice && property == "len" && arguments.is_empty() {
+                        // Slice length is stored in field 1 of the slice struct (i64)
+                        if let Some(MirType::Slice(inner)) = obj_type.as_ref() {
+                            let slice_type = MirType::Slice(inner.clone());
+                            let len_ptr = ctx.alloc_local("_slenp", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::FieldPtr {
+                                dest: len_ptr,
+                                ptr: obj_local,
+                                field_index: 1,
+                                struct_type: Box::new(slice_type.clone()),
+                            });
+                            let len_i64 = ctx.alloc_local("_slen64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Load {
+                                dest: len_i64,
+                                src: len_ptr,
+                            });
+                            let result = ctx.alloc_local("_slen", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: result,
+                                value: MirValue::Local(len_i64),
+                                to_type: MirType::I32,
                             });
                             return ctx;
                         }
@@ -6096,8 +6124,8 @@ impl Lowerer {
                 let (target_val, arr_ptr, target_type) = if let Expr::Identifier { name, .. } = target.as_ref() {
                     if let Some(&local) = ctx.locals.get(name) {
                         let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
-                        // Only skip Load for arrays (zero-copy GEP). For other types, use normal expression lowering.
-                        if matches!(t, MirType::Array(_, _)) {
+                        // Only skip Load for arrays and slices (zero-copy GEP). For other types, use normal expression lowering.
+                        if matches!(t, MirType::Array(_, _) | MirType::Slice(_)) {
                             // Use variable's alloca directly (no Load)
                             (local, local, t)
                         } else {
@@ -6168,6 +6196,45 @@ impl Lowerer {
                     });
                     return ctx;
                 }
+                // === SLICE INDEXING ===
+                if let MirType::Slice(inner) = &target_type {
+                    let et = *inner.clone();
+                    let slice_type = MirType::Slice(inner.clone());
+                    // Get ptr field (field 0) from slice struct
+                    let ptr_field = ctx.alloc_local("_sptrf", MirType::Ptr(Box::new(MirType::I8)));
+                    ctx.current_block.insts.push(MirInst::FieldPtr {
+                        dest: ptr_field,
+                        ptr: target_val,
+                        field_index: 0,
+                        struct_type: Box::new(slice_type.clone()),
+                    });
+                    let base_ptr = ctx.alloc_local("_sbase", MirType::Ptr(Box::new(MirType::I8)));
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: base_ptr,
+                        src: ptr_field,
+                    });
+                    // GEP: base_ptr + index
+                    let index_i64 = ctx.alloc_local("_si64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: index_i64,
+                        value: MirValue::Local(index_val),
+                        to_type: MirType::I64,
+                    });
+                    let elem_ptr = ctx.alloc_local("_selem_ptr", MirType::Ptr(Box::new(MirType::I8)));
+                    let et_clone = et.clone();
+                    ctx.current_block.insts.push(MirInst::PtrOffset {
+                        dest: elem_ptr,
+                        ptr: base_ptr,
+                        index: MirValue::Local(index_i64),
+                        elem_type: Box::new(et_clone),
+                    });
+                    let loaded = ctx.alloc_local("_selem_val", et);
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: loaded,
+                        src: elem_ptr,
+                    });
+                    return ctx;
+                }
                 if let MirType::Dict(_, v) = &target_type {
                     let key_arg = if matches!(ctx.local_types.get(&index_val), Some(MirType::Str)) {
                         MirValue::Local(index_val)
@@ -6206,11 +6273,13 @@ impl Lowerer {
                 if matches!(target_type, MirType::Ptr(_)) {
                     let ptr_type = ctx.local_types.get(&target_val).cloned().unwrap_or(MirType::I64);
                     let elem_type = if target_type == MirType::I64 { MirType::I8 } else { MirType::I8 };
+                    let elem_type2 = elem_type.clone();
                     let offset = ctx.alloc_local("_ptroff", ptr_type.clone());
                     ctx.current_block.insts.push(MirInst::PtrOffset {
                         dest: offset,
                         ptr: target_val,
                         index: MirValue::Local(index_val),
+                        elem_type: Box::new(elem_type2),
                     });
                     let result = ctx.alloc_local("_ptrload", elem_type);
                     ctx.current_block.insts.push(MirInst::Load {
@@ -6699,8 +6768,24 @@ impl Lowerer {
                 ctx
             }
             Expr::RangeSlice { target, start, end, .. } => {
-                ctx = self.lower_expr(ctx, target);
-                let target_val = ctx.next_local - 1;
+                // For arrays, don't lower expression (use alloca directly)
+                let (target_val, target_type) = if let Expr::Identifier { name, .. } = target.as_ref() {
+                    if let Some(&local) = ctx.locals.get(name) {
+                        let t = ctx.local_types.get(&local).cloned().unwrap_or(MirType::I32);
+                        if matches!(t, MirType::Array(_, _)) {
+                            (local, t)
+                        } else {
+                            ctx = self.lower_expr(ctx, target);
+                            (ctx.next_local - 1, ctx.local_types.get(&(ctx.next_local - 1)).cloned().unwrap_or(MirType::I32))
+                        }
+                    } else {
+                        ctx = self.lower_expr(ctx, target);
+                        (ctx.next_local - 1, ctx.local_types.get(&(ctx.next_local - 1)).cloned().unwrap_or(MirType::I32))
+                    }
+                } else {
+                    ctx = self.lower_expr(ctx, target);
+                    (ctx.next_local - 1, ctx.local_types.get(&(ctx.next_local - 1)).cloned().unwrap_or(MirType::I32))
+                };
                 let start_i64 = if let Some(s) = start {
                     ctx = self.lower_expr(ctx, s);
                     let val = ctx.next_local - 1;
@@ -6725,9 +6810,49 @@ impl Lowerer {
                     });
                     MirValue::Local(cast)
                 } else {
-                    // len - 1 (exclusive end, so full list)
                     MirValue::Constant(MirConstant::I64(-1))
                 };
+                // Handle array ranges: produce &[T] slice
+                if let MirType::Array(inner, _) = &target_type {
+                    // Get element pointer via ArrayElemPtr
+                    let start_i32 = ctx.alloc_local("_sli32", MirType::I32);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: start_i32,
+                        value: start_i64.clone(),
+                        to_type: MirType::I32,
+                    });
+                    let elem_ptr = ctx.alloc_local("_sptr", MirType::Ptr(Box::new(MirType::I8)));
+                    ctx.current_block.insts.push(MirInst::ArrayElemPtr {
+                        dest: elem_ptr,
+                        ptr: target_val,
+                        index: MirValue::Local(start_i32),
+                        arr_type: Box::new(target_type.clone()),
+                        elem_type: inner.clone(),
+                    });
+                    // Compute length: end - start (or arr_len for full slice)
+                    let len = ctx.alloc_local("_slen", MirType::I64);
+                    let len_i64 = if let Some(_) = end {
+                        ctx.current_block.insts.push(MirInst::BinaryOp {
+                            dest: len,
+                            op: MirBinaryOp::Sub,
+                            left: end_i64,
+                            right: start_i64.clone(),
+                        });
+                        MirValue::Local(len)
+                    } else if let MirType::Array(_, size) = &target_type {
+                        MirValue::Constant(MirConstant::I64(*size as i64))
+                    } else {
+                        MirValue::Constant(MirConstant::I64(-1))
+                    };
+                    let result = ctx.alloc_local("_slice", MirType::Slice(inner.clone()));
+                    ctx.current_block.insts.push(MirInst::SliceMake {
+                        dest: result,
+                        ptr: MirValue::Local(elem_ptr),
+                        len: len_i64,
+                        elem_type: inner.clone(),
+                    });
+                    return ctx;
+                }
                 let result = ctx.alloc_local("_slice", MirType::List(Box::new(MirType::I64)));
                 ctx.current_block.insts.push(MirInst::Call {
                     dest: Some(result),
@@ -7497,6 +7622,7 @@ fn mir_type_to_type_name(t: &MirType) -> String {
         MirType::Dict(k, v) => format!("dict<{},{}>", mir_type_to_type_name(k), mir_type_to_type_name(v)),
         MirType::Set(inner) => format!("set<{}>", mir_type_to_type_name(inner)),
         MirType::Array(inner, _size) => format!("[{}]", mir_type_to_type_name(inner)),
+        MirType::Slice(inner) => format!("&[{}]", mir_type_to_type_name(inner)),
     }
 }
 
@@ -7512,6 +7638,7 @@ fn mir_type_to_kind(t: &MirType) -> String {
         MirType::Dict(_, _) => "dict".into(),
         MirType::Set(_) => "set".into(),
         MirType::Array(_, _) => "array".into(),
+        MirType::Slice(_) => "slice".into(),
     }
 }
 
@@ -7532,6 +7659,7 @@ fn mir_type_to_size(t: &MirType) -> i32 {
             fields.iter().map(|(_, ft)| mir_type_to_size(ft) as i32).sum()
         }
         MirType::Array(inner, _) => mir_type_to_size(inner) * 8, // rough estimate
+        MirType::Slice(_) => 16, // ptr (8) + len (8)
     }
 }
 
@@ -7555,6 +7683,7 @@ fn mir_type_to_string(t: &MirType) -> String {
         MirType::Array(inner, _) => format!("arr_{}", mir_type_to_string(inner)),
         MirType::Dict(key, val) => format!("dict_{}_{}", mir_type_to_string(key), mir_type_to_string(val)),
         MirType::Set(inner) => format!("set_{}", mir_type_to_string(inner)),
+        MirType::Slice(inner) => format!("slice_{}", mir_type_to_string(inner)),
     }
 }
 
@@ -7740,6 +7869,10 @@ fn mir_type_to_ast_type(t: &MirType, _span: kyc_core::span::Span) -> AstType {
             size: *size,
             span: _span,
         },
+        MirType::Slice(inner) => AstType::Slice {
+            inner: Box::new(mir_type_to_ast_type(inner, _span)),
+            span: _span,
+        },
     }
 }
 
@@ -7815,6 +7948,10 @@ fn substitute_ast_type(ast: &AstType, subst: &std::collections::HashMap<String, 
         AstType::Array { inner, size, span, .. } => AstType::Array {
             inner: Box::new(substitute_ast_type(inner, subst)),
             size: *size,
+            span: *span,
+        },
+        AstType::Slice { inner, span } => AstType::Slice {
+            inner: Box::new(substitute_ast_type(inner, subst)),
             span: *span,
         },
     }
@@ -8033,6 +8170,7 @@ fn ast_type_to_mir_with_subst(
         AstType::Borrow { inner, .. } => ast_type_to_mir_with_subst(inner, struct_defs, subst),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
         AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir_with_subst(inner, struct_defs, subst)), *size),
+        AstType::Slice { inner, .. } => MirType::Slice(Box::new(ast_type_to_mir_with_subst(inner, struct_defs, subst))),
     }
 }
 
@@ -8205,5 +8343,6 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
         AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => ast_type_to_mir(inner, struct_defs),
         AstType::Ptr { .. } => MirType::Ptr(Box::new(MirType::Void)),
         AstType::Array { inner, size, .. } => MirType::Array(Box::new(ast_type_to_mir(inner, struct_defs)), *size),
+        AstType::Slice { inner, .. } => MirType::Slice(Box::new(ast_type_to_mir(inner, struct_defs))),
     }
 }

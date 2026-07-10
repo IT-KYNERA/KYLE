@@ -28,6 +28,7 @@ pub enum Type {
     Set(Box<Type>),
     Object(Vec<(String, Type)>),
     Tuple(Vec<Type>),
+    Slice(Box<Type>),
 }
 
 impl Type {
@@ -63,6 +64,7 @@ impl Type {
             }
             AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Type::from_ast_type(inner),
             AstType::Ptr { .. } => Type::Ptr,
+            AstType::Slice { inner, .. } => Type::Slice(Box::new(Type::from_ast_type(inner))),
         }
     }
 
@@ -208,6 +210,7 @@ impl fmt::Display for Type {
                 }
                 write!(f, ")")
             }
+            Type::Slice(inner) => write!(f, "&[{}]", inner),
         }
     }
 }

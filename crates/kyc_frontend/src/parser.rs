@@ -805,9 +805,15 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<AstType, String> {
         let start = self.pos;
-        // Handle `&T` — borrow type
+        // Handle `&T` — borrow type, or `&[T]` — slice type
         if self.at(TokenKind::Ampersand) {
             self.advance();
+            if self.at(TokenKind::LBracket) {
+                self.advance();
+                let inner = self.parse_type()?;
+                self.expect(TokenKind::RBracket)?;
+                return Ok(AstType::Slice { inner: Box::new(inner), span: self.span_from(start) });
+            }
             let inner = self.parse_type()?;
             return Ok(AstType::Borrow { inner: Box::new(inner), span: self.span_from(start) });
         }
@@ -1434,32 +1440,67 @@ impl Parser {
             } else if self.at(TokenKind::LBracket) {
                 let start = self.pos;
                 self.advance();
-                let index = self.parse_expr()?;
-                self.expect(TokenKind::RBracket)?;
-                // Detect range expression inside brackets: items[start..end] → RangeSlice
-                if let Expr::Binary { left, operator: BinaryOp::Range, right, .. } = &index {
-                    expr = Expr::RangeSlice {
-                        target: Box::new(expr),
-                        start: Some(left.clone()),
-                        end: Some(right.clone()),
-                        span: self.span_from(start),
+                // Handle range slice forms: [..], [start..], [..end], [start..end]
+                if self.at(TokenKind::DotDot) {
+                    // [..] or [..end]
+                    self.advance();
+                    let end = if self.at(TokenKind::RBracket) {
+                        None
+                    } else {
+                        Some(Box::new(self.parse_expr()?))
                     };
-                } else if let Expr::Binary { left, operator: BinaryOp::RangeInclusive, right, .. } = &index {
+                    self.expect(TokenKind::RBracket)?;
                     expr = Expr::RangeSlice {
                         target: Box::new(expr),
-                        start: Some(left.clone()),
-                        end: Some(right.clone()),
-                        span: self.span_from(start),
-                    };
-                } else if let Expr::Binary { left, operator: BinaryOp::RangeExclusive, right, .. } = &index {
-                    expr = Expr::RangeSlice {
-                        target: Box::new(expr),
-                        start: Some(left.clone()),
-                        end: Some(right.clone()),
+                        start: None,
+                        end,
                         span: self.span_from(start),
                     };
                 } else {
-                    expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
+                    let index = self.parse_expr()?;
+                    // Check for [start..] or [start..end]
+                    if self.at(TokenKind::DotDot) {
+                        self.advance();
+                        let end = if self.at(TokenKind::RBracket) {
+                            None
+                        } else {
+                            Some(Box::new(self.parse_expr()?))
+                        };
+                        self.expect(TokenKind::RBracket)?;
+                        expr = Expr::RangeSlice {
+                            target: Box::new(expr),
+                            start: Some(Box::new(index)),
+                            end,
+                            span: self.span_from(start),
+                        };
+                    } else {
+                        self.expect(TokenKind::RBracket)?;
+                        // Detect range expression inside brackets: items[start..end] → RangeSlice
+                        if let Expr::Binary { left, operator: BinaryOp::Range, right, .. } = &index {
+                            expr = Expr::RangeSlice {
+                                target: Box::new(expr),
+                                start: Some(left.clone()),
+                                end: Some(right.clone()),
+                                span: self.span_from(start),
+                            };
+                        } else if let Expr::Binary { left, operator: BinaryOp::RangeInclusive, right, .. } = &index {
+                            expr = Expr::RangeSlice {
+                                target: Box::new(expr),
+                                start: Some(left.clone()),
+                                end: Some(right.clone()),
+                                span: self.span_from(start),
+                            };
+                        } else if let Expr::Binary { left, operator: BinaryOp::RangeExclusive, right, .. } = &index {
+                            expr = Expr::RangeSlice {
+                                target: Box::new(expr),
+                                start: Some(left.clone()),
+                                end: Some(right.clone()),
+                                span: self.span_from(start),
+                            };
+                        } else {
+                            expr = Expr::Index { target: Box::new(expr), index: Box::new(index), span: self.span_from(start) };
+                        }
+                    }
                 }
             } else if self.at(TokenKind::LBrace) {
                 // Struct literal (no generics): Identifier { field: value, ... }

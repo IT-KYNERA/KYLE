@@ -1370,6 +1370,7 @@ impl LanguageServer {
             AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Self::ast_type_name(inner),
             AstType::Ptr { .. } => "ptr".to_string(),
             AstType::Array { inner, .. } => format!("[{}]", Self::ast_type_name(inner)),
+            AstType::Slice { inner, .. } => format!("&[{}]", Self::ast_type_name(inner)),
         }
     }
 
@@ -1612,6 +1613,7 @@ impl LanguageServer {
             AstType::Borrow { inner, .. } => format!("&{}", Self::fmt_ast_type(inner)),
             AstType::Ptr { .. } => "ptr".to_string(),
             AstType::Array { inner, size, .. } => format!("[{}; {}]", Self::fmt_ast_type(inner), size),
+            AstType::Slice { inner, .. } => format!("&[{}]", Self::fmt_ast_type(inner)),
         }
     }
 
@@ -2469,6 +2471,9 @@ impl LanguageServer {
             }
             AstType::Ptr { .. } => {}
             AstType::Array { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::Slice { inner, .. } => {
                 Self::walk_semantic_type(inner, tokens, symbols);
             }
         }

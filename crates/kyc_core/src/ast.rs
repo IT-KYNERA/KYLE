@@ -42,6 +42,8 @@ pub enum AstType {
     Array { inner: Box<AstType>, size: usize, span: Span },
     /// `ptr` — raw pointer type (for FFI/unsafe)
     Ptr { span: Span },
+    /// `&[T]` — slice type (fat pointer: ptr + len)
+    Slice { inner: Box<AstType>, span: Span },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1367,6 +1369,7 @@ impl fmt::Display for AstType {
             AstType::Borrow { inner, .. } => write!(f, "&{}", inner),
             AstType::Array { inner, size, .. } => write!(f, "[{}; {}]", inner, size),
             AstType::Ptr { .. } => write!(f, "ptr"),
+            AstType::Slice { inner, .. } => write!(f, "&[{}]", inner),
         }
     }
 }

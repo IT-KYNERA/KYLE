@@ -54,7 +54,7 @@ pub enum SsaInst {
     /// For non-promotable allocas: load value from alloca
     Load { dest: SsaValueId, src: usize },
     /// Get pointer to array element (non-promotable)
-    PtrOffset { dest: SsaValueId, ptr: usize, index: SsaValueId },
+    PtrOffset { dest: SsaValueId, ptr: usize, index: SsaValueId, elem_type: Box<MirType> },
     /// Store through pointer: ptr[index] = val (non-promotable)
     PtrStore { ptr: usize, index: SsaValueId, value: SsaValueId },
     /// Get pointer to struct field (non-promotable)
@@ -65,6 +65,8 @@ pub enum SsaInst {
     Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
     /// Allocate stack space (non-promotable)
     Alloca { dest: usize, type_: MirType, name: String },
+    /// Create a slice struct {ptr, len} from ptr and len values
+    SliceMake { dest: SsaValueId, ptr: SsaValueId, len: SsaValueId, elem_type: Box<MirType> },
 }
 
 /// A basic block in SSA form.
@@ -449,13 +451,10 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }
-                MirInst::PtrOffset { dest, ptr, index } => {
+                MirInst::PtrOffset { dest, ptr, index, elem_type } => {
                     let idx_id = resolve_value(index, &mut ssa, &stacks, &param_value_ids);
-                    let new_dest = ssa.values.len();
-                    ssa.values.push(SsaValue { type_: MirType::I64, name: format!("_po{}", dest) });
-                    ssa_block.insts.push(SsaInst::PtrOffset { dest: new_dest, ptr: *ptr, index: idx_id });
-                    alloca_current.insert(*dest, new_dest);
-                    stacks.entry(*dest).or_default().push(new_dest);
+                    let ptr_id = alloca_current.get(ptr).copied().unwrap_or(*ptr);
+                    ssa_block.insts.push(SsaInst::PtrOffset { dest: *dest, ptr: ptr_id, index: idx_id, elem_type: elem_type.clone() });
                 }
                 MirInst::PtrStore { dest: _dest, ptr, index, value } => {
                     let idx_id = resolve_value(index, &mut ssa, &stacks, &param_value_ids);
@@ -479,7 +478,15 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                             val_id
                         }
                     };
-                    ssa_block.insts.push(SsaInst::ArrayElemPtr { dest: *dest, ptr: *ptr, index: index_id, arr_type: arr_type.clone(), elem_type: elem_type.clone() });
+                    // Create an SSA value for the result pointer so resolve_value can find it
+                    let result_id = ssa.values.len();
+                    ssa.values.push(SsaValue {
+                        type_: MirType::Ptr(Box::new(MirType::I8)),
+                        name: format!("_aep{}", *dest),
+                    });
+                    ssa_block.insts.push(SsaInst::ArrayElemPtr { dest: result_id, ptr: *ptr, index: index_id, arr_type: arr_type.clone(), elem_type: elem_type.clone() });
+                    alloca_current.insert(*dest, result_id);
+                    stacks.entry(*dest).or_default().push(result_id);
                 }
                 MirInst::Memcpy { dest_ptr_local, src_alloca_local, struct_type } => {
                     ssa_block.insts.push(SsaInst::Memcpy { dest_ptr_local: *dest_ptr_local, src_alloca_local: *src_alloca_local, struct_type: struct_type.clone() });
@@ -518,6 +525,15 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     ssa.values.push(SsaValue { type_: MirType::I64, name: format!("_aa{}", dest) });
                     let handle_id = alloca_current.get(handle).copied().unwrap_or(*handle);
                     ssa_block.insts.push(SsaInst::AsyncAwait { dest: new_dest, handle: handle_id });
+                    alloca_current.insert(*dest, new_dest);
+                    stacks.entry(*dest).or_default().push(new_dest);
+                }
+                MirInst::SliceMake { dest, ptr, len, elem_type } => {
+                    let ptr_id = resolve_value(ptr, &mut ssa, &stacks, &param_value_ids);
+                    let len_id = resolve_value(len, &mut ssa, &stacks, &param_value_ids);
+                    let new_dest = ssa.values.len();
+                    ssa.values.push(SsaValue { type_: MirType::Slice(elem_type.clone()), name: format!("_sm{}", dest) });
+                    ssa_block.insts.push(SsaInst::SliceMake { dest: new_dest, ptr: ptr_id, len: len_id, elem_type: elem_type.clone() });
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }
@@ -718,8 +734,8 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
             match inst {
                 MirInst::Alloca { dest, type_, .. } => {
                     allocas.insert(*dest);
-                    // Move types, structs, ptrs cannot be promoted (SSA codegen handles them poorly)
-                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_)) {
+                    // Move types, structs, ptrs, slices cannot be promoted (SSA codegen handles them poorly)
+                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_) | MirType::Slice(_)) {
                         escaped.insert(*dest);
                     }
                 }
@@ -730,6 +746,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                 MirInst::Memcpy { .. } => {
                     // These reference heap-allocated memory, not promotable
                 }
+                MirInst::SliceMake { dest, .. } => { escaped.insert(*dest); }
                 _ => {}
             }
         }

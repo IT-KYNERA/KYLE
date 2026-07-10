@@ -1105,6 +1105,7 @@ impl TypeChecker {
                     Type::Array(et, _) => *et,
                     Type::Str => Type::Str,
                     Type::Dict(_, vt) => *vt,
+                    Type::Slice(et) => *et,
                     _ => Type::I32,
                 }
             }
@@ -1115,6 +1116,7 @@ impl TypeChecker {
                 match tt {
                     Type::List(et) => Type::List(et),
                     Type::Str => Type::Str,
+                    Type::Array(inner, _) => Type::Slice(inner),
                     _ => Type::List(Box::new(Type::I32)),
                 }
             }
@@ -1294,6 +1296,7 @@ impl TypeChecker {
             }
             AstType::Ptr { .. } => Type::Ptr,
             AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
+            AstType::Slice { inner, .. } => Type::Slice(Box::new(self.resolve_ast_type(inner))),
         }
     }
 
