@@ -2017,6 +2017,20 @@ impl<'ctx> Codegen<'ctx> {
             self.module.add_function("ky_url_query", ft, None);
         }
 
+        // === Crypto ===
+        // ptr ky_sha256(ptr, i32, ptr)
+        {
+            let params = [ptr_ty.into(), i32_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_sha256", ft, None);
+        }
+        // i32 ky_random_bytes(ptr, i64)
+        {
+            let params = [ptr_ty.into(), i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_random_bytes", ft, None);
+        }
+
         // === Prelude types: datetime ===
         // i64 ky_datetime_now()
         {

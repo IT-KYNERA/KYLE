@@ -21,6 +21,7 @@ pub mod channel;
 pub mod thread;
 pub mod url;
 pub mod regex;
+pub mod crypto;
 
 pub use memory::{ky_alloc, ky_free, ky_retain, ky_release};
 pub use io::{ky_print, ky_println, ky_input, ky_input_with_prompt, ky_open, ky_read_str, ky_write_str, ky_close, ky_sleep, ky_now};
@@ -40,6 +41,7 @@ pub use date::{ky_date_today, ky_date_from_ymd, ky_date_parse, ky_date_year, ky_
 pub use decimal::{ky_decimal_from_str, ky_decimal_to_str, ky_decimal_round, ky_decimal_truncate};
 pub use url::{ky_url_scheme, ky_url_host, ky_url_port, ky_url_path, ky_url_query};
 pub use regex::{ky_regex_new, ky_regex_free, ky_regex_is_match, ky_regex_find, ky_regex_replace};
+pub use crypto::{ky_sha256, ky_random_bytes};
 
 /// Power: compute base ** exp for i64 values. Returns i64 (truncated).
 #[unsafe(no_mangle)]
