@@ -1449,16 +1449,13 @@ fn cmd_uninstall() {
     if cfg!(target_os = "windows") {
         let home = std::env::var("USERPROFILE").unwrap_or_default();
         let appdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        // Use native \ separators for Windows
-        let targets = [
-            format!("{}\\.ky\\bin\\ky.exe", home),
+
+        // Delete runtime libs and llvm-18 (can be deleted while we run)
+        let ky_libs = [
             format!("{}\\.ky\\lib\\libkyc_runtime.a", home),
             format!("{}\\.ky\\lib\\kyc_runtime.lib", home),
-            format!("{}\\.ky\\bin\\ky.exe", appdata),
-            format!("{}\\.ky\\lib\\libkyc_runtime.a", appdata),
-            format!("{}\\.ky\\lib\\kyc_runtime.lib", appdata),
         ];
-        for t in &targets {
+        for t in &ky_libs {
             let p = Path::new(t);
             if p.exists() {
                 let _ = fs::remove_file(p);
@@ -1466,16 +1463,41 @@ fn cmd_uninstall() {
                 uninstalled = true;
             }
         }
-        // LLVM and runtime directories
-        let ky_dirs = [
-            format!("{}\\.ky", home),
-            format!("{}\\.ky", appdata),
-        ];
-        for d in &ky_dirs {
-            let llvm_dir = Path::new(d).join("llvm-18");
+        for base in &[&home, &appdata] {
+            let llvm_dir = Path::new(base).join(".ky").join("llvm-18");
             if llvm_dir.exists() {
                 let _ = fs::remove_dir_all(&llvm_dir);
                 println!("  removed {}", llvm_dir.display());
+                uninstalled = true;
+            }
+        }
+
+        // ky.exe cannot self-delete on Windows (file locked by running process).
+        // Create a self-destruct batch that runs after we exit.
+        let reinstall_targets = [
+            format!("{}\\.ky\\bin\\ky.exe", home),
+            format!("{}\\.ky\\bin\\ky.exe", appdata),
+        ];
+        for t in &reinstall_targets {
+            let ky_exe = Path::new(t);
+            if ky_exe.exists() {
+                // Write a .cmd that deletes ky.exe, the .ky dir, and itself
+                let clean_script = format!(
+                    "@echo off\r\n\
+                     ping -n 2 127.0.0.1 >nul\r\n\
+                     del /f /q \"{}\" 2>nul\r\n\
+                     del /f /q \"{}\" 2>nul\r\n\
+                     rmdir /s /q \"{}\\..\\lib\" 2>nul\r\n\
+                     rmdir /s /q \"{}\\..\" 2>nul\r\n\
+                     del /f /q \"%~f0\" 2>nul\r\n",
+                    t, t, t, t
+                );
+                let batch_path = ky_exe.parent().unwrap().join("ky_cleanup.cmd");
+                let _ = fs::write(&batch_path, &clean_script);
+                let _ = std::process::Command::new("cmd")
+                    .args(&["/c", &batch_path.to_string_lossy().to_string()])
+                    .spawn();
+                println!("  queued removal of {}", t);
                 uninstalled = true;
             }
         }
