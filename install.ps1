@@ -81,6 +81,8 @@ New-Item -ItemType Directory -Force -Path $LibDir | Out-Null
 Copy-Item "$TmpDir\ky.exe" "$BinDir\ky.exe" -Force
 if (Test-Path "$TmpDir\libkyc_runtime.a") {
     Copy-Item "$TmpDir\libkyc_runtime.a" "$LibDir\libkyc_runtime.a" -Force
+} elseif (Test-Path "$TmpDir\kyc_runtime.lib") {
+    Copy-Item "$TmpDir\kyc_runtime.lib" "$LibDir\kyc_runtime.lib" -Force
 }
 
 # Clean up ky install temp
@@ -167,7 +169,7 @@ try {
         Write-Host "✅ Kyle $Version installed successfully!"
         Write-Host ""
         Write-Host "  Binary:  $BinDir\ky.exe"
-        if (Test-Path "$LibDir\libkyc_runtime.a") {
+        if (Test-Path "$LibDir\libkyc_runtime.a" -or (Test-Path "$LibDir\kyc_runtime.lib")) {
             Write-Host "  Runtime: installed"
         }
         if (Test-Path "$LLVMDir\bin\LLVM-C.dll") {
