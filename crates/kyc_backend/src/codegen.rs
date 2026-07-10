@@ -217,7 +217,7 @@ impl<'ctx> Codegen<'ctx> {
             | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
             MirType::F32 | MirType::F64 => self.tbaa_nodes.get("float").copied(),
             MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.tbaa_nodes.get("ptr").copied(),
-            MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) | MirType::Slice(_) => self.tbaa_nodes.get("ptr").copied(),
+            MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) | MirType::Slice(_) | MirType::Box(_) => self.tbaa_nodes.get("ptr").copied(),
             MirType::Void => None,
         }
     }
@@ -349,7 +349,7 @@ impl<'ctx> Codegen<'ctx> {
                 fn_value.add_attribute(AttributeLoc::Param(idx), attr);
             }
             if noalias_kind > 0 {
-                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)) {
+                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_) | MirType::Box(_)) {
                     let attr = self.context.create_enum_attribute(noalias_kind, 0);
                     fn_value.add_attribute(AttributeLoc::Param(idx), attr);
                 }
@@ -2081,7 +2081,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::F64 => self.context.f64_type().as_basic_type_enum(),
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
             MirType::Char => self.context.i32_type().as_basic_type_enum(),
-            MirType::Str => self.context.ptr_type(Default::default()).as_basic_type_enum(),
+            MirType::Str | MirType::Box(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::Void => self.context.i32_type().as_basic_type_enum(),
             MirType::Ptr(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
@@ -2154,7 +2154,7 @@ impl<'ctx> Codegen<'ctx> {
                 fn_value.add_attribute(AttributeLoc::Param(idx), attr);
             }
             if noalias_kind > 0 {
-                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_)) {
+                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_) | MirType::Box(_)) {
                     let attr = self.context.create_enum_attribute(noalias_kind, 0);
                     fn_value.add_attribute(AttributeLoc::Param(idx), attr);
                 }

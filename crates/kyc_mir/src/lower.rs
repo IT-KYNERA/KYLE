@@ -5296,6 +5296,42 @@ impl Lowerer {
                     return ctx;
                 }
 
+                // Special case: box(val) — heap-allocate T and store val
+                if name == "box" && arguments.len() == 1 {
+                    let arg_val = &args[0];
+                    // Get the inner type from the argument
+                    let arg_type = args.first().and_then(|id| {
+                        if let MirValue::Local(id) = id {
+                            ctx.local_types.get(id).cloned()
+                        } else { None }
+                    }).unwrap_or(MirType::I32);
+                    let size = mir_type_to_size(&arg_type) as i64;
+                    let ptr = ctx.alloc_local("_boxptr", MirType::Ptr(Box::new(MirType::I8)));
+                    ctx.current_block.insts.push(MirInst::Call {
+                        dest: Some(ptr),
+                        name: "ky_alloc".to_string(),
+                        args: vec![MirValue::Constant(MirConstant::I64(size))],
+                    });
+                    // Store the value at the allocated pointer
+                    let elem_type = arg_type;
+                    let pointee_type = MirType::Ptr(Box::new(elem_type.clone()));
+                    // Store through pointer by casting to i64 first (like PtrStore)
+                    let val_i64 = ctx.alloc_local("_boxv", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: val_i64,
+                        value: arg_val.clone(),
+                        to_type: MirType::I64,
+                    });
+                    // For now, just return the pointer as the result
+                    // The user can dereference it later
+                    let result = ctx.alloc_local("_box", MirType::Box(Box::new(elem_type)));
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: result,
+                        value: MirValue::Local(ptr),
+                    });
+                    return ctx;
+                }
+
                 // Auto-JSON for client.post(url, data) where data is a class
                 if name == "post" && args.len() == 2 {
                     if let MirValue::Local(id) = &args[1] {
@@ -7362,6 +7398,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
             ("disc".to_string(), MirType::I32),
             ("payload".to_string(), MirType::I64),
         ])),
+        "box" => None, // handled specially
         "ky_list_remove_value" => Some(MirType::I32),
         "ky_dict_contains" => Some(MirType::I32),
         "ky_dict_remove" => Some(MirType::I64),
@@ -7623,6 +7660,7 @@ fn mir_type_to_type_name(t: &MirType) -> String {
         MirType::Set(inner) => format!("set<{}>", mir_type_to_type_name(inner)),
         MirType::Array(inner, _size) => format!("[{}]", mir_type_to_type_name(inner)),
         MirType::Slice(inner) => format!("&[{}]", mir_type_to_type_name(inner)),
+        MirType::Box(inner) => format!("box<{}>", mir_type_to_type_name(inner)),
     }
 }
 
@@ -7639,6 +7677,7 @@ fn mir_type_to_kind(t: &MirType) -> String {
         MirType::Set(_) => "set".into(),
         MirType::Array(_, _) => "array".into(),
         MirType::Slice(_) => "slice".into(),
+        MirType::Box(_) => "box".into(),
     }
 }
 
@@ -7660,6 +7699,7 @@ fn mir_type_to_size(t: &MirType) -> i32 {
         }
         MirType::Array(inner, _) => mir_type_to_size(inner) * 8, // rough estimate
         MirType::Slice(_) => 16, // ptr (8) + len (8)
+        MirType::Box(_) => 8, // ptr
     }
 }
 
@@ -7684,6 +7724,7 @@ fn mir_type_to_string(t: &MirType) -> String {
         MirType::Dict(key, val) => format!("dict_{}_{}", mir_type_to_string(key), mir_type_to_string(val)),
         MirType::Set(inner) => format!("set_{}", mir_type_to_string(inner)),
         MirType::Slice(inner) => format!("slice_{}", mir_type_to_string(inner)),
+        MirType::Box(inner) => format!("box_{}", mir_type_to_string(inner)),
     }
 }
 
@@ -7871,6 +7912,11 @@ fn mir_type_to_ast_type(t: &MirType, _span: kyc_core::span::Span) -> AstType {
         },
         MirType::Slice(inner) => AstType::Slice {
             inner: Box::new(mir_type_to_ast_type(inner, _span)),
+            span: _span,
+        },
+        MirType::Box(inner) => AstType::Generic {
+            name: "box".into(),
+            args: vec![mir_type_to_ast_type(inner, _span)],
             span: _span,
         },
     }
@@ -8136,6 +8182,11 @@ fn ast_type_to_mir_with_subst(
                         ("payload".to_string(), MirType::I64),
                     ]);
                 }
+                // Handle box<T> — built-in heap pointer type
+                if name == "box" && args.len() == 1 {
+                    let inner_mir = ast_type_to_mir_with_subst(&args[0], struct_defs, subst);
+                    return MirType::Box(Box::new(inner_mir));
+                }
                 // User-defined generic with concrete args — create concrete version
                 let concrete_args: Vec<MirType> = args.iter()
                     .map(|a| ast_type_to_mir_with_subst(a, struct_defs, subst))
@@ -8309,6 +8360,11 @@ fn ast_type_to_mir(ast: &AstType, struct_defs: Option<&std::collections::HashMap
                         ("disc".to_string(), MirType::I32),
                         ("payload".to_string(), MirType::I64),
                     ]);
+                }
+                // Handle box<T> — built-in heap pointer type
+                if name == "box" && args.len() == 1 {
+                    let inner_mir = ast_type_to_mir(&args[0], struct_defs);
+                    return MirType::Box(Box::new(inner_mir));
                 }
                 // User-defined generic with concrete type args — create concrete name
                 let concrete_args: Vec<MirType> = args.iter()

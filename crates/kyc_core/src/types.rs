@@ -29,6 +29,7 @@ pub enum Type {
     Object(Vec<(String, Type)>),
     Tuple(Vec<Type>),
     Slice(Box<Type>),
+    Box_(Box<Type>),
 }
 
 impl Type {
@@ -211,6 +212,7 @@ impl fmt::Display for Type {
                 write!(f, ")")
             }
             Type::Slice(inner) => write!(f, "&[{}]", inner),
+            Type::Box_(inner) => write!(f, "box<{}>", inner),
         }
     }
 }

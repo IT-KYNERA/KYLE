@@ -734,7 +734,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                 MirInst::Alloca { dest, type_, .. } => {
                     allocas.insert(*dest);
                     // Move types, structs, ptrs, slices cannot be promoted (SSA codegen handles them poorly)
-                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_) | MirType::Slice(_)) {
+                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_) | MirType::Slice(_) | MirType::Box(_)) {
                         escaped.insert(*dest);
                     }
                 }

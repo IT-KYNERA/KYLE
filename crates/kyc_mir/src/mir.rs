@@ -45,6 +45,8 @@ pub enum MirType {
     Set(Box<MirType>),
     /// Slice view: `&[T]` — fat pointer {ptr, len}, Copy semantics.
     Slice(Box<MirType>),
+    /// Heap-allocated box: `box<T>` — owned pointer to heap T, Move semantics.
+    Box(Box<MirType>),
 }
 
 /// Binary operators in MIR.
@@ -168,10 +170,10 @@ pub fn is_move_type(t: &MirType) -> bool {
         MirType::List(_) => true,
         MirType::Dict(_, _) => true,
         MirType::Set(_) => true,
+        MirType::Box(_) => true,
         // Array is NOT heap-allocated — value type on stack. No ky_free.
         // Struct is NOT heap-allocated — it's a value type on the stack.
         // Excluding it from Move prevents kl_free of stack addresses (crash).
-        // String fields inside structs are tracked independently.
         MirType::Struct(_, _) => false,
         _ => false,
     }
@@ -227,6 +229,7 @@ impl fmt::Display for MirType {
             MirType::Dict(key, val) => write!(f, "dict<{}, {}>", key, val),
             MirType::Set(inner) => write!(f, "set<{}>", inner),
             MirType::Slice(inner) => write!(f, "&[{}]", inner),
+            MirType::Box(inner) => write!(f, "box<{}>", inner),
         }
     }
 }

@@ -400,6 +400,13 @@ impl ScopeResolver {
                             Type::List(Box::new(Type::I32))
                         }
                     }
+                    "box" => {
+                        if let Some(inner) = args.first() {
+                            Type::Box_(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::Box_(Box::new(Type::I32))
+                        }
+                    }
                     "Option" => {
                         if let Some(inner) = args.first() {
                             Type::Option(Box::new(self.resolve_ast_type(inner)))

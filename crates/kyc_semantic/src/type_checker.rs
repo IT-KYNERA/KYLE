@@ -60,6 +60,7 @@ impl TypeChecker {
             "read_str" => Some(2),
             "write_str" => Some(2),
             "close" => Some(1),
+            "box" => Some(1),
             "sleep" => Some(1),
             "now" => Some(0),
             "contains" => Some(2),
@@ -905,6 +906,14 @@ impl TypeChecker {
                                         Type::Option(Box::new(Type::I32))
                                     }
                                 }
+                                "box" => {
+                                    if arguments.len() == 1 {
+                                        let arg_type = self.infer_expr(&arguments[0]);
+                                        Type::Box_(Box::new(arg_type))
+                                    } else {
+                                        Type::Box_(Box::new(Type::I32))
+                                    }
+                                }
                                 "error" => Type::Generic("Result".to_string(), vec![Type::Void, Type::Str]),
                                 _ => *ft.return_,
                             }
@@ -1275,6 +1284,13 @@ impl TypeChecker {
                     }
                     "tuple" => {
                         Type::Tuple(args.iter().map(|a| self.resolve_ast_type(a)).collect())
+                    }
+                    "box" => {
+                        if let Some(inner) = args.first() {
+                            Type::Box_(Box::new(self.resolve_ast_type(inner)))
+                        } else {
+                            Type::Box_(Box::new(Type::I32))
+                        }
                     }
                     _ => Type::Generic(name.clone(), args.iter().map(|a| self.resolve_ast_type(a)).collect()),
                 }

@@ -94,6 +94,7 @@ impl SymbolTable {
             "ky_time_now_ms", "ky_time_now_us",
             "ky_set_new", "ky_set_free", "ky_set_add",
             "ky_set_contains", "ky_set_remove", "ky_set_len",
+            "box",
         ];
         for &name in &runtime_fns {
             if let Some(scope) = self.scopes.last_mut() {

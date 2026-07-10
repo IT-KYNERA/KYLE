@@ -236,13 +236,13 @@ fn main():
  println(buf) # "data"
 ```
 
-### box: `box<T>` [ ]
+### box: `box<T>` [x]
 
-Heap allocation explicita.
+Heap allocation explicita. Move semantics (ky_free al salir de scope).
 
 ```ky
 b: box<i32> = box(42)
-*b = *b + 1 # deref + mutate
+println(b.to_str()) # → addr del heap (ptr value)
 ```
 
 ### rc: `rc<T>` [ ]
@@ -532,7 +532,7 @@ result = sb.to_str()
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitivis | 13 | 2 (u8-u64 codegen, never) | 0 |
 | Compounds | 6 | 2 (tuple) | 0 |
-| Ownership | 3 | 4 (box, rc, arc, weak) | 0 |
+| Ownership | 4 | 3 (rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
 | Specialized | 2 (str_builder, file) | 13 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path) | 0 |
-| **Total** | **25** | **28** | **0** |
+| **Total** | **26** | **27** | **0** |
