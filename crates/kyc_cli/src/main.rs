@@ -1449,24 +1449,27 @@ fn cmd_uninstall() {
     if cfg!(target_os = "windows") {
         let home = std::env::var("USERPROFILE").unwrap_or_default();
         let appdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        // Use native \ separators for Windows
         let targets = [
-            format!("{}/.ky/bin/ky.exe", home),
-            format!("{}/.ky/lib/kyc_runtime.lib", home),
-            format!("{}/.ky/bin/ky.exe", appdata),
-            format!("{}/.ky/lib/kyc_runtime.lib", appdata),
+            format!("{}\\.ky\\bin\\ky.exe", home),
+            format!("{}\\.ky\\lib\\libkyc_runtime.a", home),
+            format!("{}\\.ky\\lib\\kyc_runtime.lib", home),
+            format!("{}\\.ky\\bin\\ky.exe", appdata),
+            format!("{}\\.ky\\lib\\libkyc_runtime.a", appdata),
+            format!("{}\\.ky\\lib\\kyc_runtime.lib", appdata),
         ];
         for t in &targets {
             let p = Path::new(t);
             if p.exists() {
                 let _ = fs::remove_file(p);
-                println!("  removed {}", t);
+                println!("  removed {}", p.display());
                 uninstalled = true;
             }
         }
-        // LLVM directory (~/.ky/llvm-18 or similar)
+        // LLVM and runtime directories
         let ky_dirs = [
-            format!("{}/.ky", home),
-            format!("{}/.ky", appdata),
+            format!("{}\\.ky", home),
+            format!("{}\\.ky", appdata),
         ];
         for d in &ky_dirs {
             let llvm_dir = Path::new(d).join("llvm-18");

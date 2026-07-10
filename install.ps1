@@ -146,15 +146,25 @@ $env:LLVM_SYS_181_PREFIX = $LLVMDir
 
 # ─── Add to PATH ────────────────────────────────────────────
 
-$UserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$regPath = "HKCU:\Environment"
+$currentPath = (Get-ItemProperty -Path $regPath -Name PATH -ErrorAction SilentlyContinue).PATH
 $addedDirs = @()
-if ($UserPath -notlike "*$BinDir*") { $addedDirs += $BinDir }
-if ($UserPath -notlike "*$LLVMBin*") { $addedDirs += $LLVMBin }
+if ($currentPath -notlike "*$BinDir*") { $addedDirs += $BinDir }
+if ($currentPath -notlike "*$LLVMBin*") { $addedDirs += $LLVMBin }
 if ($addedDirs.Count -gt 0) {
-    $NewPath = ($addedDirs -join ';') + ";" + $UserPath
-    [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
+    $newPath = ($addedDirs -join ';') + ";" + $currentPath
+    # Use registry directly (not [Environment]::SetEnvironmentVariable) so
+    # we can broadcast the change to all windows afterwards.
+    Set-ItemProperty -Path $regPath -Name PATH -Value $newPath
     Write-Host "  Added to PATH:"
     foreach ($d in $addedDirs) { Write-Host "    $d" }
+    # Broadcast WM_SETTINGCHANGE so new terminals see the updated PATH
+    try {
+        $sig = '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
+        Add-Type -MemberDefinition $sig -Name NativeMethods -Namespace Win32 -ErrorAction Stop | Out-Null
+        $result = [UIntPtr]::Zero
+        [Win32.NativeMethods]::SendMessageTimeout(0xffff, 0x001a, [UIntPtr]::Zero, "Environment", 2, 5000, [ref]$result) | Out-Null
+    } catch { }
 } else {
     Write-Host "  PATH already configured"
 }
