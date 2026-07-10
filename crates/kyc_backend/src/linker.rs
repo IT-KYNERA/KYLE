@@ -66,6 +66,11 @@ impl Linker {
         }
 
         if cfg!(target_os = "windows") {
+            // Suppress LNK4098: LLVM was built with /MD (dynamic CRT), but Rust
+            // std might link a different CRT.
+            // clang/lld-link: -Wl, prefix. MSVC link.exe: direct /NODEFAULTLIB.
+            // Since we prefer clang, use the -Wl, form which all drivers pass through.
+            cmd.arg("-Wl,/NODEFAULTLIB:msvcrt");
             // Windows system libraries needed by Rust std
             cmd.arg("-lkernel32");
             cmd.arg("-lws2_32");

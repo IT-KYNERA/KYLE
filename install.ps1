@@ -8,7 +8,7 @@
 #   $env:KY_PREFIX = "C:\ky"       Install directory (default: ~\.ky)
 
 param(
-    [string]$Version = "v0.6.2",
+    [string]$Version = "v0.6.3",
     [string]$Prefix = ""
 )
 
@@ -153,12 +153,13 @@ if ($UserPath -notlike "*$LLVMBin*") { $addedDirs += $LLVMBin }
 if ($addedDirs.Count -gt 0) {
     $NewPath = ($addedDirs -join ';') + ";" + $UserPath
     [Environment]::SetEnvironmentVariable("PATH", $NewPath, "User")
-    $env:PATH = ($addedDirs -join ';') + ";" + $env:PATH
     Write-Host "  Added to PATH:"
     foreach ($d in $addedDirs) { Write-Host "    $d" }
 } else {
     Write-Host "  PATH already configured"
 }
+# Always update current session PATH too
+$env:PATH = "$BinDir;$LLVMBin;$env:PATH"
 
 # ─── Verify ─────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ Write-Host ""
 try {
     $version = & "$BinDir\ky.exe" --version 2>&1
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Kyle $Version installed successfully!"
+        Write-Host "[OK] Kyle $Version installed successfully!"
         Write-Host ""
         Write-Host "  Binary:  $BinDir\ky.exe"
         if (Test-Path "$LibDir\libkyc_runtime.a" -or (Test-Path "$LibDir\kyc_runtime.lib")) {
@@ -181,10 +182,10 @@ try {
         Write-Host "  Use now:  ky --version"
         Write-Host "  Try:      ky run examples\hello.ky"
     } else {
-        Write-Host "⚠️  Installation completed but verification failed."
+        Write-Host "[WARN] Installation completed but verification failed."
     }
 } catch {
-    Write-Host "⚠️  Installation completed but 'ky.exe' not found in PATH."
+    Write-Host "[WARN] Installation completed but 'ky.exe' not found in PATH."
     Write-Host "   Restart your terminal or add manually:"
     Write-Host "    [Environment]::SetEnvironmentVariable('PATH', ""$BinDir;`$env:PATH"", 'User')"
 }
