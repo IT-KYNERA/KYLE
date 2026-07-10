@@ -159,7 +159,6 @@ impl LowerCtx {
     /// tail-expression returns.
     fn emit_return(&mut self, value: MirValue) {
         if self.is_fallible {
-            // If the value is already a __result struct (e.g. from error()), return as-is
             if let MirValue::Local(id) = &value {
                 if let Some(MirType::Struct(name, _)) = self.local_types.get(id) {
                     if name == "Result" {
@@ -1022,7 +1021,10 @@ impl Lowerer {
         mir_func.return_type = f.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
             .unwrap_or(MirType::Void);
-        let is_fallible = f.return_type.as_ref().map_or(false, |rt| matches!(rt, AstType::Error { .. }));
+        let is_fallible = f.return_type.as_ref().map_or(false, |rt| {
+            matches!(rt, AstType::Error { .. })
+                || matches!(rt, AstType::Generic { name, .. } if name == "Result")
+        });
         mir_func.is_fallible = is_fallible;
         mir_func.is_const = f.is_const;
 
@@ -1240,7 +1242,10 @@ impl Lowerer {
         mir_func.return_type = m.return_type.as_ref()
             .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
             .unwrap_or(MirType::Void);
-        let is_fallible = m.return_type.as_ref().map_or(false, |rt| matches!(rt, AstType::Error { .. }));
+        let is_fallible = m.return_type.as_ref().map_or(false, |rt| {
+            matches!(rt, AstType::Error { .. })
+                || matches!(rt, AstType::Generic { name, .. } if name == "Result")
+        });
         mir_func.is_fallible = is_fallible;
 
         ctx.struct_defs = struct_defs;
@@ -2171,11 +2176,26 @@ impl Lowerer {
                                 ],
                             );
 
+                            // FieldPtr needs a pointer, but match_val is a loaded value.
+                            // Store it to a temp alloca to get an addressable pointer.
+                            let mv = match_val.unwrap();
+                            let mv_type = ctx.local_types.get(&mv).cloned().unwrap_or(MirType::I64);
+                            let struct_ptr = if matches!(mv_type, MirType::Struct(_, _)) {
+                                let alloca = ctx.alloc_local("_mvtmp", mv_type);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: alloca,
+                                    value: MirValue::Local(mv),
+                                });
+                                alloca
+                            } else {
+                                mv
+                            };
+
                             // Load discriminant from match value
                             let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::Ptr(Box::new(MirType::I32)));
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: disc_ptr,
-                                ptr: match_val.unwrap(),
+                                ptr: struct_ptr,
                                 field_index: 0,
                                 struct_type: Box::new(struct_type.clone()),
                             });
@@ -2222,7 +2242,7 @@ impl Lowerer {
                                 let payload_ptr = ctx.alloc_local("_pay_ptr", MirType::I64);
                                 ctx.current_block.insts.push(MirInst::FieldPtr {
                                     dest: payload_ptr,
-                                    ptr: match_val.unwrap(),
+                                    ptr: struct_ptr,
                                     field_index: 1,
                                     struct_type: Box::new(struct_type),
                                 });
@@ -3195,7 +3215,6 @@ impl Lowerer {
                 let right_local = ctx.next_local - 1;
                 let right_is_str = ctx.string_locals.contains(&right_local)
                     || ctx.local_types.get(&right_local).map_or(false, |t| *t == MirType::Str);
-
                 // Range expression outside brackets — no-op
                 if matches!(operator, BinaryOp::Range) {
                     return ctx;
@@ -5210,7 +5229,6 @@ impl Lowerer {
                 // Special case: ok(val) — construct success result struct
                 if name == "ok" && arguments.len() == 1 {
                     let arg_val = &args[0];
-                    // Allocate temps FIRST, struct LAST so the result local is the struct
                     let disc_ptr = ctx.alloc_local("_odp", MirType::I32);
                     let payload_val = ctx.alloc_local("_opv", MirType::I64);
                     ctx.current_block.insts.push(MirInst::Cast {
@@ -7093,10 +7111,22 @@ impl Lowerer {
                                     ("payload".to_string(), MirType::I64),
                                 ],
                             );
+                            // FieldPtr needs a pointer, but match_val is a loaded value.
+                            let mv_type = ctx.local_types.get(&match_val).cloned().unwrap_or(MirType::I64);
+                            let struct_ptr = if matches!(mv_type, MirType::Struct(_, _)) {
+                                let alloca = ctx.alloc_local("_mvtmp", mv_type);
+                                ctx.current_block.insts.push(MirInst::Store {
+                                    dest: alloca,
+                                    value: MirValue::Local(match_val),
+                                });
+                                alloca
+                            } else {
+                                match_val
+                            };
                             let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::Ptr(Box::new(MirType::I32)));
                             ctx.current_block.insts.push(MirInst::FieldPtr {
                                 dest: disc_ptr,
-                                ptr: match_val,
+                                ptr: struct_ptr,
                                 field_index: 0,
                                 struct_type: Box::new(struct_type.clone()),
                             });
@@ -7138,7 +7168,7 @@ impl Lowerer {
                                 let payload_ptr = ctx.alloc_local("_pay_ptr", MirType::I64);
                                 ctx.current_block.insts.push(MirInst::FieldPtr {
                                     dest: payload_ptr,
-                                    ptr: match_val,
+                                    ptr: struct_ptr,
                                     field_index: 1,
                                     struct_type: Box::new(struct_type),
                                 });

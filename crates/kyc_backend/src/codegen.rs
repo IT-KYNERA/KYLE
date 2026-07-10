@@ -555,6 +555,8 @@ impl<'ctx> Codegen<'ctx> {
                                     ssa_read!(ssa_id)
                                 } else if let Some(&v) = alloca_current.get(mir_id) {
                                     v
+                                } else if let Some(v) = block_vals.get(bi).and_then(|bv| bv.get(mir_id)).copied() {
+                                    v
                                 } else if let Some(Some(ptr)) = self.alloca_map.get(*mir_id) {
                                     // Load from actual alloca as fallback (handles non-promotable)
                                     if let Some(pointee_type) = self.alloca_types.get(mir_id) {
@@ -635,6 +637,12 @@ impl<'ctx> Codegen<'ctx> {
                             };
                             if let Some(v) = loaded {
                                 block_vals[bi].insert(*dest, v);
+                                // Also store to alloca if dest is non-promotable (for resolve_mir! fallback)
+                                if let Some(dptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                    if let Some(dt) = self.alloca_types.get(dest) {
+                                        let _ = self.builder.build_store(dptr, v);
+                                    }
+                                }
                             }
                         }
                         SsaInst::BinaryOp { dest, op, left, right } => {
