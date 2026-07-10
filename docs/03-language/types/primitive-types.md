@@ -187,7 +187,7 @@ if value = get_name(): # pattern matching
  println(value)
 ```
 
-### Fallible: `T!` [ ]
+### Fallible: `T!` [x]
 
 ```ky
 fn divide(a: i32, b: i32) i32!:
@@ -535,4 +535,4 @@ result = sb.to_str()
 | Ownership | 4 | 3 (rc, arc, weak) | 0 |
 | Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
 | Specialized | 2 (str_builder, file) | 13 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path) | 0 |
-| **Total** | **26** | **27** | **0** |
+| **Total** | **27** | **26** | **0** |

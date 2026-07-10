@@ -60,18 +60,18 @@ final class datetime:
     fn second() i32:
         ky_datetime_second(this.ms)
 
-    fn add_days(self, n: i32) datetime:
+    fn add_days(n: i32) datetime:
         val = ky_datetime_add_days(this.ms, n)
         datetime { ms: val }
 
-    fn add_hours(self, n: i32) datetime:
+    fn add_hours(n: i32) datetime:
         val = ky_datetime_add_hours(this.ms, n)
         datetime { ms: val }
 
-    fn to_str(self) str:
-        self.format("%Y-%m-%d %H:%M:%S")
+    fn to_str() str:
+        this.format("%Y-%m-%d %H:%M:%S")
 
-    fn format(self, fmt: str) str:
+    fn format(fmt: str) str:
         raw = ky_datetime_format(this.ms, fmt as ptr) as i64
         if raw == 0:
             return ""
@@ -87,17 +87,17 @@ final class duration:
     static fn from_millis(val: i64) duration:
         duration { ms: val }
 
-    fn seconds(self) i64:
+    fn seconds() i64:
         this.ms / 1000
 
-    fn minutes(self) i64:
+    fn minutes() i64:
         this.ms / 60000
 
-    fn hours(self) i64:
+    fn hours() i64:
         this.ms / 3600000
 
-    fn days(self) i64:
+    fn days() i64:
         this.ms / 86400000
 
-    fn to_str(self) str:
+    fn to_str() str:
         str(this.ms) + "ms"

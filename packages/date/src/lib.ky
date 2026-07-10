@@ -28,28 +28,28 @@ final class date:
     static fn parse(s: str) date:
         date { packed: ky_date_parse(s as ptr) }
 
-    fn year(self) i32:
+    fn year() i32:
         ky_date_year(this.packed)
 
-    fn month(self) i32:
+    fn month() i32:
         ky_date_month(this.packed)
 
-    fn day(self) i32:
+    fn day() i32:
         ky_date_day(this.packed)
 
-    fn weekday(self) i32:
+    fn weekday() i32:
         ky_date_weekday(this.packed)
 
-    fn add_days(self, n: i32) date:
+    fn add_days(n: i32) date:
         date { packed: ky_date_add_days(this.packed, n) }
 
-    fn format(self, fmt: str) str:
+    fn format(fmt: str) str:
         raw = ky_date_format(this.packed, fmt as ptr) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn to_str(self) str:
-        self.format("%Y-%m-%d")
+    fn to_str() str:
+        this.format("%Y-%m-%d")
 
 # ═══════════════════════════════════════
 # time
@@ -74,14 +74,14 @@ final class time:
     static fn parse(s: str) time:
         time { packed: ky_time_parse(s as ptr) }
 
-    fn hour(self) i32:
+    fn hour() i32:
         ky_time_hour(this.packed)
 
-    fn minute(self) i32:
+    fn minute() i32:
         ky_time_minute(this.packed)
 
-    fn second(self) i32:
+    fn second() i32:
         ky_time_second(this.packed)
 
-    fn to_str(self) str:
+    fn to_str() str:
         str(this.hour()) + ":" + str(this.minute()) + ":" + str(this.second())

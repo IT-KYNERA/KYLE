@@ -31,17 +31,17 @@ final class postgres:
             return postgres { conn: 0 }
         postgres { conn: c }
 
-    fn query(self, sql: str) result:
+    fn query(sql: str) result:
         r = PQexec(this.conn, sql as ptr)
         if r == 0:
             return result { res: 0, conn: this.conn }
         result { res: r, conn: this.conn }
 
-    fn close(self):
+    fn close():
         if this.conn != 0:
             PQfinish(this.conn)
 
-    fn error(self) str:
+    fn error() str:
         msg = PQerrorMessage(this.conn)
         pg_str(msg)
 
@@ -49,7 +49,7 @@ final class row:
     res: ^i64
     index: ^i32
 
-    fn get(self, name: str) str:
+    fn get(name: str) str:
         cols = PQnfields(this.res)
         i: ^i32 = 0
         while i < cols:
@@ -66,13 +66,13 @@ final class result:
     res: ^i64
     conn: ^i64
 
-    fn rows(self) i32:
+    fn rows() i32:
         PQntuples(this.res)
 
-    fn cols(self) i32:
+    fn cols() i32:
         PQnfields(this.res)
 
-    fn get(self, r: i32, c: i32) str:
+    fn get(r: i32, c: i32) str:
         if r < 0: return ""
         if r >= PQntuples(this.res): return ""
         if c < 0: return ""
@@ -80,9 +80,9 @@ final class result:
         val = PQgetvalue(this.res, r, c)
         pg_str(val)
 
-    fn free(self):
+    fn free():
         if this.res != 0:
             PQclear(this.res)
 
-    fn data(self, r: i32) row:
+    fn data(r: i32) row:
         row { res: this.res, index: r }

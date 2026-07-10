@@ -19,27 +19,27 @@ final class bytes:
         raw = ky_bytes_new(n)
         bytes { data: raw, size: n }
 
-    fn len(self) i32:
+    fn len() i32:
         this.size
 
-    fn get(self, i: i32) i32:
+    fn get(i: i32) i32:
         if i < 0:
             return -1
         if i >= this.size:
             return -1
         ky_bytes_get(this.data, i)
 
-    fn set(self, i: i32, val: i32):
+    fn set(i: i32, val: i32):
         if i >= 0:
             if i < this.size:
                 ky_bytes_set(this.data, i, val)
 
-    fn hex(self) str:
+    fn hex() str:
         raw = ky_bytes_to_hex(this.data, this.size) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn to_str(self) str:
+    fn to_str() str:
         raw = this.data as i64
         if raw == 0: return ""
         (raw as ptr) as str

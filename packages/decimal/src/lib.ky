@@ -14,13 +14,13 @@ final class decimal:
     static fn from_str(s: str) decimal:
         decimal { val: ky_decimal_from_str(s as ptr) }
 
-    fn round(self, n: i32) decimal:
+    fn round(n: i32) decimal:
         decimal { val: ky_decimal_round(this.val, n) }
 
-    fn truncate(self) i64:
+    fn truncate() i64:
         ky_decimal_truncate(this.val)
 
-    fn to_str(self) str:
+    fn to_str() str:
         raw = ky_decimal_to_str(this.val) as i64
         if raw == 0: return ""
         (raw as ptr) as str

@@ -18,7 +18,7 @@ final class uuid:
     static fn parse(s: str) uuid:
         uuid { data: ky_uuid_parse(s as ptr) }
 
-    fn to_str(self) str:
+    fn to_str() str:
         raw = this.data as i64
         if raw == 0: return ""
         (raw as ptr) as str

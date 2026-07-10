@@ -66,7 +66,7 @@ fn extract_header(raw: str, name: str) str:
             i = i + 1
         if i == len(name_lower) and substr(trim_line, 0, i) == name_lower:
             val = trim(substr(trim_line, i + 1, len(trim_line) - i - 1))
-            val
+            return val
         pos = pos + nl + 1
     ""
 

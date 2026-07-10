@@ -33,8 +33,8 @@ extern fn sqlite3_bind_int(stmt: ptr, idx: i32, val: i32) i32
 extern fn sqlite3_bind_text(stmt: ptr, idx: i32, val: ptr, len: i32, destructor: ptr) i32
 
 fn open(path: str) ptr:
-    ppdb = 0 as ptr
-    rc = sqlite3_open(path, ppdb)
+    ppdb: ^ptr = 0 as ptr
+    rc = sqlite3_open(path, ^&ppdb)
     ppdb
 
 fn close(db: ptr):

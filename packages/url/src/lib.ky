@@ -19,28 +19,28 @@ final class url:
     static fn parse(s: str) url:
         url { raw: s }
 
-    fn scheme(self) str:
+    fn scheme() str:
         raw = ky_url_scheme(this.raw as ptr) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn host(self) str:
+    fn host() str:
         raw = ky_url_host(this.raw as ptr) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn port(self) i32:
+    fn port() i32:
         ky_url_port(this.raw as ptr)
 
-    fn path(self) str:
+    fn path() str:
         raw = ky_url_path(this.raw as ptr) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn query(self) str:
+    fn query() str:
         raw = ky_url_query(this.raw as ptr) as i64
         if raw == 0: return ""
         (raw as ptr) as str
 
-    fn to_str(self) str:
+    fn to_str() str:
         this.raw
