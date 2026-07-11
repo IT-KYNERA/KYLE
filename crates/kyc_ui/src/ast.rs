@@ -7,8 +7,45 @@ pub struct KyxFile {
     pub view_paths: Vec<String>,
     /// Kyle code blocks: @(...)
     pub code_blocks: Vec<String>,
+    /// Style/template/theme declarations
+    pub styles: Vec<StyleDecl>,
     /// Root XML elements
     pub body: Vec<KyxNode>,
+}
+
+/// A style/template/theme declaration
+#[derive(Clone, Debug)]
+pub enum StyleDecl {
+    /// style<component> Name: prop = value, ...
+    Style {
+        component: String,
+        name: String,
+        props: Vec<StyleProp>,
+    },
+    /// layout<component> Name: prop = value, ...
+    Layout {
+        component: String,
+        name: String,
+        props: Vec<StyleProp>,
+    },
+    /// tpl<component> Name: style = X, animation = Y, ...
+    Template {
+        component: String,
+        name: String,
+        props: Vec<StyleProp>,
+    },
+    /// theme Name: prop = value, ...
+    Theme {
+        name: String,
+        props: Vec<StyleProp>,
+    },
+}
+
+/// A single style property: color = Color("#0066FF")
+#[derive(Clone, Debug)]
+pub struct StyleProp {
+    pub name: String,
+    pub value: String,
 }
 
 /// An XML element or control-flow directive
@@ -88,6 +125,9 @@ impl fmt::Display for KyxFile {
         for block in &self.code_blocks {
             writeln!(f, "@({})", block)?;
         }
+        for style in &self.styles {
+            write!(f, "{}", style)?;
+        }
         for node in &self.body {
             write!(f, "{}", node)?;
         }
@@ -133,5 +173,38 @@ impl fmt::Display for KyxAttr {
             AttrValue::Expr(e) => write!(f, "{}={}", self.name, e),
             AttrValue::Flag => write!(f, "{}", self.name),
         }
+    }
+}
+
+impl fmt::Display for StyleDecl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StyleDecl::Style { component, name, props } => {
+                writeln!(f, "style<{}> {}:", component, name)?;
+                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
+                Ok(())
+            }
+            StyleDecl::Layout { component, name, props } => {
+                writeln!(f, "layout<{}> {}:", component, name)?;
+                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
+                Ok(())
+            }
+            StyleDecl::Template { component, name, props } => {
+                writeln!(f, "tpl<{}> {}:", component, name)?;
+                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
+                Ok(())
+            }
+            StyleDecl::Theme { name, props } => {
+                writeln!(f, "theme {}:", name)?;
+                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Display for StyleProp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} = {}", self.name, self.value)
     }
 }

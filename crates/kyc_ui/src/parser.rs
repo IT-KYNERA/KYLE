@@ -45,12 +45,29 @@ impl KyxParser {
     fn parse_file(&mut self) -> Result<KyxFile, String> {
         let mut view_paths = Vec::new();
         let mut code_blocks = Vec::new();
+        let mut styles = Vec::new();
         let mut body = Vec::new();
 
         loop {
             self.skip_whitespace();
             match self.peek() {
                 None => break,
+                Some('s') if self.starts_with("style<") => {
+                    styles.push(self.parse_style_decl("style", false)?);
+                }
+                Some('l') if self.starts_with("layout<") => {
+                    styles.push(self.parse_style_decl("layout", false)?);
+                }
+                Some('t') if self.starts_with("tpl<") => {
+                    styles.push(self.parse_style_decl("tpl", false)?);
+                }
+                Some('t') if self.starts_with("theme ") => {
+                    self.pos += 5;
+                    let name = self.read_while(|c| c != ':' && c != '\n')?.trim().to_string();
+                    self.expect_char(':')?;
+                    let props = self.parse_style_props()?;
+                    styles.push(StyleDecl::Theme { name, props });
+                }
                 Some(c) if c == 'v' || c == 'V' => {
                     // Try to parse view("...")
                     let saved = self.pos;
@@ -127,7 +144,78 @@ impl KyxParser {
             }
         }
 
-        Ok(KyxFile { view_paths, code_blocks, body })
+        Ok(KyxFile { view_paths, code_blocks, styles, body })
+    }
+
+    fn parse_style_decl(&mut self, kind: &str, _is_theme: bool) -> Result<StyleDecl, String> {
+        // style<comp> Name: or layout<comp> Name: or tpl<comp> Name:
+        for c in kind.chars() { self.advance(); }
+        self.expect_char('<')?;
+        let component = self.read_while(|c| c != '>')?;
+        self.expect_char('>')?;
+        self.skip_whitespace();
+        let name = self.read_while(|c| c != ':' && c != ' ' && c != '\t')?.trim().to_string();
+        self.expect_char(':')?;
+        let props = self.parse_style_props()?;
+        match kind {
+            "layout" => Ok(StyleDecl::Layout { component, name, props }),
+            "tpl" => Ok(StyleDecl::Template { component, name, props }),
+            _ => Ok(StyleDecl::Style { component, name, props }),
+        }
+    }
+
+    fn parse_style_props(&mut self) -> Result<Vec<StyleProp>, String> {
+        let mut props = Vec::new();
+        // Expect newline + indent
+        if !self.at_newline() { return Ok(props); }
+        self.advance();
+        if !self.at_indent() { return Ok(props); }
+        self.advance();
+        loop {
+            self.skip_whitespace_inline();
+            match self.peek() {
+                None | Some('\n') | Some('\r') => break,
+                _ => {}
+            }
+            let name = self.read_while(|c| c != ' ' && c != '\t' && c != '=')?.trim().to_string();
+            if name.is_empty() { break; }
+            self.skip_whitespace();
+            if self.peek() == Some('=') {
+                self.advance();
+                self.skip_whitespace();
+                let value = self.read_while(|c| c != '\n' && c != '\r')?.trim().to_string();
+                props.push(StyleProp { name, value });
+            }
+            // Skip to next line
+            while self.peek() == Some(' ') || self.peek() == Some('\t') { self.advance(); }
+            if self.peek() == Some('\n') || self.peek() == Some('\r') {
+                self.advance();
+                // Skip empty lines
+                while self.peek() == Some('\n') || self.peek() == Some('\r') { self.advance(); }
+                // Check for dedent (end of block)
+                if !self.at_indent() && !self.at_space_or_tab() { break; }
+            }
+        }
+        Ok(props)
+    }
+
+    fn at_newline(&self) -> bool {
+        self.peek() == Some('\n') || self.peek() == Some('\r')
+    }
+
+    fn at_indent(&self) -> bool {
+        self.peek() == Some('\t') || self.peek() == Some(' ')
+    }
+
+    fn at_space_or_tab(&self) -> bool {
+        self.peek() == Some(' ') || self.peek() == Some('\t')
+    }
+
+    fn skip_whitespace_inline(&mut self) {
+        while let Some(c) = self.peek() {
+            if c == ' ' || c == '\t' { self.advance(); }
+            else { break; }
+        }
     }
 
     fn try_parse_view(&mut self) -> Result<String, String> {
