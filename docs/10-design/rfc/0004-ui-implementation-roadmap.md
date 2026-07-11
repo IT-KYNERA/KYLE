@@ -203,15 +203,34 @@ Cada componente es su propio archivo en `packages/ui/src/components/`.
 ### Entregable
 
 ```kyx
-view("/")
-
+# app.kyx — auto-routing con <router>
 <app>
     <router>
-        <route path="/" component=@home_view />
-        <route path="/login" component=@login_view />
-        <route path="/users/{id}" component=@user_detail />
+        <home_view />
+        <login_view />
+        <user_detail />
     </router>
 </app>
+```
+
+```kyx
+# home.kyx
+view("/")
+<view>
+    <text value="Inicio" />
+</view>
+```
+
+```kyx
+# user_detail.kyx
+view("/users/{id}")
+@(
+    params: {str: str} = route_params()
+    id: str = params.get("id") ?? ""
+)
+<view>
+    <text value="Usuario: " + id />
+</view>
 ```
 
 ---

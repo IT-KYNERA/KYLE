@@ -20,8 +20,8 @@ Kyle UI is un sistema de UI declarativo construido about language Kyle.
 
 Un file `.kyx` represents una vista.
 
-- Si conhas `view(...)`, represents una page (ruteable).
-- Si no conhas `view(...)`, represents un componente reutilizable.
+- Si conhas `view(...)`, represents una **page ruteable** (auto-routing: el padre `<router>` detecta la ruta automáticamente).
+- Si no conhas `view(...)`, represents un **componente reutilizable** (sin ruta propia).
 
 No existe JavaScript. Todo code Kyle se integra using expresionis `@`.
 
@@ -48,6 +48,12 @@ view("/login")
 <view>
  <text value="Login" />
 </view>
+```
+
+Múltiples rutas:
+
+```kyx
+view("/", "/home", "/index")
 ```
 
 ---
@@ -188,7 +194,7 @@ Uso:
 </card>
 ```
 
-Las views (con `view(...)`) no admiten slots.
+Las views no admiten slots.
 
 ---
 
