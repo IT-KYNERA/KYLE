@@ -732,8 +732,13 @@ impl<'ctx> Codegen<'ctx> {
                                                             return pv.into();
                                                         }
                                                     }
-                                                    // Struct value → temp alloca, pass pointer (pass-by-ref ABI)
+                                                    // Struct value → pass alloca pointer if available
                                                     if let BasicValueEnum::StructValue(sv) = v {
+                                                        // Check if the arg has a non-promotable alloca to pass by reference
+                                                        if let Some(Some(ptr)) = self.alloca_map.get(*a) {
+                                                            return ptr.as_basic_value_enum().into();
+                                                        }
+                                                        // Otherwise create temp alloca (pass-by-ref ABI)
                                                         let st = sv.get_type();
                                                         if let Ok(temp) = self.builder.build_alloca(st, "_stmp") {
                                                             let _ = self.builder.build_store(temp, sv);

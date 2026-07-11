@@ -1265,7 +1265,8 @@ impl Lowerer {
         } else {
             // Bind `this` (param 0) into a local so the body's `Expr::PropertyAccess`
             // on `this` resolves to a struct field.
-            let this_local = ctx.alloc_local("this", this_type);
+            // Store as Ptr(Struct) so the codegen handles it as a by-reference parameter
+            let this_local = ctx.alloc_local("this", MirType::Ptr(Box::new(this_type.clone())));
             ctx.current_block.insts.push(MirInst::Store {
                 dest: this_local,
                 value: MirValue::Param(0),
@@ -3065,7 +3066,16 @@ impl Lowerer {
                         // If field is List and value is empty Dict {}, create list instead
                         if let Expr::Identifier { name, .. } = object.as_ref() {
                             if let Some(&obj_local) = ctx.locals.get(name) {
-                                if let Some(MirType::Struct(_, fields)) = ctx.local_types.get(&obj_local).cloned() {
+                                let local_type = ctx.local_types.get(&obj_local).cloned();
+                                let struct_fields = match local_type {
+                                    Some(MirType::Struct(_, fields)) => Some(fields),
+                                    Some(MirType::Ptr(inner)) => match inner.as_ref() {
+                                        MirType::Struct(_, fields) => Some(fields.clone()),
+                                        _ => None,
+                                    },
+                                    _ => None,
+                                };
+                                if let Some(fields) = struct_fields {
                                     let backing = format!("_{}", property);
                                     let field_idx = fields.iter().position(|(fname, _)| fname == property.as_str())
                                         .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
@@ -3108,7 +3118,16 @@ impl Lowerer {
                             None
                         };
                         if let Some(obj_ptr) = obj_ptr {
-                            if let Some(MirType::Struct(_, fields)) = ctx.local_types.get(&obj_ptr).cloned() {
+                            let local_type = ctx.local_types.get(&obj_ptr).cloned();
+                            let struct_fields = match local_type {
+                                Some(MirType::Struct(_, fields)) => Some(fields),
+                                Some(MirType::Ptr(inner)) => match inner.as_ref() {
+                                    MirType::Struct(_, fields) => Some(fields.clone()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            };
+                            if let Some(fields) = struct_fields {
                                 let backing = format!("_{}", property);
                                 let field_idx = fields.iter().position(|(fname, _)| fname == property)
                                     .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
