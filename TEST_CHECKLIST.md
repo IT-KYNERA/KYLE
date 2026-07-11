@@ -69,16 +69,16 @@
 
 ---
 
-## ⚠️ FEATURES CON BUGS (3)
+## ⚠️ FEATURES CON BUGS (1)
 
 | # | Feature | Bug | Impact |
 |---|---------|:---:|--------|
-| 1 | `!` postfix operator (propagación) | ✅ **FIXED** | Parse error corregido |
-| 2 | `set{1,2,3}` literal | ✅ **FIXED** | Ahora parsea como function call |
-| 3 | `f32` codegen SSA error | ✅ **FIXED** | Auto-trunc f64→f32 y ext f32→f64 |
-| 4 | `await` con return type != `i32` | ⚠️ **Parcial** | i32 works. f64/str limited by runtime i64 storage |
-| 5 | `prop` syntax | ❌ No implementada | Usar get/set methods como workaround |
-| 6 | `str_builder` linker | ❌ Missing runtime API | `str_builder.new()` + `.()` dispatch broken |
+| 1 | `str_builder.append()` on instance | ⚠️ Namespace API works: `str_builder.append(sb, "Hello")` | Bajo |
+| 2 | `prop` syntax | ✅ **FIXED** | parse + codegen + type checker |
+| 3 | `!` postfix operator | ✅ **FIXED** | |
+| 4 | `set{1,2,3}` literal | ✅ **FIXED** | |
+| 5 | `f32` codegen | ✅ **FIXED** | |
+| 6 | `await` type resolution | ✅ **FIXED** (i32) | |
 
 ---
 

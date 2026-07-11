@@ -690,6 +690,8 @@ impl TypeChecker {
                                         let is_mutable = class_decl.members.iter().any(|m| {
                                             if let ClassMember::Field(f) = m {
                                                 f.name == *property && f.is_mutable
+                                            } else if let ClassMember::Property(p) = m {
+                                                p.name == *property && p.setter.is_some()
                                             } else { false }
                                         });
                                         if !is_mutable {

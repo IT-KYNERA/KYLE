@@ -3140,22 +3140,50 @@ impl Lowerer {
                                 _ => None,
                             };
                             if let Some(fields) = struct_fields {
-                                let backing = format!("_{}", property);
-                                let field_idx = fields.iter().position(|(fname, _)| fname == property)
-                                    .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
-                                if let Some(field_idx) = field_idx {
-                                    let _field_type = fields[field_idx].1.clone();
-                                    let ft = ctx.alloc_local("_fptr", MirType::I64);
-                                    ctx.current_block.insts.push(MirInst::FieldPtr {
-                                        dest: ft,
-                                        ptr: obj_ptr,
-                                        field_index: field_idx,
-                                        struct_type: Box::new(MirType::Struct("_".to_string(), fields)),
-                                    });
+                                // Check if this field is actually a property with a setter
+                                let class_name = if let Some(MirType::Struct(cname, _)) = ctx.local_types.get(&obj_ptr) {
+                                    Some(cname.clone())
+                                } else if let Some(MirType::Ptr(inner)) = ctx.local_types.get(&obj_ptr) {
+                                    if let MirType::Struct(cname, _) = inner.as_ref() {
+                                        Some(cname.clone())
+                                    } else { None }
+                                } else { None };
+                                let setter_name = class_name.as_ref().and_then(|cn| {
+                                    let methods = self.method_table.borrow();
+                                    methods.get(cn.as_str()).and_then(|m| {
+                                        let sn = format!("set_{}", property);
+                                        m.get(&sn).cloned()
+                                    })
+                                });
+                                if let Some(sn) = setter_name {
+                                    // Generate call to property setter instead of field store
+                                    let this_local = ctx.alloc_local("_this", MirType::I64);
                                     ctx.current_block.insts.push(MirInst::Store {
-                                        dest: ft,
-                                        value: MirValue::Local(val_local),
+                                        dest: this_local,
+                                        value: MirValue::Local(obj_ptr),
                                     });
+                                    ctx.current_block.insts.push(MirInst::Call {
+                                        dest: None,
+                                        name: sn,
+                                        args: vec![MirValue::Local(this_local), MirValue::Local(val_local)],
+                                    });
+                                } else {
+                                    let backing = format!("_{}", property);
+                                    let field_idx = fields.iter().position(|(fname, _)| fname == property)
+                                        .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
+                                    if let Some(field_idx) = field_idx {
+                                        let ft = ctx.alloc_local("_fptr", MirType::I64);
+                                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                                            dest: ft,
+                                            ptr: obj_ptr,
+                                            field_index: field_idx,
+                                            struct_type: Box::new(MirType::Struct("_".to_string(), fields)),
+                                        });
+                                        ctx.current_block.insts.push(MirInst::Store {
+                                            dest: ft,
+                                            value: MirValue::Local(val_local),
+                                        });
+                                    }
                                 }
                             }
                         }

@@ -1,7 +1,6 @@
 # Classes
 
-**Status:** [x] final class, struct literal, methods, constructors, `Class :: Parent` inheritance.
-[x] Properties (por get/set methods como workaround, `prop` syntax no implementada).
+**Status:** [x] final class, struct literal, methods, constructors, `Class :: Parent` inheritance, properties (get/set).
 
 ## final class
 
@@ -77,18 +76,22 @@ config.port = 9090 # allowed
 
 ## Properties
 
-⚠️ **`prop` syntax NO implementada** — usar get/set methods como workaround:
+Properties with getter/setter blocks:
 
 ```ky
 class Person:
     _name: str
 
-    fn get_name(this) str:
-        this._name
-    fn set_name(this, value: str):
-        this._name = value
+    name: str:
+        get:
+            this._name
+        set:
+            this._name = value
 
 person = Person { _name: "Alice" }
-print(person.get_name())   # Alice
-person.set_name("Bob")
+print(person.name)    # "Alice" — llama al getter
+person.name = "Bob"   # llama al setter
 ```
+
+The `prop` keyword syntax (`prop name:`) no está implementada. Usar
+`name: type:` (field declaration seguido de get/set blocks indentados).

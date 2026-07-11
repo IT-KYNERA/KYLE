@@ -1094,6 +1094,39 @@ impl<'ctx> Codegen<'ctx> {
                                         self.builder.build_load(*st, ptr_val, "_retstruct")
                                             .map_err(|e| format!("ssa ret load struct: {}", e))?
                                     }
+                                    (BasicValueEnum::FloatValue(fv), BasicTypeEnum::IntType(it)) => {
+                                        let fw = fv.get_type().get_bit_width();
+                                        let dw = it.get_bit_width();
+                                        if fw == dw as u32 {
+                                            self.builder.build_bit_cast(*fv, *it, "_retfbc")
+                                                .map_err(|e| format!("ssa ret fbitcast: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else {
+                                            self.builder.build_float_to_signed_int(*fv, *it, "_retfptosi")
+                                                .map_err(|e| format!("ssa ret fptosi: {}", e))?
+                                                .as_basic_value_enum()
+                                        }
+                                    }
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::FloatType(ft)) => {
+                                        self.builder.build_signed_int_to_float(*iv, *ft, "_retsitofp")
+                                            .map_err(|e| format!("ssa ret sitofp: {}", e))?
+                                            .as_basic_value_enum()
+                                    }
+                                    (BasicValueEnum::FloatValue(fv), BasicTypeEnum::FloatType(ft)) => {
+                                        let fw = fv.get_type().get_bit_width();
+                                        let dw = ft.get_bit_width();
+                                        if fw > dw {
+                                            self.builder.build_float_trunc(*fv, *ft, "_retftrunc")
+                                                .map_err(|e| format!("ssa ret ftrunc: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else if fw < dw {
+                                            self.builder.build_float_ext(*fv, *ft, "_retfext")
+                                                .map_err(|e| format!("ssa ret fext: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else {
+                                            ret
+                                        }
+                                    }
                                     _ => ret,
                                 }
                             } else { ret }
@@ -3085,14 +3118,26 @@ impl<'ctx> Codegen<'ctx> {
                                         self.context.ptr_type(Default::default()),
                                         field_ptr_alloca, "_fgepload"
                                     ).map_err(|e| format!("fptr store load: {}", e))?;
-                                    let siv = self.builder.build_store(gep.into_pointer_value(), val)
+                                    // Auto-cast value to match field type
+                                    let casted = if let Some(pointee_type) = self.alloca_types.get(dest) {
+                                        self.cast_to_type(val, *pointee_type)?
+                                    } else {
+                                        val
+                                    };
+                                    let siv = self.builder.build_store(gep.into_pointer_value(), casted)
                                         .map_err(|e| format!("fptr store: {}", e))?;
                                     if let Some(tbaa_node) = self.alloca_types.get(dest).and_then(|t| self.tbaa_for_llvm_type(t)) {
                                         self.add_tbaa(siv, tbaa_node);
                                     }
                                 }
                             } else if let Some(ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
-                                let siv = self.builder.build_store(ptr, val)
+                                // Auto-cast value to match alloca type for regular stores
+                                let casted = if let Some(pointee_type) = self.alloca_types.get(dest) {
+                                    self.cast_to_type(val, *pointee_type)?
+                                } else {
+                                    val
+                                };
+                                let siv = self.builder.build_store(ptr, casted)
                                     .map_err(|e| format!("store: {}", e))?;
                                 if let Some(tbaa_node) = self.alloca_types.get(dest).and_then(|t| self.tbaa_for_llvm_type(t)) {
                                     self.add_tbaa(siv, tbaa_node);
@@ -3991,6 +4036,39 @@ impl<'ctx> Codegen<'ctx> {
                                             self.builder.build_int_cast(*iv, *it, "")
                                                 .map_err(|e| format!("ret intcast: {}", e))?
                                                 .as_basic_value_enum()
+                                        }
+                                    }
+                                    (BasicValueEnum::FloatValue(fv), BasicTypeEnum::IntType(it)) => {
+                                        let fw = fv.get_type().get_bit_width();
+                                        let dw = it.get_bit_width();
+                                        if fw == dw as u32 {
+                                            self.builder.build_bit_cast(*fv, *it, "")
+                                                .map_err(|e| format!("ret fbitcast: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else {
+                                            self.builder.build_float_to_signed_int(*fv, *it, "")
+                                                .map_err(|e| format!("ret fptosi: {}", e))?
+                                                .as_basic_value_enum()
+                                        }
+                                    }
+                                    (BasicValueEnum::IntValue(iv), BasicTypeEnum::FloatType(ft)) => {
+                                        self.builder.build_signed_int_to_float(*iv, *ft, "")
+                                            .map_err(|e| format!("ret sitofp: {}", e))?
+                                            .as_basic_value_enum()
+                                    }
+                                    (BasicValueEnum::FloatValue(fv), BasicTypeEnum::FloatType(ft)) => {
+                                        let fw = fv.get_type().get_bit_width();
+                                        let dw = ft.get_bit_width();
+                                        if fw > dw {
+                                            self.builder.build_float_trunc(*fv, *ft, "")
+                                                .map_err(|e| format!("ret ftrunc: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else if fw < dw {
+                                            self.builder.build_float_ext(*fv, *ft, "")
+                                                .map_err(|e| format!("ret fext: {}", e))?
+                                                .as_basic_value_enum()
+                                        } else {
+                                            val
                                         }
                                     }
                                     (BasicValueEnum::IntValue(iv), BasicTypeEnum::StructType(st)) => {
