@@ -690,7 +690,7 @@ impl<'ctx> Codegen<'ctx> {
                                 "is_whitespace" => "ky_is_whitespace", "is_upper" => "ky_is_upper",
                                 "is_lower" => "ky_is_lower", "ord" => "ky_ord",
                                 "substr" => "ky_substr",
-                                "json_parse" => "ky_json_parse", "json_stringify" => "ky_json_stringify",
+                                // json_parse/stringify handled via prelude wrappers
                                 "assert" => "ky_assert", "assert_eq" => "ky_assert_eq",
                                 "assert_ne" => "ky_assert_ne", "assert_str" => "ky_assert_str_eq",
                                 "list_new" => "ky_list_new", "list_push" => "ky_list_push",
@@ -1928,6 +1928,24 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_bytes_to_hex", ft, None);
         }
+        // void ky_bytes_free(ptr, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_free", ft, None);
+        }
+        // ptr ky_bytes_from_hex(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_from_hex", ft, None);
+        }
+        // ptr ky_bytes_to_base64(ptr, i32)
+        {
+            let params = [ptr_ty.into(), i32_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_bytes_to_base64", ft, None);
+        }
 
         // === Prelude types: decimal ===
         // i64 ky_decimal_from_str(ptr)
@@ -1979,6 +1997,12 @@ impl<'ctx> Codegen<'ctx> {
             let params = [ptr_ty.into(), ptr_ty.into(), ptr_ty.into()];
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_regex_replace", ft, None);
+        }
+        // void ky_regex_free(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_regex_free", ft, None);
         }
 
         // === Prelude types: uuid ===
@@ -2209,6 +2233,80 @@ impl<'ctx> Codegen<'ctx> {
             let params = [i32_ty.into()];
             let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_time_second", ft, None);
+        }
+
+        // === FS / Path operations ===
+        // i32 ky_fs_exists(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_exists", ft, None);
+        }
+        // i32 ky_fs_is_dir(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_is_dir", ft, None);
+        }
+        // i32 ky_fs_is_file(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_is_file", ft, None);
+        }
+        // i64 ky_fs_size(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_size", ft, None);
+        }
+        // i32 ky_fs_copy(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_copy", ft, None);
+        }
+        // i32 ky_fs_remove(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_remove", ft, None);
+        }
+        // i32 ky_fs_create_dir(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_create_dir", ft, None);
+        }
+        // i32 ky_fs_remove_dir(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_remove_dir", ft, None);
+        }
+        // i32 ky_fs_rename(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_rename", ft, None);
+        }
+        // ptr ky_fs_read_to_string(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_read_to_string", ft, None);
+        }
+        // i32 ky_fs_write_string(ptr, ptr)
+        {
+            let params = [ptr_ty.into(), ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_write_string", ft, None);
+        }
+        // i64 ky_fs_list_dir(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_fs_list_dir", ft, None);
         }
     }
 

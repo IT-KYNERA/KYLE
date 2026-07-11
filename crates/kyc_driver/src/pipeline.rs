@@ -294,6 +294,198 @@ fn random_bytes(count: i32) ptr:
 
 extern fn ky_alloc(i64) ptr
 extern fn ky_free(ptr)
+
+# ═══════════════════════════════════════
+# bytes (extras)
+# ═══════════════════════════════════════
+
+extern fn ky_bytes_free(ptr, i32)
+extern fn ky_bytes_from_hex(ptr, ptr) ptr
+extern fn ky_bytes_to_base64(ptr, i32) ptr
+
+fn bytes_free(b: &ptr, size: i32):
+    ky_bytes_free(ky_ptr_read_ptr(b as ptr), size)
+
+fn bytes_from_hex(s: &str) ptr:
+    out_size: ^i32 = 0
+    ky_bytes_from_hex(ky_ptr_read_ptr(s as ptr), &out_size as ptr)
+
+fn bytes_to_base64(b: &ptr, size: i32) str:
+    raw = ky_bytes_to_base64(ky_ptr_read_ptr(b as ptr), size) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+# ═══════════════════════════════════════
+# channel
+# ═══════════════════════════════════════
+
+extern fn ky_channel_new(i64) i64
+extern fn ky_channel_send(i64, i64) i64
+extern fn ky_channel_recv(i64) i64
+extern fn ky_channel_close(i64)
+extern fn ky_channel_len(i64) i64
+extern fn ky_channel_free(i64)
+
+fn channel_new(capacity: i32) i64:
+    ky_channel_new(capacity as i64)
+
+fn channel_send(ch: i64, val: i64) i32:
+    ky_channel_send(ch, val) as i32
+
+fn channel_recv(ch: i64) i64:
+    ky_channel_recv(ch)
+
+fn channel_close(ch: i64):
+    ky_channel_close(ch)
+
+fn channel_len(ch: i64) i32:
+    ky_channel_len(ch) as i32
+
+fn channel_free(ch: i64):
+    ky_channel_free(ch)
+
+# ═══════════════════════════════════════
+# json
+# ═══════════════════════════════════════
+
+extern fn ky_json_parse(ptr) ptr
+extern fn ky_json_stringify(ptr) ptr
+extern fn ky_json_stringify_str(ptr) ptr
+
+fn json_parse(s: &str) ptr:
+    ky_json_parse(ky_ptr_read_ptr(s as ptr))
+
+fn json_stringify(obj: &ptr) str:
+    raw = ky_json_stringify(ky_ptr_read_ptr(obj as ptr)) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn json_pretty(obj: &ptr) str:
+    raw = ky_json_stringify_str(ky_ptr_read_ptr(obj as ptr)) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+# ═══════════════════════════════════════
+# iterator
+# ═══════════════════════════════════════
+
+extern fn ky_iter_new(i64) i64
+extern fn ky_iter_next(i64) i64
+extern fn ky_iter_map(i64, i64) i64
+extern fn ky_iter_filter(i64, i64) i64
+extern fn ky_iter_collect(i64) ptr
+
+fn iter_new(list: i64) i64:
+    ky_iter_new(list)
+
+fn iter_next(it: i64) i64:
+    ky_iter_next(it)
+
+fn iter_map(it: i64, fn_ptr: i64) i64:
+    ky_iter_map(it, fn_ptr)
+
+fn iter_filter(it: i64, fn_ptr: i64) i64:
+    ky_iter_filter(it, fn_ptr)
+
+fn iter_collect(it: i64) ptr:
+    ky_iter_collect(it)
+
+# ═══════════════════════════════════════
+# async / task
+# ═══════════════════════════════════════
+
+extern fn ky_spawn_task(ptr, i64) i64
+extern fn ky_await_task(i64) i64
+extern fn ky_yield()
+
+fn spawn_task(fn_ptr: ptr, arg: i64) i64:
+    ky_spawn_task(fn_ptr, arg)
+
+fn await_task(handle: i64) i64:
+    ky_await_task(handle)
+
+fn yield_task():
+    ky_yield()
+
+# ═══════════════════════════════════════
+# tcp / socket
+# ═══════════════════════════════════════
+
+extern fn ky_tcp_listen(i32) i32
+extern fn ky_tcp_accept(i32) i32
+extern fn ky_tcp_read(i32, i32) ptr
+extern fn ky_tcp_write(i32, ptr, i32) i32
+extern fn ky_tcp_close(i32) i32
+
+fn tcp_listen(port: i32) i32:
+    ky_tcp_listen(port)
+
+fn tcp_accept(fd: i32) i32:
+    ky_tcp_accept(fd)
+
+fn tcp_read(fd: i32, count: i32) ptr:
+    ky_tcp_read(fd, count)
+
+fn tcp_write(fd: i32, buf: &ptr, len: i32) i32:
+    ky_tcp_write(fd, ky_ptr_read_ptr(buf as ptr), len)
+
+fn tcp_close(fd: i32) i32:
+    ky_tcp_close(fd)
+
+# ═══════════════════════════════════════
+# fs / file system
+# ═══════════════════════════════════════
+
+extern fn ky_fs_exists(ptr) i32
+extern fn ky_fs_is_dir(ptr) i32
+extern fn ky_fs_is_file(ptr) i32
+extern fn ky_fs_size(ptr) i64
+extern fn ky_fs_copy(ptr, ptr) i32
+extern fn ky_fs_remove(ptr) i32
+extern fn ky_fs_create_dir(ptr) i32
+extern fn ky_fs_remove_dir(ptr) i32
+extern fn ky_fs_rename(ptr, ptr) i32
+extern fn ky_fs_read_to_string(ptr) ptr
+extern fn ky_fs_write_string(ptr, ptr) i32
+extern fn ky_fs_list_dir(ptr) i64
+
+fn fs_exists(path: &str) i32:
+    ky_fs_exists(ky_ptr_read_ptr(path as ptr))
+
+fn fs_is_dir(path: &str) i32:
+    ky_fs_is_dir(ky_ptr_read_ptr(path as ptr))
+
+fn fs_is_file(path: &str) i32:
+    ky_fs_is_file(ky_ptr_read_ptr(path as ptr))
+
+fn fs_size(path: &str) i64:
+    ky_fs_size(ky_ptr_read_ptr(path as ptr))
+
+fn fs_copy(src: &str, dst: &str) i32:
+    ky_fs_copy(ky_ptr_read_ptr(src as ptr), ky_ptr_read_ptr(dst as ptr))
+
+fn fs_remove(path: &str) i32:
+    ky_fs_remove(ky_ptr_read_ptr(path as ptr))
+
+fn fs_create_dir(path: &str) i32:
+    ky_fs_create_dir(ky_ptr_read_ptr(path as ptr))
+
+fn fs_remove_dir(path: &str) i32:
+    ky_fs_remove_dir(ky_ptr_read_ptr(path as ptr))
+
+fn fs_rename(src: &str, dst: &str) i32:
+    ky_fs_rename(ky_ptr_read_ptr(src as ptr), ky_ptr_read_ptr(dst as ptr))
+
+fn fs_read_to_string(path: &str) str:
+    raw = ky_fs_read_to_string(ky_ptr_read_ptr(path as ptr)) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn fs_write_string(path: &str, data: &str) i32:
+    ky_fs_write_string(ky_ptr_read_ptr(path as ptr), ky_ptr_read_ptr(data as ptr))
+
+fn fs_list_dir(path: &str) ptr:
+    ky_fs_list_dir(ky_ptr_read_ptr(path as ptr)) as ptr
 "#;
 
 #[derive(Default)]
