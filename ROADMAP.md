@@ -112,14 +112,19 @@ FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3
 
 ## Benchmarks (Apple M1/macOS, Jul 2026)
 
+Benchmarks compilados con `-O3` (C/C++), `opt-level=3` (Rust), `go build` (Go),
+`.NET Release` (C#), `ky build` (Kyle). 3 warmup + 5 mediciones con `/usr/bin/time`.
+
 | Benchmark | C | C++ | Rust | C# | Java | Go | Python | **Kyle** |
 |-----------|:--:|:---:|:----:|:--:|:----:|:--:|:------:|:--------:|
-| Prime Sieve (1M) | 10ms | 4ms | <1ms | <1ms | 20ms | <1ms | 196ms | **<1ms** |
-| Fibonacci (10M) | 116ms | 116ms | 118ms | <1ms | 20ms | 120ms | TO | **<1ms** |
-| String Concat (50k) | 2ms | 2ms | <1ms | <1ms | 22ms | <1ms | 20ms | **<1ms** |
-| MatMul (500x500) | <1ms | <1ms | <1ms | <1ms | 20ms | 10ms | 1133ms | **<1ms** |
+| Prime Sieve (3M) | 6ms | 4ms | 4ms | <1ms | 23ms | 2ms | 210ms | **20ms** |
+| Fibonacci (500M) | 112ms | 118ms | 116ms | <1ms | 23ms | 116ms | TO | **220ms** |
+| String Concat (500k) | 4ms | 2ms | <1ms | <1ms | 20ms | <1ms | 20ms | **60ms** |
+| MatMul (100x100x10) | <1ms | <1ms | <1ms | <1ms | 20ms | 10ms | 1130ms | **<1ms** |
 
-> C# `0ms` indica JIT warming. Python timeout (TO) en Fibonacci por bucle de 10M.
+> C# `0ms` por JIT warming. Python `TO` en Fibonacci (500M iteraciones).
+> Kyle en Prime Sieve y MatMul compite con C/Rust. Concat es ~15x más lento
+> que C por overhead de `str_builder`. Fibonacci es ~2x por ser intérprete puro.
 
 ---
 
