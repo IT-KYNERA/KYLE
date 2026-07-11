@@ -31,6 +31,7 @@ const KYLE_PRELUDE: &str = r#"
 # ═══════════════════════════════════════
 
 extern fn ky_ptr_read_ptr(ptr) ptr
+extern fn ky_clone_str(ptr) ptr
 extern fn ky_uuid_v4() ptr
 extern fn ky_uuid_parse(ptr) ptr
 
@@ -271,7 +272,7 @@ fn url_query(raw: &str) str:
     (raw_out as ptr) as str
 
 fn url_parse(raw: &str) str:
-    raw
+    ky_clone_str(ky_ptr_read_ptr(raw as ptr)) as str
 
 # ═══════════════════════════════════════
 # crypto
