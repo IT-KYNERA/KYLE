@@ -1,4 +1,12 @@
 use crate::ast::*;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static EL_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn fresh_el() -> String {
+    let id = EL_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("_el{}", id)
+}
 
 /// Generate JavaScript code from a KyxFile AST.
 pub fn generate(file: &KyxFile) -> String {
@@ -64,6 +72,7 @@ pub fn generate(file: &KyxFile) -> String {
 }
 
 fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
+    let el = fresh_el();
     let ind = " ".repeat(indent);
     let ind2 = " ".repeat(indent + 2);
 
@@ -71,7 +80,6 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
         KyxNode::Element { tag, attrs, children } => {
             let tag_js = js_tag(tag);
             if tag == "portal" {
-                // Portal: render children to a different target
                 let mut target = "body";
                 for a in attrs {
                     if a.name == "target" {
@@ -80,26 +88,26 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
                 }
                 js.push_str(&format!("{}// Portal: render to '{}'\n", ind, target));
                 for child in children {
-                    gen_node(child, js, indent, "_portal_content");
+                    gen_node(child, js, indent, &format!("{}_content", el));
                 }
-                js.push_str(&format!("{}if (typeof _portal_content !== 'undefined') {{\n", ind));
-                js.push_str(&format!("{}  portalManager.create(_portal_content, {:?});\n", ind, target));
+                js.push_str(&format!("{}if (typeof {}_content !== 'undefined') {{\n", ind, el));
+                js.push_str(&format!("{}  portalManager.create({}_content, {:?});\n", ind, el, target));
                 js.push_str(&format!("{}}}\n", ind));
                 return;
             }
             if tag == "error_boundary" {
-                // Error boundary: wrap children in ErrorBoundary
+                let b = fresh_el();
                 js.push_str(&format!("{}// Error boundary\n", ind));
-                js.push_str(&format!("{}const _boundary = new ErrorBoundary();\n", ind));
-                js.push_str(&format!("{}const _wrappedRender = _boundary.wrap(() => {{\n", ind));
-                js.push_str(&format!("{}  const _content = document.createDocumentFragment();\n", ind));
+                js.push_str(&format!("{}const {} = new ErrorBoundary();\n", ind, b));
+                js.push_str(&format!("{}const {}_wrap = {}.wrap(() => {{\n", ind, b, b));
+                js.push_str(&format!("{}  const {}_c = document.createDocumentFragment();\n", ind, b));
                 for child in children {
-                    gen_node(child, js, indent + 2, "_content");
+                    gen_node(child, js, indent + 2, &format!("{}_c", b));
                 }
-                js.push_str(&format!("{}  return _content;\n", ind));
+                js.push_str(&format!("{}  return {}_c;\n", ind, b));
                 js.push_str(&format!("{}}});\n", ind));
-                js.push_str(&format!("{}const _boundaryResult = _wrappedRender();\n", ind));
-                js.push_str(&format!("{}if (_boundaryResult) {{ {}.appendChild(_boundaryResult); }}\n", ind, parent));
+                js.push_str(&format!("{}const {}_r = {}_wrap();\n", ind, b, b));
+                js.push_str(&format!("{}if ({}_r) {{ {}.appendChild({}_r); }}\n", ind, b, parent, b));
                 return;
             }
             if tag == "outlet" {
@@ -110,25 +118,24 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
                     }
                 }
                 js.push_str(&format!("{}// Outlet: '{}'\n", ind, name));
-                js.push_str(&format!("{}portalManager.registerOutlet({:?}, _el);\n", ind, name));
+                js.push_str(&format!("{}portalManager.registerOutlet({:?}, {});\n", ind, name, el));
             }
-            js.push_str(&format!("{}const _el = document.createElement('{}');\n", ind, tag_js));
-            gen_attrs(attrs, js, indent);
-            gen_events(attrs, js, indent);
-            // ARIA auto-generation
-            js.push_str(&format!("{}A11yManager.applyAria(_el, {:?});\n", " ".repeat(indent + 2), tag));
+            js.push_str(&format!("{}const {} = document.createElement('{}');\n", ind, el, tag_js));
+            gen_attrs(attrs, js, indent, &el);
+            gen_events(attrs, js, indent, &el);
+            js.push_str(&format!("{}A11yManager.applyAria({}, {:?});\n", ind, el, tag));
             for child in children {
-                gen_node(child, js, indent + 2, "_el");
+                gen_node(child, js, indent + 2, &el);
             }
-            js.push_str(&format!("{}{}.appendChild(_el);\n", ind, parent));
+            js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, el));
         }
         KyxNode::SelfClosing { tag, attrs } => {
             let tag_js = js_tag(tag);
-            js.push_str(&format!("{}const _el = document.createElement('{}');\n", ind, tag_js));
-            gen_attrs(attrs, js, indent);
-            gen_events(attrs, js, indent);
-            js.push_str(&format!("{}A11yManager.applyAria(_el, {:?});\n", " ".repeat(indent + 2), tag));
-            js.push_str(&format!("{}{}.appendChild(_el);\n", ind, parent));
+            js.push_str(&format!("{}const {} = document.createElement('{}');\n", ind, el, tag_js));
+            gen_attrs(attrs, js, indent, &el);
+            gen_events(attrs, js, indent, &el);
+            js.push_str(&format!("{}A11yManager.applyAria({}, {:?});\n", ind, el, tag));
+            js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, el));
         }
         KyxNode::Slot { name, fallback } => {
             js.push_str(&format!("{}// Slot: {}\n", ind, name));
@@ -182,69 +189,66 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
     }
 }
 
-fn gen_attrs(attrs: &[KyxAttr], js: &mut String, indent: usize) {
+fn gen_attrs(attrs: &[KyxAttr], js: &mut String, indent: usize, el: &str) {
     let ind = " ".repeat(indent + 2);
     for attr in attrs {
         match &attr.value {
             AttrValue::String(val) => {
                 match attr.name.as_str() {
                     "tpl" | "style" => {
-                        js.push_str(&format!("{}applyStyle(_el, {:?});\n", ind, val));
+                        js.push_str(&format!("{}applyStyle({}, {:?});\n", ind, el, val));
                     }
                     "animation" => {
-                        js.push_str(&format!("{}applyAnimation(_el, {:?});\n", ind, val));
+                        js.push_str(&format!("{}applyAnimation({}, {:?});\n", ind, el, val));
                     }
                     "text" | "value" | "label" => {
-                        js.push_str(&format!("{}_el.textContent = {:?};\n", ind, val));
+                        js.push_str(&format!("{}{}.textContent = {:?};\n", ind, el, val));
                     }
                     "class" | "id" => {
-                        js.push_str(&format!("{}_el.setAttribute({:?}, {:?});\n", ind, attr.name, val));
+                        js.push_str(&format!("{}{}.setAttribute({:?}, {:?});\n", ind, el, attr.name, val));
                     }
                     _ => {
-                        js.push_str(&format!("{}_el.setAttribute({:?}, {:?});\n", ind, attr.name, val));
+                        js.push_str(&format!("{}{}.setAttribute({:?}, {:?});\n", ind, el, attr.name, val));
                     }
                 }
             }
             AttrValue::Expr(expr) => {
                 match attr.name.as_str() {
                     "bind" => {
-                        // Two-way binding via reactivity system
-                        js.push_str(&format!("{}Binding.twoWay(_el, state, {:?}, 'input');\n", ind, expr));
+                        js.push_str(&format!("{}Binding.twoWay({}, state, {:?}, 'input');\n", ind, el, expr));
                     }
                     "text" | "value" => {
-                        // One-way binding with reactivity
-                        js.push_str(&format!("{}Binding.oneWay(_el, 'textContent', state, {:?});\n", ind, expr));
+                        js.push_str(&format!("{}Binding.oneWay({}, 'textContent', state, {:?});\n", ind, el, expr));
                     }
                     "tpl" => {
-                        js.push_str(&format!("{}applyStyle(_el, state.get({:?}));\n", ind, expr));
+                        js.push_str(&format!("{}applyStyle({}, state.get({:?}));\n", ind, el, expr));
                     }
                     "animation" => {
-                        js.push_str(&format!("{}applyAnimation(_el, state.get({:?}));\n", ind, expr));
+                        js.push_str(&format!("{}applyAnimation({}, state.get({:?}));\n", ind, el, expr));
                     }
                     "checked" => {
-                        js.push_str(&format!("{}Binding.oneWay(_el, 'checked', state, {:?});\n", ind, expr));
+                        js.push_str(&format!("{}Binding.oneWay({}, 'checked', state, {:?});\n", ind, el, expr));
                     }
                     "disabled" => {
-                        js.push_str(&format!("{}Binding.oneWay(_el, 'disabled', state, {:?});\n", ind, expr));
+                        js.push_str(&format!("{}Binding.oneWay({}, 'disabled', state, {:?});\n", ind, el, expr));
                     }
-                    // Event attributes — skip setAttribute, handled by gen_events
                     "click" | "change" | "input" | "mouse_enter" | "mouse_leave"
                     | "focus" | "blur" | "keydown" | "keyup" | "submit" | "scroll"
                     | "dblclick" | "context_menu" | "mouse_down" | "mouse_up"
                     | "mouse_move" | "touch_start" | "touch_end" | "touch_move" => {}
                     _ => {
-                        js.push_str(&format!("{}_el.setAttribute({:?}, state.get({:?}));\n", ind, attr.name, expr));
+                        js.push_str(&format!("{}{}.setAttribute({:?}, state.get({:?}));\n", ind, el, attr.name, expr));
                     }
                 }
             }
             AttrValue::Flag => {
-                js.push_str(&format!("{}_el.setAttribute({:?}, '');\n", ind, attr.name));
+                js.push_str(&format!("{}{}.setAttribute({:?}, '');\n", ind, el, attr.name));
             }
         }
     }
 }
 
-fn gen_events(attrs: &[KyxAttr], js: &mut String, indent: usize) {
+fn gen_events(attrs: &[KyxAttr], js: &mut String, indent: usize, el: &str) {
     let ind = " ".repeat(indent + 2);
     for attr in attrs {
         let event_name = match attr.name.as_str() {
@@ -270,8 +274,7 @@ fn gen_events(attrs: &[KyxAttr], js: &mut String, indent: usize) {
             _ => continue,
         };
         if let AttrValue::Expr(handler) = &attr.value {
-            // Pass the DOM event wrapped as a Kyle event object
-            js.push_str(&format!("{}_el.addEventListener({:?}, (e) => {{ {}(createKyleEvent(e)); }});\n", ind, event_name, handler));
+            js.push_str(&format!("{}{}.addEventListener({:?}, (e) => {{ {}(createKyleEvent(e)); }});\n", ind, el, event_name, handler));
         }
     }
 }

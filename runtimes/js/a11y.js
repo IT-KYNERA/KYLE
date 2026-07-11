@@ -178,6 +178,7 @@ class A11yManager {
     // -----------------------------------------------------------------------
 
     _initReducedMotion() {
+        if (typeof window === 'undefined') { this._reducedMotion = false; return; }
         const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
         this._reducedMotion = mql.matches;
         mql.addEventListener('change', (e) => {

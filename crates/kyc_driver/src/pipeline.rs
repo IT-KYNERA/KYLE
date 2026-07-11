@@ -1040,6 +1040,17 @@ impl Pipeline {
             .map_err(|e| format!("Failed to create output file: {}", e))?;
         f.write_all(js.as_bytes())
             .map_err(|e| format!("Failed to write JS output: {}", e))?;
+        // Copy runtime JS files to output directory
+        let output_dir = output_path.parent().unwrap_or(Path::new("."));
+        let runtime_files = ["reactivity.js", "router.js", "a11y.js", "portal.js", "error_boundary.js", "i18n.js"];
+        let runtime_source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/js");
+        for file_name in &runtime_files {
+            let src = runtime_source_dir.join(file_name);
+            let dst = output_dir.join(file_name);
+            if src.exists() {
+                let _ = std::fs::copy(&src, &dst);
+            }
+        }
         println!("Build complete: {}", output_path.display());
         Ok(())
     }
