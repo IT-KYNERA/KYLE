@@ -29,6 +29,7 @@
   },
   "activationEvents": [
     "onLanguage:kl",
+    "onLanguage:kyx",
     "onCommand:ky.run",
     "onCommand:ky.build",
     "onCommand:ky.check",
@@ -56,6 +57,21 @@
           "light": "./icons/ky.png",
           "dark": "./icons/ky.png"
         }
+      },
+      {
+        "id": "kyx",
+        "aliases": [
+          "Kyle UI",
+          "kyx"
+        ],
+        "extensions": [
+          ".kyx"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/ky.png",
+          "dark": "./icons/ky.png"
+        }
       }
     ],
     "grammars": [
@@ -63,6 +79,11 @@
         "language": "kl",
         "scopeName": "source.ky",
         "path": "./syntaxes/ky.tmLanguage.json"
+      },
+      {
+        "language": "kyx",
+        "scopeName": "source.kyx",
+        "path": "./syntaxes/kyx.tmLanguage.json"
       }
     ],
     "commands": [
@@ -91,6 +112,10 @@
       {
         "language": "kl",
         "path": "./snippets/ky.json"
+      },
+      {
+        "language": "kyx",
+        "path": "./snippets/kyx.json"
       }
     ],
     "taskDefinitions": [
@@ -110,6 +135,20 @@
         "name": "ky",
         "label": "Kyle compiler errors",
         "owner": "kl",
+	"source": "ky",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(?:.*:)?(?:error|warning)\\[([^\\]]+)\\]:\\s*(.+)$",
+          "message": 2,
+          "code": 1,
+          "file": 0,
+          "location": 0
+        }
+      },
+      {
+        "name": "kyx",
+        "label": "Kyle UI compiler errors",
+        "owner": "kyx",
         "source": "ky",
         "fileLocation": ["relative", "${workspaceFolder}"],
         "pattern": {

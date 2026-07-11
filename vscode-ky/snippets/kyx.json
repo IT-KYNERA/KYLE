@@ -1,0 +1,82 @@
+{
+  "View component": {
+    "prefix": "view",
+    "body": "view(\"/${1:path}\")\n\n<view>\n    <${2:text} value=\"${3:Hello}\" />\n</view>",
+    "description": "Create a routed view"
+  },
+  "Component": {
+    "prefix": "comp",
+    "body": "<${1:view}>\n    <${2:text} />\n</${1:view}>",
+    "description": "Create a UI component"
+  },
+  "Button": {
+    "prefix": "button",
+    "body": "<button tpl=${1:Primary} text=\"${2:Click}\" click=@${3:handler} />",
+    "description": "Button component"
+  },
+  "Text": {
+    "prefix": "text",
+    "body": "<text value=\"${1:Hello}\" />",
+    "description": "Text component"
+  },
+  "TextField": {
+    "prefix": "input",
+    "body": "<text_field bind=@${1:email} label=\"${2:Email}\" />",
+    "description": "Text input field"
+  },
+  "Code block": {
+    "prefix": "code",
+    "body": "@(\n    ${1:count}: ^i32 = 0\n    fn ${2:increment}():\n        ${3:count = count + 1}\n)",
+    "description": "Kyle code block in .kyx"
+  },
+  "Style declaration": {
+    "prefix": "style",
+    "body": "style<${1:button}> ${2:Primary}:\n    background = Color(\"${3:#0066FF}\")\n    color = Color(\"${4:#FFFFFF}\")\n    border_radius = ${5:8}",
+    "description": "Style declaration"
+  },
+  "If in template": {
+    "prefix": "@if",
+    "body": "@if(${1:condition}):\n    <${2:text} />\n@else:\n    <${3:text} />",
+    "description": "Conditional in template"
+  },
+  "For in template": {
+    "prefix": "@for",
+    "body": "@for(${1:item} in ${2:items}):\n    <${3:text} value=@${1:item} />",
+    "description": "Loop in template"
+  },
+  "Column layout": {
+    "prefix": "column",
+    "body": "<column layout=${1:Center} spacing=${2:16}>\n    <slot />\n</column>",
+    "description": "Column layout component"
+  },
+  "Row layout": {
+    "prefix": "row",
+    "body": "<row layout=${1:SpaceBetween}>\n    <slot />\n</row>",
+    "description": "Row layout component"
+  },
+  "EventHandler": {
+    "prefix": "click",
+    "body": "click=@${1:handler}",
+    "description": "Click event handler"
+  },
+  "Bind": {
+    "prefix": "bind",
+    "body": "bind=@${1:variable}",
+    "description": "Two-way binding"
+  },
+  "Animation": {
+    "prefix": "anim",
+    "body": "animation<${1:view}> ${2:FadeIn}:\n    duration = ${3:300}\n    easing = Easing.${4:EaseOut}\n    from = AnimationState(opacity: 0.0)\n    to = AnimationState(opacity: 1.0)",
+    "description": "Animation declaration"
+  },
+  "Theme": {
+    "prefix": "theme",
+    "body": "theme ${1:Light}:\n    primary = ${2:#0066FF}\n    background = ${3:#FFFFFF}",
+    "description": "Theme declaration"
+  },
+  "Router": {
+    "prefix": "router",
+    "body": "<router>\n    <${1:home_view} />\n    <${2:login_view} />\n</router>",
+    "description": "Router component"
+  }
+}
