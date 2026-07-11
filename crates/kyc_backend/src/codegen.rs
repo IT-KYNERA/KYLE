@@ -674,7 +674,10 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                                 _ => {}
                             }
-                            let runtime_name = match name.as_str() {
+                            let runtime_name = if self.fn_value_map.contains_key(name) {
+                                name.clone()
+                            } else {
+                                match name.as_str() {
                                 "print" => "ky_print", "println" => "ky_println",
                                 "contains" => "ky_str_contains", "to_upper" => "ky_str_to_upper",
                                 "to_lower" => "ky_str_to_lower", "trim" => "ky_str_trim",
@@ -697,9 +700,10 @@ impl<'ctx> Codegen<'ctx> {
                                 "ky_str_builder_append" => "ky_str_builder_append",
                                 "ky_str_builder_to_str" => "ky_str_builder_to_str",
                                 "ky_str_builder_free" => "ky_str_builder_free",
-                                _ => name,
+                                _ => name.as_str(),
+                                }.to_string()
                             };
-                             if self.module.get_function(runtime_name).is_none() {
+                             if self.module.get_function(&runtime_name).is_none() {
                                  let ret_type = if let Some(d) = dest {
                                      let mir_type = func.values.get(*d).map(|v| &v.type_).unwrap_or(&MirType::I64);
                                      self.llvm_type(mir_type).as_basic_type_enum()
@@ -711,9 +715,9 @@ impl<'ctx> Codegen<'ctx> {
                                      .map(|v| self.llvm_type(&v.type_).into())
                                      .collect();
                                  let fn_type = ret_type.fn_type(&param_tys, false);
-                                 self.module.add_function(runtime_name, fn_type, None);
+                                 self.module.add_function(&runtime_name, fn_type, None);
                              }
-                            if let Some(callee) = self.module.get_function(runtime_name) {
+                            if let Some(callee) = self.module.get_function(&runtime_name) {
                                 let fn_ty = callee.get_type();
                                 let param_tys = fn_ty.get_param_types();
                                 let llvm_args: Vec<inkwell::values::BasicMetadataValueEnum<'ctx>> = args.iter()
@@ -3026,7 +3030,11 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                                 _ => {}
                             }
-                            let runtime_name = match name.as_str() {
+                            // Don't apply runtime name mapping for user-defined functions
+                            let runtime_name = if self.fn_value_map.contains_key(name) {
+                                name.clone()
+                            } else {
+                                match name.as_str() {
                                 "print" => "ky_print",
                                 "println" => "ky_println",
                                 "contains" => "ky_str_contains",
@@ -3055,17 +3063,15 @@ impl<'ctx> Codegen<'ctx> {
                                 "list_get" => "ky_list_get",
                                 "list_set" => "ky_list_set",
                                 "list_len" => "ky_list_len",
-                                "json_parse" => "ky_json_parse",
-"json_stringify" => "ky_json_stringify",
-                                 "json_stringify_str" => "ky_json_stringify_str",
-                                "serialize" => "ky_struct_to_json",
-                                "assert" => "ky_assert",
-                                "assert_eq" => "ky_assert_eq",
-                                "assert_ne" => "ky_assert_ne",
-                                "assert_str" => "ky_assert_str_eq",
-                            _ => name,
+                                "list_pop" => "ky_list_pop", "reserve" => "ky_list_reserve",
+                                "ky_str_builder_new" => "ky_str_builder_new",
+                                "ky_str_builder_append" => "ky_str_builder_append",
+                                "ky_str_builder_to_str" => "ky_str_builder_to_str",
+                                "ky_str_builder_free" => "ky_str_builder_free",
+                                _ => name.as_str(),
+                                }.to_string()
                             };
-                             if self.module.get_function(runtime_name).is_none() {
+                             if self.module.get_function(&runtime_name).is_none() {
                                 // Auto-declare extern function on first use with inferred types
                                 let ret_type: BasicTypeEnum = if let Some(d) = dest {
                                     let raw = self.alloca_types.get(&d).copied()
@@ -3106,9 +3112,9 @@ impl<'ctx> Codegen<'ctx> {
                                         t.into()
                                     }).collect();
                                 let fn_type = ret_type.fn_type(&param_types, false);
-                                self.module.add_function(runtime_name, fn_type, None);
+                                self.module.add_function(&runtime_name, fn_type, None);
                             }
-                            if let Some(callee_fn) = self.module.get_function(runtime_name) {
+                            if let Some(callee_fn) = self.module.get_function(&runtime_name) {
                                 let fn_ty = callee_fn.get_type();
                                 let param_types = fn_ty.get_param_types();
                                 let llvm_args: Vec<BasicValueEnum<'ctx>> = args
