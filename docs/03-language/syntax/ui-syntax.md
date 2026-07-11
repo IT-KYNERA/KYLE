@@ -4,6 +4,12 @@
 **Status:** Specification
 
 > **Arquitectura e implementaci&oacute;n:** Ver [`docs/10-design/rfc/0002-ui-architecture.md`](../../10-design/rfc/0002-ui-architecture.md) para el roadmap t&eacute;cnico completo (WASM, multiplataforma, custom OS).  
+> **Traducci&oacute;n multi-target:** Ver [`docs/10-design/rfc/0003-ui-translation.md`](../../10-design/rfc/0003-ui-translation.md) para la arquitectura de traducci&oacute;n a JS/nativo/WASM.  
+> **Sistema de estilos:** Ver [`docs/03-language/ui/style-system.md`](../../03-language/ui/style-system.md) para el sistema de estilos tipado (sin CSS).  
+> **Estado y eventos:** Ver [`docs/03-language/ui/state-events.md`](../../03-language/ui/state-events.md) para estado, binding y eventos.  
+> **Animaciones:** Ver [`docs/03-language/ui/animation.md`](../../03-language/ui/animation.md) para animaciones y transiciones.  
+> **Routing:** Ver [`docs/03-language/ui/routing.md`](../../03-language/ui/routing.md) para navegaci&oacute;n y rutas.  
+> **Accesibilidad:** Ver [`docs/03-language/ui/accessibility.md`](../../03-language/ui/accessibility.md) para a11y.  
 > **Distribuci&oacute;n:** Ver [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) para el plan de instalaci&oacute;n multi-plataforma.
 
 ---
