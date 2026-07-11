@@ -245,7 +245,7 @@ b: box<i32> = box(42)
 println(b.to_str()) # → addr del heap (ptr value)
 ```
 
-### rc: `rc<T>` [ ]
+### rc: `rc<T>` [x]
 
 Reference counting (single-thread).
 
@@ -255,7 +255,7 @@ r2 = r.clone() # incrementa refcount
 println(*r) # deref
 ```
 
-### arc: `arc<T>` [ ]
+### arc: `arc<T>` [x]
 
 Atomic reference counting (multi-thread).
 
@@ -286,7 +286,7 @@ task: future<str> = async:
 val = await task
 ```
 
-### channel: `channel<T>` [ ]
+### channel: `channel<T>` [x]
 
 ```ky
 ch: channel<i32> = channel(16) # buffer 16
@@ -308,7 +308,7 @@ select:
  println("timeout")
 ```
 
-### mutex: `mutex<T>` [ ]
+### mutex: `mutex<T>` [x]
 
 ```ky
 m: mutex<i32> = mutex(0)
@@ -316,7 +316,7 @@ lock(m):
  *val += 1 # operation segura
 ```
 
-### atomic: `atomic_i64` / `atomic_bool` [ ]
+### atomic: `atomic_i64` / `atomic_bool` [x]
 
 ```ky
 counter: atomic_i64 = atomic_i64(0)
@@ -328,7 +328,7 @@ flag.store(true)
 flag.load() # → true
 ```
 
-### iterator [ ]
+### iterator [x]
 
 ```ky
 iter = list.iter()
@@ -531,8 +531,8 @@ result = sb.to_str()
 | Category | [x] Completo | [ ] Designed | ❌ No planned |
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitivis | 13 | 2 (u8-u64 codegen, never) | 0 |
-| Compounds | 6 | 2 (tuple) | 0 |
+| Compounds | 7 (tuples, sets, queue, stack) | 1 | 0 |
 | Ownership | 6 (rc, arc) | 1 (weak) | 0 |
-| Concurrency | 5 (async/await, channel, mutex, atomic, iterator) | 3 (future, select) | 0 |
-| Specialized | 14 (str_builder, file, date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path, big_int) | 0 | 0 |
-| **Total** | **44** | **8** | **0** |
+| Concurrency | 5 (async/await, channel, mutex, atomic, iterator) | 2 (future, select) | 0 |
+| Specialized | 14 | 0 | 0 |
+| **Total** | **45** | **5** | **0** |
