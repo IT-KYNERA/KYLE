@@ -551,6 +551,16 @@ impl BorrowAnalysis {
                         }
                     }
                 }
+                // Release borrows after call (borrows are released when call returns)
+                for (i, arg) in args.iter().enumerate() {
+                    if let MirValue::Local(l) = arg {
+                        let mode = modes.and_then(|m| m.get(i).copied());
+                        if matches!(mode, Some(ParamMode::Borrow | ParamMode::MutableBorrow)) {
+                            let orig = *load_map.get(l).unwrap_or(l);
+                            borrow_states.remove(&orig);
+                        }
+                    }
+                }
                 if let Some(d) = dest {
                     if move_locals.contains(d) {
                         alive.insert(*d);
