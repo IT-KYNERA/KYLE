@@ -1,18 +1,18 @@
 # Kyle UI Framework — Built-in Components
 #
 # Usage:
-#   from ui.components import Button, Text, Column, Row, TextField
+#   from ui.components import view, text, button, column, row
 #
-#   <Button tpl=Primary text="Click" click=@handler />
-#   <Column layout=Center>
-#       <Text value="Hello" />
-#   </Column>
+#   <button tpl=primary text="Click" click=@handler />
+#   <column layout=center>
+#       <text value="Hello" />
+#   </column>
 
-from .components.view import View
-from .components.text import Text
-from .components.button import Button
-from .components.column import Column
-from .components.row import Row
-from .components.text_field import TextField
-from .components.router import Router
-from .components.app import App
+from .components.view import view
+from .components.text import text
+from .components.button import button
+from .components.column import column
+from .components.row import row
+from .components.text_field import text_field
+from .components.router import router
+from .components.app import app

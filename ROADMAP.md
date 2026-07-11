@@ -17,12 +17,13 @@
 | **Paquetes** (http, json, sqlite) | ✅ Completo |
 | **FFI** (extern fn, @link, ptr) | ✅ Completo |
 | **Tipos especializados** (46 tipos) | ✅ Todos implementados |
-| **--target flag** | ⬜ CLI + codegen + linker |
-| **.kyx parser** | ⬜ No implementado |
-| **Traductor JS** | ⬜ No implementado |
-| **UI componentes** | ⬜ No implementado |
-| **Desktop nativo** (Skia) | ⬜ No implementado |
-| **Mobile** (Android/iOS) | ⬜ No implementado |
+| **FASE 0: CLI --target** | ✅ Completo |
+| **FASE 1: Parser .kyx + JS gen** | ✅ Completo (90%) |
+| **FASE 2: Estilos tipados** | ✅ Completo (50%) |
+| **FASE 3: Eventos + Binding** | ✅ Completo (80%) |
+| **FASE 4: Componentes UI** | ⚠️ Parcial (8/28) |
+| **FASE 5: Routing** | ✅ Completo |
+| **FASE 6-12** | ⬜ No iniciado |
 
 ---
 

@@ -254,7 +254,7 @@ style<button> Primary:
  radius = md
  padding = (12, 24)
 
-layout<Column> Center:
+layout<column> Center:
  align = center
  justify = center
  spacing = 20
@@ -264,7 +264,7 @@ Uso:
 
 ```kyx
 <button style=Primary />
-<Column layout=Center />
+<column layout=Center />
 ```
 
 ---
@@ -299,7 +299,7 @@ theme Light:
 Uso:
 
 ```kyx
-<App theme=Light />
+<app theme=Light />
 ```
 
 ---
@@ -318,11 +318,11 @@ view("/login")
 )
 
 <view>
- <Column layout=Center>
+ <column layout=Center>
  <text value="Login" typography=Title />
  <text_field bind=@email />
  <password_field bind=@password />
  <button tpl=Primary text="Ingresar" click=@login />
- </Column>
+ </column>
 </view>
 ```

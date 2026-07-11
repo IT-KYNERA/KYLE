@@ -1,4 +1,4 @@
-# Button — botón clickeable con estilos
+# button — botón clickeable con estilos
 # Props: text, tpl, click, disabled, type
 
 style<button> Primary:
