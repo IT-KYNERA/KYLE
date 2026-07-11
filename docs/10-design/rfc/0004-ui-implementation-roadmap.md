@@ -11,6 +11,13 @@
 - [animation.md](../../03-language/ui/animation.md) — Animaciones
 - [routing.md](../../03-language/ui/routing.md) — Routing
 - [accessibility.md](../../03-language/ui/accessibility.md) — a11y
+- [i18n.md](../../03-language/ui/i18n.md) — Internacionalización
+- [portals.md](../../03-language/ui/portals.md) — Portales/teleport
+- [error-boundaries.md](../../03-language/ui/error-boundaries.md) — Error boundaries
+- [composition.md](../../03-language/ui/composition.md) — Composición
+- [context-patterns.md](../../03-language/ui/context-patterns.md) — Context avanzado
+- [ssr.md](../../03-language/ui/ssr.md) — SSR
+- [testing.md](../../03-language/ui/testing.md) — Testing
 
 ---
 
@@ -260,8 +267,85 @@ view("/users/{id}")
 | 7.4 | Reduced motion support | Pequeño |
 
 ---
+# FASE 8: Portales
 
-## 10. Diagrama de dependencias
+**Objetivo:** Renderizar contenido fuera del árbol padre.
+
+### Tareas
+
+| # | Tarea | Esfuerzo |
+|---|-------|:--------:|
+| 8.1 | Portal component en .kyx parser | Pequeño |
+| 8.2 | JS generator: render en target selector | Medio |
+| 8.3 | Desktop: overlay layer | Medio |
+| 8.4 | Position strategies (Auto, RelativeTo, Center) | Medio |
+
+---
+
+## 9. FASE 9: Error Boundaries
+
+**Objetivo:** Captura y recuperación de errores en UI.
+
+### Tareas
+
+| # | Tarea | Esfuerzo |
+|---|-------|:--------:|
+| 9.1 | ErrorBoundary component en parser | Pequeño |
+| 9.2 | Error capture en runtime JS | Medio |
+| 9.3 | Fallback UI system | Medio |
+| 9.4 | Retry + recovery logic | Pequeño |
+
+---
+
+## 10. FASE 10: i18n
+
+**Objetivo:** Sistema completo de internacionalización.
+
+### Tareas
+
+| # | Tarea | Esfuerzo |
+|---|-------|:--------:|
+| 10.1 | `locale ""` parser | Medio |
+| 10.2 | ICU plural rules compiler | Grande |
+| 10.3 | Date/number format compiler | Medio |
+| 10.4 | RTL layout support | Medio |
+| 10.5 | Lazy locale loading | Medio |
+
+---
+
+## 11. FASE 11: SSR
+
+**Objetivo:** Server-Side Rendering de vistas.
+
+### Tareas
+
+| # | Tarea | Esfuerzo |
+|---|-------|:--------:|
+| 11.1 | SSR renderer (Kyle → HTML) | Grande |
+| 11.2 | State serialization para hydration | Medio |
+| 11.3 | Streaming SSR | Grande |
+| 11.4 | `ky serve` dev server | Medio |
+| 11.5 | SEO meta tags | Pequeño |
+
+---
+
+## 12. FASE 12: Testing
+
+**Objetivo:** Framework de testing UI integrado.
+
+### Tareas
+
+| # | Tarea | Esfuerzo |
+|---|-------|:--------:|
+| 12.1 | Test renderer (componente aislado) | Medio |
+| 12.2 | Event simulation | Medio |
+| 12.3 | Snapshot system | Medio |
+| 12.4 | Context mocking | Pequeño |
+| 12.5 | `ky test --coverage` | Medio |
+
+---
+
+## 13. Diagrama de dependencias
 
 ```
 FASE 0: CLI + Targets
@@ -280,39 +364,63 @@ FASE 1: Parser .kyx + JS gen  ◄── EMPEZAMOS AQUÍ
   │       ▼
   ├──► FASE 5: Routing
   │
-  └──► FASE 6: Animaciones
-          │
-          ▼
-       FASE 7: a11y
+└──► FASE 6: Animaciones
+        │
+        ▼
+     FASE 7: a11y
+        │
+        ▼
+     FASE 8: Portales
+        │
+        ▼
+     FASE 9: Error Boundaries
+        │
+        ▼
+     FASE 10: i18n
+        │
+        ▼
+     FASE 11: SSR
+        │
+        ▼
+     FASE 12: Testing
 ```
 
 ---
 
-## 11. Orden de implementación recomendado
+## 14. Orden de implementación recomendado
 
 ```
-Semana 1-2:  FASE 0 (CLI + Targets)
-             FASE 1.1-1.3 (Parser .kyx básico)
+Semana 1-2:   FASE 0 (CLI + Targets)
+              FASE 1.1-1.3 (Parser .kyx básico)
 
-Semana 3-4:  FASE 1.4-1.7 (JS generator)
-             FASE 2.1-2.3 (Estilos básicos)
+Semana 3-4:   FASE 1.4-1.7 (JS generator)
+              FASE 2.1-2.3 (Estilos básicos)
 
-Semana 5-6:  FASE 3 (Eventos + Binding)
-             FASE 4.1-4.3 (View, Text, Button, Column, Row)
+Semana 5-6:   FASE 3 (Eventos + Binding)
+              FASE 4.1-4.3 (View, Text, Button, Column, Row)
 
-Semana 7-8:  FASE 4.4-4.6 (TextField, Image, Card, etc.)
-             FASE 2.4-2.5 (Theme, Responsive)
+Semana 7-8:   FASE 4.4-4.6 (TextField, Image, Card, etc.)
+              FASE 2.4-2.5 (Theme, Responsive)
 
-Semana 9-10: FASE 5 (Routing)
-             FASE 6 (Animaciones)
+Semana 9-10:  FASE 5 (Routing)
+              FASE 6 (Animaciones)
 
 Semana 11-12: FASE 7 (a11y)
-              Polish + Testing
+              FASE 8 (Portales)
+
+Semana 13-14: FASE 9 (Error Boundaries)
+              FASE 10.1-10.2 (i18n básico)
+
+Semana 15-16: FASE 10.3-10.5 (i18n avanzado)
+              FASE 11.1-11.3 (SSR básico)
+
+Semana 17-18: FASE 11.4-11.5 (SSR + SEO)
+              FASE 12 (Testing)
 ```
 
 ---
 
-## 12. Glosario de implementación
+## 15. Glosario de implementación
 
 | Término | Significado |
 |---------|-------------|
@@ -326,7 +434,12 @@ Semana 11-12: FASE 7 (a11y)
 
 ---
 
-## 13. Referencias
+## 16. Referencias
 
 - [RFC-0002](0002-ui-architecture.md) — Arquitectura
 - [RFC-0003](0003-ui-translation.md) — Traducción
+- [i18n.md](../../03-language/ui/i18n.md) — Internacionalización
+- [portals.md](../../03-language/ui/portals.md) — Portales
+- [error-boundaries.md](../../03-language/ui/error-boundaries.md) — Error boundaries
+- [ssr.md](../../03-language/ui/ssr.md) — SSR
+- [testing.md](../../03-language/ui/testing.md) — Testing UI

@@ -10,6 +10,13 @@
 > **Animaciones:** Ver [`docs/03-language/ui/animation.md`](../../03-language/ui/animation.md) para animaciones y transiciones.  
 > **Routing:** Ver [`docs/03-language/ui/routing.md`](../../03-language/ui/routing.md) para navegaci&oacute;n y rutas.  
 > **Accesibilidad:** Ver [`docs/03-language/ui/accessibility.md`](../../03-language/ui/accessibility.md) para a11y.  
+> **i18n:** Ver [`docs/03-language/ui/i18n.md`](../../03-language/ui/i18n.md) para internacionalizaci&oacute;n.  
+> **Portales:** Ver [`docs/03-language/ui/portals.md`](../../03-language/ui/portals.md) para teleport/modals/tooltips.  
+> **Error Boundaries:** Ver [`docs/03-language/ui/error-boundaries.md`](../../03-language/ui/error-boundaries.md) para captura de errores.  
+> **Composici&oacute;n:** Ver [`docs/03-language/ui/composition.md`](../../03-language/ui/composition.md) para patrones de composici&oacute;n.  
+> **Context avanzado:** Ver [`docs/03-language/ui/context-patterns.md`](../../03-language/ui/context-patterns.md) para context provider/consumer.  
+> **SSR:** Ver [`docs/03-language/ui/ssr.md`](../../03-language/ui/ssr.md) para server-side rendering.  
+> **Testing:** Ver [`docs/03-language/ui/testing.md`](../../03-language/ui/testing.md) para testing de componentes UI.  
 > **Distribuci&oacute;n:** Ver [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) para el plan de instalaci&oacute;n multi-plataforma.
 
 ---

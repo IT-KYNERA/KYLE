@@ -80,8 +80,15 @@ FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3
 | [`style-system.md`](docs/03-language/ui/style-system.md) | Sistema de estilos tipado (sin CSS) |
 | [`state-events.md`](docs/03-language/ui/state-events.md) | Estado, eventos, binding, formularios |
 | [`animation.md`](docs/03-language/ui/animation.md) | Animaciones y transiciones |
-| [`routing.md`](docs/03-language/ui/routing.md) | Routing y navegación |
+| [`routing.md`](docs/03-language/ui/routing.md) | Routing auto-routing y navegación |
 | [`accessibility.md`](docs/03-language/ui/accessibility.md) | Accesibilidad (a11y) |
+| [`i18n.md`](docs/03-language/ui/i18n.md) | Internacionalización, plurales, RTL |
+| [`portals.md`](docs/03-language/ui/portals.md) | Portales/teleport para modals, tooltips |
+| [`error-boundaries.md`](docs/03-language/ui/error-boundaries.md) | Captura de errores y fallback UI |
+| [`composition.md`](docs/03-language/ui/composition.md) | Patrones de composición (slots, HOCs) |
+| [`context-patterns.md`](docs/03-language/ui/context-patterns.md) | Context avanzado y provider/consumer |
+| [`ssr.md`](docs/03-language/ui/ssr.md) | Server-Side Rendering e hidratación |
+| [`testing.md`](docs/03-language/ui/testing.md) | Testing de UI: unit, interacción, E2E |
 | [`RFC-0002`](docs/10-design/rfc/0002-ui-architecture.md) | Arquitectura general |
 | [`RFC-0003`](docs/10-design/rfc/0003-ui-translation.md) | Traducción multi-target |
 | [`RFC-0004`](docs/10-design/rfc/0004-ui-implementation-roadmap.md) | Roadmap de implementación |
