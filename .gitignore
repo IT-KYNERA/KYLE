@@ -19,16 +19,21 @@ build/
 benchmarks/target/
 
 # === Multi-language benchmark artifacts ===
-# C
+# C / C++
 benchmarks/*/**_c
+benchmarks/*/**_cpp
 
 # Go
 benchmarks/*/*_go
 benchmarks/*/**_go
 
-# Rust
+# Rust / Kyle
 benchmarks/*/*_rs
 benchmarks/*/**_rs
+benchmarks/*/*_ky
+benchmarks/*/**_ky
+benchmarks/*/*_cs
+benchmarks/*/**_cs
 benchmarks/*/*.class
 benchmarks/*/*.dll
 benchmarks/*/*.pdb
