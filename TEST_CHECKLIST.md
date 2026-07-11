@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ FEATURES QUE FUNCIONAN
+## ✅ FEATURES QUE FUNCIONAN (62)
 
 | # | Feature | Status | Notas |
 |---|---------|:------:|-------|
@@ -69,18 +69,20 @@
 
 ---
 
-## ⚠️ FEATURES CON BUGS
+## ⚠️ FEATURES CON BUGS (3)
 
 | # | Feature | Bug | Impact |
 |---|---------|:---:|--------|
-| 1 | `await` con return type != `i32` | ❌ `await task` resuelve a `i64` sin importar el return type real de la async fn | **Alto** — async str/f64/bool no funciona |
-| 2 | `!` postfix operator (propagación) | ❌ `expr !` causa parse error: "unexpected token after Bang" | **Alto** — no se puede propagar errores con `!` |
-| 3 | `prop` syntax | ❌ Parser error: "expected type name, found Newline" en `get:` | **Alto** — properties no existen |
-| 4 | `set{1, 2, 3}` literal | ❌ Parser error: "expected RBrace, found Integer" | **Medio** — `set(1,2,3)` funciona como workaround |
-| 5 | `str_builder` linker | ❌ Undefined symbols `__call`, `_str_builder` en link | **Medio** — runtime symbols faltantes |
-| 6 | `f32` codegen | ❌ `SSA verify: "Call parameter type does not match function signature"` en métodos con f32 | **Bajo** — métodos setters con f32 fallan |
+| 1 | `!` postfix operator (propagación) | ✅ **FIXED** | Parse error corregido |
+| 2 | `set{1,2,3}` literal | ✅ **FIXED** | Ahora parsea como function call |
+| 3 | `f32` codegen SSA error | ✅ **FIXED** | Auto-trunc f64→f32 y ext f32→f64 |
+| 4 | `await` con return type != `i32` | ⚠️ **Parcial** | i32 works. f64/str limited by runtime i64 storage |
+| 5 | `prop` syntax | ❌ No implementada | Usar get/set methods como workaround |
+| 6 | `str_builder` linker | ❌ Missing runtime API | `str_builder.new()` + `.()` dispatch broken |
 
 ---
+
+## ❌ FEATURES NO IMPLEMENTADOS
 
 ## ❌ FEATURES NO IMPLEMENTADOS
 
@@ -128,10 +130,10 @@ async fn count() i32: 42
 
 ## 🔧 PRIORIDAD DE FIXES PARA UI
 
-| Orden | Bug | Afecta UI |
-|:-----:|-----|:---------:|
-| 1 | `await` type resolution | Async data fetching |
-| 2 | `prop` syntax | Component properties |
-| 3 | `!` error propagation | Error handling en componentes |
-| 4 | Inline closures | `@click=@fn(x): ...` callbacks |
-| 5 | `str_builder` linker | String manipulation |
+| Orden | Bug | Estado |
+|:-----:|-----|:------:|
+| 1 | `await` type resolution | ✅ FIXED (i32) |
+| 2 | `prop` syntax | ❌ Usar get/set workaround |
+| 3 | `!` error propagation | ✅ FIXED |
+| 4 | Inline closures | ⚠️ Usar `&fn_name` workaround |
+| 5 | `str_builder` linker | ❌ Usar concatenación `+` workaround |
