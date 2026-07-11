@@ -185,7 +185,7 @@ impl fmt::Display for Type {
                     if i > 0 { write!(f, ", ")?; }
                     write!(f, "{}", p)?;
                 }
-                write!(f, ") -> {}", ft.return_)?;
+                write!(f, ") {}", ft.return_)?;
                 if ft.fallible { write!(f, "!")?; }
                 Ok(())
             }

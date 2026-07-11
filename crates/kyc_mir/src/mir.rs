@@ -29,6 +29,10 @@ pub enum MirType {
     I16,
     I32,
     I64,
+    U8,
+    U16,
+    U32,
+    U64,
     F32,
     F64,
     Bool,
@@ -166,6 +170,12 @@ impl MirFunction {
 }
 
 /// Returns true if the MirType is a Move type (heap-allocated, ownership-transfer semantics).
+/// Return true if the type is unsigned integer.
+pub fn is_unsigned_type(t: &MirType) -> bool {
+    matches!(t, MirType::U8 | MirType::U16 | MirType::U32 | MirType::U64)
+}
+
+/// Return true if the type is move-semantics (ownership transfer).
 pub fn is_move_type(t: &MirType) -> bool {
     match t {
         MirType::Str => true,
@@ -211,6 +221,10 @@ impl fmt::Display for MirType {
             MirType::I16 => write!(f, "i16"),
             MirType::I32 => write!(f, "i32"),
             MirType::I64 => write!(f, "i64"),
+            MirType::U8 => write!(f, "u8"),
+            MirType::U16 => write!(f, "u16"),
+            MirType::U32 => write!(f, "u32"),
+            MirType::U64 => write!(f, "u64"),
             MirType::F32 => write!(f, "f32"),
             MirType::F64 => write!(f, "f64"),
             MirType::Bool => write!(f, "bool"),

@@ -1363,7 +1363,7 @@ impl fmt::Display for AstType {
                     if i > 0 { write!(f, ", ")?; }
                     write!(f, "{}", p)?;
                 }
-                write!(f, ") -> {}", return_)
+                write!(f, ") {}", return_)
             }
             AstType::Mutable { inner, .. } => write!(f, "^{}", inner),
             AstType::Borrow { inner, .. } => write!(f, "&{}", inner),

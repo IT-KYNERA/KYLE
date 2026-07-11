@@ -65,15 +65,44 @@ connect("example.com", 80) # example.com:80
 
 ## Function pointers
 
+Los punteros a función se declaran con tipo `fn(params) return_type` (sin `->`).
+
 ```ky
 fn double(n: i64) i64:
  n * 2
 
 fn main() i32:
- fn_ptr: ptr = double as ptr
- result: i64 = fn_ptr(21) # call indirect
+ # Variable con tipo función explícito
+ handler: fn(i64) i64 = double as ptr
+ result: i64 = handler(21)
  println(result.to_str()) # 42
+
+ # Type-erased a ptr
+ fn_ptr: ptr = double as ptr
+ result2: i64 = fn_ptr(21) # call indirect
+ println(result2.to_str()) # 42
  0
+```
+
+Sintaxis de tipos función:
+
+| Tipo | Significado |
+|------|-------------|
+| `fn(i32, str) bool` | Toma i32 y str, retorna bool |
+| `fn(i32, str)` | Toma i32 y str, retorna void |
+| `async fn(str) i32` | Función async, toma str, retorna i32 |
+| `fn()` | Sin parámetros, retorna void |
+
+Ejemplo con múltiples parámetros:
+
+```ky
+fn process(id: i32, name: str, active: bool) str:
+ "ok"
+
+fn main():
+ callback: fn(i32, str, bool) str = process as ptr
+ result = callback(1, "test", true)
+ println(result)
 ```
 
 ## Closures

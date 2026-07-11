@@ -214,8 +214,9 @@ impl<'ctx> Codegen<'ctx> {
     /// Get the TBAA access tag for a given MirType.
     fn tbaa_for_type(&self, ty: &MirType) -> Option<inkwell::values::MetadataValue<'ctx>> {
         match ty {
-            MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64 | MirType::I1
-            | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
+        MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64 | MirType::I1
+        | MirType::U8 | MirType::U16 | MirType::U32 | MirType::U64
+        | MirType::Bool | MirType::Char => self.tbaa_nodes.get("int").copied(),
             MirType::F32 | MirType::F64 => self.tbaa_nodes.get("float").copied(),
             MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.tbaa_nodes.get("ptr").copied(),
             MirType::Str | MirType::Ptr(_) | MirType::Struct(_, _) | MirType::Array(_, _) | MirType::Slice(_) | MirType::Box(_) => self.tbaa_nodes.get("ptr").copied(),
@@ -649,7 +650,9 @@ impl<'ctx> Codegen<'ctx> {
                         SsaInst::BinaryOp { dest, op, left, right } => {
                             let l = ssa_read!(*left);
                             let r = ssa_read!(*right);
-                            let result = self.ssa_binop(*op, l, r)?;
+                            let is_unsigned = func.values.get(*left).map_or(false, |v| kyc_mir::mir::is_unsigned_type(&v.type_))
+                                || func.values.get(*right).map_or(false, |v| kyc_mir::mir::is_unsigned_type(&v.type_));
+                            let result = self.ssa_binop(*op, l, r, is_unsigned)?;
                             block_vals[bi].insert(*dest, result);
                         }
                         SsaInst::UnaryOp { dest, op, operand } => {
@@ -750,8 +753,15 @@ impl<'ctx> Codegen<'ctx> {
                                                     if let BasicValueEnum::IntValue(iv) = v {
                                                         let vw = iv.get_type().get_bit_width();
                                                         if vw < it.get_bit_width() {
-                                                            if let Ok(ext) = self.builder.build_int_s_extend(iv, it, "_ssac") {
-                                                                return ext.into();
+                                                            let is_unsigned = func.values.get(*a).map_or(false, |sv| kyc_mir::mir::is_unsigned_type(&sv.type_));
+                                                            if is_unsigned {
+                                                                if let Ok(ext) = self.builder.build_int_z_extend(iv, it, "_ssac") {
+                                                                    return ext.into();
+                                                                }
+                                                            } else {
+                                                                if let Ok(ext) = self.builder.build_int_s_extend(iv, it, "_ssac") {
+                                                                    return ext.into();
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -2737,9 +2747,13 @@ impl<'ctx> Codegen<'ctx> {
         match mir_type {
             MirType::I1 => self.context.bool_type().as_basic_type_enum(),
             MirType::I8 => self.context.i8_type().as_basic_type_enum(),
+            MirType::U8 => self.context.i8_type().as_basic_type_enum(),
             MirType::I16 => self.context.i16_type().as_basic_type_enum(),
+            MirType::U16 => self.context.i16_type().as_basic_type_enum(),
             MirType::I32 => self.context.i32_type().as_basic_type_enum(),
+            MirType::U32 => self.context.i32_type().as_basic_type_enum(),
             MirType::I64 => self.context.i64_type().as_basic_type_enum(),
+            MirType::U64 => self.context.i64_type().as_basic_type_enum(),
             MirType::F32 => self.context.f32_type().as_basic_type_enum(),
             MirType::F64 => self.context.f64_type().as_basic_type_enum(),
             MirType::Bool => self.context.bool_type().as_basic_type_enum(),
@@ -2860,7 +2874,7 @@ impl<'ctx> Codegen<'ctx> {
         //   1. Simple type (i32/i64/f32/f64/bool — not struct/string/list)
         //   2. Only used in FieldPtr/Memcpy/PtrOffset → needs alloca (always keep)
         //   3. Defined and used within a single basic block (no cross-block flow)
-        let simple_types: [MirType; 5] = [MirType::I32, MirType::I64, MirType::F32, MirType::F64, MirType::Bool];
+        let simple_types: [MirType; 9] = [MirType::I32, MirType::I64, MirType::F32, MirType::F64, MirType::Bool, MirType::U8, MirType::U16, MirType::U32, MirType::U64];
         let mut escaping: HashSet<usize> = HashSet::new();
         let mut def_blocks: HashMap<usize, usize> = HashMap::new();
         let mut use_blocks: HashMap<usize, HashSet<usize>> = HashMap::new();
@@ -4075,7 +4089,7 @@ impl<'ctx> Codegen<'ctx> {
     }
 
     // SSA Helper: binary operation
-    fn ssa_binop(&self, op: MirBinaryOp, l: BasicValueEnum<'ctx>, r: BasicValueEnum<'ctx>) -> Result<BasicValueEnum<'ctx>, String> {
+    fn ssa_binop(&self, op: MirBinaryOp, l: BasicValueEnum<'ctx>, r: BasicValueEnum<'ctx>, is_unsigned: bool) -> Result<BasicValueEnum<'ctx>, String> {
         let to_float = |v: BasicValueEnum<'ctx>| -> inkwell::values::FloatValue<'ctx> {
             if let BasicValueEnum::FloatValue(f) = v { f }
             else { self.builder.build_signed_int_to_float(self.to_int_value(v), self.context.f64_type(), "").unwrap() }
@@ -4113,7 +4127,11 @@ impl<'ctx> Codegen<'ctx> {
             let rw = ri.get_type().get_bit_width();
             let widen = |val: inkwell::values::IntValue<'ctx>, target_w: u32| -> Option<inkwell::values::IntValue<'ctx>> {
                 let ty = match target_w { 8 => self.context.i8_type(), 16 => self.context.i16_type(), 32 => self.context.i32_type(), 64 => self.context.i64_type(), _ => return None };
-                self.builder.build_int_s_extend(val, ty, "_ssaw").ok()
+                if is_unsigned {
+                    self.builder.build_int_z_extend(val, ty, "_ssaw").ok()
+                } else {
+                    self.builder.build_int_s_extend(val, ty, "_ssaw").ok()
+                }
             };
             let (li, ri) = if lw < rw {
                 (widen(li, rw).unwrap_or(li), ri)
@@ -4124,19 +4142,51 @@ impl<'ctx> Codegen<'ctx> {
                 MirBinaryOp::Add => self.int_nsw_nuw_add(li, ri).map_err(|e| format!("iadd: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Sub => self.int_nsw_nuw_sub(li, ri).map_err(|e| format!("isub: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Mul => self.int_nsw_nuw_mul(li, ri).map_err(|e| format!("imul: {}", e))?.as_basic_value_enum(),
-                MirBinaryOp::Div => self.builder.build_int_signed_div(li, ri, "").map_err(|e| format!("idiv: {}", e))?.as_basic_value_enum(),
-                MirBinaryOp::Rem => self.builder.build_int_signed_rem(li, ri, "").map_err(|e| format!("irem: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Div => {
+                    if is_unsigned {
+                        self.builder.build_int_unsigned_div(li, ri, "").map_err(|e| format!("udiv: {}", e))?.as_basic_value_enum()
+                    } else {
+                        self.builder.build_int_signed_div(li, ri, "").map_err(|e| format!("idiv: {}", e))?.as_basic_value_enum()
+                    }
+                }
+                MirBinaryOp::Rem => {
+                    if is_unsigned {
+                        self.builder.build_int_unsigned_rem(li, ri, "").map_err(|e| format!("urem: {}", e))?.as_basic_value_enum()
+                    } else {
+                        self.builder.build_int_signed_rem(li, ri, "").map_err(|e| format!("irem: {}", e))?.as_basic_value_enum()
+                    }
+                }
                 MirBinaryOp::And => self.builder.build_and(li, ri, "").map_err(|e| format!("iand: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Or => self.builder.build_or(li, ri, "").map_err(|e| format!("ior: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Xor => self.builder.build_xor(li, ri, "").map_err(|e| format!("ixor: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Shl => self.builder.build_left_shift(li, ri, "").map_err(|e| format!("ishl: {}", e))?.as_basic_value_enum(),
-                MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, true, "").map_err(|e| format!("ishr: {}", e))?.as_basic_value_enum(),
+                MirBinaryOp::Shr => self.builder.build_right_shift(li, ri, !is_unsigned, "").map_err(|e| format!("ishr: {}", e))?.as_basic_value_enum(),
                 MirBinaryOp::Eq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::EQ, li, ri, "").map_err(|e| format!("ieq: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("iez: {}", e))?.as_basic_value_enum() }
                 MirBinaryOp::Neq => { let c = self.builder.build_int_compare(inkwell::IntPredicate::NE, li, ri, "").map_err(|e| format!("ine: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("inz: {}", e))?.as_basic_value_enum() }
-                MirBinaryOp::Lt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLT, li, ri, "").map_err(|e| format!("ilt: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz: {}", e))?.as_basic_value_enum() }
-                MirBinaryOp::Gt => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGT, li, ri, "").map_err(|e| format!("igt: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz: {}", e))?.as_basic_value_enum() }
-                MirBinaryOp::Le => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SLE, li, ri, "").map_err(|e| format!("ile: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz2: {}", e))?.as_basic_value_enum() }
-                MirBinaryOp::Ge => { let c = self.builder.build_int_compare(inkwell::IntPredicate::SGE, li, ri, "").map_err(|e| format!("ige: {}", e))?; self.add_bool_range(c); self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz2: {}", e))?.as_basic_value_enum() }
+                MirBinaryOp::Lt => {
+                    let p = if is_unsigned { inkwell::IntPredicate::ULT } else { inkwell::IntPredicate::SLT };
+                    let c = self.builder.build_int_compare(p, li, ri, "").map_err(|e| format!("ilt: {}", e))?;
+                    self.add_bool_range(c);
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz: {}", e))?.as_basic_value_enum()
+                }
+                MirBinaryOp::Gt => {
+                    let p = if is_unsigned { inkwell::IntPredicate::UGT } else { inkwell::IntPredicate::SGT };
+                    let c = self.builder.build_int_compare(p, li, ri, "").map_err(|e| format!("igt: {}", e))?;
+                    self.add_bool_range(c);
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz: {}", e))?.as_basic_value_enum()
+                }
+                MirBinaryOp::Le => {
+                    let p = if is_unsigned { inkwell::IntPredicate::ULE } else { inkwell::IntPredicate::SLE };
+                    let c = self.builder.build_int_compare(p, li, ri, "").map_err(|e| format!("ile: {}", e))?;
+                    self.add_bool_range(c);
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("ilz2: {}", e))?.as_basic_value_enum()
+                }
+                MirBinaryOp::Ge => {
+                    let p = if is_unsigned { inkwell::IntPredicate::UGE } else { inkwell::IntPredicate::SGE };
+                    let c = self.builder.build_int_compare(p, li, ri, "").map_err(|e| format!("ige: {}", e))?;
+                    self.add_bool_range(c);
+                    self.builder.build_int_z_extend(c, self.context.i32_type(), "").map_err(|e| format!("igz2: {}", e))?.as_basic_value_enum()
+                }
             })
         }
     }
