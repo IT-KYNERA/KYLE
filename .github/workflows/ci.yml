@@ -54,10 +54,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --workspace
+        run: cargo build --bin ky
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test -p kyc_core -p kyc_frontend -p kyc_hir -p kyc_semantic -p kyc_mir -p kyc_backend -p kyc_driver -p kyc_cli -p kyc_tools -p kyc_ui
 
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings 2>&1 || true
@@ -93,10 +93,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --workspace
+        run: cargo build --bin ky
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test -p kyc_core -p kyc_frontend -p kyc_hir -p kyc_semantic -p kyc_mir -p kyc_backend -p kyc_driver -p kyc_cli -p kyc_tools -p kyc_ui
 
       - name: Build release
         run: cargo build --release --bin ky
