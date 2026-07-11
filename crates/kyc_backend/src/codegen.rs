@@ -766,6 +766,21 @@ impl<'ctx> Codegen<'ctx> {
                                                         }
                                                     }
                                                 }
+                                                inkwell::types::BasicMetadataTypeEnum::FloatType(ft) => {
+                                                    if let BasicValueEnum::FloatValue(fv) = v {
+                                                        let src_w = fv.get_type().get_bit_width();
+                                                        let dst_w = ft.get_bit_width();
+                                                        if src_w > dst_w {
+                                                            if let Ok(trunc) = self.builder.build_float_trunc(fv, ft, "_ssaf") {
+                                                                return trunc.into();
+                                                            }
+                                                        } else if src_w < dst_w {
+                                                            if let Ok(ext) = self.builder.build_float_ext(fv, ft, "_ssaf") {
+                                                                return ext.into();
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                                 _ => {}
                                             }
                                         }
@@ -838,7 +853,7 @@ impl<'ctx> Codegen<'ctx> {
                                 block_vals[bi].insert(*dest, rv);
                             }
                         }
-                        SsaInst::AsyncAwait { dest, handle } => {
+                        SsaInst::AsyncAwait { dest, handle, return_type } => {
                             let handle_val = ssa_read!(*handle);
                             let join_fn = self.module.get_function("ky_await_task")
                                 .ok_or_else(|| "no kl_await_task".to_string())?;
@@ -846,7 +861,9 @@ impl<'ctx> Codegen<'ctx> {
                             let call_res = self.builder.build_call(join_fn, &args_m, "_ssaaw")
                                 .map_err(|e| format!("ssaaw: {}", e))?;
                             if let inkwell::values::ValueKind::Basic(rv) = call_res.try_as_basic_value() {
-                                block_vals[bi].insert(*dest, rv);
+                                let target_type = self.llvm_type(return_type);
+                                let casted = self.cast_to_type(rv, target_type)?;
+                                block_vals[bi].insert(*dest, casted);
                             }
                         }
                         SsaInst::PtrOffset { dest, ptr, index, elem_type } => {
@@ -3480,15 +3497,34 @@ impl<'ctx> Codegen<'ctx> {
                                         }
                                         let val = self.value_to_llvm(a, &last_value_map)?;
                                         // Auto-cast i64 → ptr when function expects ptr
+                                        // Auto-cast f64 → f32 when function expects f32
                                         if i < param_types.len() {
                                             let expected = param_types[i];
-                                            if matches!(expected, inkwell::types::BasicMetadataTypeEnum::PointerType(_)) {
-                                                if let BasicValueEnum::IntValue(int_val) = val {
-                                                    let ptr_ty = self.context.ptr_type(Default::default());
-                                                    return Ok(self.builder.build_int_to_ptr(int_val, ptr_ty, "_argptr")
-                                                        .map_err(|e| format!("arg inttoptr: {}", e))?
-                                                        .as_basic_value_enum());
+                                            match expected {
+                                                inkwell::types::BasicMetadataTypeEnum::PointerType(_) => {
+                                                    if let BasicValueEnum::IntValue(int_val) = val {
+                                                        let ptr_ty = self.context.ptr_type(Default::default());
+                                                        return Ok(self.builder.build_int_to_ptr(int_val, ptr_ty, "_argptr")
+                                                            .map_err(|e| format!("arg inttoptr: {}", e))?
+                                                            .as_basic_value_enum());
+                                                    }
                                                 }
+                                                inkwell::types::BasicMetadataTypeEnum::FloatType(ft) => {
+                                                    if let BasicValueEnum::FloatValue(fv) = val {
+                                                        let src_w = fv.get_type().get_bit_width();
+                                                        let dst_w = ft.get_bit_width();
+                                                        if src_w > dst_w {
+                                                            return Ok(self.builder.build_float_trunc(fv, ft, "")
+                                                                .map_err(|e| format!("arg ftrunc: {}", e))?
+                                                                .as_basic_value_enum());
+                                                        } else if src_w < dst_w {
+                                                            return Ok(self.builder.build_float_ext(fv, ft, "")
+                                                                .map_err(|e| format!("arg fext: {}", e))?
+                                                                .as_basic_value_enum());
+                                                        }
+                                                    }
+                                                }
+                                                _ => {}
                                             }
                                         }
                                         Ok(val)
@@ -3739,10 +3775,18 @@ impl<'ctx> Codegen<'ctx> {
                                         .as_basic_value_enum()
                                 }
                                 (BasicValueEnum::FloatValue(float_val), BasicTypeEnum::IntType(i)) => {
-                                    // Float → Integer: fptosi
-                                    self.builder.build_float_to_signed_int(*float_val, *i, "_fptosi")
-                                        .map_err(|e| format!("fptosi: {}", e))?
-                                        .as_basic_value_enum()
+                                    // Float → Integer: use bitcast when sizes match, fptosi otherwise
+                                    let f_size = float_val.get_type().get_bit_width();
+                                    let i_size = i.get_bit_width();
+                                    if f_size == i_size {
+                                        self.builder.build_bit_cast(*float_val, *i, "_fcast")
+                                            .map_err(|e| format!("fbitcast: {}", e))?
+                                            .as_basic_value_enum()
+                                    } else {
+                                        self.builder.build_float_to_signed_int(*float_val, *i, "_fptosi")
+                                            .map_err(|e| format!("fptosi: {}", e))?
+                                            .as_basic_value_enum()
+                                    }
                                 }
                                 // Pointer → Pointer: identity (no-op cast)
                                 (BasicValueEnum::PointerValue(ptr_val), BasicTypeEnum::PointerType(_)) => {
@@ -3887,7 +3931,7 @@ impl<'ctx> Codegen<'ctx> {
                                 last_value_map.insert(*dest, bv);
                             }
                         }
-                        MirInst::AsyncAwait { dest, handle } => {
+                        MirInst::AsyncAwait { dest, handle, return_type } => {
                             let handle_val = self.load_value(*handle, &last_value_map)?;
                             let join_fn = self.module.get_function("ky_await_task")
                                 .ok_or_else(|| "ky_await_task not declared".to_string())?;
@@ -3895,11 +3939,14 @@ impl<'ctx> Codegen<'ctx> {
                             let call_result = self.builder.build_call(join_fn, &args_meta, "_async_join")
                                 .map_err(|e| format!("async_join: {}", e))?;
                             if let inkwell::values::ValueKind::Basic(ret_val) = call_result.try_as_basic_value() {
+                                // Cast i64 result to the actual return type
+                                let target_type = self.llvm_type(return_type);
+                                let casted = self.cast_to_type(ret_val, target_type)?;
                                 if let Some(alloca) = self.alloca_map.get(*dest).and_then(|p| *p) {
-                                    self.builder.build_store(alloca, ret_val)
+                                    self.builder.build_store(alloca, casted)
                                         .map_err(|e| format!("async_join store: {}", e))?;
                                 }
-                                last_value_map.insert(*dest, ret_val);
+                                last_value_map.insert(*dest, casted);
                             }
                         }
                     }
@@ -4231,6 +4278,48 @@ impl<'ctx> Codegen<'ctx> {
             }
             MirConstant::Void => self.context.i32_type().const_zero().as_basic_value_enum(),
             MirConstant::Null => self.context.ptr_type(Default::default()).const_null().as_basic_value_enum(),
+        }
+    }
+
+    /// Cast an i64 value to the specified LLVM target type (used for async await results)
+    fn cast_to_type(
+        &self,
+        val: BasicValueEnum<'ctx>,
+        target: BasicTypeEnum<'ctx>,
+    ) -> Result<BasicValueEnum<'ctx>, String> {
+        match (&val, &target) {
+            (BasicValueEnum::IntValue(iv), BasicTypeEnum::IntType(t)) => {
+                let src_w = iv.get_type().get_bit_width();
+                let dst_w = t.get_bit_width();
+                if src_w >= dst_w {
+                    self.builder.build_int_truncate(*iv, *t, "")
+                        .map(|v| v.as_basic_value_enum())
+                        .map_err(|e| format!("cast trunc: {}", e))
+                } else {
+                    self.builder.build_int_z_extend(*iv, *t, "")
+                        .map(|v| v.as_basic_value_enum())
+                        .map_err(|e| format!("cast zext: {}", e))
+                }
+            }
+            (BasicValueEnum::IntValue(iv), BasicTypeEnum::PointerType(pt)) => {
+                self.builder.build_int_to_ptr(*iv, *pt, "")
+                    .map(|v| v.as_basic_value_enum())
+                    .map_err(|e| format!("cast inttoptr: {}", e))
+            }
+            (BasicValueEnum::IntValue(iv), BasicTypeEnum::FloatType(ft)) => {
+                // Bitcast the i64 bits to the float type to preserve the exact value
+                let i64_ty = self.context.i64_type();
+                if iv.get_type().get_bit_width() == 64 {
+                    self.builder.build_bit_cast(*iv, *ft, "")
+                        .map(|v| v.as_basic_value_enum())
+                        .map_err(|e| format!("cast bitcast float: {}", e))
+                } else {
+                    self.builder.build_signed_int_to_float(*iv, *ft, "")
+                        .map(|v| v.as_basic_value_enum())
+                        .map_err(|e| format!("cast inttofloat: {}", e))
+                }
+            }
+            _ => Ok(val),  // Pass through if types match or unsupported
         }
     }
 }

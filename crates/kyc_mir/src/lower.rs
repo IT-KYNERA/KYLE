@@ -220,6 +220,8 @@ impl LowerCtx {
 /// Lower a type-checked KL program to MIR.
 pub struct Lowerer {
     fn_returns: RefCell<std::collections::HashMap<String, MirType>>,
+    /// Maps async function name → declared return type (before replacing with i64)
+    async_fn_returns: RefCell<std::collections::HashMap<String, MirType>>,
     struct_defs: RefCell<std::collections::HashMap<String, Vec<(String, MirType)>>>,
     class_constructor_map: RefCell<std::collections::HashMap<String, String>>,
     const_values: RefCell<std::collections::HashMap<String, Expr>>,
@@ -260,6 +262,7 @@ impl Lowerer {
     pub fn new() -> Self {
         Self {
             fn_returns: RefCell::new(std::collections::HashMap::new()),
+            async_fn_returns: RefCell::new(std::collections::HashMap::new()),
             struct_defs: RefCell::new(std::collections::HashMap::new()),
             class_constructor_map: RefCell::new(std::collections::HashMap::new()),
             const_values: RefCell::new(std::collections::HashMap::new()),
@@ -480,10 +483,17 @@ impl Lowerer {
                         continue;
                     }
                     let struct_defs = self.struct_defs.borrow().clone();
-                    let ret_type = f.return_type.as_ref()
+                    let declared_ret = f.return_type.as_ref()
                         .map(|rt| ast_type_to_mir(rt, Some(&struct_defs)))
                         .unwrap_or(MirType::Void);
-                    fn_returns.insert(f.name.clone(), ret_type);
+                    if f.is_async {
+                        // async functions store the declared return type separately
+                        self.async_fn_returns.borrow_mut().insert(f.name.clone(), declared_ret);
+                        // The actual call returns a task handle (i64)
+                        fn_returns.insert(f.name.clone(), MirType::I64);
+                    } else {
+                        fn_returns.insert(f.name.clone(), declared_ret);
+                    }
                     self.function_decls.borrow_mut().insert(f.name.clone(), f.clone());
                 }
                 if let Decl::Class(c) = decl {
@@ -6729,21 +6739,29 @@ impl Lowerer {
             Expr::Await { expression, .. } => {
                 ctx = self.lower_expr(ctx, expression);
                 let handle_local = ctx.next_local - 1;
-                let result = ctx.alloc_local("_await", MirType::I64);
+                // Determine the actual return type (what the async fn declared)
+                let return_type: MirType = match expression.as_ref() {
+                    Expr::FunctionCall { target, .. } => {
+                        match target.as_ref() {
+                            Expr::Identifier { name, .. } => {
+                                self.async_fn_returns.borrow().get(name.as_str())
+                                    .cloned()
+                                    .or_else(|| self.fn_returns.borrow().get(name.as_str()).cloned())
+                                    .unwrap_or(MirType::I64)
+                            }
+                            _ => MirType::I64,
+                        }
+                    }
+                    _ => MirType::I64,
+                };
+                // Allocate result with the declared return type (handles are i64,
+                // but await extracts the actual value)
+                let result = ctx.alloc_local("_await", return_type.clone());
                 ctx.current_block.insts.push(MirInst::AsyncAwait {
                     dest: result,
                     handle: handle_local,
+                    return_type,
                 });
-                // Cast i64 back to the expected result type
-                let result_type = ctx.local_types.get(&result).cloned().unwrap_or(MirType::I64);
-                if result_type != MirType::I64 {
-                    let cast = ctx.alloc_local("_awaitcast", result_type.clone());
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest: cast,
-                        value: MirValue::Local(result),
-                        to_type: result_type,
-                    });
-                }
                 ctx
             }
             Expr::Async { expression, .. } => {

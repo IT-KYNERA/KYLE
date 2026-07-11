@@ -1504,29 +1504,58 @@ impl Parser {
                 }
             } else if self.at(TokenKind::LBrace) {
                 // Struct literal (no generics): Identifier { field: value, ... }
+                // Also: set{1, 2, 3} — function call with brace syntax
                 let start = self.pos;
                 if let Expr::Identifier { name: struct_name, .. } = &expr {
                     let sname = struct_name.clone();
                     self.advance(); // consume '{'
-                    let mut fields = Vec::new();
-                    while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
-                        // Skip newlines and indentation between fields
-                        while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
-                            self.advance();
+                    // Check if this is a set{...} literal (no key:value pairs)
+                    let is_set_literal = sname == "set" && !self.at(TokenKind::RBrace);
+                    if is_set_literal {
+                        // Parse as function call: set(value1, value2, ...)
+                        let mut arguments = Vec::new();
+                        while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                            while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                                self.advance();
+                            }
+                            if self.at(TokenKind::RBrace) { break; }
+                            arguments.push(self.parse_expr()?);
+                            if self.at(TokenKind::Comma) { self.advance(); }
                         }
-                        if self.at(TokenKind::RBrace) { break; }
-                        let key = self.eat_identifier();
-                        if key.is_empty() { break; }
-                        self.expect(TokenKind::Colon)?;
-                        let value = self.parse_expr()?;
-                        fields.push((key, value));
-                        if self.at(TokenKind::Comma) { self.advance(); }
+                        self.expect(TokenKind::RBrace)?;
+                        expr = Expr::FunctionCall {
+                            target: Box::new(Expr::Identifier { name: sname, span: self.span_from(start) }),
+                            arguments,
+                            type_args: vec![],
+                            span: self.span_from(start),
+                        };
+                    } else {
+                        // Normal struct literal with field: value pairs
+                        let mut fields = Vec::new();
+                        while !self.at(TokenKind::RBrace) && !self.at(TokenKind::Eof) {
+                            // Skip newlines and indentation between fields
+                            while self.at(TokenKind::Newline) || self.at(TokenKind::Indent) || self.at(TokenKind::Dedent) {
+                                self.advance();
+                            }
+                            if self.at(TokenKind::RBrace) { break; }
+                            let key = self.eat_identifier();
+                            if key.is_empty() { break; }
+                            self.expect(TokenKind::Colon)?;
+                            let value = self.parse_expr()?;
+                            fields.push((key, value));
+                            if self.at(TokenKind::Comma) { self.advance(); }
+                        }
+                        self.expect(TokenKind::RBrace)?;
+                        expr = Expr::StructLiteral { struct_name: sname, type_args: vec![], fields, span: self.span_from(start) };
                     }
-                    self.expect(TokenKind::RBrace)?;
-                    expr = Expr::StructLiteral { struct_name: sname, type_args: vec![], fields, span: self.span_from(start) };
                 } else {
                     break;
                 }
+            } else if self.at(TokenKind::Bang) {
+                // Postfix `!` for error propagation: expr !
+                let start = self.pos;
+                self.advance();
+                expr = Expr::ErrorProp { expression: Box::new(expr), span: self.span_from(start) };
             } else {
                 break;
             }

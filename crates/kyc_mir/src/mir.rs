@@ -107,7 +107,7 @@ pub enum MirInst {
     /// Spawn an async function on a thread: dest = kl_spawn_thread(func_name, arg).
     AsyncSpawn { dest: usize, function_name: String, arg: MirValue },
     /// Await (join) an async thread handle: dest = kl_join_thread(handle).
-    AsyncAwait { dest: usize, handle: usize },
+    AsyncAwait { dest: usize, handle: usize, return_type: MirType },
 }
 
 /// How a basic block ends.
@@ -366,7 +366,7 @@ impl fmt::Display for MirInst {
             MirInst::AsyncSpawn { dest, function_name, arg } => {
                 write!(f, "  %{} = async_spawn {} ({})", dest, function_name, arg)
             }
-            MirInst::AsyncAwait { dest, handle } => {
+            MirInst::AsyncAwait { dest, handle, return_type: _ } => {
                 write!(f, "  %{} = async_await %{}", dest, handle)
             }
             MirInst::SliceMake { dest, ptr, len, elem_type } => {

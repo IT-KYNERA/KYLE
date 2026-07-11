@@ -1098,9 +1098,25 @@ impl TypeChecker {
                     params: param_types, return_: Box::new(ret), fallible: false,
                 })
             }
-            Expr::Await { expression: _, .. } => {
-                // Await on an async task handle returns i64 (the widened result)
-                Type::I64
+            Expr::Await { expression, .. } => {
+                // Await on an async function returns the declared return type,
+                // not i64 (the task handle). If not an async call, return the
+                // awaited expression's type.
+                if let Expr::FunctionCall { target, .. } = expression.as_ref() {
+                    if let Expr::Identifier { name, .. } = target.as_ref() {
+                        if let Some(sym) = self.symbols.lookup(name) {
+                            if let SymKind::Function(f) = &sym.kind {
+                                if f.is_async {
+                                    // Return the declared return type from the AST
+                                    return f.return_type.as_ref()
+                                        .map(|rt| self.resolve_ast_type(rt))
+                                        .unwrap_or(Type::I64);
+                                }
+                            }
+                        }
+                    }
+                }
+                self.infer_expr(expression)
             }
             Expr::Async { .. } | Expr::AsyncBlock { .. } => {
                 // async expr returns a task handle (i64), not a function

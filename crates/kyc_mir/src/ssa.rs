@@ -50,7 +50,7 @@ pub enum SsaInst {
     /// dest = spawn_task(func_name, arg)
     AsyncSpawn { dest: SsaValueId, function_name: String, arg: SsaValueId },
     /// dest = await_task(handle)
-    AsyncAwait { dest: SsaValueId, handle: SsaValueId },
+    AsyncAwait { dest: SsaValueId, handle: SsaValueId, return_type: MirType },
     /// For non-promotable allocas (heap types, field_ptr): store value to alloca
     Store { dest: usize, value: SsaValueId },
     /// For non-promotable allocas: load value from alloca
@@ -530,11 +530,11 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }
-                MirInst::AsyncAwait { dest, handle } => {
+                MirInst::AsyncAwait { dest, handle, return_type } => {
                     let new_dest = ssa.values.len();
-                    ssa.values.push(SsaValue { type_: MirType::I64, name: format!("_aa{}", dest) });
+                    ssa.values.push(SsaValue { type_: return_type.clone(), name: format!("_aa{}", dest) });
                     let handle_id = alloca_current.get(handle).copied().unwrap_or(*handle);
-                    ssa_block.insts.push(SsaInst::AsyncAwait { dest: new_dest, handle: handle_id });
+                    ssa_block.insts.push(SsaInst::AsyncAwait { dest: new_dest, handle: handle_id, return_type: return_type.clone() });
                     alloca_current.insert(*dest, new_dest);
                     stacks.entry(*dest).or_default().push(new_dest);
                 }

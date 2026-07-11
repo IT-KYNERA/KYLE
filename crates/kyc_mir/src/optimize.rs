@@ -261,7 +261,7 @@ impl Optimizer {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
                 *arg = Self::map_value(arg, map);
             }
-            MirInst::AsyncAwait { dest, handle } => {
+            MirInst::AsyncAwait { dest, handle, return_type: _ } => {
                 if let Some(new_dest) = map.get(dest) { *dest = *new_dest; }
                 if let Some(new_h) = map.get(handle) { *handle = *new_h; }
             }
@@ -662,7 +662,7 @@ impl Optimizer {
                         used.insert(*dest);
                         Self::collect_value_refs(arg, &mut used);
                     }
-                    MirInst::AsyncAwait { dest, handle } => {
+                    MirInst::AsyncAwait { dest, handle, return_type: _ } => {
                         used.insert(*dest);
                         used.insert(*handle);
                     }
