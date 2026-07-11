@@ -93,51 +93,63 @@ impl ModuleResolver {
         // Convert dots to directory separators
         let path_str = module_name.replace('.', "/");
         let file_name = format!("{}.ky", path_str);
+        let file_name_kyx = format!("{}.kyx", path_str);
 
         if relative {
             // Resolve relative to source file directory
             if let Some(ref source_dir) = self.source_dir {
-                let candidate = source_dir.join(&file_name);
-                if candidate.exists() {
-                    return Ok(candidate);
+                for fname in [&file_name, &file_name_kyx] {
+                    let candidate = source_dir.join(fname);
+                    if candidate.exists() {
+                        return Ok(candidate);
+                    }
                 }
-                return Err(format!("relative module '{}' not found at {:?}", module_name, candidate));
+                return Err(format!("relative module '{}' not found at {:?}", module_name, source_dir.join(&file_name)));
             }
             return Err("no source directory set for relative import".to_string());
         }
 
         // Resolve against search paths
         for search_path in &self.search_paths {
-            let candidate = search_path.join(&file_name);
-            if candidate.exists() {
-                return Ok(candidate);
-            }
-            // Try <name>/lib.ky for directory-based packages
-            if !path_str.contains('/') {
-                let dir_candidate = search_path.join(&path_str).join("lib.ky");
-                if dir_candidate.exists() {
-                    return Ok(dir_candidate);
+            // Try <name>.ky and <name>.kyx
+            for fname in [&file_name, &file_name_kyx] {
+                let candidate = search_path.join(fname);
+                if candidate.exists() {
+                    return Ok(candidate);
                 }
-                // Try packages/<name>/src/lib.ky for package dirs
-                let src_candidate = search_path.join(&path_str).join("src").join("lib.ky");
-                if src_candidate.exists() {
-                    return Ok(src_candidate);
+            }
+            // Try <name>/lib.ky and <name>/lib.kyx for directory-based packages
+            if !path_str.contains('/') {
+                for lib_ext in ["ky", "kyx"] {
+                    let dir_candidate = search_path.join(&path_str).join(format!("lib.{}", lib_ext));
+                    if dir_candidate.exists() {
+                        return Ok(dir_candidate);
+                    }
+                    // Try packages/<name>/src/lib.ky and lib.kyx
+                    let src_candidate = search_path.join(&path_str).join("src").join(format!("lib.{}", lib_ext));
+                    if src_candidate.exists() {
+                        return Ok(src_candidate);
+                    }
                 }
             }
             // Try packages/<name>/src/<file> for submodules (e.g. http/server.ky → http/src/server.ky)
             if path_str.contains('/') {
                 if let Some(parent) = PathBuf::from(&path_str).parent() {
                     if let Some(file) = PathBuf::from(&path_str).file_name() {
-                        let src_candidate = search_path.join(parent).join("src").join(file).with_extension("ky");
-                        if src_candidate.exists() {
-                            return Ok(src_candidate);
+                        for ext in ["ky", "kyx"] {
+                            let src_candidate = search_path.join(parent).join("src").join(file).with_extension(ext);
+                            if src_candidate.exists() {
+                                return Ok(src_candidate);
+                            }
                         }
                     }
                 }
-                // Fallback: try <module>/lib.ky for unified packages
-                let lib_fallback = search_path.join(&path_str).with_extension("ky").parent().unwrap().join("lib.ky");
-                if lib_fallback.exists() {
-                    return Ok(lib_fallback);
+                // Fallback: try <module>/lib.ky and lib.kyx
+                for ext in ["ky", "kyx"] {
+                    let lib_fallback = search_path.join(&path_str).with_extension(ext).parent().unwrap().join(format!("lib.{}", ext));
+                    if lib_fallback.exists() {
+                        return Ok(lib_fallback);
+                    }
                 }
             }
         }

@@ -21,18 +21,21 @@ pub enum StyleDecl {
         component: String,
         name: String,
         props: Vec<StyleProp>,
+        media: Vec<MediaQuery>,
     },
     /// layout<component> Name: prop = value, ...
     Layout {
         component: String,
         name: String,
         props: Vec<StyleProp>,
+        media: Vec<MediaQuery>,
     },
     /// tpl<component> Name: style = X, animation = Y, ...
     Template {
         component: String,
         name: String,
         props: Vec<StyleProp>,
+        media: Vec<MediaQuery>,
     },
     /// theme Name: prop = value, ...
     Theme {
@@ -46,6 +49,13 @@ pub enum StyleDecl {
 pub struct StyleProp {
     pub name: String,
     pub value: String,
+}
+
+/// A @media query within a style declaration
+#[derive(Clone, Debug)]
+pub struct MediaQuery {
+    pub condition: String,  // e.g. "min_width: 640"
+    pub props: Vec<StyleProp>,
 }
 
 /// An XML element or control-flow directive
@@ -178,28 +188,23 @@ impl fmt::Display for KyxAttr {
 
 impl fmt::Display for StyleDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StyleDecl::Style { component, name, props } => {
-                writeln!(f, "style<{}> {}:", component, name)?;
-                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
-                Ok(())
-            }
-            StyleDecl::Layout { component, name, props } => {
-                writeln!(f, "layout<{}> {}:", component, name)?;
-                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
-                Ok(())
-            }
-            StyleDecl::Template { component, name, props } => {
-                writeln!(f, "tpl<{}> {}:", component, name)?;
-                for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
-                Ok(())
-            }
+        let (keyword, component, name, props, media) = match self {
+            StyleDecl::Style { component, name, props, media } => ("style", component, name, props, media),
+            StyleDecl::Layout { component, name, props, media } => ("layout", component, name, props, media),
+            StyleDecl::Template { component, name, props, media } => ("tpl", component, name, props, media),
             StyleDecl::Theme { name, props } => {
                 writeln!(f, "theme {}:", name)?;
                 for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
-                Ok(())
+                return Ok(());
             }
+        };
+        writeln!(f, "{}<{}> {}:", keyword, component, name)?;
+        for p in props { writeln!(f, "    {} = {}", p.name, p.value)?; }
+        for m in media {
+            writeln!(f, "    @media({}):", m.condition)?;
+            for p in &m.props { writeln!(f, "        {} = {}", p.name, p.value)?; }
         }
+        Ok(())
     }
 }
 

@@ -160,11 +160,11 @@ impl KyxParser {
         self.skip_whitespace();
         let name = self.read_while(|c| c != ':' && c != ' ' && c != '\t')?.trim().to_string();
         self.expect_char(':')?;
-        let props = self.parse_style_props()?;
+        let (props, media) = self.parse_style_block()?;
         match kind {
-            "layout" => Ok(StyleDecl::Layout { component, name, props }),
-            "tpl" => Ok(StyleDecl::Template { component, name, props }),
-            _ => Ok(StyleDecl::Style { component, name, props }),
+            "layout" => Ok(StyleDecl::Layout { component, name, props, media }),
+            "tpl" => Ok(StyleDecl::Template { component, name, props, media }),
+            _ => Ok(StyleDecl::Style { component, name, props, media }),
         }
     }
 
@@ -194,13 +194,53 @@ impl KyxParser {
             while self.peek() == Some(' ') || self.peek() == Some('\t') { self.advance(); }
             if self.peek() == Some('\n') || self.peek() == Some('\r') {
                 self.advance();
-                // Skip empty lines
                 while self.peek() == Some('\n') || self.peek() == Some('\r') { self.advance(); }
-                // Check for dedent (end of block)
                 if !self.at_indent() && !self.at_space_or_tab() { break; }
             }
         }
         Ok(props)
+    }
+
+    fn parse_style_block(&mut self) -> Result<(Vec<StyleProp>, Vec<MediaQuery>), String> {
+        let mut props = Vec::new();
+        let mut media = Vec::new();
+        if !self.at_newline() { return Ok((props, media)); }
+        self.advance();
+        if !self.at_indent() { return Ok((props, media)); }
+        self.advance();
+        loop {
+            self.skip_whitespace_inline();
+            match self.peek() {
+                None | Some('\n') | Some('\r') => break,
+                Some('@') if self.starts_with("@media(") => {
+                    // Parse @media query
+                    self.pos += 6; // skip "@media"
+                    let condition = self.read_while(|c| c != ')')?.trim().to_string();
+                    self.expect_char(')')?;
+                    self.expect_char(':')?;
+                    let media_props = self.parse_style_props()?;
+                    media.push(MediaQuery { condition, props: media_props });
+                }
+                _ => {
+                    let name = self.read_while(|c| c != ' ' && c != '\t' && c != '=')?.trim().to_string();
+                    if name.is_empty() { break; }
+                    self.skip_whitespace();
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        self.skip_whitespace();
+                        let value = self.read_while(|c| c != '\n' && c != '\r')?.trim().to_string();
+                        props.push(StyleProp { name, value });
+                    }
+                }
+            }
+            while self.peek() == Some(' ') || self.peek() == Some('\t') { self.advance(); }
+            if self.peek() == Some('\n') || self.peek() == Some('\r') {
+                self.advance();
+                while self.peek() == Some('\n') || self.peek() == Some('\r') { self.advance(); }
+                if !self.at_indent() && !self.at_space_or_tab() { break; }
+            }
+        }
+        Ok((props, media))
     }
 
     fn at_newline(&self) -> bool {

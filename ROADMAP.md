@@ -18,10 +18,10 @@
 | **FFI** (extern fn, @link, ptr) | ✅ Completo |
 | **Tipos especializados** (46 tipos) | ✅ Todos implementados |
 | **FASE 0: CLI --target** | ✅ Completo |
-| **FASE 1: Parser .kyx + JS gen** | ✅ Completo (90%) |
-| **FASE 2: Estilos tipados** | ✅ Completo (50%) |
-| **FASE 3: Eventos + Binding** | ✅ Completo (80%) |
-| **FASE 4: Componentes UI** | ⚠️ Parcial (8/28) |
+| **FASE 1: Parser .kyx + JS gen** | ✅ Completo |
+| **FASE 2: Estilos tipados** | ✅ Completo |
+| **FASE 3: Eventos + Binding** | ✅ Completo |
+| **FASE 4: Componentes UI** | ✅ Completo (28 componentes) |
 | **FASE 5: Routing** | ✅ Completo |
 | **FASE 6-12** | ⬜ No iniciado |
 
