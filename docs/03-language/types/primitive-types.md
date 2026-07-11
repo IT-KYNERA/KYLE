@@ -530,9 +530,9 @@ result = sb.to_str()
 
 | Category | [x] Completo | [ ] Designed | ❌ No planned |
 |-----------|:-----------:|:-----------:|:-------------:|
-| Primitivis | 13 | 2 (u8-u64 codegen, never) | 0 |
+| Primitivis | 14 | 1 (never) | 0 |
 | Compounds | 7 (tuples, sets, queue, stack) | 1 | 0 |
 | Ownership | 6 (rc, arc) | 1 (weak) | 0 |
 | Concurrency | 5 (async/await, channel, mutex, atomic, iterator) | 2 (future, select) | 0 |
 | Specialized | 14 | 0 | 0 |
-| **Total** | **45** | **5** | **0** |
+| **Total** | **46** | **4** | **0** |

@@ -1,14 +1,13 @@
 # Atomics
 
 > Operacionis atomicas lock-free for programacion concurrente.
-> Actualmente no implementeds as typis Kyle (solo uso interno en runtime Rust).
 
 ## Status current
 
 | Type | Status | Description |
 |------|--------|-------------|
-| `atomic_i64` | 📅 Planned | Entero atomico de 64 bits |
-| `atomic_bool` | 📅 Planned | Booleano atomico |
+| `atomic_i64` | ✅ Implemented | Entero atomico de 64 bits |
+| `atomic_bool` | ✅ Implemented | Booleano atomico |
 | `atomic_ptr` | 📅 Planned | Puntero atomico |
 
 ## Design propuesto

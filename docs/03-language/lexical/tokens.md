@@ -30,7 +30,7 @@ none # Option::None
 ```ky
 + - * / % # Arithmetic
 == != < > <= >= # Comparison
-&& || ! # Logical
+and or not # Logical
 & | ^ << >> # Bitwise
 = := # Assignment and declaration
 += -= *= /= %= # Compound

@@ -24,13 +24,15 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | Area | Status |
 |------|--------|
 | **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
-| **Syntax** | ✅ **Complete** — Generics, ranges, match, op overloading, is, ptr, for-else, static fn, ** |
+| **Types (46 total)** | ✅ **Complete** — 14 primitives, 7 compound, 6 ownership, 5 concurrency, 14 specialized |
 | **Borrow checker** | ✅ **Complete** |
 | **Cross-platform** | ✅ **Complete** — macOS ARM, Linux ARM/x64, Windows x64 (4 platforms via CI) |
 | **Tooling** | ✅ **Complete** — LSP, cross-platform VS Code ext, formatter, test framework, package manager |
-| **FFI (extern fn, @link, ptr)** | ✅ **Phase 0 done** — Pure Kyle FFI to C libraries |
+| **FFI (extern fn, @link, ptr)** | ✅ **Complete** — Pure Kyle FFI to C libraries |
 | **Runtime in Kyle** | ✅ **Complete** |
 | **kyc_platform** | ✅ **Complete** |
+| **UI framework (16 design docs)** | 📅 **Diseñado** — 13 docs de especificación + 3 RFCs |
+| **u8-u64 codegen** | ✅ **Complete** — MirType, unsigned ops, zext for call args |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 
@@ -67,8 +69,11 @@ locally per-platform and let CI verify any changes via a tagged release.
 3. The docs are the **canonical source of truth** for all syntax
 
 **Key files to consult:**
-- `docs/03-language/` — **Read this for ANY syntax question** (8 subdirectories)
+- `docs/03-language/` — **Read this for ANY syntax question** (9 subdirectories)
 - `docs/03-language/lexical/operators.md` — Quick lookup: keywords, operators
+- `docs/03-language/syntax/operator-overloading.md` — Overloading `op_add`, `op_eq`, etc.
+- `docs/03-language/syntax/string-interpolation.md` — `"{expr}"` syntax
+- `docs/03-language/syntax/error-propagation.md` — `!` operator for errors
 - `docs/04-standard-library/` — Standard library API
 - `TEST_CHECKLIST.md` — Verified syntax features with test status
 
@@ -108,7 +113,7 @@ ky/
 │   ├── json/             # JSON parse + stringify
 │   └── sqlite/           # SQLite database bindings
 │
-├── docs/                 # Documentation (158 files, reorganized)
+├── docs/                 # Documentation (170+ files)
 ├── vscode-ky/            # VS Code extension
 ├── examples/             # Example .ky project
 ├── tests/                # End-to-end type-check test files
@@ -125,7 +130,7 @@ ky/
 |---------|:-----:|---------|
 | [01-introduction/](docs/01-introduction/README.md) | 6 | Vision, philosophy, principles, architecture, roadmap, FAQ |
 | [02-getting-started/](docs/02-getting-started/README.md) | 9 | Installation, first program, build, testing, debugging, IDE |
-| [03-language/](docs/03-language/README.md) | **8 subdirectories** | **Formal language specification** (read for ANY syntax question) |
+| [03-language/](docs/03-language/README.md) | **9 subdirectories** | **Formal language specification** (read for ANY syntax question) |
 | [04-standard-library/](docs/04-standard-library/README.md) | 22 | Standard library modules |
 | [05-runtime/](docs/05-runtime/README.md) | 6 | Runtime internals (memory, scheduler, panic, startup) |
 | [06-compiler/](docs/06-compiler/README.md) | 17 | Compiler pipeline (lexer, parser, MIR, codegen, linker) |
@@ -140,7 +145,7 @@ ky/
 
 | You need... | Go to |
 |-------------|-------|
-| **ANY syntax question** | `docs/03-language/` (8 subdirectories) |
+| **ANY syntax question** | `docs/03-language/` (9 subdirectories) |
 | Quick keyword/operator lookup | `docs/03-language/lexical/` |
 | Compiler CLI flags | `docs/07-tools/compiler-cli.md` |
 | How to test | `docs/02-getting-started/testing.md` |
@@ -149,6 +154,9 @@ ky/
 | VS Code extension | `docs/07-tools/vscode.md` |
 | Performance tips | `docs/02-getting-started/performance.md` |
 | FFI (extern fn, @link, ptr) | `docs/03-language/ffi/abi.md` |
+| Operator overloading | `docs/03-language/syntax/operator-overloading.md` |
+| String interpolation | `docs/03-language/syntax/string-interpolation.md` |
+| Error propagation (`!`) | `docs/03-language/syntax/error-propagation.md` |
 | UI framework (.kyx) | `docs/03-language/syntax/ui-syntax.md` |
 | UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |
 | Multi-platform install | `docs/07-tools/distribution.md` |
@@ -165,7 +173,7 @@ ky/
 | `json` | JSON parse + stringify | `packages/json/` |
 | `sqlite` | SQLite database bindings | `packages/sqlite/` |
 
-All packages use `extern fn` + `@link` for FFI. See `docs/03-language-reference/ffi.md`.
+All packages use `extern fn` + `@link` for FFI. See `docs/03-language/ffi/abi.md`.
 
 ---
 
@@ -436,11 +444,6 @@ rm -rf /tmp/verify_release_*
 
 1. **Do not guess syntax** — check `docs/03-language-reference/` first
 2. **Do not add new syntax features** without checking the docs
-3. **Do not reintroduce `mut`, `let`, `var`, `const`** — use `^T` or `:=`
-4. **Do not reintroduce `Option<T>` as public syntax** — use `T?`
-5. **Do not use `struct`** — use `final class`
-6. **Do not write C/C++ code** — the compiler and runtime are pure Rust
-7. **Do not skip tests** — CI must pass before any merge
 
 ---
 
@@ -562,30 +565,5 @@ See `docs/07-tools/distribution.md` for full details.
 ---
 
 *Version: v0.6.4 · Last updated: 2026-07-10 — See sections above for release process and cross-platform guide.*
-
----
-
-## Syntax Status by Document
-
-> All items start as `[x]` — tested and verified.
-> See `TEST_CHECKLIST.md` for the complete test suite.
-
-| # | Document | Status | Notes |
-|---|----------|--------|-------|
-| 1 | `03-language/lexical/literals.md` | [x] | Keywords, literals, comments `#`, escapes `\n \t \r \0` |
-| 2 | `03-language/syntax/variables.md` | [x] | `:=` const, `^T` mutable (v0.6), `&T` borrow |
-| 3 | `03-language/types/primitive-types.md` | [x] | All types, Copy/Move, `^T`, `&T`, `^&T` |
-| 4 | `03-language/syntax/expressions.md` | [x] | Arithmetic, comparisons, bitwise, `as` casts, ranges `..` |
-| 5 | `03-language/syntax/statements.md` | [x] | if/elif/else, while, for-in range, match, return |
-| 6 | `03-language/syntax/functions.md` | [x] | Parameters (move/borrow/mut borrow), fn pointers, closures |
-| 7 | `03-language/types/structs.md` | [x] | `class`, `final class`, StructLiteral, methods, inheritance |
-| 8 | `03-language/types/enums.md` | [x] | Enum with variants, match with `Enum.Variant` |
-| 9 | `03-language/types/generics.md` | [x] | `class Box<T>`, `fn identity<T>`, `identity<i32>(42)` |
-| 10 | `03-language/memory/ownership.md` | [x] | `^T` = mutable, `&T` = borrow, `^&T` = mut borrow, move default |
-| 11 | `03-language/syntax/pattern-matching.md` | [x] | `..=` range pattern, `1 | 2` or-pattern, basic match |
-| 12 | `03-language/error-handling/result.md` | [x] | `T!`, `ok(v)`/`error(e)` patterns, result match |
-| 13 | `03-language/syntax/modules.md` | [x] | `from X import Y`, `import X` |
-| 14 | `03-language/ffi/abi.md` | [x] | `@link`, `extern fn` declarations |
-| 15 | `03-language/concurrency/async-await.md` | [x] | `async fn`, `async:` block, `await` |
 
 

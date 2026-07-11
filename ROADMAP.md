@@ -16,7 +16,7 @@
 | **Tooling** (LSP, formatter, VS Code, package manager) | ✅ Completo |
 | **Paquetes** (http, json, sqlite) | ✅ Completo |
 | **FFI** (extern fn, @link, ptr) | ✅ Completo |
-| **Tipos especializados** (22 tipos) | ✅ Todos implementados |
+| **Tipos especializados** (46 tipos) | ✅ Todos implementados |
 | **--target flag** | ⬜ CLI + codegen + linker |
 | **.kyx parser** | ⬜ No implementado |
 | **Traductor JS** | ⬜ No implementado |

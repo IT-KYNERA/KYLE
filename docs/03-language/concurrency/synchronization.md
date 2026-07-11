@@ -1,12 +1,12 @@
 # Synchronization
 
-> Primitivas de sincronizacion between threads. Actualmente no implementeds as typis Kyle.
+> Primitivas de sincronizacion between threads.
 
 ## Status current
 
 | Primitiva | Status | Description |
 |-----------|--------|-------------|
-| `mutex<T>` | 📅 Planned | Exclusion mutua with data protegido |
+| `mutex<T>` | ✅ Implemented | Exclusion mutua with data protegido |
 | `rwlock<T>` | 📅 Planned | Readers-writer lock |
 | `barrier` | 📅 Planned | Barrera de sincronizacion |
 | `condvar` | 📅 Planned | Condition variable |

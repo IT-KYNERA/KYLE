@@ -107,9 +107,54 @@ fn main():
 
 ## Closures
 
+Una closure es una función anónima que captura variables de su entorno.
+
+### Sintaxis básica
+
+```ky
+fn(x: i32): x * 2
+```
+
+### Uso con colecciones
+
 ```ky
 doubled: {i32} = list.map(fn(x: i32): x * 2)
 filtered: {i32} = list.filter(fn(x: i32): x > 5)
+```
+
+### Captura de variables
+
+Las closures capturan variables del entorno **por referencia**:
+
+```ky
+multiplier: i32 = 3
+results: {i32} = numbers.map(fn(x: i32): x * multiplier)
+```
+
+### Closure con múltiples líneas
+
+```ky
+process: fn(i32) i32 = fn(x: i32):
+    result = x * 2
+    result + 1
+```
+
+### Closure como parámetro
+
+```ky
+fn apply_twice(value: i32, f: fn(i32) i32) i32:
+    f(f(value))
+
+result = apply_twice(5, fn(x: i32): x * 2)  # 20
+```
+
+### Type inference
+
+Kyle infiere los tipos de los parámetros cuando la closure se pasa a
+una función que espera un tipo de función específico:
+
+```ky
+numbers.filter(fn(x): x > 5)   # x es i32 por inferencia
 ```
 
 ## async fn

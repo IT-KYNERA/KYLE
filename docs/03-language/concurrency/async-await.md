@@ -70,7 +70,7 @@ task: future<str> = async:
 val = await task
 ```
 
-## channel: `channel<T>` [ ]
+## channel: `channel<T>` [x]
 
 ```ky
 ch: channel<i32> = channel(16) # buffer 16
@@ -92,7 +92,7 @@ select:
  println("timeout")
 ```
 
-## mutex: `mutex<T>` [ ]
+## mutex: `mutex<T>` [x]
 
 ```ky
 m: mutex<i32> = mutex(0)
@@ -100,7 +100,7 @@ lock(m):
  *val += 1 # operation segura
 ```
 
-## Atomic typis [ ]
+## Atomic typis [x]
 
 ```ky
 counter: atomic_i64 = atomic_i64(0)
@@ -112,7 +112,9 @@ flag.store(true)
 flag.load() # → true
 ```
 
-## iterator [ ]
+---
+
+## iterator [x]
 
 ```ky
 iter = list.iter()
@@ -132,10 +134,9 @@ result = doubled.collect() # → {i32}
 | `await` | ✅ | `await task` |
 | `parallel.for` | [x] | `parallel.for(fn, 0, N)` |
 | `thread.spawn` / `thread.join` | [x] | `thread.spawn(fn, arg)` / `thread.join(h)` |
+| `mutex<T>` | [x] | `mutex<T>(v); lock(m): *val += 1` |
+| `atomic_i64` / `atomic_bool` | [x] | `atomic_i64(v).fetch_add(1)` |
+| `channel<T>` | [x] | `ch = channel<T>(n); ch.send(v); v = ch.recv()` |
+| `iterator` | [x] | `list.iter().map(fn).filter(fn).collect()` |
 | `future<T>` | 📅 | `t: future<str> = async: ...` |
-| `channel<T>` | 📅 | `ch = channel<T>(n); ch.send(v); v = ch.recv()` |
 | `select` | 📅 | `select: &msg -> ch: ...` |
-| `mutex<T>` | 📅 | `mutex<T>(v); lock(m): *val += 1` |
-| `atomic_i64` | 📅 | `atomic_i64(v).fetch_add(1)` |
-| `atomic_bool` | 📅 | `atomic_bool(v).store(true)` |
-| `iterator` | 📅 | `list.iter().map(fn).filter(fn).collect()` |
