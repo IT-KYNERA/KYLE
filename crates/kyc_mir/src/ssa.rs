@@ -424,9 +424,11 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                         let call_type = func.basic_blocks.iter()
                             .flat_map(|b| b.insts.iter())
                             .find_map(|inst| {
-                                if let MirInst::Call { dest: Some(dd), .. } = inst {
-                                    if *dd == d { Some(MirType::I64) } else { None }
-                                } else { None }
+                                // Look up the alloca type for the dest local (actual return type)
+                                if let MirInst::Alloca { dest: dd, type_, .. } = inst {
+                                    if *dd == d { return Some(type_.clone()); }
+                                }
+                                None
                             })
                             .unwrap_or(MirType::I64);
                         ssa.values.push(SsaValue { type_: call_type, name: format!("_c{}", d) });
