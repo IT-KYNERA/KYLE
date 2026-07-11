@@ -11,6 +11,7 @@ pub fn generate(file: &KyxFile) -> String {
     js.push_str("const { Router, routeParams } = require('./router.js');\n");
     js.push_str("const { A11yManager } = require('./a11y.js');\n");
     js.push_str("const { portalManager } = require('./portal.js');\n");
+    js.push_str("const { ErrorBoundary } = require('./error_boundary.js');\n");
     js.push_str("const _a11y = new A11yManager();\n\n");
 
     // Generate styles
@@ -82,6 +83,21 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
                 js.push_str(&format!("{}if (typeof _portal_content !== 'undefined') {{\n", ind));
                 js.push_str(&format!("{}  portalManager.create(_portal_content, {:?});\n", ind, target));
                 js.push_str(&format!("{}}}\n", ind));
+                return;
+            }
+            if tag == "error_boundary" {
+                // Error boundary: wrap children in ErrorBoundary
+                js.push_str(&format!("{}// Error boundary\n", ind));
+                js.push_str(&format!("{}const _boundary = new ErrorBoundary();\n", ind));
+                js.push_str(&format!("{}const _wrappedRender = _boundary.wrap(() => {{\n", ind));
+                js.push_str(&format!("{}  const _content = document.createDocumentFragment();\n", ind));
+                for child in children {
+                    gen_node(child, js, indent + 2, "_content");
+                }
+                js.push_str(&format!("{}  return _content;\n", ind));
+                js.push_str(&format!("{}}});\n", ind));
+                js.push_str(&format!("{}const _boundaryResult = _wrappedRender();\n", ind));
+                js.push_str(&format!("{}if (_boundaryResult) {{ {}.appendChild(_boundaryResult); }}\n", ind, parent));
                 return;
             }
             if tag == "outlet" {
