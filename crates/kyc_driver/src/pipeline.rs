@@ -30,6 +30,7 @@ const KYLE_PRELUDE: &str = r#"
 # uuid
 # ═══════════════════════════════════════
 
+extern fn ky_ptr_read_ptr(ptr) ptr
 extern fn ky_uuid_v4() ptr
 extern fn ky_uuid_parse(ptr) ptr
 
@@ -37,10 +38,10 @@ fn uuid_v4() ptr:
     ky_uuid_v4()
 
 fn uuid_parse(s: &str) ptr:
-    ky_uuid_parse(s as ptr)
+    ky_uuid_parse(ky_ptr_read_ptr(s as ptr))
 
 fn uuid_to_str(data: &ptr) str:
-    raw = data as ptr
+    raw = ky_ptr_read_ptr(data as ptr)
     if raw == 0 as ptr: return ""
     raw as str
 
@@ -54,7 +55,7 @@ extern fn ky_decimal_round(val: i64, decimals: i32) i64
 extern fn ky_decimal_truncate(val: i64) i64
 
 fn decimal_from_str(s: &str) i64:
-    ky_decimal_from_str(s as ptr)
+    ky_decimal_from_str(ky_ptr_read_ptr(s as ptr))
 
 fn decimal_to_str(val: i64) str:
     raw = ky_decimal_to_str(val) as i64
@@ -92,7 +93,7 @@ fn datetime_from_ymdhms(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) i64:
     ky_datetime_from_ymdhms(y, m, d, h, min, s)
 
 fn datetime_parse(s: &str) i64:
-    ky_datetime_parse(s as ptr)
+    ky_datetime_parse(ky_ptr_read_ptr(s as ptr))
 
 fn datetime_year(ms: i64) i32:
     ky_datetime_year(ms)
@@ -142,7 +143,7 @@ fn date_from_ymd(y: i32, m: i32, d: i32) i32:
     ky_date_from_ymd(y, m, d)
 
 fn date_parse(s: &str) i32:
-    ky_date_parse(s as ptr)
+    ky_date_parse(ky_ptr_read_ptr(s as ptr))
 
 fn date_year(packed: i32) i32:
     ky_date_year(packed)
@@ -177,7 +178,7 @@ fn time_from_hms(h: i32, m: i32, s: i32) i32:
     ky_time_from_hms(h, m, s)
 
 fn time_parse(s: &str) i32:
-    ky_time_parse(s as ptr)
+    ky_time_parse(ky_ptr_read_ptr(s as ptr))
 
 fn time_hour(packed: i32) i32:
     ky_time_hour(packed)
@@ -201,13 +202,13 @@ fn bytes_new(n: i32) ptr:
     ky_bytes_new(n)
 
 fn bytes_get(b: &ptr, i: i32) i32:
-    ky_bytes_get(b as ptr, i)
+    ky_bytes_get(ky_ptr_read_ptr(b as ptr), i)
 
 fn bytes_set(b: &ptr, i: i32, v: i32):
-    ky_bytes_set(b as ptr, i, v)
+    ky_bytes_set(ky_ptr_read_ptr(b as ptr), i, v)
 
 fn bytes_to_hex(b: &ptr, size: i32) str:
-    raw = ky_bytes_to_hex(b as ptr, size) as i64
+    raw = ky_bytes_to_hex(ky_ptr_read_ptr(b as ptr), size) as i64
     if raw == 0: return ""
     (raw as ptr) as str
 
@@ -221,18 +222,18 @@ extern fn ky_regex_find(ptr, ptr) ptr
 extern fn ky_regex_replace(ptr, ptr, ptr) ptr
 
 fn regex_compile(pattern: &str) ptr:
-    ky_regex_new(pattern as ptr)
+    ky_regex_new(ky_ptr_read_ptr(pattern as ptr))
 
 fn regex_is_match(re: &ptr, s: &str) i32:
-    ky_regex_is_match(re as ptr, s as ptr)
+    ky_regex_is_match(ky_ptr_read_ptr(re as ptr), ky_ptr_read_ptr(s as ptr))
 
 fn regex_find(re: &ptr, s: &str) str:
-    raw = ky_regex_find(re as ptr, s as ptr) as i64
+    raw = ky_regex_find(ky_ptr_read_ptr(re as ptr), ky_ptr_read_ptr(s as ptr)) as i64
     if raw == 0: return ""
     (raw as ptr) as str
 
 fn regex_replace(re: &ptr, s: &str, with: &str) str:
-    raw = ky_regex_replace(re as ptr, s as ptr, with as ptr) as i64
+    raw = ky_regex_replace(ky_ptr_read_ptr(re as ptr), ky_ptr_read_ptr(s as ptr), ky_ptr_read_ptr(with as ptr)) as i64
     if raw == 0: return ""
     (raw as ptr) as str
 
@@ -247,25 +248,25 @@ extern fn ky_url_path(ptr) ptr
 extern fn ky_url_query(ptr) ptr
 
 fn url_scheme(raw: &str) str:
-    raw_out = ky_url_scheme(raw as ptr) as i64
+    raw_out = ky_url_scheme(ky_ptr_read_ptr(raw as ptr)) as i64
     if raw_out == 0: return ""
     (raw_out as ptr) as str
 
 fn url_host(raw: &str) str:
-    raw_out = ky_url_host(raw as ptr) as i64
+    raw_out = ky_url_host(ky_ptr_read_ptr(raw as ptr)) as i64
     if raw_out == 0: return ""
     (raw_out as ptr) as str
 
 fn url_port(raw: &str) i32:
-    ky_url_port(raw as ptr)
+    ky_url_port(ky_ptr_read_ptr(raw as ptr))
 
 fn url_path(raw: &str) str:
-    raw_out = ky_url_path(raw as ptr) as i64
+    raw_out = ky_url_path(ky_ptr_read_ptr(raw as ptr)) as i64
     if raw_out == 0: return ""
     (raw_out as ptr) as str
 
 fn url_query(raw: &str) str:
-    raw_out = ky_url_query(raw as ptr) as i64
+    raw_out = ky_url_query(ky_ptr_read_ptr(raw as ptr)) as i64
     if raw_out == 0: return ""
     (raw_out as ptr) as str
 
@@ -282,7 +283,7 @@ extern fn ky_bytes_to_hex(ptr, i32) ptr
 
 fn sha256(data: &str) str:
     md = ky_alloc(32)
-    ky_sha256(data as ptr, len(data), md)
+    ky_sha256(ky_ptr_read_ptr(data as ptr), len(data), md)
     ky_bytes_to_hex(md, 32) as str
 
 fn random_bytes(count: i32) ptr:

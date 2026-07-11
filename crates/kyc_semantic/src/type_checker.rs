@@ -828,6 +828,7 @@ impl TypeChecker {
                                         let type_name = match &param.type_ {
                                             AstType::User { name, .. } | AstType::Primitive { name, .. } => Some(name.as_str()),
                                             AstType::Array { .. } => Some("__array__"),
+                                            AstType::Ptr { .. } => Some("ptr"),
                                             _ => None,
                                         };
                                         let is_copy_type = type_name.map_or(false, |n| n != "str" && n != "void" && n != "any" && n != "__array__")
