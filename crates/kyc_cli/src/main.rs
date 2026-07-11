@@ -33,6 +33,7 @@ fn main() {
         "build" => cmd_build(&args),
         "run" => cmd_run(&args),
         "check" => cmd_check(&args),
+        "serve" => cmd_serve(&args),
         "parse" => cmd_parse(&args),
         "mir" => cmd_mir(&args),
         "test" => cmd_test(&args),
@@ -583,7 +584,7 @@ fn cmd_new(args: &[String]) {
         project_name_arg = &args[2];
         // Check if the first arg is actually a type keyword
         let first = &args[2];
-        if first == "api" || first == "bare" {
+        if first == "api" || first == "bare" || first == "webapp" {
             eprintln!("Error: missing project name for type '{}'", first);
             eprintln!("Usage: {} new {} <project>", bin_name(), first);
             process::exit(1);
@@ -591,9 +592,10 @@ fn cmd_new(args: &[String]) {
     } else {
         eprintln!("Error: missing project name");
         eprintln!("Usage: {} new [type] <project>", bin_name());
-        eprintln!("Types: app  — standard project (default)");
-        eprintln!("       api  — HTTP API server project");
-        eprintln!("       bare — single script file, no main");
+        eprintln!("Types: app     — standard project (default)");
+        eprintln!("       api     — HTTP API server project");
+        eprintln!("       webapp  — frontend UI project with dev server");
+        eprintln!("       bare    — single script file, no main");
         process::exit(1);
     }
 
@@ -615,6 +617,7 @@ fn cmd_new(args: &[String]) {
     match project_type {
         "bare" => cmd_new_bare(&project_dir, &project_name, &exe_path),
         "api" => cmd_new_api(&project_dir, &project_name, &exe_path),
+        "webapp" => cmd_new_webapp(&project_dir, &project_name, &exe_path),
         _ => cmd_new_app(&project_dir, &project_name, &exe_path),
     }
 }
@@ -710,6 +713,165 @@ fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
     println!("   └── .vscode/        — VS Code settings");
     println!();
     println!("   cd {} && {} run {}.ky", project_name, bin_name(), project_name);
+}
+
+fn cmd_new_webapp(project_dir: &Path, project_name: &str, exe_path: &str) {
+    // Create src/ directory
+    fs::create_dir_all(project_dir.join("src")).unwrap_or_else(|e| {
+        eprintln!("Error creating project: {}", e);
+        process::exit(1);
+    });
+
+    // Write main.kyx — entry point
+    let main_kyx = format!(
+        "# {} — web frontend entry point\nview(\"/\")\n\n@(\n    count: ^i32 = 0\n    fn increment():\n        count = count + 1\n)\n\n<app>\n    <column layout=center spacing=16 padding=20>\n        <text value=\"Bienvenido a Kyle UI!\" font_size=24 font_weight=Bold />\n        <text value=\"Contador: \" + count.to_str() />\n        <button tpl=Primary text=\"+\" click=@increment />\n    </column>\n</app>\n",
+        project_name
+    );
+    fs::write(project_dir.join("src").join("main.kyx"), &main_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing src/main.kyx: {}", e);
+        process::exit(1);
+    });
+
+    // Write index.html
+    let index_html = format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{}</title>
+    <style>
+        body {{ margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }}
+        #app {{ min-height: 100vh; }}
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        import createApp from './target/debug/main.js';
+        const app = document.getElementById('app');
+        const result = createApp();
+        app.appendChild(result.element);
+    </script>
+</body>
+</html>
+"#, project_name
+    );
+    fs::write(project_dir.join("index.html"), &index_html).unwrap_or_else(|e| {
+        eprintln!("Error writing index.html: {}", e);
+        process::exit(1);
+    });
+
+    write_manifest(project_dir, project_name, "src/main.kyx");
+    write_gitignore(project_dir);
+    write_vscode_settings(project_dir, exe_path);
+
+    println!("✅ Created webapp project '{}'", project_name);
+    println!("   ├── src/main.kyx     — UI component");
+    println!("   ├── index.html       — entry page");
+    println!("   ├── ky.toml          — manifest");
+    println!("   ├── .gitignore");
+    println!("   └── .vscode/         — VS Code settings");
+    println!();
+    println!("   cd {} && {} serve --port 8080", project_name, bin_name());
+}
+
+fn cmd_serve(args: &[String]) {
+    let port = args.iter().position(|a| a == "--port")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(3000);
+
+    let project_root = match find_project_root(&std::env::current_dir().unwrap()) {
+        Some(r) => r,
+        None => { eprintln!("No ky.toml found"); process::exit(1); }
+    };
+
+    let source_path = project_root.join("src").join("main.kyx");
+    if !source_path.exists() {
+        eprintln!("No src/main.kyx found in project");
+        process::exit(1);
+    }
+
+    // Build once on start
+    println!("Building project...");
+    let source = fs::read_to_string(&source_path).unwrap_or_else(|e| {
+        eprintln!("Error reading {}: {}", source_path.display(), e);
+        process::exit(1);
+    });
+    let file = source_path.to_string_lossy().to_string();
+    let build_dir = project_root.join("target").join("debug");
+    let js_output = build_dir.join("main.js");
+    let _ = fs::create_dir_all(&build_dir);
+    match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+        Ok(()) => {}
+        Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+    }
+
+    println!("Serving on http://localhost:{}", port);
+
+    // Simple HTTP server
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = std::net::TcpListener::bind(&addr).unwrap_or_else(|e| {
+        eprintln!("Failed to bind to port {}: {}", port, e);
+        process::exit(1);
+    });
+
+    // Try to open browser
+    let url = format!("http://localhost:{}", port);
+    let _ = std::process::Command::new("open").arg(&url).spawn();
+
+    println!("Press Ctrl+C to stop");
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                handle_connection(stream, &project_root);
+            }
+            Err(e) => {
+                eprintln!("Connection error: {}", e);
+            }
+        }
+    }
+}
+
+fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
+    use std::io::{Read, Write};
+    let mut buffer = [0; 4096];
+    if stream.read(&mut buffer).is_err() { return; }
+    let request = String::from_utf8_lossy(&buffer[..]);
+    let path = request.lines().next()
+        .and_then(|l| l.split_whitespace().nth(1))
+        .unwrap_or("/");
+
+    let (status, content, mime) = if path == "/" || path == "/index.html" {
+        let index_path = project_root.join("index.html");
+        let content = fs::read_to_string(&index_path).unwrap_or_default();
+        (200, content, "text/html")
+    } else if path.starts_with("/target/debug/") {
+        let file_path = project_root.join(&path[1..]); // strip leading /
+        match fs::read_to_string(&file_path) {
+            Ok(content) => {
+                let mime = if path.ends_with(".js") { "application/javascript" }
+                    else if path.ends_with(".css") { "text/css" }
+                    else { "text/plain" };
+                (200, content, mime)
+            }
+            Err(_) => (404, "Not Found".to_string(), "text/plain"),
+        }
+    } else {
+        (404, "Not Found".to_string(), "text/plain")
+    };
+
+    let response = format!(
+        "HTTP/1.1 {status} OK\r\nContent-Type: {mime}\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{content}",
+        status = status,
+        mime = mime,
+        len = content.len(),
+        content = content
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
 }
 
 /// Write VS Code settings with correct ky compiler path.
@@ -955,6 +1117,7 @@ fn print_usage() {
     eprintln!("  {name} build <file.ky> [--target <triple>]     Compile single file");
     eprintln!("  {name} run   <file.ky> [--target <triple>]     Compile and run single file");
     eprintln!("  {name} check <file.ky>     Type-check without codegen");
+    eprintln!("  {name} serve [--port N]    Start web dev server (for .kyx projects)");
     eprintln!("  {name} parse <file.ky>     Parse and dump AST");
     eprintln!("  {name} mir   <file.ky>     Parse and dump MIR");
     eprintln!("  {name} fmt   [file/dir]    Format source files in project or specific file/dir");
@@ -962,6 +1125,7 @@ fn print_usage() {
     eprintln!();
     eprintln!("Project creation:");
     eprintln!("  {name} new   <project>     Create new KL project");
+    eprintln!("  {name} new   webapp <name>  Create new web frontend project");
     eprintln!();
     eprintln!("System:");
     eprintln!("  {name} uninstall           Remove ky and LLVM files");

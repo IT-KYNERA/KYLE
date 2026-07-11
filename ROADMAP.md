@@ -29,28 +29,31 @@
 | **FASE 10: i18n** | ✅ Completo |
 | **FASE 11: SSR** | ✅ Completo |
 | **FASE 12: Testing** | ✅ Completo |
+| **FASE 13: Webapp Project + Dev Server** | ⬜ Pendiente |
 
 ---
 
-## Próximos Pasos (UI Framework)
+## Próximos Pasos
 
 ```
-FASE 0 ─── CLI --target + WASM ───────────────── Sem 1-2
-  │
-FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3-4
-  │
-  ├── FASE 2 ─── Estilos tipados ─────────────── Sem 5
-  │
-  ├── FASE 3 ─── Eventos + Binding ───────────── Sem 6
-  │
-  ├── FASE 4 ─── Componentes UI ──────────────── Sem 7-8
-  │
-  ├── FASE 5 ─── Routing ─────────────────────── Sem 9
-  │
-  ├── FASE 6 ─── Animaciones ─────────────────── Sem 10
-  │
-  └── FASE 7 ─── a11y ────────────────────────── Sem 11-12
+FASE 13 ── ky new webapp + ky serve ─────────── Sem 19-20
 ```
+
+### FASE 13: Webapp Project + Dev Server
+
+| Tarea | Archivos | Esfuerzo |
+|-------|----------|:--------:|
+| Template `ky new webapp <name>` | `crates/kyc_cli/src/main.rs` | Pequeño |
+| Dev server `ky serve [--port]` | `crates/kyc_cli/src/main.rs` | Medio |
+| `index.html` con auto-load de runtime | `packages/webapp/template/` | Pequeño |
+| Build automático + file watching | `crates/kyc_tools/src/` | Medio |
+
+```bash
+ky new webapp mi-app
+cd mi-app
+ky serve --port 8080
+# → http://localhost:8080
+``````
 
 ### FASE 0: CLI --target + WASM (Semana 1-2)
 
