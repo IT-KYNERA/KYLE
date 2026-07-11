@@ -15,6 +15,20 @@ members = [
     "crates/kyc_runtime_wasm",
     "crates/kyc_ui",
 ]
+default-members = [
+    "crates/kyc_core",
+    "crates/kyc_frontend",
+    "crates/kyc_hir",
+    "crates/kyc_semantic",
+    "crates/kyc_mir",
+    "crates/kyc_backend",
+    "crates/kyc_driver",
+    "crates/kyc_cli",
+    "crates/kyc_runtime",
+    "crates/kyc_tools",
+    "crates/kyc_platform",
+    "crates/kyc_ui",
+]
 
 [workspace.package]
 version = "0.7.0"
