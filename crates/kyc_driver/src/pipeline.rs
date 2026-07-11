@@ -1031,6 +1031,27 @@ impl Pipeline {
         Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive, target)
     }
 
+    /// Build a .kyx UI source file: parse .kyx and generate JS.
+    pub fn build_kyx_source(source: &str, output_path: &Path) -> Result<(), String> {
+        let file = kyc_ui::parser::parse(source)
+            .map_err(|e| format!("kyx parse error: {}", e))?;
+        let js = kyc_ui::js_gen::generate(&file);
+        let mut f = std::fs::File::create(output_path)
+            .map_err(|e| format!("Failed to create output file: {}", e))?;
+        f.write_all(js.as_bytes())
+            .map_err(|e| format!("Failed to write JS output: {}", e))?;
+        println!("Build complete: {}", output_path.display());
+        Ok(())
+    }
+
+    /// Check a .kyx UI source file: parse and validate.
+    pub fn check_kyx_source(source: &str) -> Result<(), String> {
+        let file = kyc_ui::parser::parse(source)
+            .map_err(|e| format!("kyx parse error: {}", e))?;
+        println!("kyx file: {} nodes, {} views", file.body.len(), file.view_paths.len());
+        Ok(())
+    }
+
     fn _build_source(
         source: &str,
         file_name: &str,

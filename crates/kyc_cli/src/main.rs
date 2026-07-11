@@ -145,6 +145,10 @@ fn install_package_to_std(project_root: &Path, name: &str, version: &str) -> Res
 
 // ── Command Implementations ──
 
+fn is_kyx_file(file: &str) -> bool {
+    Path::new(file).extension().map_or(false, |ext| ext == "kyx")
+}
+
 fn cmd_build(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
     let target = args.iter().position(|a| a == "--target")
@@ -165,19 +169,27 @@ fn cmd_build(args: &[String]) {
             });
             let file = source_path.to_string_lossy().to_string();
             let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
-            let output = exe_path(&build_dir.join("main"));
             let _ = fs::create_dir_all(&build_dir);
-            let build_result = if release {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
+            if is_kyx_file(&file) {
+                let js_output = build_dir.join("main.js");
+                match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+                    Ok(()) => {}
+                    Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+                }
             } else {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
-            };
-            match build_result {
-                Ok(()) => println!("Build complete: {}", output.display()),
-                Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+                let output = exe_path(&build_dir.join("main"));
+                let build_result = if release {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
+                } else {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
+                };
+                match build_result {
+                    Ok(()) => println!("Build complete: {}", output.display()),
+                    Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+                }
             }
         } else {
-            eprintln!("No src/main.ky found in project");
+            eprintln!("No src/main.ky or src/main.kyx found in project");
             process::exit(1);
         }
         return;
@@ -192,16 +204,24 @@ fn cmd_build(args: &[String]) {
     let source = load_source(args, file_idx);
     let file_stem = Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string();
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
-    let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
-    let build_result = if release {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
+    if is_kyx_file(file) {
+        let js_output = build_dir.join(&file_stem).with_extension("js");
+        match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+            Ok(()) => {}
+            Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+        }
     } else {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
-    };
-    match build_result {
-        Ok(()) => println!("Build complete: {}", output.display()),
-        Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+        let output = exe_path(&build_dir.join(&file_stem));
+        let build_result = if release {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
+        } else {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
+        };
+        match build_result {
+            Ok(()) => println!("Build complete: {}", output.display()),
+            Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+        }
     }
 }
 
@@ -225,27 +245,43 @@ fn cmd_run(args: &[String]) {
             });
             let file = source_path.to_string_lossy().to_string();
             let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
-            let output = exe_path(&build_dir.join("main"));
             let _ = fs::create_dir_all(&build_dir);
-            let run_result = if release {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
-            } else {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
-            };
-            match run_result {
-                Ok(()) => {
-                    let status = process::Command::new(&output)
-                        .args(args.iter().skip(2))
-                        .status()
-                        .expect("Failed to execute binary");
-                    if !status.success() {
-                        process::exit(status.code().unwrap_or(1));
+            if is_kyx_file(&file) {
+                let js_output = build_dir.join("main.js");
+                match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+                    Ok(()) => {
+                        let status = process::Command::new("node")
+                            .arg(&js_output)
+                            .status()
+                            .expect("Failed to run with Node.js");
+                        if !status.success() {
+                            process::exit(status.code().unwrap_or(1));
+                        }
                     }
+                    Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
                 }
-                Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
+            } else {
+                let output = exe_path(&build_dir.join("main"));
+                let run_result = if release {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
+                } else {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
+                };
+                match run_result {
+                    Ok(()) => {
+                        let status = process::Command::new(&output)
+                            .args(args.iter().skip(2))
+                            .status()
+                            .expect("Failed to execute binary");
+                        if !status.success() {
+                            process::exit(status.code().unwrap_or(1));
+                        }
+                    }
+                    Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
+                }
             }
         } else {
-            eprintln!("No src/main.ky found in project");
+            eprintln!("No src/main.ky or src/main.kyx found in project");
             process::exit(1);
         }
         return;
@@ -260,24 +296,40 @@ fn cmd_run(args: &[String]) {
     let source = load_source(args, file_idx);
     let file_stem = Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string();
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
-    let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
-    let run_result = if release {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
-    } else {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
-    };
-    match run_result {
-        Ok(()) => {
-            let status = process::Command::new(&output)
-                .args(args.iter().skip(3))
-                .status()
-                .expect("Failed to execute binary");
-            if !status.success() {
-                process::exit(status.code().unwrap_or(1));
+    if is_kyx_file(file) {
+        let js_output = build_dir.join(&file_stem).with_extension("js");
+        match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+            Ok(()) => {
+                let status = process::Command::new("node")
+                    .arg(&js_output)
+                    .status()
+                    .expect("Failed to run with Node.js");
+                if !status.success() {
+                    process::exit(status.code().unwrap_or(1));
+                }
             }
+            Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
         }
-        Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
+    } else {
+        let output = exe_path(&build_dir.join(&file_stem));
+        let run_result = if release {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
+        } else {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
+        };
+        match run_result {
+            Ok(()) => {
+                let status = process::Command::new(&output)
+                    .args(args.iter().skip(3))
+                    .status()
+                    .expect("Failed to execute binary");
+                if !status.success() {
+                    process::exit(status.code().unwrap_or(1));
+                }
+            }
+            Err(e) => { eprintln!("Run error: {}", e); process::exit(1); }
+        }
     }
 }
 
@@ -293,19 +345,26 @@ fn cmd_check(args: &[String]) {
                     process::exit(1);
                 });
                 let file = source_path.to_string_lossy().to_string();
-                match kyc_driver::pipeline::Pipeline::check_source(&source, &file) {
-                    Ok(output) => {
-                        if output.analyzer.has_errors() {
-                            output.analyzer.emit_diagnostics();
-                            process::exit(1);
-                        } else {
-                            println!("No errors found.");
-                        }
+                if is_kyx_file(&file) {
+                    match kyc_driver::pipeline::Pipeline::check_kyx_source(&source) {
+                        Ok(()) => println!("No errors found."),
+                        Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
                     }
-                    Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
+                } else {
+                    match kyc_driver::pipeline::Pipeline::check_source(&source, &file) {
+                        Ok(output) => {
+                            if output.analyzer.has_errors() {
+                                output.analyzer.emit_diagnostics();
+                                process::exit(1);
+                            } else {
+                                println!("No errors found.");
+                            }
+                        }
+                        Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
+                    }
                 }
             } else {
-                eprintln!("No src/main.ky found in project");
+                eprintln!("No src/main.ky or src/main.kyx found in project");
                 process::exit(1);
             }
         } else {
@@ -321,16 +380,23 @@ fn cmd_check(args: &[String]) {
 
     let source = load_source(args, 2);
     let file = &args[2];
-    match kyc_driver::pipeline::Pipeline::check_source(&source, file) {
-        Ok(output) => {
-            if output.analyzer.has_errors() {
-                output.analyzer.emit_diagnostics();
-                process::exit(1);
-            } else {
-                println!("No errors found.");
-            }
+    if is_kyx_file(file) {
+        match kyc_driver::pipeline::Pipeline::check_kyx_source(&source) {
+            Ok(()) => println!("No errors found."),
+            Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
         }
-        Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
+    } else {
+        match kyc_driver::pipeline::Pipeline::check_source(&source, file) {
+            Ok(output) => {
+                if output.analyzer.has_errors() {
+                    output.analyzer.emit_diagnostics();
+                    process::exit(1);
+                } else {
+                    println!("No errors found.");
+                }
+            }
+            Err(e) => { eprintln!("Check error: {}", e); process::exit(1); }
+        }
     }
 }
 

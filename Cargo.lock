@@ -568,6 +568,7 @@ dependencies = [
  "kyc_mir",
  "kyc_semantic",
  "kyc_tools",
+ "kyc_ui",
 ]
 
 [[package]]
