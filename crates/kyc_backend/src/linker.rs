@@ -208,6 +208,7 @@ impl Linker {
         } else {
             "libkyc_runtime.a"
         };
+        let wasm_lib = "libkyc_runtime_wasm.a";
 
         let mut paths = Vec::new();
 
@@ -227,6 +228,9 @@ impl Linker {
         if let Some(root) = workspace_root() {
             paths.push(root.join("target").join("debug").join(runtime_lib));
             paths.push(root.join("target").join("release").join(runtime_lib));
+            // WASM runtime
+            paths.push(root.join("target/wasm32-unknown-unknown/release").join(wasm_lib));
+            paths.push(root.join("target/wasm32-unknown-unknown/debug").join(wasm_lib));
         }
 
         // 3. Current working directory

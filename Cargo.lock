@@ -615,6 +615,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "kyc_runtime_wasm"
+version = "0.6.4"
+
+[[package]]
 name = "kyc_semantic"
 version = "0.6.4"
 dependencies = [
