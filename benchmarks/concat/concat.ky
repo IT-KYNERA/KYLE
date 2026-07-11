@@ -6,6 +6,5 @@ fn main() i32:
         str_builder.append(sb, "x")
         i = i + 1
     result = str_builder.to_str(sb)
-    str_builder.free(sb)
     println(result.len().to_str())
     0
