@@ -110,7 +110,7 @@ FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3
 
 ---
 
-## Benchmarks (Apple M1/macOS, Jul 2026)
+## Benchmarks (Apple M5/macOS, Jul 2026)
 
 Benchmarks compilados con `-O3` (C/C++), `opt-level=3` (Rust), `go build` (Go),
 `.NET Release` (C#), `javac` (Java), `ky build` (Kyle).
