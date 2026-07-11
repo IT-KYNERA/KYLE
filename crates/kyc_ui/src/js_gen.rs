@@ -12,6 +12,8 @@ pub fn generate(file: &KyxFile) -> String {
     js.push_str("const { A11yManager } = require('./a11y.js');\n");
     js.push_str("const { portalManager } = require('./portal.js');\n");
     js.push_str("const { ErrorBoundary } = require('./error_boundary.js');\n");
+    js.push_str("const { getI18n, t, setLocale } = require('./i18n.js');\n");
+    js.push_str("const _i18n = getI18n();\n");
     js.push_str("const _a11y = new A11yManager();\n\n");
 
     // Generate styles
