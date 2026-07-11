@@ -95,6 +95,31 @@ FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3
 
 ---
 
+## Bugs Encontrados y Fixeados (Jul 2026)
+
+| Bug | Archivos afectados | Estado |
+|-----|:------------------:|:------:|
+| `await` type: siempre retorna `i64` sin importar el return type real | type_checker, lower, ssa, codegen | ✅ Fixed |
+| `!` propagación: parse error con postfix `!` | parser | ✅ Fixed |
+| `prop` syntax: getter/setter property dispatch | type_checker, lower, codegen | ✅ Fixed |
+| `set{1,2,3}` literal: parseaba como struct literal | parser | ✅ Fixed |
+| `f32` codegen: SSA verify error en métodos con float | codegen | ✅ Fixed |
+| `str_builder` linker: runtime symbols no exportados | lower (return type mapping) | ✅ Fixed |
+| Generic methods: `Box<T>.get()` monomorphization error | pre-existing | ⬜ No fixeado |
+| Fn pointer calls: silent crash en `apply(&fn, arg)` | pre-existing | ⬜ No fixeado |
+
+---
+
+## Benchmarks (Apple M1/macOS, Jul 2026)
+
+| Benchmark | Kyle (ms) |
+|-----------|:---------:|
+| Prime Sieve (1M) | 20 |
+| Fibonacci (10M) | 180 |
+| String Concat (50k) | 10 |
+
+---
+
 ## Testing
 
 ```bash
