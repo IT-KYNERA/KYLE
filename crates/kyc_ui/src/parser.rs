@@ -46,6 +46,7 @@ impl KyxParser {
         let mut view_paths = Vec::new();
         let mut code_blocks = Vec::new();
         let mut styles = Vec::new();
+        let mut animations = Vec::new();
         let mut body = Vec::new();
 
         loop {
@@ -71,6 +72,17 @@ impl KyxParser {
                     self.expect_char(':')?;
                     let props = self.parse_style_props()?;
                     styles.push(StyleDecl::Theme { name, props });
+                }
+                Some('a') if self.starts_with("animation<") => {
+                    self.pos += 9; // "animation"
+                    self.expect_char('<')?;
+                    let component = self.read_while(|c| c != '>')?;
+                    self.expect_char('>')?;
+                    self.skip_whitespace();
+                    let name = self.read_while(|c| c != ':' && c != ' ' && c != '\t')?.trim().to_string();
+                    self.expect_char(':')?;
+                    let props = self.parse_style_props()?;
+                    animations.push(AnimDecl { component, name, props });
                 }
                 Some(c) if c == 'v' || c == 'V' => {
                     // Try to parse view("...")
@@ -148,7 +160,7 @@ impl KyxParser {
             }
         }
 
-        Ok(KyxFile { view_paths, code_blocks, styles, body })
+        Ok(KyxFile { view_paths, code_blocks, styles, animations, body })
     }
 
     fn parse_style_decl(&mut self, kind: &str, _is_theme: bool) -> Result<StyleDecl, String> {

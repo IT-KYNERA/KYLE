@@ -14,6 +14,10 @@ pub fn generate(file: &KyxFile) -> String {
     let style_js = crate::style_gen::generate_styles(&file.styles);
     js.push_str(&style_js);
 
+    // Generate animations
+    let anim_js = crate::anim_gen::generate_animations(&file.animations);
+    js.push_str(&anim_js);
+
     // Determine component name from view path
     let comp_name = if let Some(path) = file.view_paths.first() {
         let name = path.trim_start_matches('/').replace('/', "_").replace(&['{', '}', '-'][..], "");
@@ -47,7 +51,7 @@ pub fn generate(file: &KyxFile) -> String {
 
     // Export
     js.push_str("if (typeof module !== 'undefined' && module.exports) {\n");
-    js.push_str(&format!("  module.exports = {{ render: render{}, styles }};\n", comp_name));
+    js.push_str(&format!("  module.exports = {{ render: render{}, styles, animations }};\n", comp_name));
     js.push_str("}\n");
 
     js
@@ -136,6 +140,9 @@ fn gen_attrs(attrs: &[KyxAttr], js: &mut String, indent: usize) {
                     "tpl" | "style" => {
                         js.push_str(&format!("{}applyStyle(_el, {:?});\n", ind, val));
                     }
+                    "animation" => {
+                        js.push_str(&format!("{}applyAnimation(_el, {:?});\n", ind, val));
+                    }
                     "text" | "value" | "label" => {
                         js.push_str(&format!("{}_el.textContent = {:?};\n", ind, val));
                     }
@@ -159,6 +166,9 @@ fn gen_attrs(attrs: &[KyxAttr], js: &mut String, indent: usize) {
                     }
                     "tpl" => {
                         js.push_str(&format!("{}applyStyle(_el, state.get({:?}));\n", ind, expr));
+                    }
+                    "animation" => {
+                        js.push_str(&format!("{}applyAnimation(_el, state.get({:?}));\n", ind, expr));
                     }
                     "checked" => {
                         js.push_str(&format!("{}Binding.oneWay(_el, 'checked', state, {:?});\n", ind, expr));

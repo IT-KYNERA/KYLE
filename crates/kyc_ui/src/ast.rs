@@ -9,6 +9,8 @@ pub struct KyxFile {
     pub code_blocks: Vec<String>,
     /// Style/template/theme declarations
     pub styles: Vec<StyleDecl>,
+    /// Animation declarations
+    pub animations: Vec<AnimDecl>,
     /// Root XML elements
     pub body: Vec<KyxNode>,
 }
@@ -127,6 +129,14 @@ pub enum AttrValue {
     Flag,
 }
 
+/// Animation declaration: animation<comp> Name: ...
+#[derive(Clone, Debug)]
+pub struct AnimDecl {
+    pub component: String,
+    pub name: String,
+    pub props: Vec<StyleProp>,
+}
+
 impl fmt::Display for KyxFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for path in &self.view_paths {
@@ -134,6 +144,10 @@ impl fmt::Display for KyxFile {
         }
         for block in &self.code_blocks {
             writeln!(f, "@({})", block)?;
+        }
+        for anim in &self.animations {
+            writeln!(f, "animation<{}> {}:", anim.component, anim.name)?;
+            for p in &anim.props { writeln!(f, "    {} = {}", p.name, p.value)?; }
         }
         for style in &self.styles {
             write!(f, "{}", style)?;
