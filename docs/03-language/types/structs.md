@@ -1,6 +1,7 @@
 # Classes
 
 **Status:** [x] final class, struct literal, methods, constructors, `Class :: Parent` inheritance.
+[x] Properties (por get/set methods como workaround, `prop` syntax no implementada).
 
 ## final class
 
@@ -76,13 +77,18 @@ config.port = 9090 # allowed
 
 ## Properties
 
+⚠️ **`prop` syntax NO implementada** — usar get/set methods como workaround:
+
 ```ky
 class Person:
- _name: str
+    _name: str
 
- prop name:
- get:
- this._name
- set:
- this._name = value
+    fn get_name(this) str:
+        this._name
+    fn set_name(this, value: str):
+        this._name = value
+
+person = Person { _name: "Alice" }
+print(person.get_name())   # Alice
+person.set_name("Bob")
 ```
