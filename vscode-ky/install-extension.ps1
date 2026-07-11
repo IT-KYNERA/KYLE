@@ -4,10 +4,10 @@
 #   iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.ps1" | iex
 #
 # Environment variables:
-#   $env:KY_EXT_VERSION = "v0.6.4"   Version tag to download VSIX from
+#   $env:KY_EXT_VERSION = "v0.7.0"   Version tag to download VSIX from
 
 param(
-    [string]$Version = "v0.6.4"
+    [string]$Version = "v0.7.0"
 )
 
 $Repo = "IT-KYNERA/KYLE"

@@ -564,6 +564,6 @@ See `docs/07-tools/distribution.md` for full details.
 
 ---
 
-*Version: v0.6.4 · Last updated: 2026-07-10 — See sections above for release process and cross-platform guide.*
+*Version: v0.7.0 · Last updated: 2026-07-11 — See sections above for release process and cross-platform guide.*
 
 

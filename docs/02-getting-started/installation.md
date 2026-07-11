@@ -124,7 +124,7 @@ go-to-definition, hover, rename), debugging, and a color theme.
 ## Verify Installation
 
 ```bash
-ky --version    # Should show v0.6.4
+ky --version    # Should show v0.7.0
 ky check --help # Should show help
 ky run examples/hello.ky  # Should print "Hello, World!"
 ```
