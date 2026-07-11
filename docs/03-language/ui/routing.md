@@ -61,7 +61,10 @@ view("/")
 ```kyx
 view("/users/{id}")
 @(
-    id: str = route_params().get("id") ?? ""
+    # route_params() es una función built-in del router
+    # Devuelve un dict con los parámetros de la URL
+    params: {str: str} = route_params()
+    id: str = params.get("id") ?? ""
     user: User? = fetch_user(id)
 )
 <view>

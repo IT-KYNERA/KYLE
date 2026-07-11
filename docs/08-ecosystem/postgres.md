@@ -94,7 +94,7 @@ final class Row:
  fn get_i64(name: str) i64
  fn get_f64(name: str) f64
  fn get_bool(name: str) bool
- fn keys() list<str> # columnas disponibles
+ fn keys() {str} # columnas disponibles
 ```
 
 ### Mapeo a clasis (with deserialize)

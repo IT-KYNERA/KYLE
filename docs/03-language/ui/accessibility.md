@@ -151,7 +151,7 @@ style<text> Body:
 ### 5.3 Reduced motion
 
 ```kyle
-<style<button>>:
+style<button> MotionAware:
     transition = Transition("background", 200, Easing.EaseInOut, 0)
     @media(reduced_motion: true):
         transition = Transition.NONE  # sin animación si el usuario lo prefiere

@@ -111,7 +111,7 @@ ky build --target wasm32 hello.kyx
 ### Entregable
 
 ```kyx
-<style<button>> Primary:
+style<button> Primary:
     background = Color("#0066FF")
     color = Color("#FFFFFF")
     border_radius = 8

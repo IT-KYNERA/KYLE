@@ -60,7 +60,7 @@ view("/login")
 </view>
 ```
 
-Sin `page(...)` → is un componente reutilizable.
+Sin `view(...)` → is un componente reutilizable.
 
 ---
 
@@ -195,12 +195,24 @@ Las views (con `view(...)`) no admiten slots.
 ## 14. Ciclo de vida
 
 ```kyle
-fn on_create(): ...
-fn on_init(): ...
-fn on_ready(): ...
-fn on_render(): ...
-fn on_rendered(): ...
-fn on_dispose(): ...
+fn on_created(this):
+    # Se llama una vez, después del constructor
+    # Inicializar recursos
+
+fn on_mounted(this):
+    # Se llama cuando el componente se monta en el DOM/padre
+    # Empezar timers, fetch data, etc.
+
+fn on_updated(this, changed: {str}):
+    # Se llama cuando cambian las props
+    # changed = conjunto de props que cambiaron
+
+fn on_unmounted(this):
+    # Se llama cuando el componente se desmonta
+    # Cleanup: timers, listeners, etc.
+
+fn on_error(this, error: str):
+    # Error boundary: captura errores en componentes hijos
 ```
 
 ---

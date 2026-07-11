@@ -288,7 +288,7 @@ See `docs/05-packages/registry.md` for full documentation.
 | Category | Typis |
 |-----------|-------|
 | **Primitivos** | `i8`, `i16`, `i32`, `i64`, `f32`, `f64`, `bool`, `char`, `str` |
-| **Compuestos** | `list<T>`, `dict<K,V>`, `ptr` |
+| **Compuestos** | `{T}` (list), `{K: V}` (dict), `[T, N]` (array), `ptr` |
 | **Functions** | `fn(T) U` (function pointers) |
 | **Usuario** | `class`, `struct`, `enum`, `type alias` |
 | **Generics builtin** | `Option<T>` (`T?`), `Result<T, str>` (`T!`) |
