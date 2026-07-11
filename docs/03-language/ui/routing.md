@@ -12,7 +12,7 @@
 
 ### 1.1 Páginas
 
-Cada página se define con `page()` en su .kyx:
+Cada vista ruteable se define con `view()` en su .kyx:
 
 **login.kyx:**
 ```kyx
@@ -49,7 +49,7 @@ view("/")
         <route path="/" component=@home_view />
         <route path="/login" component=@login_view />
         <route path="/dashboard" component=@dashboard_view />
-        <route path="/users/:id" component=@user_detail />
+        <route path="/users/{id}" component=@user_detail />
         <route path="/settings" component=@settings_view />
         <route path="*" component=@not_found_view />
     </router>
@@ -59,7 +59,7 @@ view("/")
 ### 1.3 Rutas con parámetros
 
 ```kyx
-view("/users/:id")
+view("/users/{id}")
 @(
     id: str = route_params().get("id") ?? ""
     user: User? = fetch_user(id)

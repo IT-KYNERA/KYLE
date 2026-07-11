@@ -209,7 +209,7 @@ view("/")
     <router>
         <route path="/" component=@home_view />
         <route path="/login" component=@login_view />
-        <route path="/users/:id" component=@user_detail />
+        <route path="/users/{id}" component=@user_detail />
     </router>
 </app>
 ```
