@@ -52,6 +52,10 @@ impl KyxParser {
             self.skip_whitespace();
             match self.peek() {
                 None => break,
+                Some('#') => {
+                    // Skip comment line
+                    while self.peek() != Some('\n') && self.peek().is_some() { self.advance(); }
+                }
                 Some('s') if self.starts_with("style<") => {
                     styles.push(self.parse_style_decl("style", false)?);
                 }
