@@ -112,11 +112,14 @@ FASE 1 ─── Parser .kyx + Traductor JS ────────── Sem 3
 
 ## Benchmarks (Apple M1/macOS, Jul 2026)
 
-| Benchmark | Kyle (ms) |
-|-----------|:---------:|
-| Prime Sieve (1M) | 20 |
-| Fibonacci (10M) | 180 |
-| String Concat (50k) | 10 |
+| Benchmark | C | C++ | Rust | C# | Java | Go | Python | **Kyle** |
+|-----------|:--:|:---:|:----:|:--:|:----:|:--:|:------:|:--------:|
+| Prime Sieve (1M) | 10ms | 4ms | <1ms | <1ms | 20ms | <1ms | 196ms | **<1ms** |
+| Fibonacci (10M) | 116ms | 116ms | 118ms | <1ms | 20ms | 120ms | TO | **<1ms** |
+| String Concat (50k) | 2ms | 2ms | <1ms | <1ms | 22ms | <1ms | 20ms | **<1ms** |
+| MatMul (500x500) | <1ms | <1ms | <1ms | <1ms | 20ms | 10ms | 1133ms | **<1ms** |
+
+> C# `0ms` indica JIT warming. Python timeout (TO) en Fibonacci por bucle de 10M.
 
 ---
 
