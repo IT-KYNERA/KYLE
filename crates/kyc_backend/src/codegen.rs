@@ -22,6 +22,7 @@ pub struct Codegen<'ctx> {
     context: &'ctx Context,
     builder: Builder<'ctx>,
     module: Module<'ctx>,
+    target_triple: Option<String>,
     fn_value_map: HashMap<String, inkwell::values::FunctionValue<'ctx>>,
     param_values: HashMap<usize, BasicValueEnum<'ctx>>,
     alloca_map: Vec<Option<PointerValue<'ctx>>>,
@@ -146,6 +147,7 @@ impl<'ctx> Codegen<'ctx> {
             context,
             builder,
             module,
+            target_triple: None,
             fn_value_map: HashMap::new(),
             param_values: HashMap::new(),
             alloca_map: Vec::new(),
@@ -156,6 +158,14 @@ impl<'ctx> Codegen<'ctx> {
             ref_param_struct_types: HashMap::new(),
             tbaa_nodes: HashMap::new(),
         }
+    }
+
+    pub fn new_with_target(context: &'ctx Context, module_name: &str, target_triple: &str) -> Self {
+        let mut cg = Self::new(context, module_name);
+        cg.target_triple = Some(target_triple.to_string());
+        let triple = inkwell::targets::TargetTriple::create(target_triple);
+        cg.module.set_triple(&triple);
+        cg
     }
 
     /// Initialize TBAA metadata nodes for type-based alias analysis.

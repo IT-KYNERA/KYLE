@@ -147,7 +147,9 @@ fn install_package_to_std(project_root: &Path, name: &str, version: &str) -> Res
 
 fn cmd_build(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--"));
+    let target = args.iter().position(|a| a == "--target")
+        .and_then(|i| args.get(i + 1)).cloned();
+    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--") && **a != "--release");
     if file_arg.is_none() {
         // Project mode
         let project_root = match find_project_root(&std::env::current_dir().unwrap()) {
@@ -166,9 +168,9 @@ fn cmd_build(args: &[String]) {
             let output = exe_path(&build_dir.join("main"));
             let _ = fs::create_dir_all(&build_dir);
             let build_result = if release {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, &file, &output, &build_dir)
+                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
             } else {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir)
+                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
             };
             match build_result {
                 Ok(()) => println!("Build complete: {}", output.display()),
@@ -193,9 +195,9 @@ fn cmd_build(args: &[String]) {
     let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
     let build_result = if release {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, file, &output, &build_dir)
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
     } else {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir)
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
     };
     match build_result {
         Ok(()) => println!("Build complete: {}", output.display()),
@@ -205,7 +207,9 @@ fn cmd_build(args: &[String]) {
 
 fn cmd_run(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--"));
+    let target = args.iter().position(|a| a == "--target")
+        .and_then(|i| args.get(i + 1)).cloned();
+    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--") && **a != "--release");
     if file_arg.is_none() {
         // Project mode
         let project_root = match find_project_root(&std::env::current_dir().unwrap()) {
@@ -224,9 +228,9 @@ fn cmd_run(args: &[String]) {
             let output = exe_path(&build_dir.join("main"));
             let _ = fs::create_dir_all(&build_dir);
             let run_result = if release {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, &file, &output, &build_dir)
+                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
             } else {
-                kyc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, &file, &output, &build_dir)
+                kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
             };
             match run_result {
                 Ok(()) => {
@@ -259,9 +263,9 @@ fn cmd_run(args: &[String]) {
     let output = exe_path(&build_dir.join(&file_stem));
     let _ = fs::create_dir_all(&build_dir);
     let run_result = if release {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release(&source, file, &output, &build_dir)
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
     } else {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts(&source, file, &output, &build_dir)
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
     };
     match run_result {
         Ok(()) => {
@@ -869,8 +873,8 @@ fn print_usage() {
     eprintln!("{} v{} — Kyle Programming Language Compiler", name, env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("Project commands (run from a project directory with ky.toml):");
-    eprintln!("  {name} build [--release]   Compile project to native binary");
-    eprintln!("  {name} run   [--release]   Compile and execute project");
+    eprintln!("  {name} build [--release] [--target <triple>]   Compile project to native binary");
+    eprintln!("  {name} run   [--release] [--target <triple>]   Compile and execute project");
     eprintln!("  {name} test                Run project tests");
     eprintln!("  {name} info                Show project info");
     eprintln!("  {name} add   <dep>[@<ver>] Add dependency");
@@ -882,8 +886,8 @@ fn print_usage() {
     eprintln!("  {name} login               Login to package registry");
     eprintln!();
     eprintln!("File commands:");
-    eprintln!("  {name} build <file.ky>     Compile single file");
-    eprintln!("  {name} run   <file.ky>     Compile and run single file");
+    eprintln!("  {name} build <file.ky> [--target <triple>]     Compile single file");
+    eprintln!("  {name} run   <file.ky> [--target <triple>]     Compile and run single file");
     eprintln!("  {name} check <file.ky>     Type-check without codegen");
     eprintln!("  {name} parse <file.ky>     Parse and dump AST");
     eprintln!("  {name} mir   <file.ky>     Parse and dump MIR");

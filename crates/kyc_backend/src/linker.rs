@@ -1,17 +1,61 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub struct Linker;
+pub struct Linker {
+    target_triple: Option<String>,
+}
 
 impl Linker {
     pub fn new() -> Self {
-        Self
+        Self { target_triple: None }
     }
 
-    fn linker_cmd() -> Command {
-        if cfg!(target_os = "windows") {
-            // Use clang as linker driver (it invokes lld/link internally)
-            // clang is always available as part of LLVM distribution
+    pub fn new_with_target(target: &str) -> Self {
+        Self { target_triple: Some(target.to_string()) }
+    }
+
+    fn is_target(&self, suffix: &str) -> bool {
+        self.target_triple.as_ref().map_or(false, |t| t.contains(suffix))
+    }
+
+    fn linker_cmd(&self) -> Command {
+        let host_os = std::env::consts::OS;
+        // Cross-compilation: use appropriate linker based on target
+        if self.is_target("windows") || self.is_target("win32") {
+            if Command::new("clang").arg("--version").output().is_ok() {
+                return Command::new("clang");
+            }
+            if Command::new("lld-link.exe").arg("--version").output().is_ok() {
+                return Command::new("lld-link.exe");
+            }
+            return Command::new("link.exe");
+        }
+        if self.is_target("linux") || self.is_target("unknown-linux") {
+            if Command::new("clang").arg("--version").output().is_ok() {
+                return Command::new("clang");
+            }
+            // For cross-compilation: try <target>-gcc (e.g. aarch64-linux-gnu-gcc)
+            if let Some(triple) = &self.target_triple {
+                let cross_gcc = format!("{}-gcc", triple);
+                if Command::new(&cross_gcc).arg("--version").output().is_ok() {
+                    return Command::new(cross_gcc);
+                }
+            }
+            return Command::new("cc");
+        }
+        if self.is_target("wasm32") || self.is_target("wasm64") {
+            // WASM target: use wasm-ld or clang with wasm triple
+            if Command::new("wasm-ld").arg("--version").output().is_ok() {
+                let mut c = Command::new("wasm-ld");
+                return c;
+            }
+            // clang can also link wasm with appropriate flags
+            if Command::new("clang").arg("--version").output().is_ok() {
+                return Command::new("clang");
+            }
+        }
+        // Default: native host linker
+        if host_os == "windows" {
             if Command::new("clang").arg("--version").output().is_ok() {
                 Command::new("clang")
             } else if Command::new("lld-link.exe").arg("--version").output().is_ok() {
@@ -19,10 +63,9 @@ impl Linker {
             } else {
                 Command::new("link.exe")
             }
-        } else if cfg!(target_os = "macos") {
+        } else if host_os == "macos" {
             Command::new("clang")
         } else {
-            // Linux: try clang first, fallback to cc (gcc symlink)
             if Command::new("clang").arg("--version").output().is_ok() {
                 Command::new("clang")
             } else {
@@ -36,12 +79,14 @@ impl Linker {
             return Err("No object files to link".to_string());
         }
 
-        let mut cmd = Self::linker_cmd();
+        let mut cmd = self.linker_cmd();
         cmd.arg("-o").arg(output);
 
         if release {
             cmd.arg("-O3");
-            cmd.arg("-flto");  // GCC Link-Time Optimization
+            if !self.is_target("wasm32") {
+                cmd.arg("-flto");
+            }
         }
 
         for obj in object_files {
@@ -58,20 +103,17 @@ impl Linker {
                 cmd.arg("-framework");
                 cmd.arg(framework_name);
             } else if link.starts_with("-L") {
-                // Library search path
                 cmd.arg(link);
             } else {
                 cmd.arg(format!("-l{}", link));
             }
         }
 
-        if cfg!(target_os = "windows") {
-            // Suppress LNK4098: LLVM was built with /MD (dynamic CRT), but Rust
-            // std might link a different CRT.
-            // clang/lld-link: -Wl, prefix. MSVC link.exe: direct /NODEFAULTLIB.
-            // Since we prefer clang, use the -Wl, form which all drivers pass through.
+        if self.is_target("wasm32") || self.is_target("wasm64") {
+            cmd.arg("--no-entry");
+            cmd.arg("-lc");
+        } else if self.is_target("windows") || self.is_target("win32") {
             cmd.arg("-Wl,/NODEFAULTLIB:msvcrt");
-            // Windows system libraries needed by Rust std
             cmd.arg("-lkernel32");
             cmd.arg("-lws2_32");
             cmd.arg("-lbcrypt");
@@ -83,14 +125,12 @@ impl Linker {
             cmd.arg("-liphlpapi");
         }
 
-        if release {
+        if release && !self.is_target("wasm32") {
             cmd.arg("-lm");
         }
 
-        // On macOS, link CoreFoundation (needed by chrono/iana-time-zone)
-        // Check at runtime (not compile-time) so cross-compiled binary works
-        if std::env::consts::OS == "macos" {
-            // Detect deployment target to match the compiled runtime .o files
+        // Native macOS linking (only for native target, not cross-compile)
+        if self.target_triple.is_none() && std::env::consts::OS == "macos" {
             let ver = std::env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| {
                 std::process::Command::new("sw_vers")
                     .arg("-productVersion")
@@ -98,7 +138,6 @@ impl Linker {
                     .ok()
                     .and_then(|o| if o.status.success() {
                         let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                        // Take major.minor only (e.g. "26.5.1" → "26.5")
                         let parts: Vec<&str> = s.split('.').collect();
                         if parts.len() >= 2 {
                             Some(format!("{}.{}", parts[0], parts[1]))
@@ -110,7 +149,6 @@ impl Linker {
                 cmd.arg(format!("-mmacosx-version-min={}", ver));
             }
             cmd.arg("-framework").arg("CoreFoundation");
-            // Common Homebrew library paths
             let homebrew_paths = [
                 "/opt/homebrew/opt/libpq/lib",
                 "/opt/homebrew/lib",
@@ -138,7 +176,7 @@ impl Linker {
             return Err("No object files to link".to_string());
         }
 
-        let mut cmd = Self::linker_cmd();
+        let mut cmd = self.linker_cmd();
         cmd.arg("-shared").arg("-o").arg(output);
 
         for obj in object_files {

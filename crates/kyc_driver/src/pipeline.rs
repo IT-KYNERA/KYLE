@@ -980,13 +980,13 @@ impl Pipeline {
     /// (.o, .ll) go to `artifact_dir` (defaults to output_path's directory).
     pub fn build_source(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
         let default_dir = output_path.parent().unwrap_or_else(|| Path::new("."));
-        Self::_build_source(source, file_name, output_path, default_dir, OptimizationLevel::Default)
+        Self::_build_source(source, file_name, output_path, default_dir, OptimizationLevel::Default, None)
     }
 
     /// Build source with release optimization.
     pub fn build_source_release(source: &str, file_name: &str, output_path: &Path) -> Result<(), String> {
         let default_dir = output_path.parent().unwrap_or_else(|| Path::new("."));
-        Self::_build_source(source, file_name, output_path, default_dir, OptimizationLevel::Aggressive)
+        Self::_build_source(source, file_name, output_path, default_dir, OptimizationLevel::Aggressive, None)
     }
 
     /// Build source with explicit artifact directory for .o / .ll files (debug).
@@ -996,7 +996,7 @@ impl Pipeline {
         output_path: &Path,
         artifact_dir: &Path,
     ) -> Result<(), String> {
-        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Default)
+        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Default, None)
     }
 
     /// Build source with explicit artifact directory for .o / .ll files (release).
@@ -1006,7 +1006,29 @@ impl Pipeline {
         output_path: &Path,
         artifact_dir: &Path,
     ) -> Result<(), String> {
-        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive)
+        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive, None)
+    }
+
+    /// Build source with explicit target triple (debug).
+    pub fn build_source_with_artifacts_target(
+        source: &str,
+        file_name: &str,
+        output_path: &Path,
+        artifact_dir: &Path,
+        target: Option<&str>,
+    ) -> Result<(), String> {
+        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Default, target)
+    }
+
+    /// Build source with explicit target triple (release).
+    pub fn build_source_with_artifacts_release_target(
+        source: &str,
+        file_name: &str,
+        output_path: &Path,
+        artifact_dir: &Path,
+        target: Option<&str>,
+    ) -> Result<(), String> {
+        Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive, target)
     }
 
     fn _build_source(
@@ -1015,6 +1037,7 @@ impl Pipeline {
         output_path: &Path,
         artifact_dir: &Path,
         optimization: OptimizationLevel,
+        target: Option<&str>,
     ) -> Result<(), String> {
         let mir = Self::mir_source(source, file_name)?;
 
@@ -1031,7 +1054,12 @@ impl Pipeline {
         }
 
         let context = Context::create();
-        let mut codegen = Codegen::new(&context, "ky_module");
+        let codegen = if let Some(triple) = target {
+            Codegen::new_with_target(&context, "ky_module", triple)
+        } else {
+            Codegen::new(&context, "ky_module")
+        };
+        let mut codegen = codegen;
         // SSA codegen — faster optimization pipeline
         codegen.compile_with_ssa(&mir.module)?;
 
@@ -1059,7 +1087,11 @@ impl Pipeline {
 
         // Link (ThinLTO in release mode)
         let is_release = optimization == OptimizationLevel::Aggressive;
-        let linker = Linker::new();
+        let linker = if let Some(triple) = target {
+            Linker::new_with_target(triple)
+        } else {
+            Linker::new()
+        };
         let runtime_lib = Linker::find_runtime_lib();
         linker.link(&[&obj_path], output_path, runtime_lib.as_deref(), is_release, &mir.module.links)
             .map_err(|e| format!("Link error: {}", e))?;
