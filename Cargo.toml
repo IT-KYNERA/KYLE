@@ -13,6 +13,7 @@ members = [
     "crates/kyc_tools",
     "crates/kyc_platform",
     "crates/kyc_runtime_wasm",
+    "crates/kyc_ui",
 ]
 
 [workspace.package]
