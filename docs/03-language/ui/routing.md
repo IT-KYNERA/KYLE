@@ -16,7 +16,7 @@ Cada página se define con `page()` en su .kyx:
 
 **login.kyx:**
 ```kyx
-page("/login")
+view("/login")
 
 <view>
     <text value="Iniciar Sesión" />
@@ -28,7 +28,7 @@ page("/login")
 
 **dashboard.kyx:**
 ```kyx
-page("/dashboard")
+view("/dashboard")
 
 <view>
     <appbar title="Dashboard" />
@@ -42,7 +42,7 @@ El router se declara en el entry point de la app:
 
 ```kyx
 # app.kyx
-page("/")
+view("/")
 
 <app>
     <router>
@@ -59,7 +59,7 @@ page("/")
 ### 1.3 Rutas con parámetros
 
 ```kyx
-page("/users/:id")
+view("/users/:id")
 @(
     id: str = route_params().get("id") ?? ""
     user: User? = fetch_user(id)

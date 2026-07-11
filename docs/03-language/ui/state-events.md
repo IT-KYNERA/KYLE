@@ -416,25 +416,25 @@ Runtime detecta cambios → re-renderiza
 ### 7.2 Validación tipada
 
 ```kyle
-final class ValidationRule[T]:
+final class ValidationRule<T>:
     fn validate(this, value: T) str?  # None = ok, Some(msg) = error
 
 # Rules predefinidas
-fn required[T]() ValidationRule[T]:
+fn required<T>() ValidationRule<T>:
     ValidationRule(fn(val: T) str?:
         if val == "" or val == None:
             "Este campo es requerido"
         None
     )
 
-fn min_length(n: i32) ValidationRule[str]:
+fn min_length(n: i32) ValidationRule<str>:
     ValidationRule(fn(val: str) str?:
         if val.len() < n:
             "Mínimo " + n.to_str() + " caracteres"
         None
     )
 
-fn email() ValidationRule[str]:
+fn email() ValidationRule<str>:
     ValidationRule(fn(val: str) str?:
         if !val.contains("@"):
             "Email inválido"

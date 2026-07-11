@@ -3,6 +3,7 @@
 **Status:** Draft — Roadmap
 **Date:** 2026-07-09
 **Documentaci&oacute;n relacionada:**
+- [`docs/10-design/rfc/0003-ui-translation.md`](0003-ui-translation.md) — Traducci&oacute;n multi-target (JS/WASM/nativo)
 - [`docs/03-language/syntax/ui-syntax.md`](../../03-language/syntax/ui-syntax.md) — sintaxis .kyx
 - [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) — distribuci&oacute;n multi-plataforma (Fase 0)
 

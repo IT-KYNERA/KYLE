@@ -20,8 +20,8 @@ Kyle UI is un sistema de UI declarativo construido about language Kyle.
 
 Un file `.kyx` represents una vista.
 
-- Si conhas `page(...)`, represents una page.
-- Si no conhas `page(...)`, represents un componente reutilizable.
+- Si conhas `view(...)`, represents una page (ruteable).
+- Si no conhas `view(...)`, represents un componente reutilizable.
 
 No existe JavaScript. Todo code Kyle se integra using expresionis `@`.
 
@@ -43,7 +43,7 @@ El file `.ky` is opcional. Toda logic can ir inside del `.kyx`.
 ## 3. Page
 
 ```kyle
-page("/login")
+view("/login")
 
 <view>
  <text value="Login" />
@@ -188,7 +188,7 @@ Uso:
 </card>
 ```
 
-Las pages no admiten slots.
+Las views (con `view(...)`) no admiten slots.
 
 ---
 
@@ -282,7 +282,7 @@ Uso:
 ## 19. Example completo: Login
 
 ```kyle
-page("/login")
+view("/login")
 
 @(
  email: str
