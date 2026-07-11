@@ -10,6 +10,7 @@ pub fn generate(file: &KyxFile) -> String {
     js.push_str("const { ReactiveState, Binding, createKyleEvent } = require('./reactivity.js');\n");
     js.push_str("const { Router, routeParams } = require('./router.js');\n");
     js.push_str("const { A11yManager } = require('./a11y.js');\n");
+    js.push_str("const { portalManager } = require('./portal.js');\n");
     js.push_str("const _a11y = new A11yManager();\n\n");
 
     // Generate styles
@@ -66,6 +67,33 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
     match node {
         KyxNode::Element { tag, attrs, children } => {
             let tag_js = js_tag(tag);
+            if tag == "portal" {
+                // Portal: render children to a different target
+                let mut target = "body";
+                for a in attrs {
+                    if a.name == "target" {
+                        if let AttrValue::String(ref v) = a.value { target = v; }
+                    }
+                }
+                js.push_str(&format!("{}// Portal: render to '{}'\n", ind, target));
+                for child in children {
+                    gen_node(child, js, indent, "_portal_content");
+                }
+                js.push_str(&format!("{}if (typeof _portal_content !== 'undefined') {{\n", ind));
+                js.push_str(&format!("{}  portalManager.create(_portal_content, {:?});\n", ind, target));
+                js.push_str(&format!("{}}}\n", ind));
+                return;
+            }
+            if tag == "outlet" {
+                let mut name = "default";
+                for a in attrs {
+                    if a.name == "name" {
+                        if let AttrValue::String(ref v) = a.value { name = v; }
+                    }
+                }
+                js.push_str(&format!("{}// Outlet: '{}'\n", ind, name));
+                js.push_str(&format!("{}portalManager.registerOutlet({:?}, _el);\n", ind, name));
+            }
             js.push_str(&format!("{}const _el = document.createElement('{}');\n", ind, tag_js));
             gen_attrs(attrs, js, indent);
             gen_events(attrs, js, indent);
