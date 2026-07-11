@@ -8,7 +8,9 @@ pub fn generate(file: &KyxFile) -> String {
 
     // Include reactivity and router runtimes
     js.push_str("const { ReactiveState, Binding, createKyleEvent } = require('./reactivity.js');\n");
-    js.push_str("const { Router, routeParams } = require('./router.js');\n\n");
+    js.push_str("const { Router, routeParams } = require('./router.js');\n");
+    js.push_str("const { A11yManager } = require('./a11y.js');\n");
+    js.push_str("const _a11y = new A11yManager();\n\n");
 
     // Generate styles
     let style_js = crate::style_gen::generate_styles(&file.styles);
@@ -67,6 +69,8 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
             js.push_str(&format!("{}const _el = document.createElement('{}');\n", ind, tag_js));
             gen_attrs(attrs, js, indent);
             gen_events(attrs, js, indent);
+            // ARIA auto-generation
+            js.push_str(&format!("{}A11yManager.applyAria(_el, {:?});\n", " ".repeat(indent + 2), tag));
             for child in children {
                 gen_node(child, js, indent + 2, "_el");
             }
@@ -77,6 +81,7 @@ fn gen_node(node: &KyxNode, js: &mut String, indent: usize, parent: &str) {
             js.push_str(&format!("{}const _el = document.createElement('{}');\n", ind, tag_js));
             gen_attrs(attrs, js, indent);
             gen_events(attrs, js, indent);
+            js.push_str(&format!("{}A11yManager.applyAria(_el, {:?});\n", " ".repeat(indent + 2), tag));
             js.push_str(&format!("{}{}.appendChild(_el);\n", ind, parent));
         }
         KyxNode::Slot { name, fallback } => {

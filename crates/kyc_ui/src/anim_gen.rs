@@ -66,7 +66,7 @@ pub fn generate_animations(animations: &[AnimDecl]) -> String {
     js.push_str("function applyAnimation(el, animName) {\n");
     js.push_str("  const a = animations[animName];\n");
     js.push_str("  if (!a) return;\n");
-    js.push_str("  el.animate(a.keyframes, a.options);\n");
+    js.push_str("  _a11y.animate(el, a.keyframes, a.options);\n");
     js.push_str("}\n\n");
 
     js
