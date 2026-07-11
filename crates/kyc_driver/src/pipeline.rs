@@ -40,9 +40,9 @@ fn uuid_parse(s: &str) ptr:
     ky_uuid_parse(s as ptr)
 
 fn uuid_to_str(data: &ptr) str:
-    raw = data as i64
-    if raw == 0: return ""
-    (raw as ptr) as str
+    raw = data as ptr
+    if raw == 0 as ptr: return ""
+    raw as str
 
 # ═══════════════════════════════════════
 # decimal
@@ -276,15 +276,13 @@ fn url_parse(raw: &str) str:
 # crypto
 # ═══════════════════════════════════════
 
-extern fn ky_ptr_read_ptr(ptr) ptr
 extern fn ky_sha256(ptr, i32, ptr) ptr
 extern fn ky_random_bytes(ptr, i64) i32
 extern fn ky_bytes_to_hex(ptr, i32) ptr
 
 fn sha256(data: &str) str:
     md = ky_alloc(32)
-    raw = ky_ptr_read_ptr(data as ptr)
-    ky_sha256(raw, len(data), md)
+    ky_sha256(data as ptr, len(data), md)
     ky_bytes_to_hex(md, 32) as str
 
 fn random_bytes(count: i32) ptr:

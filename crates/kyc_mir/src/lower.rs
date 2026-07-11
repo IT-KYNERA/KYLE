@@ -3278,11 +3278,22 @@ impl Lowerer {
                         MirType::I32
                     };
                     let dest = ctx.alloc_local("_cast", to_type.clone());
-                    ctx.current_block.insts.push(MirInst::Cast {
-                        dest,
-                        value: MirValue::Local(left_local),
-                        to_type,
-                    });
+                    // For str → ptr, use ky_ptr_read_ptr to load the data pointer
+                    // from the strBuilder struct. This gives the actual string data pointer.
+                    let src_type = ctx.local_types.get(&left_local);
+                    if matches!(to_type, MirType::Ptr(_)) && matches!(src_type, Some(MirType::Str | MirType::Ptr(_))) {
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(dest),
+                            name: "ky_ptr_read_ptr".to_string(),
+                            args: vec![MirValue::Local(left_local)],
+                        });
+                    } else {
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest,
+                            value: MirValue::Local(left_local),
+                            to_type,
+                        });
+                    }
                     return ctx;
                 }
 
