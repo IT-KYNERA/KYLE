@@ -22,6 +22,10 @@ pub mod thread;
 pub mod url;
 pub mod regex;
 pub mod crypto;
+pub mod duration;
+pub mod path_;
+pub mod big_int;
+pub mod sync;
 
 pub use memory::{ky_alloc, ky_free, ky_retain, ky_release};
 pub use io::{ky_print, ky_println, ky_input, ky_input_with_prompt, ky_open, ky_read_str, ky_write_str, ky_close, ky_sleep, ky_now};
@@ -42,6 +46,12 @@ pub use decimal::{ky_decimal_from_str, ky_decimal_to_str, ky_decimal_round, ky_d
 pub use url::{ky_url_scheme, ky_url_host, ky_url_port, ky_url_path, ky_url_query};
 pub use regex::{ky_regex_new, ky_regex_free, ky_regex_is_match, ky_regex_find, ky_regex_replace};
 pub use crypto::{ky_sha256, ky_random_bytes};
+pub use duration::{ky_duration_from_secs, ky_duration_from_millis, ky_duration_from_hours, ky_duration_from_days, ky_duration_to_str, ky_duration_free};
+pub use path_::{ky_path_new, ky_path_dirname, ky_path_basename, ky_path_extension, ky_path_join, ky_path_to_str, ky_path_free};
+pub use big_int::{ky_big_int_from_str, ky_big_int_from_i64, ky_big_int_add, ky_big_int_sub, ky_big_int_mul, ky_big_int_to_str, ky_big_int_free};
+pub use sync::{ky_mutex_new, ky_mutex_lock, ky_mutex_store, ky_mutex_free,
+    ky_atomic_i64_new, ky_atomic_i64_load, ky_atomic_i64_store, ky_atomic_i64_add, ky_atomic_i64_free,
+    ky_atomic_bool_new, ky_atomic_bool_load, ky_atomic_bool_store, ky_atomic_bool_free};
 
 /// Power: compute base ** exp for i64 values. Returns i64 (truncated).
 #[unsafe(no_mangle)]

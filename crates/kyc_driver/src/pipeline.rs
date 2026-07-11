@@ -486,6 +486,195 @@ fn fs_write_string(path: &str, data: &str) i32:
 
 fn fs_list_dir(path: &str) ptr:
     ky_fs_list_dir(ky_ptr_read_ptr(path as ptr)) as ptr
+
+# ═══════════════════════════════════════
+# duration
+# ═══════════════════════════════════════
+
+extern fn ky_duration_from_secs(i64) i64
+extern fn ky_duration_from_millis(i64) i64
+extern fn ky_duration_from_hours(i64) i64
+extern fn ky_duration_from_days(i64) i64
+extern fn ky_duration_to_str(i64) ptr
+extern fn ky_duration_free(i64)
+
+fn duration_from_secs(secs: i64) i64:
+    ky_duration_from_secs(secs)
+
+fn duration_from_millis(ms: i64) i64:
+    ky_duration_from_millis(ms)
+
+fn duration_from_hours(hours: i64) i64:
+    ky_duration_from_hours(hours)
+
+fn duration_from_days(days: i64) i64:
+    ky_duration_from_days(days)
+
+fn duration_to_str(d: i64) str:
+    raw = ky_duration_to_str(d) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn duration_free(d: i64):
+    ky_duration_free(d)
+
+# ═══════════════════════════════════════
+# path
+# ═══════════════════════════════════════
+
+extern fn ky_path_new(ptr) i64
+extern fn ky_path_dirname(i64) ptr
+extern fn ky_path_basename(i64) ptr
+extern fn ky_path_extension(i64) ptr
+extern fn ky_path_join(i64, ptr) i64
+extern fn ky_path_to_str(i64) ptr
+extern fn ky_path_free(i64)
+
+fn path_new(path: &str) i64:
+    ky_path_new(ky_ptr_read_ptr(path as ptr))
+
+fn path_dirname(p: i64) str:
+    raw = ky_path_dirname(p) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn path_basename(p: i64) str:
+    raw = ky_path_basename(p) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn path_extension(p: i64) str:
+    raw = ky_path_extension(p) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn path_join(p: i64, other: &str) i64:
+    ky_path_join(p, ky_ptr_read_ptr(other as ptr))
+
+fn path_to_str(p: i64) str:
+    raw = ky_path_to_str(p) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn path_free(p: i64):
+    ky_path_free(p)
+
+# ═══════════════════════════════════════
+# big_int
+# ═══════════════════════════════════════
+
+extern fn ky_big_int_from_str(ptr) i64
+extern fn ky_big_int_from_i64(i64) i64
+extern fn ky_big_int_add(i64, i64) i64
+extern fn ky_big_int_sub(i64, i64) i64
+extern fn ky_big_int_mul(i64, i64) i64
+extern fn ky_big_int_to_str(i64) ptr
+extern fn ky_big_int_free(i64)
+
+fn big_int_from_str(s: &str) i64:
+    ky_big_int_from_str(ky_ptr_read_ptr(s as ptr))
+
+fn big_int_from_i64(val: i64) i64:
+    ky_big_int_from_i64(val)
+
+fn big_int_add(a: i64, b: i64) i64:
+    ky_big_int_add(a, b)
+
+fn big_int_sub(a: i64, b: i64) i64:
+    ky_big_int_sub(a, b)
+
+fn big_int_mul(a: i64, b: i64) i64:
+    ky_big_int_mul(a, b)
+
+fn big_int_to_str(n: i64) str:
+    raw = ky_big_int_to_str(n) as i64
+    if raw == 0: return ""
+    (raw as ptr) as str
+
+fn big_int_free(n: i64):
+    ky_big_int_free(n)
+
+# ═══════════════════════════════════════
+# rc / arc — reference counting
+# Uses the runtime's built-in retain/release
+# ═══════════════════════════════════════
+
+extern fn ky_retain(ptr)
+extern fn ky_release(ptr)
+
+fn rc_new(val: ptr) ptr:
+    ky_retain(val)
+    val
+
+fn rc_clone(val: ptr) ptr:
+    ky_retain(val)
+    val
+
+fn rc_free(val: ptr):
+    ky_release(val)
+
+# ═══════════════════════════════════════
+# mutex
+# ═══════════════════════════════════════
+
+extern fn ky_mutex_new(i64) i64
+extern fn ky_mutex_lock(i64) i64
+extern fn ky_mutex_store(i64, i64)
+extern fn ky_mutex_free(i64)
+
+fn mutex_new(val: i64) i64:
+    ky_mutex_new(val)
+
+fn mutex_lock(m: i64) i64:
+    ky_mutex_lock(m)
+
+fn mutex_store(m: i64, val: i64):
+    ky_mutex_store(m, val)
+
+fn mutex_free(m: i64):
+    ky_mutex_free(m)
+
+# ═══════════════════════════════════════
+# atomic_i64 / atomic_bool
+# ═══════════════════════════════════════
+
+extern fn ky_atomic_i64_new(i64) i64
+extern fn ky_atomic_i64_load(i64) i64
+extern fn ky_atomic_i64_store(i64, i64)
+extern fn ky_atomic_i64_add(i64, i64) i64
+extern fn ky_atomic_i64_free(i64)
+
+extern fn ky_atomic_bool_new(i32) i64
+extern fn ky_atomic_bool_load(i64) i32
+extern fn ky_atomic_bool_store(i64, i32)
+extern fn ky_atomic_bool_free(i64)
+
+fn atomic_i64_new(val: i64) i64:
+    ky_atomic_i64_new(val)
+
+fn atomic_i64_load(a: i64) i64:
+    ky_atomic_i64_load(a)
+
+fn atomic_i64_store(a: i64, val: i64):
+    ky_atomic_i64_store(a, val)
+
+fn atomic_i64_add(a: i64, val: i64) i64:
+    ky_atomic_i64_add(a, val)
+
+fn atomic_i64_free(a: i64):
+    ky_atomic_i64_free(a)
+
+fn atomic_bool_new(val: i32) i64:
+    ky_atomic_bool_new(val)
+
+fn atomic_bool_load(a: i64) i32:
+    ky_atomic_bool_load(a)
+
+fn atomic_bool_store(a: i64, val: i32):
+    ky_atomic_bool_store(a, val)
+
+fn atomic_bool_free(a: i64):
+    ky_atomic_bool_free(a)
 "#;
 
 #[derive(Default)]

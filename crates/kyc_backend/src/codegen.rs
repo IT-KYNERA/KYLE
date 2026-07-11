@@ -2308,6 +2308,230 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_fs_list_dir", ft, None);
         }
+
+        // === Duration ===
+        // i64 ky_duration_from_secs(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_from_secs", ft, None);
+        }
+        // i64 ky_duration_from_millis(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_from_millis", ft, None);
+        }
+        // i64 ky_duration_from_hours(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_from_hours", ft, None);
+        }
+        // i64 ky_duration_from_days(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_from_days", ft, None);
+        }
+        // ptr ky_duration_to_str(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_to_str", ft, None);
+        }
+        // void ky_duration_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_duration_free", ft, None);
+        }
+
+        // === Path ===
+        // i64 ky_path_new(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_new", ft, None);
+        }
+        // ptr ky_path_dirname(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_dirname", ft, None);
+        }
+        // ptr ky_path_basename(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_basename", ft, None);
+        }
+        // ptr ky_path_extension(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_extension", ft, None);
+        }
+        // i64 ky_path_join(i64, ptr)
+        {
+            let params = [i64_ty.into(), ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_join", ft, None);
+        }
+        // ptr ky_path_to_str(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_to_str", ft, None);
+        }
+        // void ky_path_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_path_free", ft, None);
+        }
+
+        // === BigInt ===
+        // i64 ky_big_int_from_str(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_from_str", ft, None);
+        }
+        // i64 ky_big_int_from_i64(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_from_i64", ft, None);
+        }
+        // i64 ky_big_int_add(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_add", ft, None);
+        }
+        // i64 ky_big_int_sub(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_sub", ft, None);
+        }
+        // i64 ky_big_int_mul(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_mul", ft, None);
+        }
+        // ptr ky_big_int_to_str(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = ptr_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_to_str", ft, None);
+        }
+        // void ky_big_int_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_big_int_free", ft, None);
+        }
+
+        // === RC / ARC (reference counting) ===
+        // void ky_retain(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_retain", ft, None);
+        }
+        // void ky_release(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_release", ft, None);
+        }
+
+        // === Mutex ===
+        // i64 ky_mutex_new(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_mutex_new", ft, None);
+        }
+        // i64 ky_mutex_lock(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_mutex_lock", ft, None);
+        }
+        // void ky_mutex_store(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_mutex_store", ft, None);
+        }
+        // void ky_mutex_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_mutex_free", ft, None);
+        }
+
+        // === AtomicI64 ===
+        // i64 ky_atomic_i64_new(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_i64_new", ft, None);
+        }
+        // i64 ky_atomic_i64_load(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_i64_load", ft, None);
+        }
+        // void ky_atomic_i64_store(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_i64_store", ft, None);
+        }
+        // i64 ky_atomic_i64_add(i64, i64)
+        {
+            let params = [i64_ty.into(), i64_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_i64_add", ft, None);
+        }
+        // void ky_atomic_i64_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_i64_free", ft, None);
+        }
+
+        // === AtomicBool ===
+        // i64 ky_atomic_bool_new(i32)
+        {
+            let params = [i32_ty.into()];
+            let ft = i64_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_bool_new", ft, None);
+        }
+        // i32 ky_atomic_bool_load(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_bool_load", ft, None);
+        }
+        // void ky_atomic_bool_store(i64, i32)
+        {
+            let params = [i64_ty.into(), i32_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_bool_store", ft, None);
+        }
+        // void ky_atomic_bool_free(i64)
+        {
+            let params = [i64_ty.into()];
+            let ft = void_ty.fn_type(&params, false);
+            self.module.add_function("ky_atomic_bool_free", ft, None);
+        }
     }
 
     /// Emit inline LLVM IR for list operations instead of calling FFI functions.

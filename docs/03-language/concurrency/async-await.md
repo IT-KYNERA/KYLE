@@ -1,7 +1,7 @@
 # Concurrency & Parallel Execution
 
-**Status:** [x] `async fn`, `async:` block, `await`, `parallel.for`, `thread.spawn` / `thread.join`.
-[ ] `future<T>`, `channel<T>`, `select`, `mutex<T>`, `Atomic*`, `iterator`.
+**Status:** [x] `async fn`, `async:` block, `await`, `parallel.for`, `thread.spawn` / `thread.join`, `channel<T>`, `mutex<T>`, `Atomic*`, `iterator`.
+[ ] `future<T>`, `select`.
 
 ---
 

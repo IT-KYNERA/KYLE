@@ -16,4 +16,6 @@ chrono = "0.4"
 uuid = { version = "1", features = ["v4"] }
 url = "2"
 regex = "1"
+num-bigint = "0.4"
+num-traits = "0.2"
 kyc_platform = { path = "../kyc_platform" }

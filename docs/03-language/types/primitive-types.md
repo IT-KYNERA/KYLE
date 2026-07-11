@@ -344,7 +344,7 @@ result = doubled.collect() # → {i32}
 > Todos estos are nativos de Kyle (no requieren `from X import Y`).
 > Estan disponiblis globalmente as typis built-in del language.
 
-### date_time [ ]
+### date_time [x]
 
 ```ky
 dt = date_time.now()
@@ -361,7 +361,7 @@ dt3 = dt.add_hours(3)
 diff = dt.diff(dt2)
 ```
 
-### duration [ ]
+### duration [x]
 
 ```ky
 d = duration.from_secs(60)
@@ -371,7 +371,7 @@ d = duration.from_days(7)
 d.to_str() # → "1h 0m 0s"
 ```
 
-### date [ ]
+### date [x]
 
 ```ky
 d = date.today()
@@ -383,7 +383,7 @@ weekday = d.weekday()
 d2 = d.add_days(7)
 ```
 
-### time [ ]
+### time [x]
 
 ```ky
 t = time.now()
@@ -394,7 +394,7 @@ minute = t.minute()
 second = t.second()
 ```
 
-### bytis [ ]
+### bytis [x]
 
 ```ky
 b = bytes.new(1024)
@@ -407,7 +407,7 @@ hex = b.hex()
 b64 = b.to_base64()
 ```
 
-### decimal [ ]
+### decimal [x]
 
 ```ky
 d = decimal.from_str("3.14")
@@ -417,7 +417,7 @@ d.truncate() # → 3
 d.to_str() # → "3.14"
 ```
 
-### uuid [ ]
+### uuid [x]
 
 ```ky
 id = uuid.v4()
@@ -425,7 +425,7 @@ id = uuid.parse("550e8400-e29b-41d4-a716-446655440000")
 id.to_str()
 ```
 
-### url [ ]
+### url [x]
 
 ```ky
 u = url.parse("https://user:pass@host:8080/path?q=1#frag")
@@ -436,7 +436,7 @@ u.path() # → "/path"
 u.query() # → "q=1"
 ```
 
-### regex [ ]
+### regex [x]
 
 ```ky
 re = regex("[0-9]+")
@@ -452,7 +452,7 @@ val = env("PATH")
 env("MY_VAR", "value") # set
 ```
 
-### jare [ ]
+### jare [x]
 
 ```ky
 j = json.parse('{"name": "Kyle", "age": 30}')
@@ -475,7 +475,7 @@ f.close()
 f.exists() # → true
 ```
 
-### socket [ ]
+### socket [x]
 
 ```ky
 server = socket.tcp_listen(8080)
@@ -492,7 +492,7 @@ resp = conn.read(4096)
 conn.close()
 ```
 
-### path [ ]
+### path [x]
 
 ```ky
 p = path("/home/user/file.txt")
@@ -505,7 +505,7 @@ p.is_dir() # → false
 p.join("subdir") # → "/home/user/file.txt/subdir"
 ```
 
-### big_int [ ]
+### big_int [x]
 
 ```ky
 n = big_int("123456789012345678901234567890")
@@ -532,7 +532,7 @@ result = sb.to_str()
 |-----------|:-----------:|:-----------:|:-------------:|
 | Primitivis | 13 | 2 (u8-u64 codegen, never) | 0 |
 | Compounds | 6 | 2 (tuple) | 0 |
-| Ownership | 4 | 3 (rc, arc, weak) | 0 |
-| Concurrency | 1 (async/await) | 7 (future, channel, select, mutex, atomic, iterator) | 0 |
-| Specialized | 2 (str_builder, file) | 13 (date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path) | 0 |
-| **Total** | **27** | **26** | **0** |
+| Ownership | 6 (rc, arc) | 1 (weak) | 0 |
+| Concurrency | 5 (async/await, channel, mutex, atomic, iterator) | 3 (future, select) | 0 |
+| Specialized | 14 (str_builder, file, date_time, duration, date, time, bytes, decimal, uuid, url, regex, env, json, socket, path, big_int) | 0 | 0 |
+| **Total** | **44** | **8** | **0** |
