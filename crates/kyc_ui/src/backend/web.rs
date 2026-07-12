@@ -32,7 +32,7 @@ impl UiBackend for WebBackend {
         js.push_str("// Target: Web (JS/DOM) — ES Modules\n\n");
 
         js.push_str("import { ReactiveState, Binding, createKyleEvent } from '/target/debug/reactivity.js';\n");
-        js.push_str("import { Router, routeParams } from '/target/debug/router.js';\n");
+        js.push_str("import { Router, routeParams, set_title, set_meta, navigate, navigate_back, navigate_replace } from '/target/debug/router.js';\n");
         js.push_str("import { A11yManager } from '/target/debug/a11y.js';\n");
         js.push_str("import { portalManager } from '/target/debug/portal.js';\n");
         js.push_str("import { ErrorBoundary } from '/target/debug/error_boundary.js';\n");
@@ -279,7 +279,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str, model: 
                             AttrValue::Expr(v) => v.clone(),
                             AttrValue::Flag => String::new(),
                         };
-                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); window.navigate({}); }});\n", ind, el, target));
+                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); navigate({}); }});\n", ind, el, target));
                     }
                 }
             }
@@ -374,7 +374,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str, model: 
                             AttrValue::Expr(v) => v.clone(),
                             AttrValue::Flag => String::new(),
                         };
-                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); window.navigate({}); }});\n", ind, el, target));
+                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); navigate({}); }});\n", ind, el, target));
                     }
                 }
             }
@@ -1183,6 +1183,22 @@ fn translate_kyle_block_to_js(block: &str) -> String {
                 open_fns.push(indent);
             }
             continue;
+        }
+
+        // Compound assignment: "count += 1" → "state.set('count', state.get('count') + 1);"
+        if line.contains("+=") || line.contains("-=") || line.contains("*=") || line.contains("/=") {
+            let op = if line.contains("+=") { "+=" } else if line.contains("-=") { "-=" }
+                     else if line.contains("*=") { "*=" } else { "/=" };
+            if let Some(pos) = line.find(op) {
+                let target = line[..pos].trim();
+                let value = line[pos + 2..].trim();
+                if !target.contains('(') && !target.contains(' ') && !target.starts_with("state.") {
+                    js.push_str(&format!("  state.set('{}', state.get('{}') {} {});\n", target, target, &op[..1], value));
+                } else {
+                    js.push_str(&format!("  {} {} {};\n", target, op, value));
+                }
+                continue;
+            }
         }
 
         // Function body: "count = count + 1" → "state.set('count', state.get('count') + 1);"

@@ -255,6 +255,10 @@ export function createRouter(options = {}) {
 }
 
 // Global fallback for direct script inclusion
+// Snake_case aliases for Kyle-generated code
+export { setTitle as set_title, setMeta as set_meta };
+export { navigate as navigate, navigateBack as navigate_back, navigateReplace as navigate_replace };
+
 if (typeof window !== 'undefined') {
     window.Router = Router;
     window.createRouter = createRouter;
@@ -264,4 +268,6 @@ if (typeof window !== 'undefined') {
     window.navigateReplace = navigateReplace;
     window.setTitle = setTitle;
     window.setMeta = setMeta;
+    window.set_title = setTitle;
+    window.set_meta = setMeta;
 }

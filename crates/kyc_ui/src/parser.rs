@@ -268,6 +268,14 @@ impl KyxParser {
     }
 
     fn parse_at_directive(&mut self) -> Result<KyxNode, String> {
+        // @(...) code block
+        if self.peek() == Some('(') {
+            let content_start = self.pos + 1;
+            self.advance();
+            let after_paren = self.find_matching_paren()?;
+            let block = self.extract_and_advance(after_paren, content_start);
+            return Ok(KyxNode::CodeBlock(block));
+        }
         // @if(cond): ... @else: ... or @for(item in list): or @match(expr): or @expr
         if self.starts_with("if(") {
             self.pos += 2; // skip 'if'
