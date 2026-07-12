@@ -748,12 +748,12 @@ fn cmd_new_webapp(project_dir: &Path, project_name: &str, exe_path: &str) {
 <body>
     <div id="app"></div>
     <script>
-        (async () => {
-            const { render } = await import('./target/debug/main.js');
+        (async () => {{
+            const {{ render }} = await import('./target/debug/main.js');
             const app = document.getElementById('app');
             const result = render();
             app.appendChild(result.element);
-        })();
+        }})();
     </script>
 </body>
 </html>
