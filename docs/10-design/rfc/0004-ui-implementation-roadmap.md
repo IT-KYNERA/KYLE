@@ -1,7 +1,11 @@
 # RFC-0004: UI Framework — Roadmap de Implementación
 
-**Status:** Plan
-**Date:** 2026-07-10
+**Status:** Reemplazado por [RFC-0005](0005-ui-rearchitecture-plan.md)
+**Date:** 2026-07-10 (original)
+
+> ⚠️ Este roadmap ha sido reemplazado por [RFC-0005](0005-ui-rearchitecture-plan.md)
+> que define la nueva arquitectura UI-IR + Backend system + CLI unificado.
+> Las FASIS 0-12 originales han sido refactorizadas en FASIS A-F.
 **Documentación relacionada:**
 - [0002-ui-architecture.md](0002-ui-architecture.md) — Arquitectura
 - [0003-ui-translation.md](0003-ui-translation.md) — Traducción multi-target

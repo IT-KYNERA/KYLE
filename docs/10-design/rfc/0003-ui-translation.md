@@ -1,9 +1,10 @@
 # RFC-0003: Traducción Multi-Target de Kyle UI
 
-**Status:** Draft
-**Date:** 2026-07-10
-**Documentación relacionada:**
+**Status:** Implementado (IR+Backend layer) — Actualizado 2026-07-11
+**Date:** 2026-07-10 (creado)
+**Documentaci&oacute;n relacionada:**
 - [`0002-ui-architecture.md`](0002-ui-architecture.md) — Arquitectura general del framework UI
+- [`0005-ui-rearchitecture-plan.md`](0005-ui-rearchitecture-plan.md) — Plan de readaptaci&oacute;n
 - [`../../03-language/syntax/ui-syntax.md`](../../03-language/syntax/ui-syntax.md) — Sintaxis .kyx
 - [`../../06-compiler/wasm.md`](../../06-compiler/wasm.md) — Target WASM
 
@@ -38,52 +39,55 @@ sin que el usuario tenga que escribir HTML, CSS o JavaScript. Un solo código fu
 
 ## 2. Arquitectura del Traductor
 
-### 2.1 Pipeline de compilación web
+### 2.1 Pipeline de compilación web (actualizado con UI-IR)
 
-Para el target web, el pipeline se divide en DOS vías que se encuentran en el runtime:
+Para el target web, el pipeline ahora tiene una **capa intermedia agnóstica (UI-IR)**:
 
 ```
-┌────────────────────────────────────────────────────┐
-│                  source.kyx                        │
-│  <view>                                            │
-│    @(count: i32)                                   │
-│    <button text=@count.to_str() click=@incr />    │
-│  </view>                                           │
-└──────────────────────┬─────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                    source.kyx                        │
+│  <view>                                              │
+│    @(count: i32)                                     │
+│    <button text=@count.to_str() click=@incr />      │
+│  </view>                                             │
+└──────────────────────┬───────────────────────────────┘
                        │
                        ▼
-┌────────────────────────────────────────────────────┐
-│              kyc_ui (parser .kyx)                  │
-│  Transforma XML a AST Kyle                        │
-└──────────────────────┬─────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│              kyc_ui (parser .kyx)                    │
+│  Transforma XML a UI-IR (ir.rs)                     │
+└──────────────────────┬───────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────┐
+│              UI-IR (UiProgram)                       │
+│  Agnóstico, tipado, reutilizable por todos backends │
+└──────────────────────┬───────────────────────────────┘
                        │
               ┌────────┴────────┐
               ▼                 ▼
 ┌───────────────────┐  ┌───────────────────┐
 │  VÍA 1: LÓGICA   │  │  VÍA 2: UI       │
-│  (código Kyle)   │  │  (declaraciones)  │
+│  (código Kyle)   │  │  (UI-IR)          │
 ├───────────────────┤  ├───────────────────┤
-│  Semantic + HIR   │  │  .kyx → AST      │
-│  + MIR + SSA      │  │  → JS Generator  │
+│  Semantic + HIR   │  │  Web Backend     │
+│  + MIR + SSA      │  │  (backend/web)   │
 ├───────────────────┤  ├───────────────────┤
-│  LLVM Backend     │  │  Genera JS que    │
-│  (wasm32 target)  │  │  manipula el DOM  │
+│  LLVM Backend     │  │  UI-IR → JS (ESM)│
+│  (wasm32 target)  │  │  + HTML auto-gen │
 ├───────────────────┤  ├───────────────────┤
 │  app.wasm         │  │  ui-runtime.js   │
-│  (lógica + FFI)   │  │  (componentes)   │
+│  (lógica + FFI)   │  │  (ES modules)    │
 └────────┬──────────┘  └────────┬──────────┘
          │                      │
          └──────────┬───────────┘
                     ▼
 ┌──────────────────────────────────────┐
-│         Navegador (index.html)       │
+│         Navegador (index.html)       │  ← auto-generado
 │                                      │
-│  <script src="ui-runtime.js">       │
-│  <script>                            │
-│    WebAssembly.instantiate(          │
-│      fetch("app.wasm"),             │
-│      { env: { /* JS FFI */ } }      │
-│    )                                 │
+│  <script type="module">              │
+│    import { render } from            │
+│      './target/debug/ui-runtime.js'  │
 │  </script>                           │
 └──────────────────────────────────────┘
 ```

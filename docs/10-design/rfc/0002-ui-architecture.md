@@ -1,9 +1,10 @@
 # RFC-0002: Kyle UI Framework
 
-**Status:** Draft — Roadmap
-**Date:** 2026-07-09
+**Status:** Implementado (FASIS A-C) — Actualizado 2026-07-11
+**Date:** 2026-07-09 (creado)
 **Documentaci&oacute;n relacionada:**
 - [`docs/10-design/rfc/0003-ui-translation.md`](0003-ui-translation.md) — Traducci&oacute;n multi-target (JS/WASM/nativo)
+- [`docs/10-design/rfc/0005-ui-rearchitecture-plan.md`](0005-ui-rearchitecture-plan.md) — Plan de readaptaci&oacute;n multi-plataforma
 - [`docs/03-language/syntax/ui-syntax.md`](../../03-language/syntax/ui-syntax.md) — sintaxis .kyx
 - [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) — distribuci&oacute;n multi-plataforma (Fase 0)
 

@@ -41,19 +41,24 @@ kyc_runtime/ ✅ runtime (memory, strings, lists, dicts)
 kyc_tools/ ✅ LSP, formatter, package manager
 ```
 
-### Planned crate additions
+### Current crate structure (updated)
 
-| Crate | When | Purpose |
-|-------|------|---------|
-| `kyc_platform` | ✅ **Expanded** | FS (exists, copy, remove, create_dir, remove_dir, list_dir, is_dir, is_file, size, rename, read_to_string, write_string) + Time (now_ms, now_us). Exposed as `fs.*` / `time.*` APIs. |
-| `kyc_platform_macos` | After Phase 0 | macOS platform adapter |
-| `kyc_platform_linux` | future | Linux platform adapter |
-| Various `ky-*` | After Phase 0 | Kyle packagis (HTTP, SQLite, JSON, etc.) |
-| `kyc_graphics` | Aspirational | Canvas, GPU rendering |
-| `kyc_ui` | Aspirational | Widget library |
-| `kyc_scene` | Aspirational | Scene graph |
-| `kyc_platform_macos` | Aspirational | macOS platform adapter |
-| `kyc_platform_linux` | Aspirational | Linux platform adapter |
+| Crate | Status | Purpose |
+|-------|--------|---------|
+| `kyc_core` | ✅ | Foundation types |
+| `kyc_frontend` | ✅ | Lexer + parser |
+| `kyc_hir` | ✅ | Desugaring |
+| `kyc_semantic` | ✅ | Type checker, scope, borrow |
+| `kyc_mir` | ✅ | MIR lowering, SSA, optimizations |
+| `kyc_backend` | ✅ | LLVM codegen, linker |
+| `kyc_driver` | ✅ | Pipeline orchestration |
+| `kyc_cli` | ✅ | CLI binary (`ky`) |
+| `kyc_runtime` | ✅ | Runtime (memory, strings, lists, dicts) |
+| `kyc_tools` | ✅ | LSP, formatter, package manager |
+| `kyc_ui` | ✅ | .kyx parser + UI-IR + Backends |
+| `kyc_platform` | ✅ | FS, Time APIs |
+| `kyc_graphics` | 📅 | Aspirational |
+| `kyc_scene` | 📅 | Aspirational |
 
 ---
 

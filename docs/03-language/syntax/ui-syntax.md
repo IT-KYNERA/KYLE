@@ -4,6 +4,7 @@
 **Status:** Specification
 
 > **Arquitectura e implementaci&oacute;n:** Ver [`docs/10-design/rfc/0002-ui-architecture.md`](../../10-design/rfc/0002-ui-architecture.md) para el roadmap t&eacute;cnico completo (WASM, multiplataforma, custom OS).  
+> **Re-arquitectura UI-IR:** Ver [`docs/10-design/rfc/0005-ui-rearchitecture-plan.md`](../../10-design/rfc/0005-ui-rearchitecture-plan.md) para la nueva capa agn&oacute;stica.  
 > **Traducci&oacute;n multi-target:** Ver [`docs/10-design/rfc/0003-ui-translation.md`](../../10-design/rfc/0003-ui-translation.md) para la arquitectura de traducci&oacute;n a JS/nativo/WASM.  
 > **Sistema de estilos:** Ver [`docs/03-language/ui/style-system.md`](../../03-language/ui/style-system.md) para el sistema de estilos tipado (sin CSS).  
 > **Estado y eventos:** Ver [`docs/03-language/ui/state-events.md`](../../03-language/ui/state-events.md) para estado, binding y eventos.  
