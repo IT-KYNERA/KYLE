@@ -2,7 +2,7 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="${KY_VERSION:-v0.7.0}"
+VERSION="${KY_VERSION:-v0.8.0}"
 
 # ─── Functions ──────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ usage() {
     echo "Usage: curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh"
     echo ""
     echo "Environment variables:"
-    echo "  KY_VERSION=v0.7.0     Version to install (default: v0.7.0)"
+    echo "  KY_VERSION=v0.8.0     Version to install (default: v0.8.0)"
     echo "  KY_PREFIX=/custom/path Install directory (default: ~/.ky or /usr/local)"
     echo ""
     echo "  install.sh uninstall   Remove Kyle from the system"
