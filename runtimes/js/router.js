@@ -3,7 +3,7 @@
 //  Client-side router with History API, route params, guards, lazy loading.
 // =============================================================================
 
-class Route {
+export class Route {
     constructor(pattern, view, options = {}) {
         this.pattern = pattern;
         this.view = view;           // component function or lazy loader
@@ -51,7 +51,7 @@ class Route {
     }
 }
 
-class Router {
+export class Router {
     constructor(options = {}) {
         this.routes = [];
         this.currentPath = '/';
@@ -206,28 +206,28 @@ class Router {
 }
 
 // Get route params (called from Kyle components)
-function routeParams() {
+export function routeParams() {
     return window.__router?.currentParams || {};
 }
 
 // Navigate programmatically (called from Kyle)
-function navigate(path) {
+export function navigate(path) {
     return window.__router?.navigate(path);
 }
 
-function navigateBack() {
+export function navigateBack() {
     window.history.back();
 }
 
-function navigateReplace(path) {
+export function navigateReplace(path) {
     return window.__router?.navigate(path, { replace: true });
 }
 
 // =============================================================================
-//  Auto-routing: scan .kyx view() declarations
+// Auto-routing: scan .kyx view() declarations
 // =============================================================================
 
-function createRouter(options = {}) {
+export function createRouter(options = {}) {
     const router = new Router(options);
     window.__router = router;
 
@@ -238,10 +238,8 @@ function createRouter(options = {}) {
     return router;
 }
 
-// Export for both browser and Node.js
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Router, Route, createRouter, routeParams, navigate, navigateBack, navigateReplace };
-} else if (typeof window !== 'undefined') {
+// Global fallback for direct script inclusion
+if (typeof window !== 'undefined') {
     window.Router = Router;
     window.createRouter = createRouter;
     window.routeParams = routeParams;

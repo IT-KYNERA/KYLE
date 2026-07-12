@@ -3,7 +3,7 @@
 //  Proxy-based reactive state with one-way and two-way binding.
 // =============================================================================
 
-class ReactiveState {
+export class ReactiveState {
     constructor(initial = {}) {
         this._watchers = new Map();   // key → Set<callback>
         this._batchDepth = 0;
@@ -82,7 +82,7 @@ class ReactiveState {
 //  Binding Helpers
 // =============================================================================
 
-class Binding {
+export class Binding {
     // One-way binding: state → UI
     static oneWay(el, prop, state, key) {
         const update = (value) => {
@@ -160,7 +160,7 @@ class Binding {
 // =============================================================================
 
 // Create a Kyle-compatible event object from a DOM event
-function createKyleEvent(domEvent) {
+export function createKyleEvent(domEvent) {
     return {
         type: domEvent.type,
         target: domEvent.target,
@@ -177,10 +177,8 @@ function createKyleEvent(domEvent) {
     };
 }
 
-// Export for both browser and Node.js
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ReactiveState, Binding, createKyleEvent };
-} else if (typeof window !== 'undefined') {
+// Global fallback for direct script inclusion
+if (typeof window !== 'undefined') {
     window.ReactiveState = ReactiveState;
     window.Binding = Binding;
     window.createKyleEvent = createKyleEvent;

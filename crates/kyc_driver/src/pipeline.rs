@@ -1031,18 +1031,37 @@ impl Pipeline {
         Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive, target)
     }
 
-    /// Build a .kyx UI source file: parse .kyx and generate JS.
+    /// Build a .kyx UI source file: parse .kyx and generate JS via UI-IR backend.
     pub fn build_kyx_source(source: &str, output_path: &Path) -> Result<(), String> {
         let file = kyc_ui::parser::parse(source)
             .map_err(|e| format!("kyx parse error: {}", e))?;
-        let js = kyc_ui::js_gen::generate(&file);
-        let mut f = std::fs::File::create(output_path)
-            .map_err(|e| format!("Failed to create output file: {}", e))?;
-        f.write_all(js.as_bytes())
-            .map_err(|e| format!("Failed to write JS output: {}", e))?;
-        // Copy runtime JS files to output directory
+        let program = kyc_ui::parser::to_ui_program(file);
+
+        // Use web backend (default for now)
+        let backend = kyc_ui::backend::get_backend("web")
+            .ok_or("Web backend not available")?;
+        let output = backend.generate(&program);
+
+        // Write generated files
         let output_dir = output_path.parent().unwrap_or(Path::new("."));
-        let runtime_files = ["reactivity.js", "router.js", "a11y.js", "portal.js", "error_boundary.js", "i18n.js"];
+        for gen_file in &output.files {
+            let dst = output_dir.join(&gen_file.path);
+            std::fs::write(&dst, &gen_file.content)
+                .map_err(|e| format!("Failed to write {}: {}", gen_file.path, e))?;
+        }
+
+        // Write HTML shell if available
+        if let Some(html) = &output.html_shell {
+            let html_path = output_dir.join("index.html");
+            std::fs::write(&html_path, html)
+                .map_err(|e| format!("Failed to write index.html: {}", e))?;
+        }
+
+        // Copy runtime JS files to output directory
+        let runtime_files = [
+            "reactivity.js", "router.js", "a11y.js", "portal.js",
+            "error_boundary.js", "i18n.js", "ssr.js", "testing.js",
+        ];
         let runtime_source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/js");
         for file_name in &runtime_files {
             let src = runtime_source_dir.join(file_name);
@@ -1051,15 +1070,18 @@ impl Pipeline {
                 let _ = std::fs::copy(&src, &dst);
             }
         }
-        println!("Build complete: {}", output_path.display());
+        println!("Build complete: {} (web target)", output_path.display());
         Ok(())
     }
 
-    /// Check a .kyx UI source file: parse and validate.
+    /// Check a .kyx UI source file: parse and validate (now as UI-IR).
     pub fn check_kyx_source(source: &str) -> Result<(), String> {
         let file = kyc_ui::parser::parse(source)
             .map_err(|e| format!("kyx parse error: {}", e))?;
-        println!("kyx file: {} nodes, {} views", file.body.len(), file.view_paths.len());
+        let program = kyc_ui::parser::to_ui_program(file);
+        println!("kyx file: {} nodes, {} views, {} styles, {} animations",
+            program.body.len(), program.view_paths.len(),
+            program.styles.len(), program.animations.len());
         Ok(())
     }
 

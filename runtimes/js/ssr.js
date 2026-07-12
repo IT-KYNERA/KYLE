@@ -3,7 +3,7 @@
 //  Renderiza componentes Kyle a HTML strings para el servidor.
 // =============================================================================
 
-class SSRRenderer {
+export class SSRRenderer {
     // Render a component to HTML string
     static render(componentFn, props = {}) {
         const result = componentFn(props);
@@ -99,8 +99,6 @@ class SSRRenderer {
 }
 
 // Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SSRRenderer };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.SSRRenderer = SSRRenderer;
 }

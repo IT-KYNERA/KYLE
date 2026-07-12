@@ -3,7 +3,7 @@
 //  Renderizado de componentes en tests, simulación de eventos, snapshots.
 // =============================================================================
 
-class UITestRenderer {
+export class UITestRenderer {
     constructor() {
         this.container = null;
     }
@@ -115,32 +115,30 @@ class UITestRenderer {
 }
 
 // Create test renderer singleton
-let _testRenderer = null;
-function getTestRenderer() {
+export let _testRenderer = null;
+export function getTestRenderer() {
     if (!_testRenderer) _testRenderer = new UITestRenderer();
     return _testRenderer;
 }
 
-function render(componentFn, props) {
+export function render(componentFn, props) {
     return getTestRenderer().render(componentFn, props);
 }
 
-function find(selector) {
+export function find(selector) {
     return getTestRenderer().find(selector);
 }
 
-function click(selector) {
+export function click(selector) {
     return getTestRenderer().click(selector);
 }
 
-function snapshot() {
+export function snapshot() {
     return getTestRenderer().snapshot();
 }
 
 // Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { UITestRenderer, getTestRenderer, render, find, click, snapshot };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.UITestRenderer = UITestRenderer;
     window.render = render;
     window.find = find;

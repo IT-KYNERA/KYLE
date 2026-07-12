@@ -545,6 +545,7 @@ dependencies = [
  "kyc_core",
  "kyc_driver",
  "kyc_tools",
+ "kyc_ui",
  "tar",
  "ureq",
 ]

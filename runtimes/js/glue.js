@@ -3,7 +3,7 @@
 //  Bridges the Kyle WASM module with the browser/Node.js environment.
 // =============================================================================
 
-class KyleRuntime {
+export class KyleRuntime {
     constructor() {
         this.wasm = null;
         this.memory = null;
@@ -154,9 +154,7 @@ class KyleRuntime {
     }
 }
 
-// Export for both browser and Node.js
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { KyleRuntime };
-} else if (typeof window !== 'undefined') {
+// Global fallback
+if (typeof window !== 'undefined') {
     window.KyleRuntime = KyleRuntime;
 }

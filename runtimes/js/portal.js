@@ -3,7 +3,7 @@
 //  Renderiza contenido fuera del árbol padre del componente.
 // =============================================================================
 
-class PortalManager {
+export class PortalManager {
     constructor() {
         this.portals = new Map();
         this.outlets = new Map();
@@ -179,12 +179,10 @@ class PortalManager {
 }
 
 // Singleton
-const portalManager = new PortalManager();
+export const portalManager = new PortalManager();
 
 // Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PortalManager, portalManager };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.PortalManager = PortalManager;
     window.portalManager = portalManager;
 }

@@ -547,6 +547,66 @@ impl KyxParser {
     }
 }
 
+/// Convert KyxFile to platform-agnostic UI-IR UiProgram
+pub fn to_ui_program(file: KyxFile) -> crate::ir::UiProgram {
+    crate::ir::UiProgram {
+        view_paths: file.view_paths,
+        code_blocks: file.code_blocks,
+        styles: file.styles,
+        animations: file.animations,
+        body: file.body.into_iter().map(convert_node).collect(),
+    }
+}
+
+fn convert_node(node: KyxNode) -> crate::ir::UiNode {
+    use crate::ir::{UiNode, UiAttr, AttrValue, ComponentTag};
+    match node {
+        KyxNode::Element { tag, attrs, children } => UiNode::Element {
+            tag: ComponentTag::from_str(&tag),
+            attrs: attrs.into_iter().map(convert_attr).collect(),
+            children: children.into_iter().map(convert_node).collect(),
+        },
+        KyxNode::SelfClosing { tag, attrs } => UiNode::SelfClosing {
+            tag: ComponentTag::from_str(&tag),
+            attrs: attrs.into_iter().map(convert_attr).collect(),
+        },
+        KyxNode::Slot { name, fallback } => UiNode::Slot {
+            name,
+            fallback: fallback.into_iter().map(convert_node).collect(),
+        },
+        KyxNode::If { condition, then_branch, else_branch } => UiNode::If {
+            condition,
+            then_branch: then_branch.into_iter().map(convert_node).collect(),
+            else_branch: else_branch.into_iter().map(convert_node).collect(),
+        },
+        KyxNode::For { item, list, body } => UiNode::For {
+            item, list,
+            body: body.into_iter().map(convert_node).collect(),
+        },
+        KyxNode::Match { expr, cases } => UiNode::Match {
+            expr,
+            cases: cases.into_iter().map(|c| crate::ir::MatchCase {
+                pattern: c.pattern,
+                body: c.body.into_iter().map(convert_node).collect(),
+            }).collect(),
+        },
+        KyxNode::Expr(e) => UiNode::Expr(e),
+        KyxNode::CodeBlock(b) => UiNode::CodeBlock(b),
+        KyxNode::Text(t) => UiNode::Text(t),
+    }
+}
+
+fn convert_attr(attr: KyxAttr) -> crate::ir::UiAttr {
+    crate::ir::UiAttr {
+        name: attr.name,
+        value: match attr.value {
+            crate::ast::AttrValue::String(s) => crate::ir::AttrValue::String(s),
+            crate::ast::AttrValue::Expr(e) => crate::ir::AttrValue::Expr(e),
+            crate::ast::AttrValue::Flag => crate::ir::AttrValue::Flag,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

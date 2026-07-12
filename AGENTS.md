@@ -31,7 +31,10 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | **FFI (extern fn, @link, ptr)** | ✅ **Complete** — Pure Kyle FFI to C libraries |
 | **Runtime in Kyle** | ✅ **Complete** |
 | **kyc_platform** | ✅ **Complete** |
-| **UI framework (16 design docs)** | 📅 **Diseñado** — 13 docs de especificación + 3 RFCs |
+| **UI framework (16 design docs)** | ✅ **FASE A-C completa** — UI-IR, Web Backend (ESM), `ky run` unificado |
+| **Desktop Skia backend** | 📅 **FASE D** — Pendiente |
+| **Android / iOS backends** | 📅 **FASE E** — Pendiente |
+| **Terminal / TUI backend** | 📅 **FASE F** — Pendiente |
 | **u8-u64 codegen** | ✅ **Complete** — MirType, unsigned ops, zext for call args |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.

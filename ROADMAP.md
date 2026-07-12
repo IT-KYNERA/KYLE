@@ -1,7 +1,7 @@
 # Kyle — Roadmap de Desarrollo
 
 > Documento completo: [`docs/01-introduction/roadmap.md`](docs/01-introduction/roadmap.md)
-> UI Framework: [`docs/10-design/rfc/0004-ui-implementation-roadmap.md`](docs/10-design/rfc/0004-ui-implementation-roadmap.md)
+> UI Framework: [`docs/10-design/rfc/0005-ui-rearchitecture-plan.md`](docs/10-design/rfc/0005-ui-rearchitecture-plan.md)
 
 ---
 
@@ -17,113 +17,100 @@
 | **Paquetes** (http, json, sqlite) | ✅ Completo |
 | **FFI** (extern fn, @link, ptr) | ✅ Completo |
 | **Tipos especializados** (46 tipos) | ✅ Todos implementados |
-| **FASE 0: CLI --target** | ✅ Completo |
-| **FASE 1: Parser .kyx + JS gen** | ✅ Completo |
-| **FASE 2: Estilos tipados** | ✅ Completo |
-| **FASE 3: Eventos + Binding** | ✅ Completo |
-| **FASE 4: Componentes UI** | ✅ Completo (28 componentes) |
-| **FASE 6: Animaciones** | ✅ Completo |
-| **FASE 7: a11y** | ✅ Completo |
-| **FASE 8: Portales** | ✅ Completo |
-| **FASE 9: Error Boundaries** | ✅ Completo |
-| **FASE 10: i18n** | ✅ Completo |
-| **FASE 11: SSR** | ✅ Completo |
-| **FASE 12: Testing** | ✅ Completo |
-| **FASE 13: Webapp Project + Dev Server** | ⬜ Pendiente |
+
+### UI Framework — Nueva Arquitectura (RFC-0005)
+
+| Fase | Estado |
+|:----:|:------:|
+| **FASE A: UI-IR + Backend system** | ✅ Completo |
+| **FASE B: JS Runtimes → ESM** | ✅ Completo |
+| **FASE C: `ky run` unificado + app auto-gen** | ✅ Completo |
+| **FASE D: Desktop Skia** | ⬜ Pendiente |
+| **FASE E: Android / iOS** | ⬜ Pendiente |
+| **FASE F: Terminal / TUI** | ⬜ Pendiente |
+
+---
+
+## Arquitectura UI-IR
+
+```
+.ky / .kyx
+     │
+     ▼
+┌──────────────────┐
+│  .kyx Parser     │  → produce UI-IR (agnóstico)
+└──────┬───────────┘
+       ▼
+┌──────────────────┐
+│  UI-IR           │  ← UiNode, ComponentTag, UiProgram
+│  (ir.rs)         │
+└──────┬───────────┘
+       │
+  ┌────┴──────────────────────┐
+  │                           │
+  ▼                           ▼
+Web Backend            Desktop Backend   ← FUTURO
+(JS ESM + WASM)        (Skia + FFI)
+  │                           │
+  ├── Android Backend  ← FUTURO
+  ├── iOS Backend      ← FUTURO
+  └── Terminal Backend ← FUTURO
+```
+
+### Capas implementadas
+
+| Capa | Archivo | Descripción |
+|------|---------|-------------|
+| UI-IR | `crates/kyc_ui/src/ir.rs` | UiNode, ComponentTag (30+ tags), UiProgram |
+| Backend trait | `crates/kyc_ui/src/backend/mod.rs` | UiBackend trait + registry |
+| Web Backend | `crates/kyc_ui/src/backend/web.rs` | UI-IR → JS (ESM) + HTML auto-gen |
+| Parser | `crates/kyc_ui/src/parser.rs` | .kyx → KyxFile → UI-IR |
+| App Config | `crates/kyc_ui/src/app_config.rs` | Config parser (port, title, target settings) |
+| CLI | `crates/kyc_cli/src/main.rs` | `ky run` = dev server, `ky serve` deprecated |
 
 ---
 
 ## Próximos Pasos
 
-```
-FASE 13 ── ky new webapp + ky serve ─────────── Sem 19-20
-```
+### FASE D: Desktop Nativo (Skia) — Sem 7-10
 
-### FASE 13: Webapp Project + Dev Server
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| FFI Skia: extern fn para canvas 2D | Grande |
+| Backend desktop: UI-IR → Kyle AST | Grande |
+| Ventana nativa (GLFW via FFI) | Medio |
+| Layout engine (flexbox en Kyle) | Grande |
+| Componentes Skia: View, Text, Button | Grande |
+| `ky run --target desktop` | Pequeño |
 
-| Tarea | Archivos | Esfuerzo |
-|-------|----------|:--------:|
-| Template `ky new webapp <name>` | `crates/kyc_cli/src/main.rs` | Pequeño |
-| Dev server `ky serve [--port]` | `crates/kyc_cli/src/main.rs` | Medio |
-| `index.html` con auto-load de runtime | `packages/webapp/template/` | Pequeño |
-| Build automático + file watching | `crates/kyc_tools/src/` | Medio |
+### FASE E: Mobile (Android + iOS) — Sem 11-16
 
-```bash
-ky new webapp mi-app
-cd mi-app
-ky serve --port 8080
-# → http://localhost:8080
-``````
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| Backend Android: UI-IR → XML layouts | Grande |
+| Backend iOS: UI-IR → SwiftUI | Grande |
+| `ky run --target android` | Pequeño |
 
-### FASE 0: CLI --target + WASM (Semana 1-2)
+### FASE F: Terminal / TUI — Sem 17-18
 
-| Tarea | Archivos |
-|-------|----------|
-| Flag `--target` en CLI | `crates/kyc_cli/src/main.rs` |
-| Target triple en Codegen | `crates/kyc_backend/src/codegen.rs` |
-| Target triple en Pipeline | `crates/kyc_driver/src/pipeline.rs` |
-| Linker por target triple | `crates/kyc_backend/src/linker.rs` |
-| Compilar runtime a WASM | `crates/kyc_runtime/` |
-| JS glue runtime básico | `runtimes/js/glue.js` |
-
-### FASE 1: Parser .kyx + Traductor JS (Semana 3-4)
-
-| Tarea | Archivos |
-|-------|----------|
-| Nueva crate `kyc_ui` | `crates/kyc_ui/src/lib.rs` |
-| Parser XML .kyx → AstType | `crates/kyc_ui/src/parser.rs` |
-| Resolver .kyx | `crates/kyc_frontend/src/resolver.rs` |
-| JS generator | `crates/kyc_ui/src/js_gen.rs` |
-
-### FASE 2-7: Ver plan detallado
-
-→ [`docs/10-design/rfc/0004-ui-implementation-roadmap.md`](docs/10-design/rfc/0004-ui-implementation-roadmap.md)
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| Backend terminal: UI-IR → NCurses | Grande |
+| `ky run --target terminal` | Pequeño |
 
 ---
 
-## Documentos de Diseño UI
+## Bugs Conocidos
 
-| Documento | Contenido |
-|-----------|-----------|
-| [`ui-syntax.md`](docs/03-language/syntax/ui-syntax.md) | Sintaxis .kyx (componentes, eventos, slots) |
-| [`style-system.md`](docs/03-language/ui/style-system.md) | Sistema de estilos tipado (sin CSS) |
-| [`state-events.md`](docs/03-language/ui/state-events.md) | Estado, eventos, binding, formularios |
-| [`animation.md`](docs/03-language/ui/animation.md) | Animaciones y transiciones |
-| [`routing.md`](docs/03-language/ui/routing.md) | Routing auto-routing y navegación |
-| [`accessibility.md`](docs/03-language/ui/accessibility.md) | Accesibilidad (a11y) |
-| [`i18n.md`](docs/03-language/ui/i18n.md) | Internacionalización, plurales, RTL |
-| [`portals.md`](docs/03-language/ui/portals.md) | Portales/teleport para modals, tooltips |
-| [`error-boundaries.md`](docs/03-language/ui/error-boundaries.md) | Captura de errores y fallback UI |
-| [`composition.md`](docs/03-language/ui/composition.md) | Patrones de composición (slots, HOCs) |
-| [`context-patterns.md`](docs/03-language/ui/context-patterns.md) | Context avanzado y provider/consumer |
-| [`ssr.md`](docs/03-language/ui/ssr.md) | Server-Side Rendering e hidratación |
-| [`testing.md`](docs/03-language/ui/testing.md) | Testing de UI: unit, interacción, E2E |
-| [`RFC-0002`](docs/10-design/rfc/0002-ui-architecture.md) | Arquitectura general |
-| [`RFC-0003`](docs/10-design/rfc/0003-ui-translation.md) | Traducción multi-target |
-| [`RFC-0004`](docs/10-design/rfc/0004-ui-implementation-roadmap.md) | Roadmap de implementación |
-
----
-
-## Bugs Encontrados y Fixeados (Jul 2026)
-
-| Bug | Archivos afectados | Estado |
-|-----|:------------------:|:------:|
-| `await` type: siempre retorna `i64` sin importar el return type real | type_checker, lower, ssa, codegen | ✅ Fixed |
-| `!` propagación: parse error con postfix `!` | parser | ✅ Fixed |
-| `prop` syntax: getter/setter property dispatch | type_checker, lower, codegen | ✅ Fixed |
-| `set{1,2,3}` literal: parseaba como struct literal | parser | ✅ Fixed |
-| `f32` codegen: SSA verify error en métodos con float | codegen | ✅ Fixed |
-| `str_builder` linker: runtime symbols no exportados | lower (return type mapping) | ✅ Fixed |
-| Generic methods: `Box<T>.get()` monomorphization error | pre-existing | ⬜ No fixeado |
-| Fn pointer calls: silent crash en `apply(&fn, arg)` | pre-existing | ⬜ No fixeado |
+| Bug | Estado |
+|-----|:------:|
+| `kyc_runtime_wasm` panic_impl lang item | ⬜ Pre-existente (no afecta build) |
+| Generic methods: `Box<T>.get()` monomorphization | ⬜ Pre-existente |
+| Fn pointer calls: `apply(&fn, arg)` silent crash | ⬜ Pre-existente |
 
 ---
 
 ## Benchmarks (Apple M5/macOS, Jul 2026)
-
-Benchmarks compilados con `-O3` (C/C++), `opt-level=3` (Rust), `go build` (Go),
-`.NET Release` (C#), `javac` (Java), `ky build` (Kyle).
-3 warmup + 5 mediciones con `date +%s%N`. Script: `bash benchmarks/run_benchmarks.sh`
 
 | Benchmark | C | C++ | Rust | C# | Java | Go | Python | **Kyle** |
 |-----------|:--:|:---:|:----:|:--:|:----:|:--:|:------:|:--------:|
@@ -132,25 +119,24 @@ Benchmarks compilados con `-O3` (C/C++), `opt-level=3` (Rust), `go build` (Go),
 | String Concat (500k) | 8ms | 10ms | 3ms | 22ms | 35ms | 4ms | 22ms | **65ms** |
 | MatMul (100x100x10) | 7ms | 7ms | 8ms | 33ms | 38ms | 14ms | 1171ms | **9ms** |
 
-> Python `TO` en Fibonacci (500M iteraciones, timeout 120s).
-> Kyle compite con C/Rust en cómputo numérico. Concat es ~10x más lento que C
-> por overhead de `str_builder`. Fibonacci es ~2x por ser intérprete puro.
-
 ---
 
 ## Testing
 
 ```bash
-# Rust tests
-cargo test --workspace
+# Rust tests (excluye kyc_runtime_wasm que requiere wasm32)
+cargo test --workspace --exclude kyc_runtime_wasm
+
+# Build release
+cargo build --release --bin ky
 
 # Kyle type-check
 ky check <file.ky>
 
-# UI build (cuando exista)
-ky build --target wasm32 app.kyx
+# UI build
+ky run   # sirve proyecto UI en localhost:8080
 ```
 
 ---
 
-*Última actualización: 2026-07-10*
+*Última actualización: 2026-07-11 · Arquitectura multi-target (RFC-0005)*

@@ -3,7 +3,7 @@
 //  Traducciones, plurales, formato fechas/números, RTL.
 // =============================================================================
 
-class I18nManager {
+export class I18nManager {
     constructor(options = {}) {
         this.locale = options.locale || navigator?.language?.split('-')[0] || 'en';
         this.fallbackLocale = options.fallbackLocale || 'en';
@@ -176,25 +176,23 @@ const PLURAL_RULES = {
 
 // Create singleton
 let _instance = null;
-function getI18n(options) {
+export function getI18n(options) {
     if (!_instance) _instance = new I18nManager(options || {});
     return _instance;
 }
 
 // Global t() function
-function t(key, params) {
+export function t(key, params) {
     return getI18n().t(key, params);
 }
 
 // Global locale switch
-function setLocale(locale) {
+export function setLocale(locale) {
     getI18n().setLocale(locale);
 }
 
 // Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { I18nManager, getI18n, t, setLocale };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.I18nManager = I18nManager;
     window.t = t;
     window.setLocale = setLocale;

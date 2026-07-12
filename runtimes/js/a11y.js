@@ -3,7 +3,7 @@
 //  ARIA, keyboard navigation, focus management, reduced motion.
 // =============================================================================
 
-class A11yManager {
+export class A11yManager {
     constructor() {
         this.focusStack = [];
         this.keyboardHandlers = new Map();
@@ -233,9 +233,7 @@ class A11yManager {
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { A11yManager };
-} else if (typeof window !== 'undefined') {
+// Global fallback
+if (typeof window !== 'undefined') {
     window.A11yManager = A11yManager;
 }

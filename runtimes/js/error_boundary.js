@@ -3,7 +3,7 @@
 //  Captura errores en componentes hijos con UI de fallback y recovery.
 // =============================================================================
 
-class ErrorBoundary {
+export class ErrorBoundary {
     constructor(options = {}) {
         this.state = 'success'; // 'success' | 'error' | 'recovering'
         this.error = null;
@@ -141,7 +141,7 @@ class ErrorBoundary {
 }
 
 // Create an error boundary wrapper for components
-function withErrorBoundary(componentFn, options = {}) {
+export function withErrorBoundary(componentFn, options = {}) {
     const boundary = new ErrorBoundary(options);
     const wrapped = boundary.wrap(componentFn);
     wrapped.boundary = boundary;
@@ -150,9 +150,7 @@ function withErrorBoundary(componentFn, options = {}) {
 }
 
 // Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ErrorBoundary, withErrorBoundary };
-} else if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
     window.ErrorBoundary = ErrorBoundary;
     window.withErrorBoundary = withErrorBoundary;
 }
