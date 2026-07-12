@@ -150,11 +150,27 @@ fn is_kyx_file(file: &str) -> bool {
     Path::new(file).extension().map_or(false, |ext| ext == "kyx")
 }
 
+/// Extract the first non-flag argument from args, skipping values of known flags.
+fn first_file_arg(args: &[String]) -> Option<String> {
+    let mut skip_next = false;
+    for a in args.iter().skip(2) {
+        if skip_next { skip_next = false; continue; }
+        if a.starts_with("--") {
+            skip_next = matches!(a.as_str(), "--target" | "--port" | "--host");
+            continue;
+        }
+        if *a == "--release" { continue; }
+        return Some(a.clone());
+    }
+    None
+}
+
 fn cmd_build(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
     let target = args.iter().position(|a| a == "--target")
         .and_then(|i| args.get(i + 1)).cloned();
-    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--") && **a != "--release");
+    let is_desktop = target.as_deref() == Some("desktop") || target.as_deref() == Some("native");
+    let file_arg = first_file_arg(args);
     if file_arg.is_none() {
         // Project mode
         let project_root = match find_project_root(&std::env::current_dir().unwrap()) {
@@ -171,7 +187,11 @@ fn cmd_build(args: &[String]) {
             let file = source_path.to_string_lossy().to_string();
             let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
             let _ = fs::create_dir_all(&build_dir);
-            if is_kyx_file(&file) {
+
+            if is_desktop && is_kyx_file(&file) {
+                // Desktop build: .kyx → UI-IR → main.ky → native binary
+                build_desktop_kyx(&source, &file, &build_dir, release);
+            } else if is_kyx_file(&file) {
                 let js_output = build_dir.join("main.js");
                 match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
                     Ok(()) => {}
@@ -201,12 +221,15 @@ fn cmd_build(args: &[String]) {
     }
 
     let file = file_arg.unwrap();
-    let file_idx = args.iter().position(|a| a == file).unwrap();
+    let file_idx = args.iter().position(|a| *a == file).unwrap();
     let source = load_source(args, file_idx);
-    let file_stem = Path::new(file).file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let file_stem = Path::new(&file).file_stem().unwrap_or_default().to_string_lossy().to_string();
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
     let _ = fs::create_dir_all(&build_dir);
-    if is_kyx_file(file) {
+
+    if is_desktop && is_kyx_file(&file) {
+        build_desktop_kyx(&source, &file, &build_dir, release);
+    } else if is_kyx_file(&file) {
         let js_output = build_dir.join(&file_stem).with_extension("js");
         match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
             Ok(()) => {}
@@ -215,9 +238,9 @@ fn cmd_build(args: &[String]) {
     } else {
         let output = exe_path(&build_dir.join(&file_stem));
         let build_result = if release {
-            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, file, &output, &build_dir, target.as_deref())
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
         } else {
-            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, file, &output, &build_dir, target.as_deref())
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
         };
         match build_result {
             Ok(()) => println!("Build complete: {}", output.display()),
@@ -226,28 +249,77 @@ fn cmd_build(args: &[String]) {
     }
 }
 
+/// Build a .kyx file for desktop: UI-IR → main.ky → native binary
+fn build_desktop_kyx(source: &str, file: &str, build_dir: &Path, release: bool) {
+    let output = exe_path(&build_dir.join("main"));
+    let main_ky_path = build_dir.join("main.ky");
+
+    // Parse .kyx → UI-IR → Desktop backend → main.ky
+    let file_ast = match kyc_ui::parser::parse(source) {
+        Ok(f) => f,
+        Err(e) => { eprintln!("kyx parse error: {}", e); process::exit(1); }
+    };
+    let program = kyc_ui::parser::to_ui_program(file_ast);
+    let backend = match kyc_ui::backend::get_backend("desktop") {
+        Some(b) => b,
+        None => { eprintln!("Desktop backend not available"); process::exit(1); }
+    };
+    let output_files = backend.generate(&program);
+
+    // Write generated main.ky
+    for gen_file in &output_files.files {
+        let dst = build_dir.join(&gen_file.path);
+        if let Err(e) = fs::write(&dst, &gen_file.content) {
+            eprintln!("Error writing {}: {}", gen_file.path, e);
+            process::exit(1);
+        }
+    }
+
+    // Build the generated main.ky through the normal compiler pipeline
+    let main_ky_source = match fs::read_to_string(&main_ky_path) {
+        Ok(s) => s,
+        Err(e) => { eprintln!("Error reading generated main.ky: {}", e); process::exit(1); }
+    };
+
+    let build_result = if release {
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(
+            &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
+    } else {
+        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(
+            &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
+    };
+    match build_result {
+        Ok(()) => println!("Build complete: {} (desktop target)", output.display()),
+        Err(e) => { eprintln!("Desktop build error: {}", e); process::exit(1); }
+    }
+}
+
 fn cmd_run(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
     let target = args.iter().position(|a| a == "--target")
         .and_then(|i| args.get(i + 1)).cloned();
+    let is_desktop = target.as_deref() == Some("desktop") || target.as_deref() == Some("native");
     let port = args.iter().position(|a| a == "--port")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    let file_arg = args.iter().skip(2).find(|a| !a.starts_with("--") && **a != "--release");
+    let file_arg = first_file_arg(args);
 
     if let Some(file) = file_arg {
         // Single-file mode
         if let Some(project_root) = find_project_root(&std::env::current_dir().unwrap()) {
             resolve_and_check(&project_root);
         }
-        let file_idx = args.iter().position(|a| a == file).unwrap();
+        let file_idx = args.iter().position(|a| *a == file).unwrap();
         let source = load_source(args, file_idx);
-        if is_kyx_file(file) || kyc_ui::app_config::has_ui_content(&source) {
-            run_dev_server(&source, file, port, true);
+
+        if is_desktop && is_kyx_file(&file) {
+            run_desktop_app(&source, &file, release);
+        } else if is_kyx_file(&file) || kyc_ui::app_config::has_ui_content(&source) {
+            run_dev_server(&source, &file, port, true);
         } else {
-            compile_and_run_native(&source, file, &args, release, target.as_deref());
+            compile_and_run_native(&source, &file, &args, release, target.as_deref());
         }
     } else {
         // Project mode
@@ -263,7 +335,10 @@ fn cmd_run(args: &[String]) {
                 process::exit(1);
             });
             let file = source_path.to_string_lossy().to_string();
-            if is_kyx_file(&file) || kyc_ui::app_config::has_ui_content(&source) {
+
+            if is_desktop && is_kyx_file(&file) {
+                run_desktop_app(&source, &file, release);
+            } else if is_kyx_file(&file) || kyc_ui::app_config::has_ui_content(&source) {
                 run_dev_server_for_project(&project_root, &source, &file, port);
             } else {
                 let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
@@ -291,6 +366,22 @@ fn cmd_run(args: &[String]) {
             eprintln!("No src/main.ky or src/main.kyx found in project");
             process::exit(1);
         }
+    }
+}
+
+/// Build and run a .kyx file as a desktop (native) application
+fn run_desktop_app(source: &str, file: &str, release: bool) {
+    let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
+    let _ = fs::create_dir_all(&build_dir);
+    let output = exe_path(&build_dir.join("main"));
+
+    build_desktop_kyx(source, file, &build_dir, release);
+
+    let status = process::Command::new(&output)
+        .status()
+        .expect("Failed to execute desktop app");
+    if !status.success() {
+        process::exit(status.code().unwrap_or(1));
     }
 }
 

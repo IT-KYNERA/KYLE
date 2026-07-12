@@ -1,4 +1,5 @@
 pub mod web;
+pub mod desktop;
 
 use crate::ir::*;
 
@@ -34,11 +35,12 @@ pub trait UiBackend {
 pub fn get_backend(name: &str) -> Option<Box<dyn UiBackend>> {
     match name {
         "web" | "wasm32" => Some(Box::new(web::WebBackend::new())),
+        "desktop" | "native" => Some(Box::new(desktop::DesktopBackend::new())),
         _ => None,
     }
 }
 
 /// All registered backend names
 pub fn available_backends() -> Vec<&'static str> {
-    vec!["web (wasm32-unknown-unknown)"]
+    vec!["web (wasm32-unknown-unknown)", "desktop (native)"]
 }
