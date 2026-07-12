@@ -32,9 +32,11 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | **Runtime in Kyle** | ✅ **Complete** |
 | **kyc_platform** | ✅ **Complete** |
 | **UI framework (16 design docs)** | ✅ **FASE A-C completa** — UI-IR, Web Backend (ESM), `ky run` unificado |
-| **Desktop Skia backend** | 📅 **FASE D** — Pendiente |
-| **Android / iOS backends** | 📅 **FASE E** — Pendiente |
-| **Terminal / TUI backend** | 📅 **FASE F** — Pendiente |
+| **Diseño v2 (RFC-0005)** | ✅ **Aprobado** — Rutas centralizadas, props via visibilidad, layouts persistentes, targets por SO |
+| **Routing + Module Resolver** | 📅 **v0.8.0** — `<router>`, `<route>`, `<layout>`, `<slot>`, props via `_name` |
+| **Desktop nativos (macOS/Windows/Linux)** | 📅 **FASE D** — Pendiente |
+| **iOS / Android** | 📅 **FASE E** — Pendiente |
+| **Terminal / TUI** | 📅 **FASE F** — Pendiente |
 | **u8-u64 codegen** | ✅ **Complete** — MirType, unsigned ops, zext for call args |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.
@@ -161,6 +163,8 @@ ky/
 | String interpolation | `docs/03-language/syntax/string-interpolation.md` |
 | Error propagation (`!`) | `docs/03-language/syntax/error-propagation.md` |
 | UI framework (.kyx) | `docs/03-language/syntax/ui-syntax.md` |
+| UI routing | `docs/03-language/ui/routing.md` |
+| UI layout + slots | `docs/03-language/ui/composition.md` |
 | UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |
 | Multi-platform install | `docs/07-tools/distribution.md` |
 | Runtime internals | `docs/05-runtime/` |

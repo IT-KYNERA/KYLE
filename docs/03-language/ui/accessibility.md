@@ -135,7 +135,7 @@ El theme system debe garantizar contraste suficiente:
 # Validación en tiempo de compilación
 theme AccessibleTheme: LightTheme:
     # Error de compilación si el contraste es < 4.5:1
-    on_surface = Color("#666666")  # ❌ Muy claro sobre #FFFFFF
+    on_surface = color("#666666")  # ❌ Muy claro sobre #FFFFFF
 ```
 
 ### 5.2 Texto escalable
@@ -152,9 +152,9 @@ style<text> Body:
 
 ```kyle
 style<button> MotionAware:
-    transition = Transition("background", 200, Easing.EaseInOut, 0)
+    transition = transition("background", 200, easing.ease_in_out, 0)
     @media(reduced_motion: true):
-        transition = Transition.NONE  # sin animación si el usuario lo prefiere
+        transition = transition.none()  # sin animación si el usuario lo prefiere
 ```
 
 ---

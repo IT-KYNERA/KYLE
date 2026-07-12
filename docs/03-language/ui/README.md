@@ -9,7 +9,7 @@ Esta sección contiene la documentación de diseño del framework UI de Kyle.
 | [style-system.md](style-system.md) | Sistema de estilos tipado (Color, Spacing, Layout, Theme, Responsive) |
 | [state-events.md](state-events.md) | Estado, eventos, binding, formularios, validación |
 | [animation.md](animation.md) | Animaciones y transiciones (tipadas, multi-target) |
-| [routing.md](routing.md) | Routing auto-routing, navegación, guards, lazy loading |
+| [routing.md](routing.md) | Routing centralizado, `<route>`, `<layout>`, `<slot>`, guards, navegación |
 | [accessibility.md](accessibility.md) | Accesibilidad (WCAG 2.1 AA, ARIA, teclado, screen readers) |
 
 ## Patrones Avanzados
@@ -28,6 +28,7 @@ Esta sección contiene la documentación de diseño del framework UI de Kyle.
 | [ssr.md](ssr.md) | Server-Side Rendering, streaming, hidratación, SEO |
 | [i18n.md](i18n.md) | Internacionalización, plurales, fechas, RTL, lazy locales |
 | [testing.md](testing.md) | Testing de UI: unit, interacción, snapshots, E2E |
+| [file-picker.md](file-picker.md) | File picker nativo: selector de archivos en todas las plataformas |
 
 ## Documentos relacionados
 

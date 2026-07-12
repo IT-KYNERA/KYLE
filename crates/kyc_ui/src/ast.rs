@@ -1,10 +1,21 @@
 use std::fmt;
 
+/// A route extracted from `<route path="..." component=@comp layout=@layout>`
+#[derive(Clone, Debug)]
+pub struct RouteDecl {
+    pub path: String,
+    pub component: String,
+    pub layout: Option<String>,
+    pub title: Option<String>,
+    pub guard: Option<String>,
+    pub lazy: bool,
+}
+
 /// A parsed .kyx file
 #[derive(Clone, Debug)]
 pub struct KyxFile {
-    /// Optional view path declarations: view("/path", "/alias")
-    pub view_paths: Vec<String>,
+    /// Route declarations extracted from <route> elements
+    pub routes: Vec<RouteDecl>,
     /// Kyle code blocks: @(...)
     pub code_blocks: Vec<String>,
     /// Style/template/theme declarations
@@ -139,8 +150,8 @@ pub struct AnimDecl {
 
 impl fmt::Display for KyxFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for path in &self.view_paths {
-            writeln!(f, "view(\"{}\")", path)?;
+        for route in &self.routes {
+            writeln!(f, "route {} -> {}", route.path, route.component)?;
         }
         for block in &self.code_blocks {
             writeln!(f, "@({})", block)?;

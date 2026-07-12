@@ -1031,11 +1031,12 @@ impl Pipeline {
         Self::_build_source(source, file_name, output_path, artifact_dir, OptimizationLevel::Aggressive, target)
     }
 
-    /// Build a .kyx UI source file: parse .kyx and generate JS via UI-IR backend.
-    pub fn build_kyx_source(source: &str, output_path: &Path) -> Result<(), String> {
-        let file = kyc_ui::parser::parse(source)
-            .map_err(|e| format!("kyx parse error: {}", e))?;
-        let program = kyc_ui::parser::to_ui_program(file);
+    /// Build a .kyx UI source file: parse .kyx, resolve dependencies, and generate JS via UI-IR backend.
+    /// `source_path` is the path to the .kyx source file (used for relative resolution of dependencies).
+    /// If None, uses the current directory.
+    pub fn build_kyx_source(source: &str, source_path: Option<&Path>, output_path: &Path) -> Result<(), String> {
+        let src_path = source_path.unwrap_or_else(|| Path::new("main.kyx"));
+        let program = kyc_ui::resolver::build_multifile_program(source, src_path)?;
 
         // Use web backend (default for now)
         let backend = kyc_ui::backend::get_backend("web")
@@ -1065,14 +1066,18 @@ impl Pipeline {
         Ok(())
     }
 
-    /// Check a .kyx UI source file: parse and validate (now as UI-IR).
+    /// Check a .kyx UI source file: parse and validate with multi-file resolution.
     pub fn check_kyx_source(source: &str) -> Result<(), String> {
         let file = kyc_ui::parser::parse(source)
             .map_err(|e| format!("kyx parse error: {}", e))?;
         let program = kyc_ui::parser::to_ui_program(file);
-        println!("kyx file: {} nodes, {} views, {} styles, {} animations",
-            program.body.len(), program.view_paths.len(),
+        println!("kyx file: {} nodes, {} routes, {} styles, {} animations",
+            program.body.len(), program.routes.len(),
             program.styles.len(), program.animations.len());
+        // Show routes
+        for r in &program.routes {
+            println!("  route {} -> {} (layout: {:?})", r.path, r.component, r.layout);
+        }
         Ok(())
     }
 

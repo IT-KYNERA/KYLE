@@ -1,7 +1,7 @@
 # RFC-0005: Re-arquitectura UI Framework — Multiplataforma desde el núcleo
 
-**Status:** Implementado (FASIS A-C)
-**Date:** 2026-07-11
+**Status:** Implementado (FASES A-C) — Diseño v2 aprobado
+**Date:** 2026-07-12
 **Documentación relacionada:**
 - [0002-ui-architecture.md](0002-ui-architecture.md) — Arquitectura original
 - [0003-ui-translation.md](0003-ui-translation.md) — Traducción multi-target
@@ -11,13 +11,19 @@
 
 ## 0. Resumen Ejecutivo
 
-El framework UI se ha refactorizado para tener una **capa intermedia agnóstica (UI-IR)** que permite
-a `.kyx` compilar a cualquier plataforma. El `index.html` ya no está hardcodeado. 
-`ky serve` se unificó en `ky run`. Los JS runtimes ahora usan ES Modules.
+El framework UI tiene una **capa intermedia agnóstica (UI-IR)** que permite
+a `.kyx` compilar a cualquier plataforma. El diseño v2 introduce:
+
+- **Targets desglosados por SO**: `web`, `macos`, `windows`, `linux`, `ios`, `android`
+- **Rutas centralizadas** en el `<router>` con `<route>`, NO en las vistas
+- **Props vía visibilidad**: público = prop, `_` = interno, `__` = privado
+- **Layouts persistentes** con `<layout>` + `<slot />` (navbar/sidebar no se refrescan)
+- **Sin `view("/path")`**: los `.kyx` son solo componentes, las rutas están en `app.kyx`
+- **Todo snake_case**: `color()`, `spacing.all()`, `font_weight.bold`, etc.
 
 ---
 
-## 1. Arquitectura Implementada
+## 1. Arquitectura Aprobada
 
 ```
 .ky / .kyx (código fuente)
@@ -33,21 +39,70 @@ a `.kyx` compilar a cualquier plataforma. El `index.html` ya no está hardcodead
 │   UiNode, ComponentTag       │
 └──────────┬───────────────────┘
            │
-     ┌─────┴─────────────────────┐
-     │                           │
-     ▼                           ▼
-┌──────────────────┐    ┌──────────────────┐
-│  Web Backend     │    │ Desktop Backend  │  ← FUTURO
-│  UI-IR → JS ESM │    │ UI-IR → Skia     │
-│  + HTML auto     │    │ + FFI nativo     │
-└──────────────────┘    └──────────────────┘
-     │
-     ├── Android Backend ← FUTURO
-     ├── iOS Backend ← FUTURO
-     └── Terminal Backend ← FUTURO
+     ┌─────┴───────────────────────────┐
+     │          │          │           │
+     ▼          ▼          ▼           ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
+│  Web   │ │  macOS  │ │Windows │ │  Linux   │
+│ Backend│ │ Backend │ │Backend │ │ Backend  │
+└────────┘ └────────┘ └────────┘ └──────────┘
+     │          │          │           │
+     ▼          ▼          ▼           ▼
+┌────────┐ ┌────────┐
+│  iOS   │ │ Android│
+│ Backend│ │ Backend│
+└────────┘ └────────┘
 ```
 
-### 1.1 UI-IR (UI Intermediate Representation)
+### 1.1 Principios de diseño
+
+1. **Rutas centralizadas en `<router>`** — Sin `view("/path")` en componentes
+2. **Props via visibilidad** — `name` = prop, `_name` = interno, `__name` = privado
+3. **Layouts persistentes** — `<layout>` + `<slot />` para wrappers que no se refrescan
+4. **Todo snake_case** — `color()`, `spacing.all()`, `font_weight.bold`
+5. **Targets por SO** — `web`, `macos`, `windows`, `linux`, `ios`, `android`
+
+### 1.2 Jerarquía de componentes nativos
+
+```
+<app>                   ← Raíz (1 por app)
+<router>                ← Navegador
+<route>                 ← Definición de ruta (path, component, layout, title, guard)
+<layout>                ← Layout persistente
+<slot />                ← Punto de inserción
+<view>                  ← Contenedor genérico (equivalente a div)
+<vstack>/<hstack>/<zstack>  ← Layout flex
+<text>/<button>/<image>/<link>  ← Elementos
+```
+
+### 1.3 Tipos nativos
+
+Cada componente es un `final class`. No hay mapeo explícito a plataformas — eso es interno del backend.
+
+```kyle
+final class app, router, route, layout, view
+final class vstack, hstack, zstack, spacer, divider
+final class text, button, image, link, input, text_field
+final class group, scroll, modal, sheet, alert, navbar, sidebar
+```
+
+---
+
+## 2. Cambios del Diseño v1 → v2
+
+| Aspecto | v1 (anterior) | v2 (aprobado) |
+|---------|---------------|---------------|
+| Rutas | `view("/path")` en cada `.kyx` | Centralizadas en `<router>` con `<route>` |
+| Props | Bloque `@(...)` en .kyx | Visibilidad: `name` = prop, `_` = interno |
+| Layout | No existía | `<layout>` + `<slot />` persistente |
+| Target | `@target("web")` string | `target(Target.web)` enum tipado |
+| `Color` | `Color("#0066FF")` | `color("#0066ff")` |
+| `class` en link | `class="nav-link"` | Eliminado (usar `style=Style.nav_link`) |
+| Desktop target | `desktop` (genérico) | `macos`, `windows`, `linux` |
+
+---
+
+## 3. UI-IR (UI Intermediate Representation)
 
 Definido en `crates/kyc_ui/src/ir.rs`:
 
@@ -71,22 +126,11 @@ pub enum UiNode {
 }
 ```
 
-### 1.2 ComponentTag
+---
 
-Tags conocidos (30+) que cada backend traduce a su equivalente nativo:
+## 4. Sistema de Backends
 
-| Tag | Web (DOM) | Desktop (Skia) | Android | iOS |
-|-----|:---------:|:--------------:|:-------:|:---:|
-| view | div | SkContainer | View | UIView |
-| text | span | SkText | TextView | UILabel |
-| button | button | SkButton | Button | UIButton |
-| column | div flex-col | FlexColumn | LinearLayout V | VStack |
-| row | div flex-row | FlexRow | LinearLayout H | HStack |
-| ... | ... | ... | ... | ... |
-
-### 1.3 Sistema de Backends
-
-Trait `UiBackend` en `crates/kyc_ui/src/backend/mod.rs`:
+Trait `UiBackend`:
 
 ```rust
 pub trait UiBackend {
@@ -96,96 +140,63 @@ pub trait UiBackend {
 }
 ```
 
-Backends registrados: `web` (wasm32), `desktop` (futuro), `android` (futuro).
+Backends registrados:
+- `web` (wasm32) — ✅ Implementado
+- `macos` (arm64) — 📅 FASE D
+- `windows` (x64) — 📅 FASE D
+- `linux` (x64/arm64) — 📅 FASE D
+- `ios` (arm64) — 📅 FASE E
+- `android` (arm64) — 📅 FASE E
 
 ---
 
-## 2. Cambios Realizados (FASIS A-C)
+## 5. Plan de Implementación
 
-### FASE A: UI-IR + Backend System
+### FASE R: Routing + Module Resolver (v0.8.0)
 
-| Archivo | Acción |
-|---------|--------|
-| `crates/kyc_ui/src/ir.rs` | **NUEVO** — UiNode, ComponentTag, UiProgram |
-| `crates/kyc_ui/src/backend/mod.rs` | **NUEVO** — trait UiBackend + registry |
-| `crates/kyc_ui/src/backend/web.rs` | **NUEVO** — web backend (UI-IR → JS ESM) |
-| `crates/kyc_ui/src/parser.rs` | **MODIFICADO** — to_ui_program() conversión |
-| `crates/kyc_driver/src/pipeline.rs` | **MODIFICADO** — usa backend system |
+| Tarea | Esfuerzo | Archivos |
+|-------|:--------:|----------|
+| Parser: `<route path="..." component=@comp layout=@layout>` | Medio | `parser.rs`, `ir.rs` |
+| Parser: props via visibility (`_name`, `__name`) | Medio | `parser.rs` |
+| Module resolver: `<home_view />` busca `views/home.kyx` | Grande | `resolver.rs` |
+| Multi-file: compilar N .kyx → 1 IR con N rutas | Grande | `pipeline.rs` |
+| `<layout>` + `<slot />` en UI-IR | Medio | `ir.rs`, `web_backend.rs` |
+| `target(Target.web)` enum en parser | Pequeño | `parser.rs` |
 
-### FASE B: ES Modules en JS Runtimes
-
-| Archivo | Cambio |
-|---------|--------|
-| `runtimes/js/reactivity.js` | `require` → `export class/function` |
-| `runtimes/js/router.js` | `module.exports` → `export` |
-| `runtimes/js/a11y.js` | ESM exports |
-| `runtimes/js/portal.js` | ESM exports |
-| `runtimes/js/error_boundary.js` | ESM exports |
-| `runtimes/js/i18n.js` | ESM exports |
-| `runtimes/js/glue.js` | ESM exports |
-| `runtimes/js/ssr.js` | ESM exports |
-| `runtimes/js/testing.js` | ESM exports |
-
-### FASE C: CLI Unificado + app_config + HTML auto-gen
-
-| Archivo | Cambio |
-|---------|--------|
-| `crates/kyc_ui/src/app_config.rs` | **NUEVO** — parser de configuración |
-| `crates/kyc_cli/src/main.rs` | `ky run` = dev server, `ky serve` deprecated |
-| `ROADMAP.md` | Actualizado con nueva arquitectura |
-| `AGENTS.md` | Actualizado con FASIS UI |
-
----
-
-## 3. Comandos Actualizados
-
-```bash
-ky new mi-app              # Crea proyecto UI (main.kyx + lib.ky)
-cd mi-app
-ky run                     # Compila y sirve en localhost:8080
-ky run --port 9090         # Puerto custom
-ky serve                   # Deprecado, delega a ky run
-ky run app.ky              # Compila y ejecuta nativo
-```
-
----
-
-## 4. Plan de Implementación Futura
-
-### FASE D: Desktop Nativo (Skia)
+### FASE C: Config + CLI (v0.8.0)
 
 | Tarea | Esfuerzo |
 |-------|:--------:|
-| FFI Skia: extern fn para canvas 2D | Grande |
-| Backend desktop: UI-IR → Kyle AST | Grande |
-| Ventana nativa (GLFW via FFI) | Medio |
-| Layout engine (flexbox en Kyle) | Grande |
-| Componentes Skia: View, Text, Button | Grande |
-| `ky run --target desktop` | Pequeño |
+| `app.kyx` como entry point único | Medio |
+| `ky new kyui` genera `app.kyx + views/ + layouts/ + components/` | Medio |
+| Bloque `config:` con `target(Target.web): port = 8080` | Medio |
 
-### FASE E: Mobile (Android + iOS)
+### FASE D: Desktop Nativos (Skia/SDL2/GLFW)
 
 | Tarea | Esfuerzo |
 |-------|:--------:|
-| Backend Android: UI-IR → XML layouts + Kotlin | Grande |
+| Backend macOS: UI-IR → AppKit/SwiftUI | Grande |
+| Backend Windows: UI-IR → Win32 | Grande |
+| Backend Linux: UI-IR → GTK | Grande |
+| Layout engine (flexbox) | Grande |
+
+### FASE E: Mobile (iOS + Android)
+
+| Tarea | Esfuerzo |
+|-------|:--------:|
 | Backend iOS: UI-IR → SwiftUI | Grande |
-| `ky run --target android` | Pequeño |
-
-### FASE F: Terminal / TUI
-
-| Tarea | Esfuerzo |
-|-------|:--------:|
-| Backend terminal: UI-IR → NCurses/ratatui | Grande |
-| `ky run --target terminal` | Pequeño |
+| Backend Android: UI-IR → Compose | Grande |
 
 ---
 
-## 5. Glosario
+## 6. Glosario
 
 | Término | Significado |
 |---------|-------------|
 | UI-IR | UI Intermediate Representation — AST agnóstico de plataforma |
 | Backend | Traductor de UI-IR a código de plataforma específica |
 | ComponentTag | Enum de tags conocidos (View, Text, Button, etc.) |
-| ESM | ES Modules — sistema de módulos nativo de JS |
-| UiBackend | Trait que deben implementar todos los backends |
+| Target | Enum: `web`, `macos`, `windows`, `linux`, `ios`, `android` |
+| `<route>` | Elemento que define una ruta (path + component + layout) |
+| `<layout>` | Wrapper persistente con `<slot />` para contenido dinámico |
+| Props via visibility | `name` = prop público, `_name` = interno, `__name` = privado |

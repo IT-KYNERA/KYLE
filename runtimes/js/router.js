@@ -223,6 +223,22 @@ export function navigateReplace(path) {
     return window.__router?.navigate(path, { replace: true });
 }
 
+// Set page title from Kyle
+export function setTitle(title) {
+    document.title = title;
+}
+
+// Set meta tags from Kyle
+export function setMeta(name, content) {
+    let el = document.querySelector(`meta[name="${name}"]`);
+    if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('name', name);
+        document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+}
+
 // =============================================================================
 // Auto-routing: scan .kyx view() declarations
 // =============================================================================
@@ -246,4 +262,6 @@ if (typeof window !== 'undefined') {
     window.navigate = navigate;
     window.navigateBack = navigateBack;
     window.navigateReplace = navigateReplace;
+    window.setTitle = setTitle;
+    window.setMeta = setMeta;
 }

@@ -1,6 +1,5 @@
 # Kyle — Roadmap de Desarrollo
 
-> Documento completo: [`docs/01-introduction/roadmap.md`](docs/01-introduction/roadmap.md)
 > UI Framework: [`docs/10-design/rfc/0005-ui-rearchitecture-plan.md`](docs/10-design/rfc/0005-ui-rearchitecture-plan.md)
 
 ---
@@ -18,125 +17,128 @@
 | **FFI** (extern fn, @link, ptr) | ✅ Completo |
 | **Tipos especializados** (46 tipos) | ✅ Todos implementados |
 
-### UI Framework — Nueva Arquitectura (RFC-0005)
+### UI Framework (RFC-0005 v2)
 
 | Fase | Estado |
 |:----:|:------:|
-| **FASE A: UI-IR + Backend system** | ✅ Completo |
-| **FASE B: JS Runtimes → ESM** | ✅ Completo |
-| **FASE C: `ky run` unificado + app auto-gen** | ✅ Completo |
-| **FASE D: Desktop Skia** | ⬜ Pendiente |
-| **FASE E: Android / iOS** | ⬜ Pendiente |
-| **FASE F: Terminal / TUI** | ⬜ Pendiente |
+| **UI-IR + Backend system** | ✅ Completo |
+| **JS Runtimes → ESM** | ✅ Completo |
+| **`ky run` + `ky new kyui`** | ✅ Completo |
+| **Routing: `<router>` + `<route>` + `<layout>` + `<slot>`** | ✅ **v0.8.0 — COMPLETADO** |
+| **Module resolver multi-archivo** | ✅ **COMPLETADO** |
+| **`app.kyx` entry point + template kyui** | ✅ **COMPLETADO** |
+| **`navigate()` / `set_title()` / `<link>` built-in** | ✅ **COMPLETADO** |
+| **Web backend funcional** | ✅ **Funciona** |
+| **Desktop backend (SDL2)** | 🟡 **Roto** — Sin `SDL_PollEvent`, eventos, ni ventana responsive |
+| **iOS backend (SwiftUI)** | 🟡 **Roto** — Swift inválido, Package.swift mal configurado |
+| **File picker nativo** | 📅 **FASE 1 — PRIORIDAD MÁXIMA** |
+| **Form models + class binding** | 📅 **FASE 2 — PRIORIDAD ALTA** |
+| **Config block global** | 📅 **FASE 5** |
+| **WASM target** | 📅 **FASE 6** |
 
 ---
 
-## Arquitectura UI-IR
+## Plan de Implementación Priorizado
 
-```
-.ky / .kyx
-     │
-     ▼
-┌──────────────────┐
-│  .kyx Parser     │  → produce UI-IR (agnóstico)
-└──────┬───────────┘
-       ▼
-┌──────────────────┐
-│  UI-IR           │  ← UiNode, ComponentTag, UiProgram
-│  (ir.rs)         │
-└──────┬───────────┘
-       │
-  ┌────┴──────────────────────┐
-  │                           │
-  ▼                           ▼
-Web Backend            Desktop Backend   ← FUTURO
-(JS ESM + WASM)        (Skia + FFI)
-  │                           │
-  ├── Android Backend  ← FUTURO
-  ├── iOS Backend      ← FUTURO
-  └── Terminal Backend ← FUTURO
-```
+### FASE 1: File Picker Nativo + File I/O (5-7 días)
 
-### Capas implementadas
-
-| Capa | Archivo | Descripción |
-|------|---------|-------------|
-| UI-IR | `crates/kyc_ui/src/ir.rs` | UiNode, ComponentTag (30+ tags), UiProgram |
-| Backend trait | `crates/kyc_ui/src/backend/mod.rs` | UiBackend trait + registry |
-| Web Backend | `crates/kyc_ui/src/backend/web.rs` | UI-IR → JS (ESM) + HTML auto-gen |
-| Parser | `crates/kyc_ui/src/parser.rs` | .kyx → KyxFile → UI-IR |
-| App Config | `crates/kyc_ui/src/app_config.rs` | Config parser (port, title, target settings) |
-| CLI | `crates/kyc_cli/src/main.rs` | `ky run` = dev server, `ky serve` deprecated |
-
----
-
-## Próximos Pasos
-
-### FASE D: Desktop Nativo (Skia) — Sem 7-10
+**Objetivo:** Poder abrir selector de archivos nativo (imagen, PDF, cualquier archivo), leer contenido, y enviar a backend HTTP.
 
 | Tarea | Esfuerzo |
 |-------|:--------:|
-| FFI Skia: extern fn para canvas 2D | Grande |
-| Backend desktop: UI-IR → Kyle AST | Grande |
-| Ventana nativa (GLFW via FFI) | Medio |
-| Layout engine (flexbox en Kyle) | Grande |
-| Componentes Skia: View, Text, Button | Grande |
-| `ky run --target desktop` | Pequeño |
+| 1.1 Tipo `file_data` en IR (`name`, `size`, `mime`, `content`) | Pequeño |
+| 1.2 Tag `FilePicker` en ComponentTag | Pequeño |
+| 1.3 Web backend: `<input type="file">` + FileReader | Medio |
+| 1.4 Verificar tipo `bytes` funcional en runtime | Medio |
+| 1.5 Demo: upload de archivo a backend HTTP | Medio |
 
-### FASE E: Mobile (Android + iOS) — Sem 11-16
+### FASE 2: Form Models + Class Binding (5-7 días)
 
-| Tarea | Esfuerzo |
-|-------|:--------:|
-| Backend Android: UI-IR → XML layouts | Grande |
-| Backend iOS: UI-IR → SwiftUI | Grande |
-| `ky run --target android` | Pequeño |
-
-### FASE F: Terminal / TUI — Sem 17-18
+**Objetivo:** Declarar clase Kyle como modelo de formulario con binding + validación automática.
 
 | Tarea | Esfuerzo |
 |-------|:--------:|
-| Backend terminal: UI-IR → NCurses | Grande |
-| `ky run --target terminal` | Pequeño |
+| 2.1 Atributo `field=` en inputs (alternativa a `bind=`) | Medio |
+| 2.2 Atributo `model=` en `<form>` | Medio |
+| 2.3 Web backend: binding desde modelo | Grande |
+| 2.4 Validación automática desde `fn validate()` | Medio |
+| 2.5 Validaciones declarativas (`@required`, `@email`, `@min`) | Grande |
+
+### FASE 3: Arreglar Desktop Backend (3-5 días)
+
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| 3.1 `SDL_PollEvent` + manejar `SDL_QUIT` | Medio |
+| 3.2 Arreglar `SDL_WINDOWPOS_UNDEFINED` | Pequeño |
+| 3.3 `SDL_RenderFillRect` en vez de drawLine loop | Pequeño |
+| 3.4 `@if`, `@for`, `@match`, `@expr` en desktop | Medio |
+| 3.5 Soportar 20+ ComponentTags más | Grande |
+
+### FASE 4: Arreglar iOS Backend (3-5 días)
+
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| 4.1 `.fontWeight(.bold())` → `.fontWeight(.bold)` | Pequeño |
+| 4.2 Extensión `Color(hex:)` en código generado | Pequeño |
+| 4.3 `Package.swift` con `.library` | Medio |
+| 4.4 No ignorar `Slot`, `Match`, `Expr`, `CodeBlock` | Medio |
+| 4.5 Soportar 20+ ComponentTags más | Grande |
+
+### FASE 5: Config Block Global (2-3 días)
+
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| 5.1 Parsear bloque `config:` con propiedades tipadas | Medio |
+| 5.2 `target(Target.web): port = 8080` | Medio |
+| 5.3 Tipografía global (fuente base, tamaños) | Medio |
+
+### FASE 6: WASM + Performance (2-4 días)
+
+| Tarea | Esfuerzo |
+|-------|:--------:|
+| 6.1 Probar y arreglar build WASM | Grande |
+| 6.2 Code splitting por ruta (lazy loading) | Medio |
 
 ---
 
-## Bugs Conocidos
+## Estado de Backends UI
 
-| Bug | Estado |
-|-----|:------:|
-| `kyc_runtime_wasm` panic_impl lang item | ⬜ Pre-existente (no afecta build) |
-| Generic methods: `Box<T>.get()` monomorphization | ⬜ Pre-existente |
-| Fn pointer calls: `apply(&fn, arg)` silent crash | ⬜ Pre-existente |
-
----
-
-## Benchmarks (Apple M5/macOS, Jul 2026)
-
-| Benchmark | C | C++ | Rust | C# | Java | Go | Python | **Kyle** |
-|-----------|:--:|:---:|:----:|:--:|:----:|:--:|:------:|:--------:|
-| Prime Sieve (3M) | 9ms | 9ms | 9ms | 26ms | 31ms | 9ms | 196ms | **23ms** |
-| Fibonacci (500M) | 116ms | 117ms | 121ms | 251ms | 137ms | 118ms | TO | **235ms** |
-| String Concat (500k) | 8ms | 10ms | 3ms | 22ms | 35ms | 4ms | 22ms | **65ms** |
-| MatMul (100x100x10) | 7ms | 7ms | 8ms | 33ms | 38ms | 14ms | 1171ms | **9ms** |
+| Backend | Estado | Próximo paso |
+|---------|:------:|-------------|
+| **Web** | ✅ Funcional | Mantener + WASM |
+| **Desktop (macOS)** | 🟡 Genera código con bugs | FASE 3 |
+| **Desktop (Windows)** | ❌ No implementado | FASE 3 |
+| **Desktop (Linux)** | ❌ No implementado | FASE 3 |
+| **iOS** | 🟡 Genera Swift inválido | FASE 4 |
+| **Android** | ❌ No implementado | Post-FASE 4 |
 
 ---
 
 ## Testing
 
 ```bash
-# Rust tests (excluye kyc_runtime_wasm que requiere wasm32)
+# Rust tests
 cargo test --workspace --exclude kyc_runtime_wasm
 
 # Build release
 cargo build --release --bin ky
 
-# Kyle type-check
-ky check <file.ky>
+# Create test project
+ky new kyui /tmp/test
+cd /tmp/test
 
-# UI build
-ky run   # sirve proyecto UI en localhost:8080
+# Build web
+ky build web
+# Serve
+ky run web        # Dev server on :8080
+
+# Desktop (WIP)
+ky build desktop  # Genera main.ky + compila
+
+# iOS (WIP)
+ky build ios      # Genera ios-app/ (necesita arreglos)
 ```
 
 ---
 
-*Última actualización: 2026-07-11 · Arquitectura multi-target (RFC-0005)*
+*Última actualización: 2026-07-12 · Plan priorizado por fases*

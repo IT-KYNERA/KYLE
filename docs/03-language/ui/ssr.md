@@ -39,7 +39,7 @@ Hidratación: eventos, binding, estado reactivo
 
 ## 2. SSR Automático
 
-Por defecto, las vistas `.kyx` con `view("/path")` son SSR automático al
+Por defecto, las vistas `.kyx` registradas en el `<router>` son SSR automático al
 compilar para web con flag `--ssr`:
 
 ```bash
@@ -296,7 +296,7 @@ Generación automática de `sitemap.xml` basado en las rutas declaradas:
 ### 9.1 Kyle SSR Server
 
 ```bash
-ky serve app.kyx --port 3000
+ky run web app.kyx --port 3000
 ```
 
 Inicia un servidor HTTP que:
@@ -309,7 +309,7 @@ Inicia un servidor HTTP que:
 
 ```javascript
 // server.js — generado automáticamente por ky build --ssr
-const { render } = require('./ssr-runtime.js');
+import { render } from './ssr-runtime.js';
 
 app.get('/*', (req, res) => {
     const html = render(req.path, {

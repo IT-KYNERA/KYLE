@@ -69,7 +69,7 @@ fn gen_node(node: &UiNode, k: &mut String, indent: usize, ren: &str, bx: i32, by
     match node {
         UiNode::Element { tag, attrs, children } => {
             match tag {
-                ComponentTag::Text | ComponentTag::Label => {
+                ComponentTag::Text => {
                     let x = get_int(attrs, "x").unwrap_or(bx + 20);
                     let y = get_int(attrs, "y").unwrap_or(by + 30);
                     emit(k, indent, "SDL_SetRenderDrawColor(ren, 240, 240, 240, 255)");
@@ -85,11 +85,12 @@ fn gen_node(node: &UiNode, k: &mut String, indent: usize, ren: &str, bx: i32, by
                     emit(k, indent, &format!("fill_rect(ren, {}, {}, 100, 36)", x, y));
                     by + 46
                 }
-                ComponentTag::View | ComponentTag::Column | ComponentTag::Row |
-                ComponentTag::Card | ComponentTag::Spacer | ComponentTag::Surface => {
+                ComponentTag::View | ComponentTag::VStack | ComponentTag::HStack |
+                ComponentTag::ZStack | ComponentTag::Card | ComponentTag::Spacer | ComponentTag::Surface => {
                     let pad = get_int(attrs, "padding").unwrap_or(10);
                     gen_nodes(children, k, indent, ren, bx + pad, by + pad)
                 }
+                ComponentTag::FilePicker => by,
                 _ => gen_nodes(children, k, indent, ren, bx, by),
             }
         }
@@ -122,7 +123,8 @@ mod tests {
     fn test_desktop() {
         let b = DesktopBackend::new();
         let p = UiProgram {
-            view_paths: vec![], code_blocks: vec![], styles: vec![], animations: vec![],
+            routes: vec![], code_blocks: vec![], styles: vec![], animations: vec![],
+            component_renderers: vec![],
             body: vec![UiNode::SelfClosing {
                 tag: ComponentTag::Text, attrs: vec![]
             }],

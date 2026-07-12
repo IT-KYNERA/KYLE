@@ -31,9 +31,9 @@ sigue perteneciendo al componente que lo declara.
 
 ```kyx
 <portal target="body">
-    <dialog>
+    <modal>
         <text value="Contenido del modal" />
-    </dialog>
+    </modal>
 </portal>
 ```
 

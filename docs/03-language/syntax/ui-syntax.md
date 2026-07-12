@@ -1,329 +1,514 @@
 # Kyle UI Syntax Specification
 
-**Version:** 1.0 
+**Version:** 2.0
 **Status:** Specification
 
-> **Arquitectura e implementaci&oacute;n:** Ver [`docs/10-design/rfc/0002-ui-architecture.md`](../../10-design/rfc/0002-ui-architecture.md) para el roadmap t&eacute;cnico completo (WASM, multiplataforma, custom OS).  
-> **Re-arquitectura UI-IR:** Ver [`docs/10-design/rfc/0005-ui-rearchitecture-plan.md`](../../10-design/rfc/0005-ui-rearchitecture-plan.md) para la nueva capa agn&oacute;stica.  
-> **Traducci&oacute;n multi-target:** Ver [`docs/10-design/rfc/0003-ui-translation.md`](../../10-design/rfc/0003-ui-translation.md) para la arquitectura de traducci&oacute;n a JS/nativo/WASM.  
-> **Sistema de estilos:** Ver [`docs/03-language/ui/style-system.md`](../../03-language/ui/style-system.md) para el sistema de estilos tipado (sin CSS).  
-> **Estado y eventos:** Ver [`docs/03-language/ui/state-events.md`](../../03-language/ui/state-events.md) para estado, binding y eventos.  
-> **Animaciones:** Ver [`docs/03-language/ui/animation.md`](../../03-language/ui/animation.md) para animaciones y transiciones.  
-> **Routing:** Ver [`docs/03-language/ui/routing.md`](../../03-language/ui/routing.md) para navegaci&oacute;n y rutas.  
-> **Accesibilidad:** Ver [`docs/03-language/ui/accessibility.md`](../../03-language/ui/accessibility.md) para a11y.  
-> **i18n:** Ver [`docs/03-language/ui/i18n.md`](../../03-language/ui/i18n.md) para internacionalizaci&oacute;n.  
-> **Portales:** Ver [`docs/03-language/ui/portals.md`](../../03-language/ui/portals.md) para teleport/modals/tooltips.  
-> **Error Boundaries:** Ver [`docs/03-language/ui/error-boundaries.md`](../../03-language/ui/error-boundaries.md) para captura de errores.  
-> **Composici&oacute;n:** Ver [`docs/03-language/ui/composition.md`](../../03-language/ui/composition.md) para patrones de composici&oacute;n.  
-> **Context avanzado:** Ver [`docs/03-language/ui/context-patterns.md`](../../03-language/ui/context-patterns.md) para context provider/consumer.  
-> **SSR:** Ver [`docs/03-language/ui/ssr.md`](../../03-language/ui/ssr.md) para server-side rendering.  
-> **Testing:** Ver [`docs/03-language/ui/testing.md`](../../03-language/ui/testing.md) para testing de componentes UI.  
-> **Distribuci&oacute;n:** Ver [`docs/07-tools/distribution.md`](../../07-tools/distribution.md) para el plan de instalaci&oacute;n multi-plataforma.
+> **Sistema de estilos:** Ver [`docs/03-language/ui/style-system.md`](../../03-language/ui/style-system.md) para el sistema de estilos tipado (sin CSS).
+> **Estado y eventos:** Ver [`docs/03-language/ui/state-events.md`](../../03-language/ui/state-events.md) para estado, binding y eventos.
+> **Routing:** Ver [`docs/03-language/ui/routing.md`](../../03-language/ui/routing.md) para navegación y rutas.
+> **Animaciones:** Ver [`docs/03-language/ui/animation.md`](../../03-language/ui/animation.md) para animaciones y transiciones.
+> **Composición:** Ver [`docs/03-language/ui/composition.md`](../../03-language/ui/composition.md) para layouts, slots y composición.
 
 ---
 
 ## 1. Philosophy
 
-Kyle UI is un sistema de UI declarativo construido about language Kyle.
+Kyle UI es un sistema de UI declarativo construido sobre el lenguaje Kyle.
 
-Un file `.kyx` represents una vista.
+Un archivo `.kyx` representa un **componente**. NO hay `view("/path")` — las rutas son centralizadas en el `<router>` dentro de `app.kyx`.
 
-- Si conhas `view(...)`, represents una **page ruteable** (auto-routing: el padre `<router>` detecta la ruta automáticamente).
-- Si no conhas `view(...)`, represents un **componente reutilizable** (sin ruta propia).
-
-No existe JavaScript. Todo code Kyle se integra using expresionis `@`.
+No existe JavaScript, HTML ni CSS. Todo es Kyle tipado.
 
 ---
 
-## 2. Files
+## 2. Componentes nativos = Tipos
 
-```
-Login.ky ← Logic opcional
-Login.kyx ← Vista
+Cada componente nativo es un **tipo** (`final class`). Se usa tanto en markup (`.kyx`) como programáticamente (`.ky`). El backend traduce cada tipo a su equivalente nativo — eso es interno, no parte del lenguaje.
 
-Button.kyx ← Componente
-```
-
-El file `.ky` is opcional. Toda logic can ir inside del `.kyx`.
-
----
-
-## 3. Page
+### 2.1 Tipos nativos (built-in)
 
 ```kyle
-view("/login")
+# Contenedores
+final class app        # raíz de la aplicación (1 por app)
+final class router     # navegador de rutas
+final class route      # definición de ruta (path, component, layout)
+final class layout     # wrapper persistente con <slot />
+final class view       # contenedor genérico
+final class group      # agrupación lógica (invisible)
+final class scroll     # contenedor scrollable (con direction: vertical/horizontal/both)
+enum direction: vertical, horizontal, both
 
-<view>
- <text value="Login" />
-</view>
+# Layout
+final class vstack     # columna flex (vertical)
+final class hstack     # fila flex (horizontal)
+final class zstack     # superposición (eje Z)
+final class spacer     # espaciado flexible
+final class divider    # línea separadora
+
+# Elementos
+final class text       # texto
+final class button     # botón
+final class image      # imagen
+final class link       # navegación declarativa
+final class input      # entrada de texto (genérico)
+final class text_field       # campo de texto
+final class password_field   # campo de contraseña
+final class checkbox    # casilla de verificación
+final class radio      # botón de opción
+final class switch     # interruptor
+final class slider     # deslizador
+final class progress   # barra de progreso
+final class spinner    # indicador de carga
+
+# Overlays
+final class modal      # ventana modal
+final class sheet      # hoja (bottom sheet)
+final class alert      # alerta / diálogo
+final class tooltip    # tooltip
+
+# Navegación
+final class navbar     # barra de navegación
+final class sidebar    # barra lateral
+final class tab_bar    # barra de pestañas
+final class footer     # pie de página
 ```
 
-Múltiples rutas:
+### 2.2 Uso declarativo (`.kyx`)
 
 ```kyx
-view("/", "/home", "/index")
-```
-
----
-
-## 4. Componente
-
-```kyle
 <view>
- <text value="Hello" />
+    <vstack>
+        <text value="Hola Mundo" />
+        <button text="Click" click=@handler />
+    </vstack>
 </view>
 ```
 
-Sin `view(...)` → is un componente reutilizable.
+### 2.3 Uso programático (`.ky`)
+
+Como son tipos, se pueden instanciar desde código Kyle:
+
+```kyle
+fn build_dynamic_view(items: {str}) view:
+    container = view()
+    stack = vstack()
+    for item in items:
+        label = text(value: item)
+        stack.add_child(label)
+    container.add_child(stack)
+    container
+```
+
+```kyle
+fn show_loading():
+    modal(
+        content: vstack(
+            children: {spinner(), text(value: "Cargando...")}
+        )
+    )
+```
+
+### 2.4 Layout: `vstack`, `hstack`, `zstack`
+
+Son los tres tipos de layout. Cada uno organiza hijos en una dirección:
+
+```kyle
+# vstack: vertical (columna) — hijos de arriba a abajo
+final class vstack:
+    alignment: alignment           # cómo alinear horizontalmente
+    spacing: f32 = 0               # espacio entre hijos
+    padding: spacing?              # padding interno
+    scroll: bool = false           # ← TRUE = scroll vertical automático
+
+# hstack: horizontal (fila) — hijos de izquierda a derecha
+final class hstack:
+    alignment: alignment           # cómo alinear verticalmente
+    spacing: f32 = 0
+    padding: spacing?
+    scroll: bool = false           # ← TRUE = scroll horizontal automático
+
+# zstack: superposición — hijos apilados en eje Z
+final class zstack:
+    alignment: alignment           # alineación de todos los hijos
+    padding: spacing?
+
+# scroll: contenedor scrollable genérico (para contenido no-stack)
+final class scroll:
+    direction: direction           # vertical | horizontal | both
+```
+
+Ejemplos:
+
+```kyx
+# vstack — columna, centrada, con gap de 12px
+<vstack alignment=alignment.center spacing=12>
+    <text value="Uno" />
+    <text value="Dos" />
+    <text value="Tres" />
+</vstack>
+
+# hstack — fila, espacio entre elementos
+<hstack alignment=alignment.center spacing=8>
+    <button text="Aceptar" />
+    <button text="Cancelar" />
+</hstack>
+
+# zstack — superposición (imagen de fondo + texto encima)
+<zstack>
+    <image src="fondo.jpg" />
+    <text value="Texto sobre imagen" />
+</zstack>
+
+# vstack con padding
+<vstack spacing=16 padding=spacing.all(24)>
+    <text value="Título" typography=Title />
+    <text value="Cuerpo del contenido" />
+</vstack>
+```
+
+Los stacks se adaptan al contenido (fit content). Para scroll:
+
+```kyx
+# Opción recomendada: scroll=true en el stack
+<vstack scroll=true spacing=8>
+    @for(item in items):
+        <item_card data=@item />
+</vstack>
+
+# scroll horizontal
+<hstack scroll=true spacing=12>
+    @for(card in cards):
+        <card data=@card />
+</hstack>
+
+# scroll genérico para contenido que no es stack
+<scroll direction=vertical>
+    <text value="Mucho contenido que necesita scroll..." />
+</scroll>
+```
+
+### 2.5 `layout` — reglas del tipo
+
+`layout` es un tipo específico con semántica de wrapper persistente:
+
+1. Debe tener exactamente un `slot` (verificado en compilación)
+2. Puede tener otros hijos (navbar, sidebar, footer) que PERSISTEN al navegar
+3. El `slot` es donde el router inyecta el contenido de la ruta activa
+4. Los hijos del layout NO se re-renderizan al cambiar de ruta
+
+```kyx
+<layout>
+    <navbar title="Mi App" />
+    <hstack>
+        <sidebar />
+        <main>
+            <slot />
+        </main>
+    </hstack>
+</layout>
+```
 
 ---
 
-## 5. Code Kyle
+## 3. El bloque `@(...)` — Todo el código Kyle
 
-Fragmentos pequenos with `@`:
+El bloque `@(...)` es donde va TODO el código Kyle: variables, props, funciones, estado, contexto.
+Separa el código de la marcación (markup).
+
+### 3.1 Sintaxis
+
+```kyx
+<view>
+    @(
+        # ── Variables / Props ──
+        count: ^i32                # ← público = prop
+        label: str                 # ← público = prop
+        on_click: ^&(fn ())        # ← callback como prop
+        color: str = "#333"        # ← prop con default (opcional)
+
+        # ── Internos (NO son props) ──
+        _step: i32 = 1             # ← _ = interno, no es prop
+        __cache: [i32] = {}        # ← __ = privado, no es prop
+        _fn helper(this):          # ← función interna
+            count += _step
+
+        # ── Funciones públicas = callbacks ──
+        fn increment():
+            count += _step
+    )
+
+    <text value=@"Valor: " + count.to_str() />
+    <button text="+" click=@increment />
+</view>
+```
+
+Uso:
+```kyx
+<counter count=@mi_var label="Clicks" on_click=@mi_callback color="#FF0000" />
+```
+
+### 3.2 Props via Visibilidad
+
+Dentro de `@(...)`, lo que es prop se determina por **visibilidad** (convención Kyle):
+
+| Declaración dentro de `@(...)` | ¿Es prop? | Visible desde fuera |
+|-------------------------------|-----------|-------------------|
+| `count: ^i32` | ✅ Sí | Se pasa como atributo |
+| `label: str` | ✅ Sí | Se pasa como string |
+| `fn handle_click(this)` | ✅ Sí | Se pasa como callback |
+| `_internal: str` | ❌ No | Uso interno del componente |
+| `__cache: [i32]` | ❌ No | Privado del módulo |
+| `_fn helper(this)` | ❌ No | Función interna |
+
+### 3.3 Props con default (opcional)
+
+```kyx
+@(
+    name: str = "Invitado"         # opcional — default "Invitado"
+    age: i32 = 18                  # opcional — default 18
+    theme: Theme = Theme.light     # opcional — default light
+)
+```
+
+### 3.4 Expresiones inline con `@`
+
+Para expresiones pequeñas dentro del markup:
 
 ```kyx
 <text value=@user.name />
-```
-
-Varias lines with `@(...)`:
-
-```kyle
-@(
- email: str
- password: str
-
- fn login():
- ...
-)
+<button click=@fn (): navigate("/login") />
 ```
 
 ---
 
-## 6. Variables
+## 5. Variables y Binding
 
-```kyle
-@total = products.count
-
-<text value=@total />
-```
-
----
-
-## 7. Condicionales
+### 5.1 Variables normales (no reactivas)
 
 ```kyx
-@if(user.isAdmin):
- <button text="Delete" />
+<view>
+    @(
+        total = products.count     # variable normal dentro de @(...)
+    )
+    <text value=@total />
+</view>
 ```
 
-```kyx
-@if(user.isAdmin):
- <admin_panel />
-@else:
- <user_panel />
-```
-
----
-
-## 8. Match
-
-```kyx
-@match(state):
- Loading:
- <spinner />
- Success:
- <dashboard />
- Error:
- <error_view />
-```
-
----
-
-## 9. For
-
-```kyx
-@for(product in products):
- <product_card product=@product />
-```
-
----
-
-## 10. Eventos
-
-```kyx
-<button click=@login />
-
-<text_field change=@on_change />
-
-<text_field input=@on_input />
-```
-
----
-
-## 11. Binding
+### 5.2 Binding bidireccional
 
 ```kyx
 <text_field bind=@email />
+<checkbox bind=@accept_terms />
 ```
 
----
-
-## 12. Componentis hijos
+### 5.3 Binding one-way (estado → UI)
 
 ```kyx
-<card>
- <text />
- <button />
-</card>
+<text value=@user.name />          # se actualiza cuando user.name cambia
 ```
 
----
-
-## 13. Slots
-
-Declaration en componente:
-
-```kyle
-slot header
-slot Content
-```
-
-Uso:
+### 5.4 Binding a props
 
 ```kyx
-<card>
- <header>
- <text value="Title" />
- </header>
- <content>
- <text value="Body" />
- </content>
-</card>
+<child_component prop=@parent_var />
 ```
-
-Las views no admiten slots.
 
 ---
 
-## 14. Ciclo de vida
+## 6. Condicionales
+
+```kyx
+@if(user.is_admin):
+    <button text="Delete" />
+
+@if(user.is_admin):
+    <admin_panel />
+@else:
+    <user_panel />
+```
+
+---
+
+## 7. Match
+
+```kyx
+@match(state):
+    Loading:
+        <spinner />
+    Success:
+        <dashboard />
+    Error:
+        <error_view />
+```
+
+---
+
+## 8. For
+
+```kyx
+@for(product in products):
+    <product_card product=@product />
+```
+
+---
+
+## 9. Eventos
+
+```kyx
+<button click=@login />
+<text_field change=@on_change />
+<text_field input=@on_input />
+<checkbox change=@on_toggle />
+<form submit=@handle_submit />
+<view mouse_enter=@on_hover />
+<view keydown=@on_keypress />
+<view scroll=@on_scroll />
+```
+
+---
+
+## 10. Ciclo de Vida
 
 ```kyle
 fn on_created(this):
-    # Se llama una vez, después del constructor
-    # Inicializar recursos
+    # Una vez, después del constructor
 
 fn on_mounted(this):
-    # Se llama cuando el componente se monta en el DOM/padre
-    # Empezar timers, fetch data, etc.
+    # Cuando el componente se monta
 
 fn on_updated(this, changed: {str}):
-    # Se llama cuando cambian las props
-    # changed = conjunto de props que cambiaron
+    # Cuando cambian props (changed = set de props que cambiaron)
 
 fn on_unmounted(this):
-    # Se llama cuando el componente se desmonta
-    # Cleanup: timers, listeners, etc.
+    # Cleanup
 
 fn on_error(this, error: str):
-    # Error boundary: captura errores en componentes hijos
+    # Error boundary
 ```
 
 ---
 
-## 15. Componentis nativos
+## 11. Estilos
 
-```
-App, View, Column, Row, Grid, Stack, Spacer, Container,
-Card, Surface, Scroll, List, Form,
-Text, Label, Button, IconButton, Image, Icon, Divider,
-TextField, PasswordField, TextArea, Checkbox, Radio, Switch, Slider,
-Progress, Spinner, Select, Menu, MenuItem,
-Toolbar, AppBar, BottomBar, Navigation, Tab, Tabs,
-Dialog, Drawer, Popup, Snackbar, Tooltip,
-Canvas, Video, Audio, Map, Chart, WebView
-```
-
----
-
-## 16. Recursos (Style, Layout, Typography, Animation)
+### 11.1 Estilos declarados
 
 ```kyle
 style<button> Primary:
- background = theme.primary
- color = white
- radius = md
- padding = (12, 24)
+    background = color("#0066FF")
+    color = color("#FFFFFF")
+    border_radius = 8
+    padding = spacing.all(12)
 
-layout<column> Center:
- align = center
- justify = center
- spacing = 20
+style<button> Secondary:
+    background = color("transparent")
+    color = color("#0066FF")
+    border = border(2, color("#0066FF"), BorderStyle.solid)
 ```
 
-Uso:
+### 11.2 Aplicar estilo
 
 ```kyx
-<button style=Primary />
-<column layout=Center />
+<button style=Primary text="Ingresar" />
+<button tpl=Elevated>
+    <text value="Contenido" />
+</button>
+```
+
+### 11.3 Inline
+
+```kyx
+<text style=style(color: color("#FF0000"), font_size: 16) value="Error" />
 ```
 
 ---
 
-## 17. Template
+## 12. Recursos (Template, Theme)
+
+### 12.1 Templates
 
 ```kyle
 tpl<button> Primary:
- style = primary_style
- animation = primary_animation
- cursor = pointer
- ripple = true
+    style = Primary
+    animation = ripple_animation
+    cursor = cursor.pointer
+    ripple = true
 ```
 
-Uso:
+### 12.2 Themes
+
+```kyle
+theme LightTheme:
+    primary = color("#0066FF")
+    background = color("#FFFFFF")
+    on_background = color("#1A1A1A")
+
+theme DarkTheme: LightTheme:
+    primary = color("#4D8EFF")
+    background = color("#121212")
+```
 
 ```kyx
-<button tpl=Primary />
+<app theme=@LightTheme>
+    ...
+</app>
 ```
 
 ---
 
-## 18. Theme
-
-```kyle
-theme Light:
- primary = #0066FF
- background = white
- text = black
-```
-
-Uso:
+## 13. Ejemplo completo: Login
 
 ```kyx
-<app theme=Light />
+# app.kyx
+<app title="Mi App">
+    <router>
+        <route path="/" component=@home_view layout=@main_layout title="Inicio" />
+        <route path="/login" component=@login_view layout=@blank_layout title="Login" />
+        <route path="*" component=@not_found layout=@main_layout title="404" />
+    </router>
+</app>
 ```
 
----
-
-## 19. Example completo: Login
-
-```kyle
-view("/login")
-
-@(
- email: str
- password: str
-
- fn login():
- print("login with " + email)
-)
-
+```kyx
+# views/login.kyx
 <view>
- <column layout=Center>
- <text value="Login" typography=Title />
- <text_field bind=@email />
- <password_field bind=@password />
- <button tpl=Primary text="Ingresar" click=@login />
- </column>
+    @(
+        email: ^str = ""
+        password: ^str = ""
+        loading: ^bool = false
+
+        fn handle_submit():
+            loading = true
+            navigate("/dashboard")
+    )
+
+    <vstack layout=@Center>
+        <text value="Login" typography=Title />
+        <text_field bind=@email placeholder="Email" />
+        <password_field bind=@password placeholder="Contraseña" />
+        <button tpl=Primary text=@"Ingresar" disabled=@loading click=@handle_submit />
+    </vstack>
 </view>
 ```
+
+```kyx
+# layouts/main.kyx
+<layout>
+    <navbar title="Mi App" />
+    <hstack>
+        <sidebar />
+        <main>
+            <slot />
+        </main>
+    </hstack>
+</layout>
+```
+
+---
+
+## 14. Referencias
+
+- [routing.md](../ui/routing.md) — Routing y navegación
+- [state-events.md](../ui/state-events.md) — Estado y eventos
+- [style-system.md](../ui/style-system.md) — Sistema de estilos
+- [composition.md](../ui/composition.md) — Layouts, slots, composición
+- [animation.md](../ui/animation.md) — Animaciones

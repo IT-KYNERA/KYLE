@@ -43,7 +43,7 @@ impl KyxParser {
     }
 
     fn parse_file(&mut self) -> Result<KyxFile, String> {
-        let mut view_paths = Vec::new();
+        let routes = Vec::new();
         let mut code_blocks = Vec::new();
         let mut styles = Vec::new();
         let mut animations = Vec::new();
@@ -54,7 +54,6 @@ impl KyxParser {
             match self.peek() {
                 None => break,
                 Some('#') => {
-                    // Skip comment line
                     while self.peek() != Some('\n') && self.peek().is_some() { self.advance(); }
                 }
                 Some('s') if self.starts_with("style<") => {
@@ -74,7 +73,7 @@ impl KyxParser {
                     styles.push(StyleDecl::Theme { name, props });
                 }
                 Some('a') if self.starts_with("animation<") => {
-                    self.pos += 9; // "animation"
+                    self.pos += 9;
                     self.expect_char('<')?;
                     let component = self.read_while(|c| c != '>')?;
                     self.expect_char('>')?;
@@ -83,17 +82,6 @@ impl KyxParser {
                     self.expect_char(':')?;
                     let props = self.parse_style_props()?;
                     animations.push(AnimDecl { component, name, props });
-                }
-                Some(c) if c == 'v' || c == 'V' => {
-                    // Try to parse view("...")
-                    let saved = self.pos;
-                    if let Ok(path) = self.try_parse_view() {
-                        view_paths.push(path);
-                    } else {
-                        self.pos = saved;
-                        // Not a view declaration — skip
-                        self.advance();
-                    }
                 }
                 Some('@') => {
                     self.advance();
@@ -160,7 +148,7 @@ impl KyxParser {
             }
         }
 
-        Ok(KyxFile { view_paths, code_blocks, styles, animations, body })
+        Ok(KyxFile { routes, code_blocks, styles, animations, body })
     }
 
     fn parse_style_decl(&mut self, kind: &str, _is_theme: bool) -> Result<StyleDecl, String> {
@@ -274,33 +262,9 @@ impl KyxParser {
         }
     }
 
-    fn try_parse_view(&mut self) -> Result<String, String> {
-        // view("/path")
-        if !self.starts_with("view(") {
-            return Err("Not a view declaration".to_string());
-        }
-        for c in "view(".chars() {
-            self.advance();
-        }
-        self.expect_char('"')?;
-        let path = self.read_until('"')?;
-        self.expect_char(')')?;
-        Ok(path)
-    }
-
     fn starts_with(&self, s: &str) -> bool {
         let cs: Vec<char> = s.chars().collect();
         self.chars[self.pos..].starts_with(&cs)
-    }
-
-    fn parse_view(&mut self) -> Result<String, String> {
-        // view("/path")
-        self.expect_string("view(")?;
-        self.expect_char('"')?;
-        let path = self.read_until('"')?;
-        self.expect_char('"')?;
-        self.expect_char(')')?;
-        Ok(path)
     }
 
     fn parse_at_directive(&mut self) -> Result<KyxNode, String> {
@@ -616,55 +580,154 @@ impl KyxParser {
 }
 
 /// Convert KyxFile to platform-agnostic UI-IR UiProgram
+/// Extracts <route> elements from the body into UiProgram.routes.
 pub fn to_ui_program(file: KyxFile) -> crate::ir::UiProgram {
+    use crate::ir::RouteConfig;
+
+    // Convert RouteDecl from KyxFile
+    let mut routes: Vec<RouteConfig> = file.routes.into_iter().map(|r| {
+        RouteConfig {
+            path: r.path,
+            component: r.component,
+            layout: r.layout,
+            title: r.title,
+            guard: r.guard,
+            lazy: r.lazy,
+            target_config: Vec::new(),
+        }
+    }).collect();
+
+    // Convert body, extracting <route> elements
+    let mut body = Vec::new();
+    for node in file.body {
+        let ir_node = convert_node(node, &mut routes);
+        if let Some(n) = ir_node {
+            body.push(n);
+        }
+    }
+
     crate::ir::UiProgram {
-        view_paths: file.view_paths,
+        routes,
         code_blocks: file.code_blocks,
         styles: file.styles,
         animations: file.animations,
-        body: file.body.into_iter().map(convert_node).collect(),
+        body,
+        component_renderers: Vec::new(),
     }
 }
 
-fn convert_node(node: KyxNode) -> crate::ir::UiNode {
-    use crate::ir::{UiNode, UiAttr, AttrValue, ComponentTag};
+/// Convert a KyxNode to UiNode, optionally extracting RouteConfig from <route> elements.
+/// Returns None if the node is a <route> that was extracted into routes.
+fn convert_node(node: KyxNode, routes: &mut Vec<crate::ir::RouteConfig>) -> Option<crate::ir::UiNode> {
+    use crate::ir::{UiNode, ComponentTag};
+
     match node {
-        KyxNode::Element { tag, attrs, children } => UiNode::Element {
-            tag: ComponentTag::from_str(&tag),
-            attrs: attrs.into_iter().map(convert_attr).collect(),
-            children: children.into_iter().map(convert_node).collect(),
-        },
-        KyxNode::SelfClosing { tag, attrs } => UiNode::SelfClosing {
-            tag: ComponentTag::from_str(&tag),
-            attrs: attrs.into_iter().map(convert_attr).collect(),
-        },
-        KyxNode::Slot { name, fallback } => UiNode::Slot {
+        KyxNode::Element { tag, attrs, children } => {
+            // Check if this is a <route> element — extract as RouteConfig
+            if tag.to_lowercase() == "route" {
+                let mut path = String::new();
+                let mut component = String::new();
+                let mut layout = None;
+                let mut title = None;
+                let mut guard = None;
+                let mut lazy = false;
+                for a in &attrs {
+                    match a.name.as_str() {
+                        "path" => path = attr_value_str(&a.value),
+                        "component" => component = strip_at(attr_value_str(&a.value)),
+                        "layout" => layout = Some(strip_at(attr_value_str(&a.value))),
+                        "title" => title = Some(attr_value_str(&a.value)),
+                        "guard" => guard = Some(strip_at(attr_value_str(&a.value))),
+                        "lazy" => lazy = true,
+                        _ => {}
+                    }
+                }
+                routes.push(crate::ir::RouteConfig {
+                    path, component, layout, title, guard, lazy,
+                    target_config: Vec::new(),
+                });
+                return None; // Don't add to body
+            }
+
+            let converted_children: Vec<crate::ir::UiNode> = children.into_iter()
+                .filter_map(|c| convert_node(c, routes))
+                .collect();
+
+            Some(UiNode::Element {
+                tag: ComponentTag::from_str(&tag),
+                attrs: attrs.into_iter().map(convert_attr).collect(),
+                children: converted_children,
+            })
+        }
+        KyxNode::SelfClosing { tag, attrs } => {
+            if tag.to_lowercase() == "route" {
+                let mut path = String::new();
+                let mut component = String::new();
+                let mut layout = None;
+                let mut title = None;
+                let mut guard = None;
+                let mut lazy = false;
+                for a in &attrs {
+                    match a.name.as_str() {
+                        "path" => path = attr_value_str(&a.value),
+                        "component" => component = strip_at(attr_value_str(&a.value)),
+                        "layout" => layout = Some(strip_at(attr_value_str(&a.value))),
+                        "title" => title = Some(attr_value_str(&a.value)),
+                        "guard" => guard = Some(strip_at(attr_value_str(&a.value))),
+                        "lazy" => lazy = true,
+                        _ => {}
+                    }
+                }
+                routes.push(crate::ir::RouteConfig {
+                    path, component, layout, title, guard, lazy,
+                    target_config: Vec::new(),
+                });
+                return None;
+            }
+            Some(crate::ir::UiNode::SelfClosing {
+                tag: ComponentTag::from_str(&tag),
+                attrs: attrs.into_iter().map(convert_attr).collect(),
+            })
+        }
+        KyxNode::Slot { name, fallback } => Some(UiNode::Slot {
             name,
-            fallback: fallback.into_iter().map(convert_node).collect(),
-        },
-        KyxNode::If { condition, then_branch, else_branch } => UiNode::If {
+            fallback: fallback.into_iter().filter_map(|c| convert_node(c, routes)).collect(),
+        }),
+        KyxNode::If { condition, then_branch, else_branch } => Some(UiNode::If {
             condition,
-            then_branch: then_branch.into_iter().map(convert_node).collect(),
-            else_branch: else_branch.into_iter().map(convert_node).collect(),
-        },
-        KyxNode::For { item, list, body } => UiNode::For {
+            then_branch: then_branch.into_iter().filter_map(|c| convert_node(c, routes)).collect(),
+            else_branch: else_branch.into_iter().filter_map(|c| convert_node(c, routes)).collect(),
+        }),
+        KyxNode::For { item, list, body } => Some(UiNode::For {
             item, list,
-            body: body.into_iter().map(convert_node).collect(),
-        },
-        KyxNode::Match { expr, cases } => UiNode::Match {
+            body: body.into_iter().filter_map(|c| convert_node(c, routes)).collect(),
+        }),
+        KyxNode::Match { expr, cases } => Some(UiNode::Match {
             expr,
             cases: cases.into_iter().map(|c| crate::ir::MatchCase {
                 pattern: c.pattern,
-                body: c.body.into_iter().map(convert_node).collect(),
+                body: c.body.into_iter().filter_map(|n| convert_node(n, routes)).collect(),
             }).collect(),
-        },
-        KyxNode::Expr(e) => UiNode::Expr(e),
-        KyxNode::CodeBlock(b) => UiNode::CodeBlock(b),
-        KyxNode::Text(t) => UiNode::Text(t),
+        }),
+        KyxNode::Expr(e) => Some(UiNode::Expr(e)),
+        KyxNode::CodeBlock(b) => Some(UiNode::CodeBlock(b)),
+        KyxNode::Text(t) => Some(UiNode::Text(t)),
     }
 }
 
-fn convert_attr(attr: KyxAttr) -> crate::ir::UiAttr {
+fn attr_value_str(val: &crate::ast::AttrValue) -> String {
+    match val {
+        crate::ast::AttrValue::String(s) => s.clone(),
+        crate::ast::AttrValue::Expr(e) => e.clone(),
+        crate::ast::AttrValue::Flag => String::new(),
+    }
+}
+
+fn strip_at(s: String) -> String {
+    if s.starts_with('@') { s[1..].to_string() } else { s }
+}
+
+fn convert_attr(attr: crate::ast::KyxAttr) -> crate::ir::UiAttr {
     crate::ir::UiAttr {
         name: attr.name,
         value: match attr.value {
@@ -684,19 +747,21 @@ mod tests {
         let result = parse("");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert!(file.view_paths.is_empty());
+        assert!(file.routes.is_empty());
         assert!(file.body.is_empty());
     }
 
     #[test]
-    fn test_view_declaration() {
-        let result = parse("view(\"/login\")");
-        if let Err(ref e) = result {
-            eprintln!("Parse error: {}", e);
-        }
+    fn test_route_element() {
+        let result = parse(r#"<route path="/" component=@home_view layout=@main_layout title="Home" />"#);
         assert!(result.is_ok(), "Parse failed: {:?}", result.err());
         let file = result.unwrap();
-        assert_eq!(file.view_paths, vec!["/login"]);
+        // <route> is parsed as a regular element (extracted in to_ui_program)
+        assert_eq!(file.body.len(), 1);
+        match &file.body[0] {
+            KyxNode::SelfClosing { tag, .. } => assert_eq!(tag, "route"),
+            _ => panic!("Expected self-closing route element"),
+        }
     }
 
     #[test]
@@ -756,9 +821,7 @@ mod tests {
 
     #[test]
     fn test_full_login() {
-        let source = r#"view("/login")
-
-@(
+        let source = r#"@(
  email: str
  password: str
  fn login():
@@ -766,10 +829,10 @@ mod tests {
 )
 
 <view>
- <Column layout=Center>
+ <vstack alignment=alignment.center>
   <text_field bind=@email />
   <button tpl=Primary text="Ingresar" click=@login />
- </Column>
+ </vstack>
 </view>"#;
         let result = parse(source);
         if let Err(ref e) = result {
@@ -777,7 +840,7 @@ mod tests {
         }
         assert!(result.is_ok(), "Parse failed: {:?}", result.err());
         let file = result.unwrap();
-        assert_eq!(file.view_paths, vec!["/login"]);
+        assert!(file.routes.is_empty());
         assert_eq!(file.code_blocks.len(), 1);
         assert_eq!(file.body.len(), 1);
     }

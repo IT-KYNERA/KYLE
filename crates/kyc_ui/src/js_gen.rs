@@ -32,9 +32,9 @@ pub fn generate(file: &KyxFile) -> String {
     let anim_js = crate::anim_gen::generate_animations(&file.animations);
     js.push_str(&anim_js);
 
-    // Determine component name from view path
-    let comp_name = if let Some(path) = file.view_paths.first() {
-        let name = path.trim_start_matches('/').replace('/', "_").replace(&['{', '}', '-'][..], "");
+    // Determine component name from first route
+    let comp_name = if let Some(route) = file.routes.first() {
+        let name = route.path.trim_start_matches('/').replace('/', "_").replace(&['{', '}', '-'][..], "");
         if name.is_empty() { "home".to_string() } else { name }
     } else {
         "component".to_string()
@@ -52,13 +52,13 @@ pub fn generate(file: &KyxFile) -> String {
     js.push_str("  return { element: el, state };\n");
     js.push_str("}\n\n");
 
-    // Route registration (for views with view("/path"))
-    if !file.view_paths.is_empty() {
-        js.push_str("// Auto-register routes\n");
+    // Route registration from routes
+    if !file.routes.is_empty() {
+        js.push_str("// Register routes\n");
         js.push_str("if (typeof window !== 'undefined') {\n");
         js.push_str("  if (!window.__KYLE_ROUTES) window.__KYLE_ROUTES = {};\n");
-        for path in &file.view_paths {
-            js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render{};\n", path, comp_name));
+        for route in &file.routes {
+            js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render{};\n", route.path, comp_name));
         }
         js.push_str("}\n\n");
     }

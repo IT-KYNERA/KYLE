@@ -226,7 +226,8 @@ fn cmd_build(args: &[String]) {
                 }
             } else if is_kyx_file(&file) {
                 let js_output = build_dir.join("main.js");
-                match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+                let src_path = std::path::Path::new(&file);
+                match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, Some(src_path), &js_output) {
                     Ok(()) => {}
                     Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
                 }
@@ -266,7 +267,8 @@ fn cmd_build(args: &[String]) {
         }
     } else if is_kyx_file(&file) {
         let js_output = build_dir.join(&file_stem).with_extension("js");
-        match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
+        let src_path = std::path::Path::new(&file);
+        match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, Some(src_path), &js_output) {
             Ok(()) => {}
             Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
         }
@@ -286,11 +288,12 @@ fn cmd_build(args: &[String]) {
 
 /// Build a .kyx file using a named UI backend (desktop, ios, etc.)
 fn build_ui_backend_kyx(source: &str, file: &str, build_dir: &Path, backend_name: &str, release: bool) {
-    let file_ast = match kyc_ui::parser::parse(source) {
-        Ok(f) => f,
-        Err(e) => { eprintln!("kyx parse error: {}", e); process::exit(1); }
+    // Use multi-file resolution
+    let source_path = std::path::Path::new(file);
+    let program = match kyc_ui::resolver::build_multifile_program(source, source_path) {
+        Ok(p) => p,
+        Err(e) => { eprintln!("kyx build error: {}", e); process::exit(1); }
     };
-    let program = kyc_ui::parser::to_ui_program(file_ast);
     let backend = match kyc_ui::backend::get_backend(backend_name) {
         Some(b) => b,
         None => { eprintln!("Backend '{}' not available", backend_name); process::exit(1); }
@@ -497,9 +500,10 @@ fn run_dev_server(source: &str, file: &str, port: u16, _single_file: bool) {
     let _ = fs::create_dir_all(&build_dir);
     let js_output = build_dir.join("ui-runtime.js");
 
-    // Build kyx source to JS
+    // Build kyx source to JS with multi-file resolution
     println!("Building project...");
-    match kyc_driver::pipeline::Pipeline::build_kyx_source(source, &js_output) {
+    let source_path = Path::new(file);
+    match kyc_driver::pipeline::Pipeline::build_kyx_source(source, Some(source_path), &js_output) {
         Ok(()) => {}
         Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
     }
@@ -513,7 +517,8 @@ fn run_dev_server_for_project(project_root: &Path, source: &str, _file: &str, po
     let js_output = build_dir.join("ui-runtime.js");
 
     println!("Building project...");
-    match kyc_driver::pipeline::Pipeline::build_kyx_source(source, &js_output) {
+    let source_path = project_root.join("app.kyx");
+    match kyc_driver::pipeline::Pipeline::build_kyx_source(source, Some(&source_path), &js_output) {
         Ok(()) => {}
         Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
     }
@@ -837,72 +842,125 @@ fn cmd_new(args: &[String]) {
 }
 
 fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
+    // Create directories: views, layouts, components, src
+    fs::create_dir_all(project_dir.join("views")).unwrap_or_else(|e| {
+        eprintln!("Error creating project: {}", e);
+        process::exit(1);
+    });
+    fs::create_dir_all(project_dir.join("layouts")).unwrap_or_else(|e| {
+        eprintln!("Error creating project: {}", e);
+        process::exit(1);
+    });
+    fs::create_dir_all(project_dir.join("components")).unwrap_or_else(|e| {
+        eprintln!("Error creating project: {}", e);
+        process::exit(1);
+    });
     fs::create_dir_all(project_dir.join("src")).unwrap_or_else(|e| {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
 
-    // Main UI entry point (.kyx)
-    let main_kyx = format!(
-        r##"# {name} — UI entry point
-view("/")
-
-@(
-    count: ^i32 = 0
-    fn increment():
-        count = count + 1
-)
-
-style<app> Default:
-    background = Color("#FFFFFF")
-    padding = Spacing.all(20)
-
-style<column> Centered:
-    gap = 16
-    display = Display.Flex
-    flex_direction = FlexDirection.Column
-    align_items = Alignment.Center
-    justify_content = Alignment.Center
-
-style<text> Title:
-    font_size = 24
-    font_weight = FontWeight.Bold
-    color = Color("#1A1A1A")
-
-style<text> Counter:
-    font_size = 16
-    color = Color("#333333")
-
-style<text> Hint:
-    font_size = 14
-    color = Color("#999999")
-
-style<button> Primary:
-    background = Color("#0066FF")
-    color = Color("#FFFFFF")
-    font_size = 16
-    font_weight = FontWeight.Medium
-    border_radius = 8
-    padding = Spacing(12, 24, 12, 24)
-    cursor = Cursor.Pointer
-
-<app tpl=Default>
-    <column tpl=Centered>
-        <text tpl=Title value="Bienvenido a Kyle UI!" />
-        <text tpl=Counter value=@"Contador: " + count.to_str() />
-        <button tpl=Primary text="+" click=@increment />
-        <text tpl=Hint value="Edit src/main.kyx to get started" />
-    </column>
+    // Entry point: app.kyx
+    let app_kyx = format!(
+        r##"# {name} — Kyle UI App
+<app title=@"{name}" config=@config>
+    <router>
+        <route path="/" component=@home_view layout=@main_layout title="Home" />
+        <route path="*" component=@not_found_view layout=@main_layout title="404" />
+    </router>
 </app>
 "##,
         name = project_name
     );
-    fs::write(project_dir.join("src").join("main.kyx"), &main_kyx).unwrap_or_else(|e| {
-        eprintln!("Error writing src/main.kyx: {}", e);
+    fs::write(project_dir.join("app.kyx"), &app_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing app.kyx: {}", e);
         process::exit(1);
     });
 
-    // Library module for business logic
+    // Home view: views/home.kyx
+    let home_kyx = format!(
+        r##"# Home view
+<view>
+    @(
+        count: ^i32 = 0
+        fn increment():
+            count += 1
+    )
+
+    <vstack alignment=alignment.center spacing=16>
+        <text value="Bienvenido a Kyle UI!" typography=Title />
+        <text value=@"Contador: " + count.to_str() />
+        <button tpl=Primary text="+" click=@increment />
+    </vstack>
+</view>
+"##
+    );
+    fs::write(project_dir.join("views").join("home.kyx"), &home_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing views/home.kyx: {}", e);
+        process::exit(1);
+    });
+
+    // Not found view: views/not_found.kyx
+    let not_found_kyx = r##"# 404 view
+<view>
+    @(set_title("404 — No Encontrado"))
+
+    <vstack alignment=alignment.center spacing=12>
+        <text value="404" typography=Display />
+        <text value="Página no encontrada" />
+        <link to="/">Volver al inicio</link>
+    </vstack>
+</view>
+"##;
+    fs::write(project_dir.join("views").join("not_found.kyx"), &not_found_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing views/not_found.kyx: {}", e);
+        process::exit(1);
+    });
+
+    // Main layout: layouts/main.kyx
+    let main_layout_kyx = r##"# Persistent layout with navbar
+<layout>
+    <navbar title="Mi App" />
+    <main>
+        <slot />
+    </main>
+    <footer>
+        <text value="Kyle UI" />
+    </footer>
+</layout>
+"##;
+    fs::write(project_dir.join("layouts").join("main.kyx"), &main_layout_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing layouts/main.kyx: {}", e);
+        process::exit(1);
+    });
+
+    // Styles: components/styles.kyx
+    let styles_kyx = r##"# Shared styles
+style<text> Title:
+    font_size = 24
+    font_weight = font_weight.bold
+    color = color("#1A1A1A")
+
+style<text> Display:
+    font_size = 48
+    font_weight = font_weight.bold
+    color = color("#0066FF")
+
+style<button> Primary:
+    background = color("#0066FF")
+    color = color("#FFFFFF")
+    font_size = 16
+    font_weight = font_weight.medium
+    border_radius = 8
+    padding = spacing.all(12)
+    cursor = cursor.pointer
+"##;
+    fs::write(project_dir.join("components").join("styles.kyx"), &styles_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing components/styles.kyx: {}", e);
+        process::exit(1);
+    });
+
+    // Library module
     let lib_kl = format!(
         "# {} — library module\nfn greet(greeting: str, name: str) str:\n    greeting + \", \" + name + \"!\"\n",
         project_name
@@ -912,16 +970,20 @@ style<button> Primary:
         process::exit(1);
     });
 
-    write_manifest(project_dir, project_name, "src/main.kyx");
+    write_manifest(project_dir, project_name, "app.kyx");
     write_gitignore(project_dir);
     write_vscode_settings(project_dir, exe_path);
 
-    println!("✅ Created project '{}'", project_name);
-    println!("   ├── src/main.kyx    — UI entry point (edit this!)");
-    println!("   ├── src/lib.ky      — library module");
-    println!("   ├── ky.toml         — manifest");
+    println!("✅ Created kyui project '{}'", project_name);
+    println!("   ├── app.kyx              — entry point");
+    println!("   ├── views/home.kyx       — home page view");
+    println!("   ├── views/not_found.kyx  — 404 page");
+    println!("   ├── layouts/main.kyx     — persistent layout");
+    println!("   ├── components/styles.kyx — shared styles");
+    println!("   ├── src/lib.ky            — library module");
+    println!("   ├── ky.toml              — manifest");
     println!("   ├── .gitignore");
-    println!("   └── .vscode/        — VS Code settings");
+    println!("   └── .vscode/             — VS Code settings");
     println!();
     println!("   cd {} && ky run web      # Web (browser)", project_name);
     println!("   cd {} && ky run desktop  # Desktop (SDL2)", project_name);
@@ -999,8 +1061,12 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
         .and_then(|l| l.split_whitespace().nth(1))
         .unwrap_or("/");
 
-    // Auto-rebuild if source changed
-    let source_path = project_root.join("src/main.kyx");
+    // Auto-rebuild if source changed (check app.kyx or src/main.kyx)
+    let source_path = if project_root.join("app.kyx").exists() {
+        project_root.join("app.kyx")
+    } else {
+        project_root.join("src/main.kyx")
+    };
     if source_path.exists() {
         if let Ok(meta) = std::fs::metadata(&source_path) {
             if let Ok(mtime) = meta.modified() {
@@ -1012,8 +1078,8 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
                         if let Ok(src) = std::fs::read_to_string(&source_path) {
                             let bd = project_root.join("target/debug");
                             let _ = std::fs::create_dir_all(&bd);
-                            let _ = kyc_driver::pipeline::Pipeline::build_kyx_source(&src, &bd.join("ui-runtime.js"));
-                            println!("  [auto-rebuild] src/main.kyx changed");
+                            let _ = kyc_driver::pipeline::Pipeline::build_kyx_source(&src, Some(&source_path), &bd.join("ui-runtime.js"));
+                            println!("  [auto-rebuild] {} changed", source_path.file_name().unwrap_or_default().to_string_lossy());
                         }
                         LAST_BUILD.store(ms, Ordering::Relaxed);
                     }

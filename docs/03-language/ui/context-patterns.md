@@ -156,7 +156,7 @@ props intermedios:
 <app>
     <home_page />
 
-    <section class="dark-section">
+    <section style=@dark_theme_style>
         @(
             # Override del context para esta sección
             context ThemeContext:
@@ -353,8 +353,8 @@ const ContextSystem = {
 
 ```kyle
 # Generado automáticamente
-final class ContextManager:
-    providers: ^{ContextKey: any} = {}
+final class context_manager:
+    providers: ^{context_key: any} = {}
 
     fn provide<T>(this, key: ContextKey, value: T):
         this.providers.set(key, value)

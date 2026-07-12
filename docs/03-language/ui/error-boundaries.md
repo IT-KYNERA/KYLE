@@ -74,12 +74,12 @@ la app se rompa.
     on_retry: ^&(fn ())
 )
 <view>
-    <column align=center padding=32>
+    <vstack alignment=alignment.center padding=32>
         <icon name="alert" size=48 color=@theme.error />
         <text value="Algo salió mal" />
         <text value="Intenta de nuevo más tarde" />
         <button text="Reintentar" click=@on_retry />
-    </column>
+    </vstack>
 </view>
 ```
 
@@ -362,8 +362,8 @@ class ErrorBoundary {
 
 ```kyle
 # Generado automáticamente
-final class ErrorBoundary:
-    state: ^BoundaryState = BoundaryState.Success
+final class error_boundary:
+    state: ^boundary_state = boundary_state.success
     children: ^View
     fallback: View
     max_retries: i32 = 3

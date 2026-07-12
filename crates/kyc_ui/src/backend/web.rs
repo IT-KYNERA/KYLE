@@ -69,19 +69,54 @@ impl UiBackend for WebBackend {
         js.push_str("  const el = document.createDocumentFragment();\n");
 
         for node in &program.body {
-            gen_node(node, &mut js, 2, "el");
+            gen_node(node, &mut js, 2, "el", "");
         }
 
         js.push_str("  return { element: el, state };\n");
         js.push_str("}\n\n");
 
-        // Route registration
-        if !program.view_paths.is_empty() {
-            js.push_str("// Auto-register routes\n");
+        // Generate component renderers from resolved dependencies
+        for comp in &program.component_renderers {
+            let comp_name = &comp.name;
+            js.push_str(&format!("\n// Component renderer: {}\n", comp_name));
+            js.push_str(&format!("function render_{}(params = {{}}) {{\n", comp_name));
+
+            // Code blocks for this component
+            for block in &comp.code_blocks {
+                let js_block = translate_kyle_block_to_js(block);
+                if !js_block.is_empty() {
+                    js.push_str("  // From Kyle block:\n");
+                    for line in js_block.lines() {
+                        js.push_str(&format!("  {}\n", line));
+                    }
+                }
+            }
+
+            js.push_str("  const el = document.createDocumentFragment();\n");
+            for node in &comp.body {
+                gen_node(node, &mut js, 2, "el", "");
+            }
+            js.push_str("  return { element: el, state };\n");
+            js.push_str("}\n");
+        }
+
+        // Route registration from RouteConfig
+        if !program.routes.is_empty() {
+            js.push_str("\n// Register routes\n");
             js.push_str("if (typeof window !== 'undefined') {\n");
             js.push_str("  if (!window.__KYLE_ROUTES) window.__KYLE_ROUTES = {};\n");
-            for path in &program.view_paths {
-                js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render;\n", path));
+            for route in &program.routes {
+                // Use component-specific renderer if available
+                let comp_name = &route.component;
+                let func_name = format!("render_{}", comp_name);
+                // Check if a component renderer exists with this name
+                let has_renderer = program.component_renderers.iter()
+                    .any(|c| c.name == *comp_name);
+                if has_renderer {
+                    js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = {};\n", route.path, func_name));
+                } else {
+                    js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render;\n", route.path));
+                }
             }
             js.push_str("}\n\n");
         }
@@ -102,14 +137,94 @@ impl UiBackend for WebBackend {
     }
 }
 
-fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
+fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str, model: &str) {
     let el = fresh_el();
     let ind = " ".repeat(indent);
     let ind2 = " ".repeat(indent + 2);
 
     match node {
         UiNode::Element { tag, attrs, children } => {
+            // Detect form model context
+            let mut child_model = model;
+            if tag == &ComponentTag::Form {
+                for a in attrs {
+                    if a.name == "model" {
+                        if let AttrValue::Expr(ref v) = a.value {
+                            child_model = v.trim_start_matches('@');
+                        }
+                    }
+                }
+            }
+
             let tag_js = js_tag(tag);
+            if tag == &ComponentTag::FilePicker {
+                let mut accept = String::new();
+                let mut multiple = false;
+                let mut on_select = String::new();
+                let mut field = String::new();
+                for a in attrs {
+                    match a.name.as_str() {
+                        "accept" => if let AttrValue::String(ref v) = a.value { accept = v.clone(); },
+                        "multiple" => multiple = true,
+                        "on_select" => if let AttrValue::Expr(ref v) = a.value { on_select = v.clone(); },
+                        "field" => if let AttrValue::String(ref v) = a.value { field = v.clone(); },
+                        _ => {}
+                    }
+                }
+                // If field= is set and there's a model, auto-generate the callback
+                let single_callback = if !field.is_empty() && !child_model.is_empty() {
+                    format!("(fileData) => {{ state['{}'] = {{ ...(state['{}'] || {{}}), '{}': fileData }}; }}", child_model, child_model, field)
+                } else if !on_select.is_empty() {
+                    format!("({})", on_select.clone())
+                } else {
+                    String::new()
+                };
+                let multi_callback = if !field.is_empty() && !child_model.is_empty() {
+                    format!("(files) => {{ state['{}'] = {{ ...(state['{}'] || {{}}), '{}': files }}; }}", child_model, child_model, field)
+                } else if !on_select.is_empty() {
+                    format!("({})", on_select.clone())
+                } else {
+                    String::new()
+                };
+                // Generate file input + handler
+                let input_el = fresh_el();
+                js.push_str(&format!("{}// FilePicker\n", ind));
+                js.push_str(&format!("{}const {} = document.createElement('input');\n", ind, input_el));
+                js.push_str(&format!("{}{}.type = 'file';\n", ind, input_el));
+                if !accept.is_empty() {
+                    js.push_str(&format!("{}{}.accept = {:?};\n", ind, input_el, accept));
+                }
+                if multiple {
+                    js.push_str(&format!("{}{}.multiple = true;\n", ind, input_el));
+                }
+                js.push_str(&format!("{}{}.style.display = 'none';\n", ind, input_el));
+                // Click handler triggers file picker
+                js.push_str(&format!("{}{}.addEventListener('change', async () => {{\n", ind, input_el));
+                if multiple {
+                    js.push_str(&format!("{}  const files = [];\n", ind));
+                    js.push_str(&format!("{}  for (const f of {}.files) {{\n", ind, input_el));
+                    js.push_str(&format!("{}    const buf = await f.arrayBuffer();\n", ind));
+                    js.push_str(&format!("{}    files.push({{ name: f.name, size: f.size, mime: f.type, content: new Uint8Array(buf), last_modified: f.lastModified }});\n", ind));
+                    js.push_str(&format!("{}  }}\n", ind));
+                    if !multi_callback.is_empty() {
+                        js.push_str(&format!("{}  ({})(files);\n", ind, multi_callback));
+                    }
+                } else {
+                    js.push_str(&format!("{}  const f = {}.files[0];\n", ind, input_el));
+                    js.push_str(&format!("{}  if (!f) return;\n", ind));
+                    js.push_str(&format!("{}  const buf = await f.arrayBuffer();\n", ind));
+                    js.push_str(&format!("{}  const fileData = {{ name: f.name, size: f.size, mime: f.type, content: new Uint8Array(buf), last_modified: f.lastModified }};\n", ind));
+                    if !single_callback.is_empty() {
+                        js.push_str(&format!("{}  ({})(fileData);\n", ind, single_callback));
+                    }
+                }
+                js.push_str(&format!("{}}});\n", ind));
+                // Trigger click on mount
+                js.push_str(&format!("{}{}.click();\n", ind, input_el));
+                js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, input_el));
+                return;
+            }
+
             if tag == &ComponentTag::Portal {
                 let mut target = "body";
                 for a in attrs {
@@ -119,7 +234,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
                 }
                 js.push_str(&format!("{}// Portal: render to '{}'\n", ind, target));
                 for child in children {
-                    gen_node(child, js, indent, &format!("{}_content", el));
+                    gen_node(child, js, indent, &format!("{}_content", el), model);
                 }
                 js.push_str(&format!("{}if (typeof {}_content !== 'undefined') {{\n", ind, el));
                 js.push_str(&format!("{}  portalManager.create({}_content, {:?});\n", ind, el, target));
@@ -133,7 +248,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
                 js.push_str(&format!("{}const {}_wrap = {}.wrap(() => {{\n", ind, b, b));
                 js.push_str(&format!("{}  const {}_c = document.createDocumentFragment();\n", ind, b));
                 for child in children {
-                    gen_node(child, js, indent + 2, &format!("{}_c", b));
+                    gen_node(child, js, indent + 2, &format!("{}_c", b), model);
                 }
                 js.push_str(&format!("{}  return {}_c;\n", ind, b));
                 js.push_str(&format!("{}}});\n", ind));
@@ -141,7 +256,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
                 js.push_str(&format!("{}if ({}_r) {{ {}.appendChild({}_r); }}\n", ind, b, parent, b));
                 return;
             }
-            if tag == &ComponentTag::Outlet {
+            if tag == &ComponentTag::Slot {
                 let mut name = "default";
                 for a in attrs {
                     if a.name == "name" {
@@ -153,18 +268,117 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
             }
             js.push_str(&format!("{}const {} = document.createElement('{}');\n", ind, el, tag_js));
             gen_attrs(attrs, js, indent, &el);
-            gen_events(attrs, js, indent, &el);
+            gen_events(attrs, js, indent, &el, child_model);
+
+            // Link component: intercept clicks for client-side navigation
+            if tag == &ComponentTag::Link {
+                for a in attrs {
+                    if a.name == "to" {
+                        let target = match &a.value {
+                            AttrValue::String(v) => format!("{:?}", v),
+                            AttrValue::Expr(v) => v.clone(),
+                            AttrValue::Flag => String::new(),
+                        };
+                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); window.navigate({}); }});\n", ind, el, target));
+                    }
+                }
+            }
+
             js.push_str(&format!("{}A11yManager.applyAria({}, {:?});\n", ind, el, tag.as_str()));
             for child in children {
-                gen_node(child, js, indent + 2, &el);
+                gen_node(child, js, indent + 2, &el, child_model);
             }
             js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, el));
         }
         UiNode::SelfClosing { tag, attrs } => {
+            // FilePicker: generate hidden file input with FileReader
+            if tag == &ComponentTag::FilePicker {
+                let mut accept = String::new();
+                let mut multiple = false;
+                let mut on_select = String::new();
+                let mut field = String::new();
+                for a in attrs {
+                    match a.name.as_str() {
+                        "accept" => if let AttrValue::String(ref v) = a.value { accept = v.clone(); },
+                        "multiple" => multiple = true,
+                        "on_select" => if let AttrValue::Expr(ref v) = a.value { on_select = v.clone(); },
+                        "field" => if let AttrValue::String(ref v) = a.value { field = v.clone(); },
+                        _ => {}
+                    }
+                }
+                let single_callback = if !field.is_empty() && !model.is_empty() {
+                    format!("(fileData) => {{ state['{}'] = {{ ...(state['{}'] || {{}}), '{}': fileData }}; }}", model, model, field)
+                } else if !on_select.is_empty() {
+                    format!("({})", on_select.clone())
+                } else {
+                    String::new()
+                };
+                let mut multi_callback = if !field.is_empty() && !model.is_empty() {
+                    format!("(files) => {{ state['{}'] = {{ ...(state['{}'] || {{}}), '{}': files }}; }}", model, model, field)
+                } else if !on_select.is_empty() {
+                    format!("({})", on_select.clone())
+                } else {
+                    String::new()
+                };
+                // For multi on_select, use the same callback name
+                if multi_callback.is_empty() && !on_select.is_empty() {
+                    multi_callback = on_select.clone();
+                }
+                let input_el = fresh_el();
+                js.push_str(&format!("{}// FilePicker\n", ind));
+                js.push_str(&format!("{}const {} = document.createElement('input');\n", ind, input_el));
+                js.push_str(&format!("{}{}.type = 'file';\n", ind, input_el));
+                if !accept.is_empty() {
+                    js.push_str(&format!("{}{}.accept = {:?};\n", ind, input_el, accept));
+                }
+                if multiple {
+                    js.push_str(&format!("{}{}.multiple = true;\n", ind, input_el));
+                }
+                js.push_str(&format!("{}{}.style.display = 'none';\n", ind, input_el));
+                js.push_str(&format!("{}{}.addEventListener('change', async () => {{\n", ind, input_el));
+                if multiple {
+                    js.push_str(&format!("{}  const files = [];\n", ind));
+                    js.push_str(&format!("{}  for (const f of {}.files) {{\n", ind, input_el));
+                    js.push_str(&format!("{}    const buf = await f.arrayBuffer();\n", ind));
+                    js.push_str(&format!("{}    files.push({{ name: f.name, size: f.size, mime: f.type, content: new Uint8Array(buf), last_modified: f.lastModified }});\n", ind));
+                    js.push_str(&format!("{}  }}\n", ind));
+                    if !multi_callback.is_empty() {
+                        js.push_str(&format!("{}  ({})(files);\n", ind, multi_callback));
+                    }
+                } else {
+                    js.push_str(&format!("{}  const f = {}.files[0];\n", ind, input_el));
+                    js.push_str(&format!("{}  if (!f) return;\n", ind));
+                    js.push_str(&format!("{}  const buf = await f.arrayBuffer();\n", ind));
+                    js.push_str(&format!("{}  const fileData = {{ name: f.name, size: f.size, mime: f.type, content: new Uint8Array(buf), last_modified: f.lastModified }};\n", ind));
+                    if !single_callback.is_empty() {
+                        js.push_str(&format!("{}  ({})(fileData);\n", ind, single_callback));
+                    }
+                }
+                js.push_str(&format!("{}}});\n", ind));
+                js.push_str(&format!("{}{}.click();\n", ind, input_el));
+                js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, input_el));
+                return;
+            }
+
             let tag_js = js_tag(tag);
             js.push_str(&format!("{}const {} = document.createElement('{}');\n", ind, el, tag_js));
             gen_attrs(attrs, js, indent, &el);
-            gen_events(attrs, js, indent, &el);
+            gen_events(attrs, js, indent, &el, model);
+
+            // Link component: intercept clicks for client-side navigation
+            if tag == &ComponentTag::Link {
+                for a in attrs {
+                    if a.name == "to" {
+                        let target = match &a.value {
+                            AttrValue::String(v) => format!("{:?}", v),
+                            AttrValue::Expr(v) => v.clone(),
+                            AttrValue::Flag => String::new(),
+                        };
+                        js.push_str(&format!("{}{}.addEventListener('click', (e) => {{ e.preventDefault(); window.navigate({}); }});\n", ind, el, target));
+                    }
+                }
+            }
+
             js.push_str(&format!("{}A11yManager.applyAria({}, {:?});\n", ind, el, tag.as_str()));
             js.push_str(&format!("{}{}.appendChild({});\n", ind, parent, el));
         }
@@ -172,19 +386,19 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
             js.push_str(&format!("{}// Slot: {}\n", ind, name));
             if !fallback.is_empty() {
                 for child in fallback {
-                    gen_node(child, js, indent, parent);
+                    gen_node(child, js, indent, parent, model);
                 }
             }
         }
         UiNode::If { condition, then_branch, else_branch } => {
             js.push_str(&format!("{}if ({}) {{\n", ind, condition));
             for child in then_branch {
-                gen_node(child, js, indent + 4, parent);
+                gen_node(child, js, indent + 4, parent, model);
             }
             if !else_branch.is_empty() {
                 js.push_str(&format!("{}}} else {{\n", ind));
                 for child in else_branch {
-                    gen_node(child, js, indent + 4, parent);
+                    gen_node(child, js, indent + 4, parent, model);
                 }
             }
             js.push_str(&format!("{}}}\n", ind));
@@ -192,7 +406,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
         UiNode::For { item, list, body } => {
             js.push_str(&format!("{}for (const {} of {}) {{\n", ind, item, list));
             for child in body {
-                gen_node(child, js, indent + 4, parent);
+                gen_node(child, js, indent + 4, parent, model);
             }
             js.push_str(&format!("{}}}\n", ind));
         }
@@ -201,7 +415,7 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
             for case in cases {
                 js.push_str(&format!("{}  case {}:\n", ind, case.pattern));
                 for child in &case.body {
-                    gen_node(child, js, indent + 8, parent);
+                    gen_node(child, js, indent + 8, parent, model);
                 }
                 js.push_str(&format!("{}    break;\n", ind));
             }
@@ -437,8 +651,28 @@ fn layout_to_flex(layout: &str) -> (&str, &str) {
     }
 }
 
-fn gen_events(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
+fn gen_events(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str, model: &str) {
     let ind = " ".repeat(indent + 2);
+    // Handle field= for model binding
+    if !model.is_empty() {
+        for attr in attrs {
+            if attr.name == "field" {
+                if let AttrValue::String(ref field_name) = attr.value {
+                    // Two-way binding: model.field <-> input value
+                    js.push_str(&format!("{}// Field binding: {}.{}\n", ind, model, field_name));
+                    // One-way: model -> input
+                    js.push_str(&format!("{}{}.value = state['{}']?.{} ?? '';\n", ind, el, model, field_name));
+                    js.push_str(&format!("{}{}.addEventListener('input', () => {{\n", ind, el));
+                    js.push_str(&format!("{}  state['{}'] = {{ ...(state['{}'] || {{}}), '{}': {}.value }};\n", ind, model, model, field_name, el));
+                    js.push_str(&format!("{}}});\n", ind));
+                }
+            }
+            if attr.name == "bind" {
+                // Skip bind when field is set
+            }
+        }
+    }
+    // Standard event listeners
     for attr in attrs {
         let event_name = match attr.name.as_str() {
             "click" => "click",
@@ -470,10 +704,12 @@ fn gen_events(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
 
 fn js_tag(tag: &ComponentTag) -> &str {
     match tag {
-        ComponentTag::View | ComponentTag::Column | ComponentTag::Row
-        | ComponentTag::Stack | ComponentTag::Container => "div",
-        ComponentTag::Text | ComponentTag::Label => "span",
-        ComponentTag::Button | ComponentTag::IconButton => "button",
+        ComponentTag::View | ComponentTag::VStack | ComponentTag::HStack
+        | ComponentTag::ZStack
+        | ComponentTag::Card | ComponentTag::Surface
+        | ComponentTag::Group | ComponentTag::Scroll => "div",
+        ComponentTag::Text => "span",
+        ComponentTag::Button => "button",
         ComponentTag::TextField => "input",
         ComponentTag::PasswordField => "input",
         ComponentTag::TextArea => "textarea",
@@ -483,7 +719,8 @@ fn js_tag(tag: &ComponentTag) -> &str {
         ComponentTag::Link => "a",
         ComponentTag::List => "ul",
         ComponentTag::Form => "form",
-        ComponentTag::Dialog => "dialog",
+        ComponentTag::Modal | ComponentTag::Alert => "div",
+        ComponentTag::Navbar | ComponentTag::Sidebar | ComponentTag::Footer => "div",
         ComponentTag::Canvas => "canvas",
         ComponentTag::Video => "video",
         ComponentTag::Audio => "audio",
@@ -492,6 +729,7 @@ fn js_tag(tag: &ComponentTag) -> &str {
         ComponentTag::Switch => "input",
         ComponentTag::Progress => "progress",
         ComponentTag::Spinner => "div",
+        ComponentTag::FilePicker => "input",
         _ => "div",
     }
 }
@@ -995,10 +1233,11 @@ mod tests {
     fn test_web_backend_generates_js() {
         let backend = WebBackend::new();
         let program = UiProgram {
-            view_paths: vec![],
+            routes: vec![],
             code_blocks: vec![],
             styles: vec![],
             animations: vec![],
+            component_renderers: vec![],
             body: vec![UiNode::SelfClosing {
                 tag: ComponentTag::Text,
                 attrs: vec![UiAttr {

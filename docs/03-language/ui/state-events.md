@@ -1,7 +1,7 @@
 # Estado y Eventos
 
-**Status:** Draft v1.0
-**Date:** 2026-07-10
+**Status:** Draft v2.0
+**Date:** 2026-07-12
 **Documentación relacionada:**
 - [ui-syntax.md](../syntax/ui-syntax.md) — Sintaxis .kyx
 - [style-system.md](style-system.md) — Sistema de estilos
@@ -13,82 +13,93 @@
 
 ### 1.1 Estado local
 
-Cada componente puede tener estado local. Se declara como variables `^T` (mutables)
-dentro del bloque `@(...)` del .kyx:
+Todo el código Kyle va dentro del bloque `@(...)`:
 
 ```kyx
-@(
-    count: ^i32 = 0
-    fn increment():
-        count = count + 1
-)
 <view>
-    <text value="Contador: " + count.to_str() />
+    @(
+        count: ^i32 = 0
+
+        fn increment():
+            count += 1
+    )
+
+    <text value=@"Contador: " + count.to_str() />
     <button text="+" click=@increment />
 </view>
 ```
 
 ### 1.2 Estado derivado
 
-Estado que se calcula automáticamente a partir de otras variables:
-
 ```kyx
-@(
-    items: ^{str} = {}
-    filtered: ^{str} = {}  # se actualiza cuando cambia items o filter_text
-    filter_text: ^str = ""
+<view>
+    @(
+        items: ^{str} = {}
+        filter_text: ^str = ""
+        filtered: ^{str} = {}
 
-    fn update_filter():
-        filtered = items.filter(fn(x): x.contains(filter_text))
-)
+        fn update_filter():
+            filtered = items.filter(fn(x): x.contains(filter_text))
+    )
+</view>
 ```
 
-### 1.3 Props (parámetros del componente)
+### 1.3 Props vía visibilidad
 
-Los props se pasan como atributos desde el padre:
+Los props son variables **públicas** dentro de `@(...)`. Lo interno se marca con `_`:
 
-```kyx
-<!-- Uso -->
-<user_card name="Juan" age=30 />
-```
+| Declaración dentro de `@(...)` | ¿Es prop? | Visible desde fuera |
+|-------------------------------|-----------|-------------------|
+| `name: str` | ✅ Sí | Se pasa como atributo |
+| `count: ^i32` | ✅ Sí | Binding reactivo |
+| `_internal: str` | ❌ No | Uso interno |
+| `__cache: [i32]` | ❌ No | Privado del módulo |
+| `fn on_click(this)` | ✅ Sí | Callback |
 
 ```kyx
 <!-- Definición en UserCard.kyx -->
-@(
-    name: str       # prop requerido
-    age: i32 = 0    # prop opcional con default
-    on_click: ^&(fn ())  # callback
-)
 <view>
-    <text value=name />
-    <text value=age.to_str() />
+    @(
+        name: str                      # prop requerido
+        age: i32 = 0                   # prop opcional con default
+        on_click: ^&(fn ())            # callback como prop
+    )
+
+    <text value=@"Nombre: " + name />
+    <text value=@"Edad: " + age.to_str() />
 </view>
+```
+
+```kyx
+<!-- Uso desde padre -->
+<user_card name="Juan" age=30 on_click=@handle_click />
 ```
 
 ### 1.4 Estado global (Context)
 
-Para estado compartido entre componentes no relacionados:
+Para estado compartido entre componentes:
 
 ```kyx
-@(
-    # Definir contexto
-    context AuthContext:
-        user: User?
-        token: str?
-        fn login(email: str, password: str):
-            # ...
-)
+<view>
+    @(
+        context AuthContext:
+            user: User?
+            token: str?
+            fn login(email: str, password: str):
+                # ...
+    )
+</view>
 ```
 
 Consumir contexto:
 
 ```kyx
-@(
-    auth = use_context(AuthContext)
-)
 <view>
+    @(
+        auth = use_context(AuthContext)
+    )
     @if auth.user != None:
-        <text value="Bienvenido, " + auth.user.name />
+        <text value=@"Bienvenido, " + auth.user.name />
     @else:
         <button text="Login" click=@show_login />
 </view>
@@ -98,18 +109,16 @@ Consumir contexto:
 
 ## 2. Binding Bidireccional
 
-El binding sincroniza automáticamente el estado con la UI.
-
 ### 2.1 One-way binding (estado → UI)
 
 ```kyx
-<text value=@name />           # se actualiza cuando name cambia
+<text value=@name />               # se actualiza cuando name cambia
 ```
 
 ### 2.2 Two-way binding (estado ↔ UI)
 
 ```kyx
-<text_field bind=@email />      # email se actualiza al escribir, y viceversa
+<text_field bind=@email />          # email se actualiza al escribir
 <checkbox bind=@accept_terms />
 ```
 
@@ -123,23 +132,12 @@ Cuando `parent_var` cambia, `prop` se actualiza automáticamente.
 
 ### 2.4 Cómo funciona el binding
 
-El compilador transforma el binding en:
-
 Web target:
 ```javascript
-// Generado automáticamente
 const state = { email: '' };
 const input = document.createElement('input');
-
-// One-way: estado → UI
-function updateUI() {
-    input.value = state.email;
-}
-
-// Two-way: UI → estado
 input.addEventListener('input', () => {
     state.email = input.value;
-    // Notificar a WASM del cambio
     wasm.exports.onStateChange('email', state.email);
 });
 ```
@@ -168,30 +166,33 @@ input.addEventListener('input', () => {
 ### 3.2 Parámetros de evento
 
 ```kyx
-@(
-    fn handle_click(event: MouseEvent):
-        print("click en: " + event.x.to_str() + ", " + event.y.to_str())
+<view>
+    @(
+        fn handle_click(event: MouseEvent):
+            print("click en: " + event.x.to_str() + ", " + event.y.to_str())
 
-    fn handle_keypress(event: KeyboardEvent):
-        if event.key == "Enter":
-            submit()
-)
+        fn handle_keypress(event: KeyboardEvent):
+            if event.key == "Enter":
+                submit()
+    )
+</view>
 ```
 
 ### 3.3 Eventos personalizados
 
-Los componentes pueden emitir eventos personalizados:
+Los componentes pueden emitir eventos personalizados via callbacks:
 
 ```kyx
 <!-- Definición -->
-@(
+<view>
     on_save: ^&(fn (data: str))
     data: ^str = ""
 
-    fn save():
-        on_save(data)
-)
-<view>
+    @(
+        fn save():
+            on_save(data)
+    )
+
     <text_field bind=@data />
     <button text="Guardar" click=@save />
 </view>
@@ -204,14 +205,15 @@ Los componentes pueden emitir eventos personalizados:
 
 ### 3.4 Event bubbling
 
-Por defecto, los eventos burbujean hacia el padre. Se puede detener:
+Por defecto, los eventos burbujean hacia el padre:
 
 ```kyx
-@(
-    fn handle_click(event: MouseEvent):
-        event.stop_propagation()
-        # solo este componente maneja el click
-)
+<view>
+    @(
+        fn handle_click(event: MouseEvent):
+            event.stop_propagation()
+    )
+</view>
 ```
 
 ---
@@ -220,61 +222,44 @@ Por defecto, los eventos burbujean hacia el padre. Se puede detener:
 
 ### 4.1 Cómo se actualiza la UI
 
-Cuando una variable de estado cambia:
-
 ```
 count = count + 1
-    │
-    ▼
+     │
+     ▼
 Runtime detecta el cambio
-    │
-    ▼
+     │
+     ▼
 Busca qué componentes dependen de count
-    │
-    ▼
+     │
+     ▼
 Re-renderiza solo esos componentes
-    │
-    ▼
-Genera nuevas llamadas a createElement / draw
 ```
 
 ### 4.2 Implementación por target
 
-**Web:** El runtime JS detecta cambios vía Proxy o setters:
+**Web:** Proxy/setters en JS:
 ```javascript
-// Generado automáticamente
 function createState(initial) {
     const state = reactive({ ...initial });
-    const watchers = new Map();
-
-    state.$watch = (key, fn) => {
-        if (!watchers.has(key)) watchers.set(key, []);
-        watchers.get(key).push(fn);
-    };
-
     return new Proxy(state, {
         set(target, key, value) {
             target[key] = value;
-            // Notificar a watchers
-            if (watchers.has(key)) {
-                for (const fn of watchers.get(key)) fn(value);
-            }
+            notifyWatchers(key, value);
             return true;
         }
     });
 }
 ```
 
-**Desktop:** El runtime Kyle maneja reactive updates vía diff del árbol de componentes.
+**Desktop:** Runtime Kyle maneja reactive updates vía diff del árbol de componentes.
 
 ### 4.3 Optimización
 
-Solo los componentes afectados se re-renderizan. El framework mantiene un
-grafo de dependencias:
+Solo los componentes afectados se re-renderizan:
 
 ```
 count ───→ CounterView (depende de count)
-           └──→ Button (no depende de count → skip)
+           └──→ Button (no depende → skip)
 ```
 
 ---
@@ -284,53 +269,44 @@ count ───→ CounterView (depende de count)
 ### 5.1 Padre → Hijo (props)
 
 ```kyx
-<child_component
-    title="Mi Título"
-    items=@data_list
-/>
+<child_component title="Mi Título" items=@data_list />
 ```
 
-### 5.2 Hijo → Padre (eventos/callbacks)
+### 5.2 Hijo → Padre (callbacks)
 
 ```kyx
-<child_component
-    on_delete=@handle_delete
-    on_select=@handle_select
-/>
+<child_component on_delete=@handle_delete on_select=@handle_select />
 ```
 
 ### 5.3 Entre hermanos (vía padre)
 
 ```kyx
-@(
-    selected_id: ^i32 = -1
-
-    fn on_select(id: i32):
-        selected_id = id
-)
 <view>
-    <item_list
-        items=@items
-        on_select=@on_select
-    />
-    <item_detail
-        item_id=@selected_id
-    />
+    @(
+        selected_id: ^i32 = -1
+
+        fn on_select(id: i32):
+            selected_id = id
+    )
+
+    <item_list items=@items on_select=@on_select />
+    <item_detail item_id=@selected_id />
 </view>
 ```
 
 ### 5.4 Entre componentes no relacionados (vía context)
 
 ```kyx
-@(
-    context AppState:
-        theme: Theme = LightTheme
-        user: User?
-        notifications: {Notification}
+<view>
+    @(
+        context AppState:
+            theme: Theme = LightTheme
+            user: User?
+            notifications: {Notification}
 
-    # Cualquier componente puede acceder a AppState
-    state = use_context(AppState)
-)
+        state = use_context(AppState)
+    )
+</view>
 ```
 
 ---
@@ -339,29 +315,31 @@ count ───→ CounterView (depende de count)
 
 ```
 Usuario hace click
-    │
-    ▼
-Evento nativo (click del browser / touch)
-    │
-    ▼
+     │
+     ▼
+Evento nativo (click del browser / touch / mouse)
+     │
+     ▼
 [Web] addEventListener captura
 [Desktop] Event loop captura
-    │
-    ▼
-Traduce a evento Kyle (MouseEvent, KeyboardEvent, etc.)
-    │
-    ▼
-Ejecuta el callback Kyle (en WASM o nativo)
-    │
-    ▼
+[iOS] UIControl action
+     │
+     ▼
+Traduce a evento Kyle (MouseEvent, KeyboardEvent)
+     │
+     ▼
+Ejecuta el callback Kyle
+     │
+     ▼
 Callback modifica estado
-    │
-    ▼
+     │
+     ▼
 Runtime detecta cambios → re-renderiza
-    │
-    ▼
+     │
+     ▼
 [Web] Actualiza DOM
 [Desktop] Redibuja con Skia
+[iOS] Actualiza SwiftUI View
 ```
 
 ---
@@ -371,83 +349,143 @@ Runtime detecta cambios → re-renderiza
 ### 7.1 Form básico
 
 ```kyx
-@(
-    email: ^str = ""
-    password: ^str = ""
-    errors: ^{str} = {}
-    loading: ^bool = false
+<view>
+    @(
+        email: ^str = ""
+        password: ^str = ""
+        errors: ^{str} = {}
+        loading: ^bool = false
 
-    fn validate() bool:
-        errors = {}
-        if email == "":
-            errors.push("Email requerido")
-        if password == "":
-            errors.push("Contraseña requerida")
-        if password.len() < 6:
-            errors.push("Mínimo 6 caracteres")
-        errors.len() == 0
+        fn validate() bool:
+            errors = {}
+            if email == "":
+                errors.push("Email requerido")
+            if password == "":
+                errors.push("Contraseña requerida")
+            if password.len() < 6:
+                errors.push("Mínimo 6 caracteres")
+            errors.len() == 0
 
-    fn handle_submit():
-        if !validate():
-            return
-        loading = true
-        # login...
-)
-
-<form submit=@handle_submit>
-    <text_field
-        label="Email"
-        bind=@email
-        error=if errors.contains("Email requerido"): "Requerido" else: ""
-    />
-    <password_field
-        label="Contraseña"
-        bind=@password
-        error=if errors.contains("Contraseña requerida"): "Requerido" else: ""
-    />
-    <button
-        tpl=Primary
-        text=if loading: "Cargando..." else: "Ingresar"
-        disabled=@loading
-    />
-</form>
-```
-
-### 7.2 Validación tipada
-
-```kyle
-final class ValidationRule<T>:
-    fn validate(this, value: T) str?  # None = ok, Some(msg) = error
-
-# Rules predefinidas
-fn required<T>() ValidationRule<T>:
-    ValidationRule(fn(val: T) str?:
-        if val == "" or val == None:
-            "Este campo es requerido"
-        None
+        fn handle_submit():
+            if !validate():
+                return
+            loading = true
     )
 
-fn min_length(n: i32) ValidationRule<str>:
-    ValidationRule(fn(val: str) str?:
-        if val.len() < n:
-            "Mínimo " + n.to_str() + " caracteres"
-        None
-    )
-
-fn email() ValidationRule<str>:
-    ValidationRule(fn(val: str) str?:
-        if !val.contains("@"):
-            "Email inválido"
-        None
-    )
+    <form submit=@handle_submit>
+        <text_field label="Email" bind=@email
+            error=if errors.contains("Email requerido"): "Requerido" else: "" />
+        <password_field label="Contraseña" bind=@password
+            error=if errors.contains("Contraseña requerida"): "Requerido" else: "" />
+        <button tpl=Primary text=@"Ingresar" disabled=@loading />
+    </form>
+</view>
 ```
 
 ---
 
-## 8. Referencias
+## 8. Form Models (Class Binding)
+
+### 8.1 Problema
+
+Sin form models, cada campo requiere una variable separada:
+
+```kyx
+<view>
+    @(
+        name: ^str = ""
+        email: ^str = ""
+        age: ^i32 = 0
+        errors: ^{str} = {}
+    )
+</view>
+```
+
+20 campos = 20 variables. Frustrante, repetitivo, propenso a errores.
+
+### 8.2 Solución: `model=` en `<form>`
+
+Se declara una clase como **modelo** y el `<form>` la usa automáticamente:
+
+```kyx
+# models/user.ky
+final class UserForm:
+    name: str = ""
+    email: str = ""
+    age: i32 = 0
+    avatar: file_data?       # ← tipo file_data para la foto
+
+    fn validate() {str}:
+        e = {}
+        if name == "": e.set("name", "Requerido")
+        if !email.contains("@"): e.set("email", "Email inválido")
+        if age < 18: e.set("age", "Debe ser mayor de edad")
+        e
+
+    fn to_api() {str}:
+        {
+            "name": name,
+            "email": email,
+            "age": age.to_str(),
+            "avatar": avatar.content  # ← bytes para enviar
+        }
+```
+
+```kyx
+# views/register.kyx
+<view>
+    @(
+        form: ^UserForm = UserForm()
+
+        fn handle_submit():
+            errs = form.validate()
+            if errs.is_empty():
+                http.post("/api/users", json: form.to_api())
+    )
+
+    <form model=@form submit=@handle_submit>
+        <text_field field="name" label="Nombre" />
+        <text_field field="email" label="Email" />
+        <number_field field="age" label="Edad" />
+        <file_picker field="avatar" accept="image/*" label="Foto de perfil" />
+        <button tpl=Primary text="Guardar" />
+    </form>
+</view>
+```
+
+### 8.3 `field=` vs `bind=`
+
+| Atributo | Uso | Descripción |
+|----------|-----|-------------|
+| `bind=@var` | Sin modelo | Binding a variable suelta |
+| `field="name"` | Con `model=@form` | Binding automático al campo del modelo |
+
+### 8.4 Validación automática
+
+```kyx
+# Los errores se muestran automáticamente
+<text_field field="email" label="Email" />
+# Si form.errors tiene "email", se muestra el error debajo del campo
+```
+
+### 8.5 Validaciones declarativas (post-MVP)
+
+```kyx
+final class UserForm:
+    @required name: str
+    @email email: str
+    @min(18) age: str
+    @pattern("^[0-9]+$") phone: str
+```
+
+Estas anotaciones generarían automáticamente las reglas de validación sin escribir `fn validate()`.
+
+---
+
+## 9. Referencias
 
 - [ui-syntax.md](../syntax/ui-syntax.md) — Sintaxis .kyx
 - [RFC-0003](../../10-design/rfc/0003-ui-translation.md) — Traducción multi-target
 - [style-system.md](style-system.md) — Sistema de estilos
-- [animation.md](animation.md) — Animaciones
 - [routing.md](routing.md) — Routing/Navegación
+- [file-picker.md](file-picker.md) — Selector de archivos nativo

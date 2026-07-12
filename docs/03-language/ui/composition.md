@@ -24,22 +24,69 @@ Button               Button
 
 ---
 
-## 2. Slots Básicos
+## 2. Layout Persistente + Slot (Routing)
 
-### 2.1 Slot default
+El patrón `<layout>` + `<slot />` permite crear wrappers persistentes
+que NO se re-renderizan al navegar entre rutas.
+
+### 2.1 Layout con slot
 
 ```kyx
-# card.kyx
-<view>
-    <slot />   # contenido del hijo se renderiza aquí
-</view>
+# layouts/main.kyx
+<layout>
+    <navbar title="Mi App" />
+    <hstack>
+        <sidebar />
+        <main>
+            <slot />    ← contenido de la ruta activa
+        </main>
+    </hstack>
+    <footer />
+</layout>
 ```
 
 ```kyx
-<card>
-    <text value="Contenido" />
-</card>
+# layouts/blank.kyx — sin navbar, sidebar ni footer
+<layout>
+    <slot />
+</layout>
 ```
+
+### 2.2 Cómo funciona
+
+Cuando el usuario navega de `/` a `/login`:
+
+```
+Antes:                      Después:
+<main_layout>               <main_layout>        ← PERSISTE (no se recrea)
+  <navbar />                  <navbar />         ← PERSISTE
+  <vstack>                    <vstack>            ← PERSISTE
+    <sidebar />                 <sidebar />       ← PERSISTE
+    <main>                      <main>            ← PERSISTE
+      <slot>                      <slot>
+        <home_view />    →         <login_view />  ← SOLO ESTO CAMBIA
+      </slot>                     </slot>
+    </main>                     </main>
+  </vstack>                   </vstack>
+  <footer />                  <footer />          ← PERSISTE
+</main_layout>              </main_layout>
+```
+
+### 2.3 Uso en router
+
+```kyx
+<router>
+    <route path="/" component=@home layout=@main_layout />
+    <route path="/login" component=@login layout=@blank_layout />
+    <route path="/dashboard" component=@dashboard layout=@main_layout />
+</router>
+```
+
+El layout se monta UNA VEZ. Solo el `<slot />` se re-renderiza al navegar.
+
+---
+
+## 3. Slots Básicos
 
 ### 2.2 Slots nombrados
 
@@ -159,10 +206,10 @@ Un componente puede exponer una referencia a un elemento interno:
         input_ref.focus()
 )
 
-<column>
+<vstack>
     <input_wrapper ref=@input_ref />
     <button text="Focus" click=@focus_input />
-</column>
+</vstack>
 ```
 
 ### 4.1 Forward con múltiples refs
@@ -298,13 +345,13 @@ Componentes que solo definen estructura:
     on_cancel: ^&(fn ())
 )
 
-<dialog>
+<modal>
     <text value="¿Estás seguro?" />
-    <row>
+    <hstack>
         <button text="Sí" click=@on_confirm />
         <button text="No" click=@on_cancel />
-    </row>
-</dialog>
+    </hstack>
+</modal>
 ```
 
 ---
@@ -363,7 +410,7 @@ Separa la lógica de estado de la presentación:
 ```kyx
 # styled_button.kyx — componente que compone estilo + comportamiento
 @(
-    variant: Style  # Primary | Secondary | Danger
+    variant: style  # Primary | Secondary | Danger
     on_click: ^&(fn ())
 )
 

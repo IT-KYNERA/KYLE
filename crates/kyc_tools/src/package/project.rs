@@ -14,7 +14,9 @@ pub fn find_project_root(start: &Path) -> Option<PathBuf> {
 
 /// Locate the main source file for a project.
 pub fn main_source_path(project_root: &Path) -> Option<PathBuf> {
-    // Try .kyx first (UI projects), then .ky (native projects)
+    // Try app.kyx first (root-level UI entry), then src/main.kyx, then src/main.ky
+    let app_kyx = project_root.join("app.kyx");
+    if app_kyx.exists() { return Some(app_kyx); }
     let kyx_path = project_root.join("src").join("main.kyx");
     if kyx_path.exists() { return Some(kyx_path); }
     let ky_path = project_root.join("src").join("main.ky");

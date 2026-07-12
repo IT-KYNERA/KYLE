@@ -126,19 +126,19 @@ fn gen_ios_node(node: &UiNode, swift: &mut String, indent: usize) {
                     gen_ios_nodes(children, swift, indent + 1, "");
                     swift.push_str(&format!("{}}}\n", ind));
                 }
-                ComponentTag::Column => {
+                ComponentTag::VStack => {
                     let spacing = get_style_attr(attrs, "spacing", "16");
                     swift.push_str(&format!("{}VStack(spacing: {}) {{\n", ind, spacing));
                     gen_ios_nodes(children, swift, indent + 1, "");
                     swift.push_str(&format!("{}}}\n", ind));
                 }
-                ComponentTag::Row => {
+                ComponentTag::HStack => {
                     let spacing = get_style_attr(attrs, "spacing", "16");
                     swift.push_str(&format!("{}HStack(spacing: {}) {{\n", ind, spacing));
                     gen_ios_nodes(children, swift, indent + 1, "");
                     swift.push_str(&format!("{}}}\n", ind));
                 }
-                ComponentTag::Text | ComponentTag::Label => {
+                ComponentTag::Text => {
                     let text = get_text_attr(attrs);
                     // If text is already a Text() expression, use it directly
                     if text.starts_with("Text(") {
@@ -183,6 +183,9 @@ fn gen_ios_node(node: &UiNode, swift: &mut String, indent: usize) {
                     swift.push_str(&format!("{}ScrollView {{\n", ind));
                     gen_ios_nodes(children, swift, indent + 1, "");
                     swift.push_str(&format!("{}}}\n", ind));
+                }
+                ComponentTag::FilePicker => {
+                    swift.push_str(&format!("{}// FilePicker: not implemented for iOS yet\n", ind));
                 }
                 _ => {
                     // Custom/unknown: render children
@@ -447,10 +450,11 @@ mod tests {
     fn test_ios_generates_swift() {
         let b = IosBackend::new();
         let p = UiProgram {
-            view_paths: vec![],
+            routes: vec![],
             code_blocks: vec!["count: ^i32 = 0\nfn increment():\n    count = count + 1".to_string()],
             styles: vec![],
             animations: vec![],
+            component_renderers: vec![],
             body: vec![
                 UiNode::SelfClosing {
                     tag: ComponentTag::Text,

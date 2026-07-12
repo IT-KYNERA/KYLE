@@ -208,7 +208,7 @@ test("Button renders correctly on all targets"):
 
     # Los snapshots se generan por target
     expect(btn).to_match_snapshot("button-web", target: "web")
-    expect(btn).to_match_snapshot("button-desktop", target: "desktop")
+    expect(btn).to_match_snapshot("button-macos", target: Target.macos)
 ```
 
 ---

@@ -16,19 +16,19 @@ Estado animable en un fotograma. Es un tipo Kyle con todas las propiedades
 que pueden animarse:
 
 ```kyle
-final class AnimationState:
+final class animation_state:
     opacity: f32?          # 0.0 a 1.0
     translate_x: f32?      # desplazamiento en píxeles
     translate_y: f32?
     scale_x: f32?          # 1.0 = tamaño original
     scale_y: f32?
     rotate: f32?           # grados
-    background: Color?
-    color: Color?
+    background: color?
+    color: color?
     border_radius: f32?
-    shadow: Shadow?
-    width: Length?
-    height: Length?
+    shadow: shadow?
+    width: length?
+    height: length?
 ```
 
 ### 1.2 AnimationFrame
@@ -36,11 +36,11 @@ final class AnimationState:
 Un fotograma en la línea de tiempo:
 
 ```kyle
-final class AnimationFrame:
+final class animation_frame:
     progress: f32           # 0.0 a 1.0 (porcentaje de la animación)
-    state: AnimationState   # estado en ese punto
+    state: animation_state   # estado en ese punto
 
-    static fn at(progress: f32, state: AnimationState) AnimationFrame
+    static fn at(progress: f32, state: animation_state) animation_frame
 ```
 
 ### 1.3 Declaración de animaciones (tipada)
@@ -52,36 +52,36 @@ igual que los estilos con `style<componente>`, asegurando type-safety:
 # Animación completa con fotogramas
 animation<view> FadeIn:
     duration = 300              # milisegundos
-    easing = Easing.EaseOut
-    fill_mode = FillMode.Forwards  # mantener estado final
+    easing = easing.ease_out
+    fill_mode = fill_mode.forwards  # mantener estado final
     frames = {
-        AnimationFrame.at(0.0, AnimationState(opacity: 0.0)),
-        AnimationFrame.at(1.0, AnimationState(opacity: 1.0)),
+        animation_frame.at(0.0, animation_state(opacity: 0.0)),
+        animation_frame.at(1.0, animation_state(opacity: 1.0)),
     }
 
 # Animación con from/to (azúcar sintáctico para 2 fotogramas)
 animation<view> SlideIn:
-    from = AnimationState(
+    from = animation_state(
         translate_x: -100,
         opacity: 0.0,
     )
-    to = AnimationState(
+    to = animation_state(
         translate_x: 0,
         opacity: 1.0,
     )
     duration = 400
-    easing = Easing.EaseOutCubic
+    easing = easing.ease_out_cubic
 
 # Keyframes múltiples
 animation<view> Pulse:
     frames = {
-        AnimationFrame.at(0.0,  AnimationState(scale_x: 1.0, scale_y: 1.0)),
-        AnimationFrame.at(0.5,  AnimationState(scale_x: 1.05, scale_y: 1.05)),
-        AnimationFrame.at(1.0,  AnimationState(scale_x: 1.0, scale_y: 1.0)),
+        animation_frame.at(0.0,  animation_state(scale_x: 1.0, scale_y: 1.0)),
+        animation_frame.at(0.5,  animation_state(scale_x: 1.05, scale_y: 1.05)),
+        animation_frame.at(1.0,  animation_state(scale_x: 1.0, scale_y: 1.0)),
     }
     duration = 1000
-    easing = Easing.EaseInOut
-    iterations = AnimationIteration.Infinite
+    easing = easing.ease_in_out
+    iterations = animation_iteration.infinite
 ```
 
 ### 1.4 Transiciones (en estilos)
@@ -91,38 +91,38 @@ Son parte del `Transition` type:
 
 ```kyle
 style<button> Primary:
-    background = Color("#0066FF")
-    color = Color("#FFFFFF")
+    background = color("#0066FF")
+    color = color("#FFFFFF")
     border_radius = 8
-    transition = Transition(
+    transition = transition(
         property: "background",
         duration: 200,
-        easing: Easing.EaseInOut,
+        easing: easing.ease_in_out,
         delay: 0,
     )
 
 # El hover cambia solo el background, la transición se aplica automáticamente
 style<button> PrimaryHover: Primary:
-    background = Color("#0052CC")
+    background = color("#0052CC")
 ```
 
 ### 1.5 Micro-interacciones
 
 ```kyle
 animation<button> Ripple:
-    type = AnimationType.Ripple
+    type = animation_type.ripple
     duration = 600
-    color = Color("#FFFFFF")
+    color = color("#FFFFFF")
     max_opacity = 0.3
 
 animation<button> ScalePress:
-    type = AnimationType.Scale
+    type = animation_type.scale
     frames = {
-        AnimationFrame.at(0.0, AnimationState(scale_x: 1.0, scale_y: 1.0)),
-        AnimationFrame.at(1.0, AnimationState(scale_x: 0.95, scale_y: 0.95)),
+        animation_frame.at(0.0, animation_state(scale_x: 1.0, scale_y: 1.0)),
+        animation_frame.at(1.0, animation_state(scale_x: 0.95, scale_y: 0.95)),
     }
     duration = 100
-    easing = Easing.EaseOut
+    easing = easing.ease_out
 ```
 
 ---
@@ -200,18 +200,18 @@ enum AnimationType:
         click=@toggle
     />
 
-    <dialog
+    <modal
         visible=@visible
         animation=FadeIn
     >
-        <column layout=Center padding=16>
+        <vstack alignment=alignment.center padding=16>
             <text value="Contenido del diálogo" />
             <button
                 text="Cerrar"
                 click=@toggle
             />
-        </column>
-    </dialog>
+        </vstack>
+    </modal>
 </view>
 ```
 
@@ -294,10 +294,10 @@ fn animate_fade_in(el, start_time: i64):
 )
 
 <style<card>> Elevated:
-    background = Color("#FFFFFF")
+    background = color("#FFFFFF")
     border_radius = 8
     shadow = Shadow(0, 2, 4, 0, Color.black().with_alpha(0.1))
-    transition = Transition("all", 200, Easing.EaseOut, 0)
+    transition = transition("all", 200, easing.ease_out, 0)
 
 <style<card>> ElevatedHover: Elevated:
     shadow = Shadow(0, 8, 16, 0, Color.black().with_alpha(0.2))
