@@ -80,6 +80,7 @@ impl UiBackend for WebBackend {
             let comp_name = &comp.name;
             js.push_str(&format!("\n// Component renderer: {}\n", comp_name));
             js.push_str(&format!("function render_{}(params = {{}}) {{\n", comp_name));
+            js.push_str("  const state = new ReactiveState({});\n");
 
             // Code blocks for this component
             for block in &comp.code_blocks {
@@ -102,7 +103,7 @@ impl UiBackend for WebBackend {
 
         // Route registration from RouteConfig
         if !program.routes.is_empty() {
-            js.push_str("\n// Register routes\n");
+            js.push_str("\n// Register and start router\n");
             js.push_str("if (typeof window !== 'undefined') {\n");
             js.push_str("  if (!window.__KYLE_ROUTES) window.__KYLE_ROUTES = {};\n");
             for route in &program.routes {
@@ -118,14 +119,18 @@ impl UiBackend for WebBackend {
                     js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render;\n", route.path));
                 }
             }
+            // Create and start router
+            js.push_str("  const router = createRouter({ container: document.getElementById('app') });\n");
+            js.push_str("  router.start();\n");
             js.push_str("}\n\n");
         }
 
         // Export render function
         js.push_str("export { render };\n");
 
-        // Build HTML shell
-        let html = generate_html();
+        // Build HTML shell (adapts if routes exist — router handles rendering)
+        let has_routes = !program.routes.is_empty();
+        let html = generate_html(!has_routes);
 
         BackendOutput {
             files: vec![GeneratedFile {
@@ -735,8 +740,16 @@ fn js_tag(tag: &ComponentTag) -> &str {
 }
 
 /// Generate HTML shell from component config
-fn generate_html() -> String {
-    r#"<!DOCTYPE html>
+fn generate_html(call_render: bool) -> String {
+    let script = if call_render {
+        r#"        import { render } from './target/debug/ui-runtime.js';
+        const app = document.getElementById('app');
+        const result = render();
+        app.appendChild(result.element);"#.to_string()
+    } else {
+        r#"        import './target/debug/ui-runtime.js';"#.to_string()
+    };
+    format!(r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -746,14 +759,11 @@ fn generate_html() -> String {
 <body>
     <div id="app"></div>
     <script type="module">
-        import { render } from './target/debug/ui-runtime.js';
-        const app = document.getElementById('app');
-        const result = render();
-        app.appendChild(result.element);
+{}
     </script>
 </body>
 </html>
-"#.to_string()
+"#, script)
 }
 
 // ── Style Generator ──────────────────────────────────────────────
