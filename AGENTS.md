@@ -162,7 +162,7 @@ ky/
 | Operator overloading | `docs/03-language/syntax/operator-overloading.md` |
 | String interpolation | `docs/03-language/syntax/string-interpolation.md` |
 | Error propagation (`!`) | `docs/03-language/syntax/error-propagation.md` |
-| UI framework (.kyx) | `docs/03-language/syntax/ui-syntax.md` |
+| UI framework (.kyx + imports) | `docs/03-language/syntax/ui-syntax.md` |
 | UI routing | `docs/03-language/ui/routing.md` |
 | UI layout + slots | `docs/03-language/ui/composition.md` |
 | UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |

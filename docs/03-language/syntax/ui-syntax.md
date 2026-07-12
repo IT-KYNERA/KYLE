@@ -15,9 +15,26 @@
 
 Kyle UI es un sistema de UI declarativo construido sobre el lenguaje Kyle.
 
-Un archivo `.kyx` representa un **componente**. NO hay `view("/path")` — las rutas son centralizadas en el `<router>` dentro de `app.kyx`.
+Un archivo `.kyx` representa un **componente**. Se importa explícitamente con `from X import Y` y se usa como `<Y />` en templates.
 
 No existe JavaScript, HTML ni CSS. Todo es Kyle tipado.
+
+### 1.1 Estructura de proyecto
+
+```
+mi-app/
+├── app.kyx              ← Entry point (solo esto en raíz)
+├── src/
+│   ├── views/           ← Vistas (páginas con ruta)
+│   │   ├── home.kyx
+│   │   └── not_found.kyx
+│   ├── layouts/         ← Layouts persistentes
+│   │   └── main.kyx
+│   ├── components/      ← Componentes reutilizables
+│   │   └── counter.kyx
+│   └── lib.ky           ← Lógica de negocio
+└── ky.toml
+```
 
 ---
 
@@ -73,7 +90,38 @@ final class tab_bar    # barra de pestañas
 final class footer     # pie de página
 ```
 
-### 2.2 Uso declarativo (`.kyx`)
+### 2.2 Imports: `from X import Y`
+
+Los componentes se importan explícitamente con la misma sintaxis que Kyle:
+
+```kyx
+# app.kyx
+from views.home import home
+from layouts.main import main
+from components.header import header
+from components.footer import footer
+```
+
+La resolución busca en este orden:
+1. `./views/home.kyx` (relativo al archivo actual)
+2. `src/views/home.kyx` (proyecto estándar)
+3. `views/home.kyx` (raíz del proyecto, legacy)
+
+Una vez importado, se usa como tag nativo:
+
+```kyx
+<app>
+    <header />
+    <router>
+        <route path="/" component=home layout=main />
+    </router>
+    <footer />
+</app>
+```
+
+Los componentes nativos (`view`, `vstack`, `text`, etc.) NO requieren import — son built-in.
+
+### 2.3 Uso declarativo (`.kyx`)
 
 ```kyx
 <view>
@@ -84,7 +132,7 @@ final class footer     # pie de página
 </view>
 ```
 
-### 2.3 Uso programático (`.ky`)
+### 2.4 Uso programático (`.ky`)
 
 Como son tipos, se pueden instanciar desde código Kyle:
 
@@ -459,17 +507,22 @@ theme DarkTheme: LightTheme:
 
 ```kyx
 # app.kyx
+from views.home import home
+from views.login import login
+from views.not_found import not_found
+from layouts.main import main
+
 <app title="Mi App">
     <router>
-        <route path="/" component=@home_view layout=@main_layout title="Inicio" />
-        <route path="/login" component=@login_view layout=@blank_layout title="Login" />
-        <route path="*" component=@not_found layout=@main_layout title="404" />
+        <route path="/" component=home layout=main title="Inicio" />
+        <route path="/login" component=login layout=main title="Login" />
+        <route path="*" component=not_found layout=main title="404" />
     </router>
 </app>
 ```
 
 ```kyx
-# views/login.kyx
+# src/views/login.kyx
 <view>
     @(
         email: ^str = ""
@@ -481,17 +534,17 @@ theme DarkTheme: LightTheme:
             navigate("/dashboard")
     )
 
-    <vstack layout=@Center>
-        <text value="Login" typography=Title />
+    <vstack alignment=alignment.center>
+        <text value="Login" style=Title />
         <text_field bind=@email placeholder="Email" />
         <password_field bind=@password placeholder="Contraseña" />
-        <button tpl=Primary text=@"Ingresar" disabled=@loading click=@handle_submit />
+        <button style=Primary text=@"Ingresar" disabled=@loading click=@handle_submit />
     </vstack>
 </view>
 ```
 
 ```kyx
-# layouts/main.kyx
+# src/layouts/main.kyx
 <layout>
     <navbar title="Mi App" />
     <hstack>

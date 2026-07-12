@@ -71,14 +71,20 @@ Las rutas se declaran en el `<router>` con `<route>`. NO hay `view()` en los arc
 
 ```kyx
 # app.kyx — Entry point con rutas centralizadas
-<app title=@"config.title" config=@config>
+from views.home import home
+from views.login import login
+from views.user_profile import user_profile
+from views.not_found import not_found
+from layouts.main import main
+
+<app title="Mi App">
     <router>
-        <route path="/" component=@home_view layout=@main_layout title="Inicio" />
-        <route path="/login" component=@login_view layout=@blank_layout title="Login" />
-        <route path="/users/{id}" component=@user_profile layout=@main_layout
+        <route path="/" component=home layout=main title="Inicio" />
+        <route path="/login" component=login layout=main title="Login" />
+        <route path="/users/{id}" component=user_profile layout=main
             title=@"'Perfil de ' + params.get('id')"
         />
-        <route path="*" component=@not_found layout=@main_layout title="404" />
+        <route path="*" component=not_found layout=main title="404" />
     </router>
 </app>
 ```
