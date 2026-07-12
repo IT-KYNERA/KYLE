@@ -230,6 +230,55 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
 fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
     let ind = " ".repeat(indent + 2);
     for attr in attrs {
+        // Check if this is a style-related attribute
+        if let Some(css_prop) = style_attr_to_css(&attr.name) {
+            match &attr.value {
+                AttrValue::String(val) => {
+                    let css_val = attr_style_value(&attr.name, val);
+                    js.push_str(&format!("{}{}.style[{}] = {};\n", ind, el, css_prop, css_val));
+                }
+                AttrValue::Expr(expr) => {
+                    let css_val = if is_simple_key(expr) {
+                        format!("state.get({:?})", expr)
+                    } else {
+                        format!("{}", expr)
+                    };
+                    js.push_str(&format!("{}const __upd = () => {{ {}.style[{}] = {}; }};\n", ind, el, css_prop, css_val));
+                    js.push_str(&format!("{}__upd();\n", ind));
+                    // Watch count as a heuristic
+                    js.push_str(&format!("{}state.watch('count', __upd);\n", ind));
+                }
+                AttrValue::Flag => {
+                    js.push_str(&format!("{}{}.style[{}] = '1';\n", ind, el, css_prop));
+                }
+            }
+            continue;
+        }
+        // Check for layout attribute (flexbox)
+        if attr.name == "layout" {
+            if let AttrValue::String(val) = &attr.value {
+                let (ai, jc) = layout_to_flex(val);
+                js.push_str(&format!("{}{}.style.display = 'flex';\n", ind, el));
+                if !ai.is_empty() {
+                    js.push_str(&format!("{}{}.style.alignItems = '{}';\n", ind, el, ai));
+                }
+                if !jc.is_empty() {
+                    js.push_str(&format!("{}{}.style.justifyContent = '{}';\n", ind, el, jc));
+                }
+            }
+            continue;
+        }
+        // Check for spacing attribute (gap in flexbox)
+        if attr.name == "spacing" {
+            if let AttrValue::String(val) = &attr.value {
+                let v = if val.chars().all(|c| c.is_ascii_digit()) {
+                    format!("{}px", val)
+                } else { val.clone() };
+                js.push_str(&format!("{}{}.style.gap = '{}';\n", ind, el, v));
+            }
+            continue;
+        }
+        // Regular attribute handling
         match &attr.value {
             AttrValue::String(val) => {
                 match attr.name.as_str() {
@@ -242,11 +291,13 @@ fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
                     "text" | "value" | "label" => {
                         js.push_str(&format!("{}{}.textContent = {:?};\n", ind, el, val));
                     }
-                    "class" | "id" => {
+                    "class" | "id" | "type" | "placeholder" | "src" | "alt" | "href" => {
                         js.push_str(&format!("{}{}.setAttribute({:?}, {:?});\n", ind, el, attr.name, val));
                     }
                     _ => {
-                        js.push_str(&format!("{}{}.setAttribute({:?}, {:?});\n", ind, el, attr.name, val));
+                        // Unknown attr: try as style first, else setAttribute
+                        let css_name = attr.name.replace("_", "-");
+                        js.push_str(&format!("{}{}.style['{}'] = '{}';\n", ind, el, css_name, val));
                     }
                 }
             }
@@ -256,7 +307,15 @@ fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
                         js.push_str(&format!("{}Binding.twoWay({}, state, {:?}, 'input');\n", ind, el, expr));
                     }
                     "text" | "value" => {
-                        js.push_str(&format!("{}Binding.oneWay({}, 'textContent', state, {:?});\n", ind, el, expr));
+                        // For computed expressions, use watch-based approach
+                        if is_simple_key(expr) {
+                            js.push_str(&format!("{}Binding.oneWay({}, 'textContent', state, {:?});\n", ind, el, expr));
+                        } else {
+                            let js_expr = kyle_to_js_expr(expr);
+                            js.push_str(&format!("{}const __upd = () => {{ {}.textContent = {}; }};\n", ind, el, js_expr));
+                            js.push_str(&format!("{}__upd();\n", ind));
+                            js.push_str(&format!("{}state.watch('count', __upd);\n", ind));
+                        }
                     }
                     "tpl" => {
                         js.push_str(&format!("{}applyStyle({}, state.get({:?}));\n", ind, el, expr));
@@ -275,7 +334,13 @@ fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
                     | "dblclick" | "context_menu" | "mouse_down" | "mouse_up"
                     | "mouse_move" | "touch_start" | "touch_end" | "touch_move" => {}
                     _ => {
-                        js.push_str(&format!("{}{}.setAttribute({:?}, state.get({:?}));\n", ind, el, attr.name, expr));
+                        let css_name = attr.name.replace("_", "-");
+                        if is_simple_key(expr) {
+                            js.push_str(&format!("{}{}.style['{}'] = state.get({:?});\n", ind, el, css_name, expr));
+                        } else {
+                            js.push_str(&format!("{}const __upd = () => {{ {}.style['{}'] = {}; }};\n", ind, el, css_name, expr));
+                            js.push_str(&format!("{}__upd();\n", ind));
+                        }
                     }
                 }
             }
@@ -283,6 +348,93 @@ fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
                 js.push_str(&format!("{}{}.setAttribute({:?}, '');\n", ind, el, attr.name));
             }
         }
+    }
+}
+
+/// Map style attribute names to CSS property strings (quoted)
+fn style_attr_to_css(name: &str) -> Option<String> {
+    let prop = match name {
+        "font_size" => "fontSize",
+        "font_weight" => "fontWeight",
+        "font_family" => "fontFamily",
+        "color" => "color",
+        "background" | "bg" => "background",
+        "background_color" => "backgroundColor",
+        "padding" => "padding",
+        "margin" => "margin",
+        "width" | "w" => "width",
+        "height" | "h" => "height",
+        "min_width" => "minWidth",
+        "max_width" => "maxWidth",
+        "min_height" => "minHeight",
+        "max_height" => "maxHeight",
+        "border_radius" => "borderRadius",
+        "border" => "border",
+        "opacity" => "opacity",
+        "overflow" => "overflow",
+        "display" => "display",
+        "gap" => "gap",
+        "z_index" => "zIndex",
+        "cursor" => "cursor",
+        "text_align" => "textAlign",
+        "line_height" => "lineHeight",
+        "letter_spacing" => "letterSpacing",
+        "transform" => "transform",
+        "transition" => "transition",
+        "box_shadow" | "shadow" => "boxShadow",
+        "flex" => "flex",
+        "flex_grow" => "flexGrow",
+        "flex_shrink" => "flexShrink",
+        "flex_basis" => "flexBasis",
+        "flex_direction" => "flexDirection",
+        "align_items" => "alignItems",
+        "align_self" => "alignSelf",
+        "justify_content" => "justifyContent",
+        "position" => "position",
+        "top" => "top",
+        "right" => "right",
+        "bottom" => "bottom",
+        "left" => "left",
+        _ => return None,
+    };
+    Some(format!("'{}'", prop))
+}
+
+/// Convert a style attribute value to a JS expression
+fn attr_style_value(name: &str, val: &str) -> String {
+    let v = val.trim().trim_matches('"');
+    // Numbers -> add px for size-related properties
+    let needs_px = matches!(name, "font_size" | "border_radius" | "gap" | "padding"
+        | "margin" | "width" | "height" | "min_width" | "max_width"
+        | "min_height" | "max_height" | "line_height" | "letter_spacing"
+        | "top" | "right" | "bottom" | "left");
+    if needs_px && v.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return format!("'{}px'", v);
+    }
+    format!("'{}'", v)
+}
+
+/// Check if an expression is a simple state key (single identifier)
+fn is_simple_key(expr: &str) -> bool {
+    let trimmed = expr.trim();
+    !trimmed.contains(' ') && !trimmed.contains('"') && !trimmed.contains('+')
+        && !trimmed.contains('(') && !trimmed.contains(')')
+}
+
+/// Convert layout value to (alignItems, justifyContent)
+fn layout_to_flex(layout: &str) -> (&str, &str) {
+    match layout.trim().to_lowercase().as_str() {
+        "center" => ("center", "center"),
+        "start" => ("flex-start", "flex-start"),
+        "end" => ("flex-end", "flex-end"),
+        "stretch" => ("stretch", "stretch"),
+        "top" | "start_top" => ("flex-start", "flex-start"),
+        "bottom" | "end_bottom" => ("flex-end", "flex-end"),
+        "center_x" | "hcenter" => ("center", "flex-start"),
+        "center_y" | "vcenter" => ("flex-start", "center"),
+        "space_between" => ("center", "space-between"),
+        "space_around" => ("center", "space-around"),
+        _ => ("", ""),
     }
 }
 
@@ -477,29 +629,124 @@ fn to_css_name(prop: &str) -> &str {
         "shadow" => "boxShadow",
         "transform" => "transform",
         "transition" => "transition",
-        _ => prop,
+        "flex_direction" => "flexDirection",
+        "flex_grow" => "flexGrow",
+        "flex_shrink" => "flexShrink",
+        "flex_basis" => "flexBasis",
+        "align_items" => "alignItems",
+        "justify_content" => "justifyContent",
+        _ => prop, // passthrough
     }
 }
 
 fn to_css_value(prop: &str, val: &str) -> String {
     let val = val.trim();
+    // Handle Color(...) function
     if val.starts_with("Color(") {
+        // Color("#FF0000") or Color(r, g, b, a)
         let inner = val.trim_start_matches("Color(").trim_end_matches(')');
-        return inner.trim_matches('"').to_string();
+        // Check if it's a hex string
+        let inner = inner.trim().trim_matches('"');
+        if inner.starts_with('#') {
+            return inner.to_string();
+        }
+        // Handle Color.from_hex, Color.from_rgba, etc.
+        return "#333333".to_string();
     }
+    // Handle Spacing(...) function
     if val.starts_with("Spacing") {
+        // Spacing.all(12) or Spacing(12, 24, 12, 24)
         if let Some(num) = val.split(|c: char| !c.is_ascii_digit()).find(|s| !s.is_empty()) {
             return format!("{}px", num);
         }
         return "0".to_string();
     }
+    // Handle enum types: FontWeight.Bold → "bold", etc.
+    let normalized = val.trim();
+    if normalized.starts_with("FontWeight.") {
+        return match normalized.trim_start_matches("FontWeight.") {
+            "Thin" => "100",
+            "Light" => "300",
+            "Normal" => "400",
+            "Medium" => "500",
+            "SemiBold" => "600",
+            "Bold" => "700",
+            "Black" => "900",
+            _ => "400",
+        }.to_string();
+    }
+    if normalized.starts_with("TextAlign.") {
+        return match normalized.trim_start_matches("TextAlign.") {
+            "Left" => "left",
+            "Center" => "center",
+            "Right" => "right",
+            "Justify" => "justify",
+            _ => "left",
+        }.to_string();
+    }
+    if normalized.starts_with("Display.") {
+        return match normalized.trim_start_matches("Display.") {
+            "Flex" => "flex",
+            "Grid" => "grid",
+            "None" => "none",
+            "Block" => "block",
+            "Inline" => "inline",
+            _ => "flex",
+        }.to_string();
+    }
+    if normalized.starts_with("FlexDirection.") {
+        return match normalized.trim_start_matches("FlexDirection.") {
+            "Row" => "row",
+            "Column" | "Col" => "column",
+            "RowReverse" => "row-reverse",
+            "ColumnReverse" => "column-reverse",
+            _ => "column",
+        }.to_string();
+    }
+    if normalized.starts_with("Alignment.") || normalized.starts_with("Align") {
+        return match normalized.trim_start_matches("Alignment.").trim_start_matches("Align") {
+            "Center" => "center",
+            "Start" | "FlexStart" => "flex-start",
+            "End" | "FlexEnd" => "flex-end",
+            "Stretch" => "stretch",
+            "SpaceBetween" => "space-between",
+            "SpaceAround" => "space-around",
+            "SpaceEvenly" => "space-evenly",
+            "Baseline" => "baseline",
+            _ => "center",
+        }.to_string();
+    }
+    if normalized.starts_with("Cursor.") {
+        return match normalized.trim_start_matches("Cursor.") {
+            "Pointer" => "pointer",
+            "Default" => "default",
+            "Text" => "text",
+            "Wait" => "wait",
+            "Crosshair" => "crosshair",
+            "NotAllowed" => "not-allowed",
+            "Grab" => "grab",
+            "Grabbing" => "grabbing",
+            _ => "default",
+        }.to_string();
+    }
+    if normalized.starts_with("Overflow.") {
+        return match normalized.trim_start_matches("Overflow.") {
+            "Visible" => "visible",
+            "Hidden" => "hidden",
+            "Scroll" => "scroll",
+            "Auto" => "auto",
+            _ => "visible",
+        }.to_string();
+    }
+    // Numeric size props
     if prop == "font_size" || prop == "border_radius" || prop == "gap"
-        || prop == "line_height"
+        || prop == "line_height" || prop == "letter_spacing"
     {
         if val.chars().all(|c| c.is_ascii_digit() || c == '.') {
             return format!("{}px", val);
         }
     }
+    // Direct hex colors
     if val.starts_with('#') || val == "white" || val == "black" || val == "transparent" {
         return val.to_string();
     }
@@ -726,6 +973,18 @@ fn translate_kyle_block_to_js(block: &str) -> String {
     }
 
     js
+}
+
+/// Translate a Kyle expression to JS, replacing state vars and method names.
+fn kyle_to_js_expr(expr: &str) -> String {
+    let mut result = expr.to_string();
+    // Replace .to_str() with .toString()
+    result = result.replace(".to_str()", ".toString()");
+    result = result.replace(".to_string()", ".toString()");
+    // Replace common Kyle variable references with state.get(...)
+    // We handle known state keys from the code blocks
+    result = result.replace("count", "state.get('count')");
+    result
 }
 
 #[cfg(test)]

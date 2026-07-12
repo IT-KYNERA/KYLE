@@ -776,12 +776,45 @@ view("/")
         count = count + 1
 )
 
-<app>
-    <column layout=center spacing=16 padding=20>
-        <text value="Bienvenido a Kyle UI!" font_size=24 font_weight=Bold />
-        <text value=@"Contador: " + count.to_str() />
+style<app> Default:
+    background = Color("#FFFFFF")
+    padding = Spacing.all(20)
+
+style<column> Centered:
+    gap = 16
+    display = Display.Flex
+    flex_direction = FlexDirection.Column
+    align_items = Alignment.Center
+    justify_content = Alignment.Center
+
+style<text> Title:
+    font_size = 24
+    font_weight = FontWeight.Bold
+    color = Color("#1A1A1A")
+
+style<text> Counter:
+    font_size = 16
+    color = Color("#333333")
+
+style<text> Hint:
+    font_size = 14
+    color = Color("#999999")
+
+style<button> Primary:
+    background = Color("#0066FF")
+    color = Color("#FFFFFF")
+    font_size = 16
+    font_weight = FontWeight.Medium
+    border_radius = 8
+    padding = Spacing(12, 24, 12, 24)
+    cursor = Cursor.Pointer
+
+<app tpl=Default>
+    <column tpl=Centered>
+        <text tpl=Title value="Bienvenido a Kyle UI!" />
+        <text tpl=Counter value=@"Contador: " + count.to_str() />
         <button tpl=Primary text="+" click=@increment />
-        <text value="Edit src/main.kyx to get started" color=#666666 font_size=14 />
+        <text tpl=Hint value="Edit src/main.kyx to get started" />
     </column>
 </app>
 "##,
