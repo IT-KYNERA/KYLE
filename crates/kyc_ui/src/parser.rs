@@ -43,7 +43,8 @@ impl KyxParser {
     }
 
     fn parse_file(&mut self) -> Result<KyxFile, String> {
-        let routes = Vec::new();
+        let mut imports = Vec::new();
+        let mut routes = Vec::new();
         let mut code_blocks = Vec::new();
         let mut styles = Vec::new();
         let mut animations = Vec::new();
@@ -55,6 +56,16 @@ impl KyxParser {
                 None => break,
                 Some('#') => {
                     while self.peek() != Some('\n') && self.peek().is_some() { self.advance(); }
+                }
+                Some('f') if self.starts_with("from ") => {
+                    // Parse: from views.home import home
+                    self.pos += 5; // "from "
+                    let module = self.read_while(|c| c != ' ' && c != '\t' && c != '\n')?;
+                    self.skip_whitespace();
+                    self.expect_string("import")?;
+                    self.skip_whitespace();
+                    let name = self.read_while(|c| c != '\n' && c != ' ' && c != '\t')?;
+                    imports.push(crate::ast::ImportDecl { module, name });
                 }
                 Some('s') if self.starts_with("style<") => {
                     styles.push(self.parse_style_decl("style", false)?);
@@ -148,7 +159,7 @@ impl KyxParser {
             }
         }
 
-        Ok(KyxFile { routes, code_blocks, styles, animations, body })
+        Ok(KyxFile { imports, routes, code_blocks, styles, animations, body })
     }
 
     fn parse_style_decl(&mut self, kind: &str, _is_theme: bool) -> Result<StyleDecl, String> {

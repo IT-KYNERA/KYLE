@@ -1,5 +1,14 @@
 use std::fmt;
 
+/// An import declaration: `from views.home import home`
+#[derive(Clone, Debug)]
+pub struct ImportDecl {
+    /// Module path: "views.home" → resolves to src/views/home.kyx
+    pub module: String,
+    /// Import name: "home" → available as `home` in scope
+    pub name: String,
+}
+
 /// A route extracted from `<route path="..." component=@comp layout=@layout>`
 #[derive(Clone, Debug)]
 pub struct RouteDecl {
@@ -14,6 +23,8 @@ pub struct RouteDecl {
 /// A parsed .kyx file
 #[derive(Clone, Debug)]
 pub struct KyxFile {
+    /// Import declarations: from X import Y
+    pub imports: Vec<ImportDecl>,
     /// Route declarations extracted from <route> elements
     pub routes: Vec<RouteDecl>,
     /// Kyle code blocks: @(...)
@@ -150,6 +161,9 @@ pub struct AnimDecl {
 
 impl fmt::Display for KyxFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for imp in &self.imports {
+            writeln!(f, "from {} import {}", imp.module, imp.name)?;
+        }
         for route in &self.routes {
             writeln!(f, "route {} -> {}", route.path, route.component)?;
         }

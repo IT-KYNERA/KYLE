@@ -85,6 +85,8 @@ pub struct UiProgram {
 pub struct ComponentRenderer {
     pub name: String,
     pub code_blocks: Vec<String>,
+    pub styles: Vec<StyleDecl>,
+    pub animations: Vec<AnimDecl>,
     pub body: Vec<UiNode>,
 }
 

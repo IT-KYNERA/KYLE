@@ -197,7 +197,34 @@ pub fn resolve_all_components(
     Ok(resolved)
 }
 
+/// Resolve an import module path to a file path.
+/// "views.home" → tries src/views/home.kyx, views/home.kyx, etc.
+fn resolve_import_module(module: &str, base_dir: &Path) -> Result<PathBuf, String> {
+    let file_stem = module.replace('.', "/");
+    let base = if base_dir.is_absolute() {
+        base_dir.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(base_dir)
+    };
+    // Try paths in priority order
+    let candidates = vec![
+        base.join("src").join(&file_stem).with_extension("kyx"),
+        base.join("src").join(&file_stem).with_extension("ky"),
+        base.join(&file_stem).with_extension("kyx"),
+        base.join(&file_stem).with_extension("ky"),
+    ];
+    for p in &candidates {
+        if p.exists() {
+            return Ok(p.clone());
+        }
+    }
+    Err(format!("Import '{}' not found. Searched: {:?}", module,
+        candidates.iter().map(|p| p.display().to_string()).collect::<Vec<_>>()))
+}
+
 /// Build a multi-file UiProgram from an entry .kyx file and its dependencies.
+/// 1. Processes explicit `from X import Y` declarations
+/// 2. Auto-resolves any remaining custom component tags as fallback
 pub fn build_multifile_program(
     source: &str,
     source_path: &Path,
@@ -210,28 +237,54 @@ pub fn build_multifile_program(
 
     let base_dir = source_path.parent().unwrap_or(Path::new("."));
 
-    // Resolve dependencies
-    let deps = resolve_all_components(&entry_file, base_dir)?;
+    // 1. Process explicit imports
+    let mut component_renderers = Vec::new();
+    let mut resolved_names = std::collections::HashSet::new();
+
+    for imp in &entry_file.imports {
+        let path = resolve_import_module(&imp.module, base_dir)?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+        let dep_file = crate::parser::parse(&content)
+            .map_err(|e| format!("Error parsing {}: {}", path.display(), e))?;
+        let dep_program = crate::parser::to_ui_program(dep_file);
+        component_renderers.push(ComponentRenderer {
+            name: imp.name.clone(),
+            code_blocks: dep_program.code_blocks,
+            styles: dep_program.styles,
+            animations: dep_program.animations,
+            body: dep_program.body,
+        });
+        resolved_names.insert(imp.name.clone());
+    }
+
+    // 2. Auto-resolve any custom tags not covered by imports (fallback)
+    let custom_tags = extract_custom_tags(&entry_file);
+    for tag in &custom_tags {
+        if resolved_names.contains(tag) { continue; }
+        if let Ok((_path, dep_file)) = resolve_and_parse(tag, base_dir) {
+            let dep_program = crate::parser::to_ui_program(dep_file);
+            component_renderers.push(ComponentRenderer {
+                name: tag.clone(),
+                code_blocks: dep_program.code_blocks,
+                styles: dep_program.styles,
+                animations: dep_program.animations,
+                body: dep_program.body,
+            });
+            resolved_names.insert(tag.clone());
+        }
+    }
 
     // Convert entry to IR
     let entry_program = crate::parser::to_ui_program(entry_file);
-    let mut all_routes: Vec<crate::ir::RouteConfig> = entry_program.routes;
+    let mut all_routes = entry_program.routes;
     let mut all_styles = entry_program.styles;
     let mut all_animations = entry_program.animations;
-    let mut component_renderers = Vec::new();
 
-    // Convert each dependency to a ComponentRenderer
-    for (tag, _path, dep_file) in &deps {
-        let dep_program = crate::parser::to_ui_program(dep_file.clone());
-        all_routes.extend(dep_program.routes);
-        all_styles.extend(dep_program.styles);
-        all_animations.extend(dep_program.animations);
-
-        component_renderers.push(ComponentRenderer {
-            name: tag.clone(),
-            code_blocks: dep_program.code_blocks,
-            body: dep_program.body,
-        });
+    // Collect styles/animations from all renderers too
+    for comp in &component_renderers {
+        all_styles.extend(comp.styles.clone());
+        all_animations.extend(comp.animations.clone());
     }
 
     // De-duplicate routes by path (last one wins)

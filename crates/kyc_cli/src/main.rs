@@ -863,10 +863,14 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
     // Entry point: app.kyx (root level)
     let app_kyx = format!(
         r##"# {name} — Kyle UI App
+from views.home import home
+from views.not_found import not_found
+from layouts.main import main
+
 <app title="{name}">
     <router>
-        <route path="/" component=@home layout=@main title="Home" />
-        <route path="*" component=@not_found layout=@main title="404" />
+        <route path="/" component=home layout=main title="Home" />
+        <route path="*" component=not_found layout=main title="404" />
     </router>
 </app>
 "##,
