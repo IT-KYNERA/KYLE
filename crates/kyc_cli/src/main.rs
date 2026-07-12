@@ -880,6 +880,20 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
     // Home view: views/home.kyx
     let home_kyx = format!(
         r##"# Home view
+style<text> Title:
+    font_size = 24
+    font_weight = font_weight.bold
+    color = color("#1A1A1A")
+
+style<button> Primary:
+    background = color("#0066FF")
+    color = color("#FFFFFF")
+    font_size = 16
+    font_weight = font_weight.medium
+    border_radius = 8
+    padding = spacing.all(12)
+    cursor = cursor.pointer
+
 <view>
     @(
         count: ^i32 = 0
@@ -902,6 +916,11 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
 
     // Not found view: views/not_found.kyx
     let not_found_kyx = r##"# 404 view
+style<text> Display:
+    font_size = 48
+    font_weight = font_weight.bold
+    color = color("#0066FF")
+
 <view>
     @(set_title("404 — No Encontrado"))
 
@@ -934,31 +953,8 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
 
-    // Styles: components/styles.kyx
-    let styles_kyx = r##"# Shared styles
-style<text> Title:
-    font_size = 24
-    font_weight = font_weight.bold
-    color = color("#1A1A1A")
-
-style<text> Display:
-    font_size = 48
-    font_weight = font_weight.bold
-    color = color("#0066FF")
-
-style<button> Primary:
-    background = color("#0066FF")
-    color = color("#FFFFFF")
-    font_size = 16
-    font_weight = font_weight.medium
-    border_radius = 8
-    padding = spacing.all(12)
-    cursor = cursor.pointer
-"##;
-    fs::write(project_dir.join("components").join("styles.kyx"), &styles_kyx).unwrap_or_else(|e| {
-        eprintln!("Error writing components/styles.kyx: {}", e);
-        process::exit(1);
-    });
+    // Not found view: views/not_found.kyx (already created above with Display style)
+    // (styles are inline in each view file — no separate components/styles.kyx)
 
     // Library module
     let lib_kl = format!(

@@ -275,6 +275,32 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str, model: 
             gen_attrs(attrs, js, indent, &el);
             gen_events(attrs, js, indent, &el, child_model);
 
+            // App component: handle title and icon
+            if tag == &ComponentTag::App {
+                for a in attrs {
+                    if a.name == "title" {
+                        let val = match &a.value {
+                            AttrValue::String(v) => format!("{:?}", v),
+                            AttrValue::Expr(v) => v.clone(),
+                            AttrValue::Flag => String::new(),
+                        };
+                        if !val.is_empty() {
+                            js.push_str(&format!("{}document.title = {};\n", ind, val));
+                        }
+                    }
+                    if a.name == "icon" {
+                        let val = match &a.value {
+                            AttrValue::String(v) => format!("{:?}", v),
+                            AttrValue::Expr(v) => v.clone(),
+                            AttrValue::Flag => String::new(),
+                        };
+                        if !val.is_empty() {
+                            js.push_str(&format!("{}let _icon = document.querySelector('link[rel*=\"icon\"]'); if (!_icon) {{ _icon = document.createElement('link'); _icon.rel = 'icon'; document.head.appendChild(_icon); }} _icon.href = {};\n", ind, val));
+                        }
+                    }
+                }
+            }
+
             // Link component: intercept clicks for client-side navigation
             if tag == &ComponentTag::Link {
                 for a in attrs {
@@ -621,6 +647,22 @@ fn style_attr_to_css(name: &str) -> Option<String> {
 /// Convert a style attribute value to a JS expression
 fn attr_style_value(name: &str, val: &str) -> String {
     let v = val.trim().trim_matches('"');
+    // Handle color("#hex") → '#hex'
+    if v.starts_with("color(") {
+        let inner = v.trim_start_matches("color(").trim_end_matches(')');
+        return format!("'{}'", inner.trim_matches('"'));
+    }
+    // Handle spacing.all(N) → Npx  
+    if v.starts_with("spacing.") || v.starts_with("Spacing.") {
+        let inner = v.split('(').nth(1).and_then(|s| s.trim_end_matches(')').split(',').next());
+        if let Some(n) = inner {
+            let n = n.trim().trim_matches('"');
+            if n.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                return format!("'{}px'", n);
+            }
+            return format!("'{}'", n);
+        }
+    }
     // Numbers -> add px for size-related properties
     let needs_px = matches!(name, "font_size" | "border_radius" | "gap" | "padding"
         | "margin" | "width" | "height" | "min_width" | "max_width"
@@ -888,100 +930,103 @@ fn to_css_name(prop: &str) -> &str {
 
 fn to_css_value(prop: &str, val: &str) -> String {
     let val = val.trim();
-    // Handle Color(...) function
-    if val.starts_with("Color(") {
-        // Color("#FF0000") or Color(r, g, b, a)
-        let inner = val.trim_start_matches("Color(").trim_end_matches(')');
-        // Check if it's a hex string
+    // Handle color(...) function (lowercase)
+    if val.to_lowercase().starts_with("color(") {
+        let inner = val.trim_start_matches("color(").trim_start_matches("Color(").trim_end_matches(')');
         let inner = inner.trim().trim_matches('"');
         if inner.starts_with('#') {
             return inner.to_string();
         }
-        // Handle Color.from_hex, Color.from_rgba, etc.
         return "#333333".to_string();
     }
-    // Handle Spacing(...) function
-    if val.starts_with("Spacing") {
-        // Spacing.all(12) or Spacing(12, 24, 12, 24)
+    // Handle spacing.(...) function
+    if val.to_lowercase().starts_with("spacing") {
         if let Some(num) = val.split(|c: char| !c.is_ascii_digit()).find(|s| !s.is_empty()) {
             return format!("{}px", num);
         }
         return "0".to_string();
     }
-    // Handle enum types: FontWeight.Bold → "bold", etc.
-    let normalized = val.trim();
-    if normalized.starts_with("FontWeight.") {
-        return match normalized.trim_start_matches("FontWeight.") {
-            "Thin" => "100",
-            "Light" => "300",
-            "Normal" => "400",
-            "Medium" => "500",
-            "SemiBold" => "600",
-            "Bold" => "700",
-            "Black" => "900",
+    // Handle enum types: font_weight.bold → "bold", etc.
+    let normalized = val.trim().to_lowercase();
+    if normalized.starts_with("font_weight.") || normalized.starts_with("fontweight.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "thin" => "100",
+            "light" => "300",
+            "normal" => "400",
+            "medium" => "500",
+            "semibold" | "semi_bold" => "600",
+            "bold" => "700",
+            "black" => "900",
             _ => "400",
         }.to_string();
     }
-    if normalized.starts_with("TextAlign.") {
-        return match normalized.trim_start_matches("TextAlign.") {
-            "Left" => "left",
-            "Center" => "center",
-            "Right" => "right",
-            "Justify" => "justify",
+    if normalized.starts_with("text_align.") || normalized.starts_with("textalign.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "left" => "left",
+            "center" => "center",
+            "right" => "right",
+            "justify" => "justify",
             _ => "left",
         }.to_string();
     }
-    if normalized.starts_with("Display.") {
-        return match normalized.trim_start_matches("Display.") {
-            "Flex" => "flex",
-            "Grid" => "grid",
-            "None" => "none",
-            "Block" => "block",
-            "Inline" => "inline",
+    if normalized.starts_with("display.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "flex" => "flex",
+            "grid" => "grid",
+            "none" => "none",
+            "block" => "block",
+            "inline" => "inline",
             _ => "flex",
         }.to_string();
     }
-    if normalized.starts_with("FlexDirection.") {
-        return match normalized.trim_start_matches("FlexDirection.") {
-            "Row" => "row",
-            "Column" | "Col" => "column",
-            "RowReverse" => "row-reverse",
-            "ColumnReverse" => "column-reverse",
+    if normalized.starts_with("flex_direction.") || normalized.starts_with("flexdirection.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "row" => "row",
+            "column" | "col" => "column",
+            "row_reverse" | "rowreverse" => "row-reverse",
+            "column_reverse" | "columnreverse" => "column-reverse",
             _ => "column",
         }.to_string();
     }
-    if normalized.starts_with("Alignment.") || normalized.starts_with("Align") {
-        return match normalized.trim_start_matches("Alignment.").trim_start_matches("Align") {
-            "Center" => "center",
-            "Start" | "FlexStart" => "flex-start",
-            "End" | "FlexEnd" => "flex-end",
-            "Stretch" => "stretch",
-            "SpaceBetween" => "space-between",
-            "SpaceAround" => "space-around",
-            "SpaceEvenly" => "space-evenly",
-            "Baseline" => "baseline",
+    if normalized.starts_with("alignment.") || normalized.starts_with("align.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "center" => "center",
+            "start" | "flex_start" | "flexstart" => "flex-start",
+            "end" | "flex_end" | "flexend" => "flex-end",
+            "stretch" => "stretch",
+            "space_between" | "spacebetween" => "space-between",
+            "space_around" | "spacearound" => "space-around",
+            "space_evenly" | "spaceevenly" => "space-evenly",
+            "baseline" => "baseline",
             _ => "center",
         }.to_string();
     }
-    if normalized.starts_with("Cursor.") {
-        return match normalized.trim_start_matches("Cursor.") {
-            "Pointer" => "pointer",
-            "Default" => "default",
-            "Text" => "text",
-            "Wait" => "wait",
-            "Crosshair" => "crosshair",
-            "NotAllowed" => "not-allowed",
-            "Grab" => "grab",
-            "Grabbing" => "grabbing",
+    if normalized.starts_with("cursor.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "pointer" => "pointer",
+            "default" => "default",
+            "text" => "text",
+            "wait" => "wait",
+            "crosshair" => "crosshair",
+            "not_allowed" | "notallowed" => "not-allowed",
+            "grab" => "grab",
+            "grabbing" => "grabbing",
             _ => "default",
         }.to_string();
     }
-    if normalized.starts_with("Overflow.") {
-        return match normalized.trim_start_matches("Overflow.") {
-            "Visible" => "visible",
-            "Hidden" => "hidden",
-            "Scroll" => "scroll",
-            "Auto" => "auto",
+    if normalized.starts_with("overflow.") {
+        let v = normalized.rsplit('.').next().unwrap_or("");
+        return match v {
+            "visible" => "visible",
+            "hidden" => "hidden",
+            "scroll" => "scroll",
+            "auto" => "auto",
             _ => "visible",
         }.to_string();
     }
