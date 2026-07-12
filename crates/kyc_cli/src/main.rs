@@ -313,21 +313,10 @@ fn build_ui_backend_kyx(source: &str, file: &str, build_dir: &Path, backend_name
         }
     }
 
-    // For web, copy runtime JS files
+    // For web, write runtime JS files from embedded content
     if backend_name == "web" || backend_name == "wasm32" {
-        let runtime_files = [
-            "reactivity.js", "router.js", "a11y.js", "portal.js",
-            "error_boundary.js", "i18n.js", "ssr.js", "testing.js", "glue.js",
-        ];
-        let runtime_source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/js");
-        for file_name in &runtime_files {
-            let src = runtime_source_dir.join(file_name);
-            let dst = build_dir.join(file_name);
-            if src.exists() {
-                let _ = std::fs::copy(&src, &dst);
-            } else {
-                eprintln!("Warning: runtime file not found: {}", src.display());
-            }
+        if let Err(e) = kyc_ui::embedded_runtime::write_runtime_files(build_dir) {
+            eprintln!("Error writing runtime files: {}", e);
         }
         // Write HTML shell
         if let Some(html) = &output_files.html_shell {

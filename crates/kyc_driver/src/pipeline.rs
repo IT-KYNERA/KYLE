@@ -1057,19 +1057,10 @@ impl Pipeline {
                 .map_err(|e| format!("Failed to write index.html: {}", e))?;
         }
 
-        // Copy runtime JS files to output directory
-        let runtime_files = [
-            "reactivity.js", "router.js", "a11y.js", "portal.js",
-            "error_boundary.js", "i18n.js", "ssr.js", "testing.js",
-        ];
-        let runtime_source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/js");
-        for file_name in &runtime_files {
-            let src = runtime_source_dir.join(file_name);
-            let dst = output_dir.join(file_name);
-            if src.exists() {
-                let _ = std::fs::copy(&src, &dst);
-            }
-        }
+        // Write runtime JS files from embedded content (works in installed binaries)
+        kyc_ui::embedded_runtime::write_runtime_files(output_dir)
+            .map_err(|e| format!("Failed to write runtime files: {}", e))?;
+
         println!("Build complete: {} (web target)", output_path.display());
         Ok(())
     }
