@@ -1,5 +1,6 @@
 pub mod web;
 pub mod desktop;
+pub mod ios;
 
 use crate::ir::*;
 
@@ -36,11 +37,12 @@ pub fn get_backend(name: &str) -> Option<Box<dyn UiBackend>> {
     match name {
         "web" | "wasm32" => Some(Box::new(web::WebBackend::new())),
         "desktop" | "native" => Some(Box::new(desktop::DesktopBackend::new())),
+        "ios" | "iphone" | "ios-app" => Some(Box::new(ios::IosBackend::new())),
         _ => None,
     }
 }
 
 /// All registered backend names
 pub fn available_backends() -> Vec<&'static str> {
-    vec!["web (wasm32-unknown-unknown)", "desktop (native)"]
+    vec!["web (wasm32-unknown-unknown)", "desktop (native)", "ios (aarch64-apple-ios)"]
 }

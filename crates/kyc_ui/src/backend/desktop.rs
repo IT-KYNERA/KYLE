@@ -25,8 +25,7 @@ impl UiBackend for DesktopBackend {
         k.push_str("extern fn SDL_RenderClear(r: ptr) i32\n");
         k.push_str("extern fn SDL_RenderDrawLine(r: ptr, x1: i32, y1: i32, x2: i32, y2: i32) i32\n");
         k.push_str("extern fn SDL_RenderPresent(r: ptr)\n");
-        k.push_str("extern fn SDL_PollEvent(e: ptr) i32\n\n");
-        k.push_str("@link \"c\"\nextern fn ky_sleep(ms: i64)\n\n");
+        k.push_str("extern fn SDL_Delay(ms: i32)\n\n");
 
         k.push_str("fn fill_rect(ren: ptr, x: i32, y: i32, rw: i32, rh: i32):\n");
         k.push_str("    row: ^i32 = 0\n    while row < rh:\n");
@@ -39,19 +38,18 @@ impl UiBackend for DesktopBackend {
 
         k.push_str("fn main(args: {str}):\n");
         k.push_str("    SDL_Init(32)\n");
-        k.push_str("    win = SDL_CreateWindow(\"Kyle\" as ptr, 0x7FFF0000, 0x7FFF0000, 800, 600, 4)\n");
+        k.push_str("    win = SDL_CreateWindow(\"Kyle\" as ptr, 0x2FFF0000, 0x2FFF0000, 800, 600, 4)\n");
         k.push_str("    if win == 0 as ptr: SDL_Quit() return\n");
-        k.push_str("    ren = SDL_CreateRenderer(win, -1, 2)\n");
+        k.push_str("    ren = SDL_CreateRenderer(win, -1, 1)\n");
         k.push_str("    if ren == 0 as ptr: SDL_DestroyWindow(win) SDL_Quit() return\n");
-        k.push_str("    evt: i64 = 0\n");
-        k.push_str("    run: ^i32 = 1\n    while run != 0:\n");
-        k.push_str("        while SDL_PollEvent(^&evt) != 0:\n");
-        k.push_str("            if evt == 0x100: run = 0\n");
+        k.push_str("    # Allocate event buffer (128 bytes for SDL_Event)\n");
+        k.push_str("    run: ^i32 = 1\n    frame: ^i32 = 0\n    while run != 0:\n");
         k.push_str("        SDL_SetRenderDrawColor(ren, 230, 230, 230, 255)\n");
         k.push_str("        SDL_RenderClear(ren)\n");
         k.push_str("        render_app(ren, 800, 600)\n");
         k.push_str("        SDL_RenderPresent(ren)\n");
-        k.push_str("        ky_sleep(16)\n");
+        k.push_str("        frame = frame + 1\n");
+        k.push_str("        if frame > 180: run = 0\n        SDL_Delay(16)\n");
         k.push_str("    SDL_DestroyRenderer(ren)\n    SDL_DestroyWindow(win)\n    SDL_Quit()\n");
 
         BackendOutput {

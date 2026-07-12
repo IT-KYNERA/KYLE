@@ -165,12 +165,44 @@ fn first_file_arg(args: &[String]) -> Option<String> {
     None
 }
 
+/// Extract the build target from args. Checks both positional arg (web/desktop/ios) and --target flag.
+fn build_target(args: &[String]) -> Option<String> {
+    // Check if first positional arg is a target name
+    let first = args.iter().skip(2).find(|a| !a.starts_with("--") && *a != "--release");
+    if let Some(f) = first {
+        match f.as_str() {
+            "web" | "desktop" | "ios" | "native" => return Some(f.clone()),
+            _ => {}
+        }
+    }
+    // Fallback to --target flag
+    args.iter().position(|a| a == "--target")
+        .and_then(|i| args.get(i + 1)).cloned()
+}
+
 fn cmd_build(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    let target = args.iter().position(|a| a == "--target")
-        .and_then(|i| args.get(i + 1)).cloned();
+    let target = build_target(args);
     let is_desktop = target.as_deref() == Some("desktop") || target.as_deref() == Some("native");
+    let is_ios = target.as_deref() == Some("ios") || target.as_deref() == Some("iphone");
+    let is_web = target.as_deref() == Some("web") || target.as_deref() == Some("wasm32");
+    let ui_backend_name = if is_ios { Some("ios") } else if is_desktop { Some("desktop") } else if is_web { Some("web") } else { None };
     let file_arg = first_file_arg(args);
+
+    // In project mode, filter out the target keyword from file_arg
+    let file_arg = if let Some(ref f) = file_arg {
+        match f.as_str() {
+            "web" | "desktop" | "ios" | "native" => {
+                // Find next non-flag, non-target arg
+                args.iter().skip(2).filter(|a| {
+                    !a.starts_with("--") && *a != "--release"
+                        && *a != "web" && *a != "desktop" && *a != "ios" && *a != "native"
+                }).next().cloned()
+            }
+            _ => file_arg
+        }
+    } else { None };
+
     if file_arg.is_none() {
         // Project mode
         let project_root = match find_project_root(&std::env::current_dir().unwrap()) {
@@ -188,9 +220,10 @@ fn cmd_build(args: &[String]) {
             let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
             let _ = fs::create_dir_all(&build_dir);
 
-            if is_desktop && is_kyx_file(&file) {
-                // Desktop build: .kyx → UI-IR → main.ky → native binary
-                build_desktop_kyx(&source, &file, &build_dir, release);
+            if let Some(backend_name) = ui_backend_name {
+                if is_kyx_file(&file) {
+                    build_ui_backend_kyx(&source, &file, &build_dir, backend_name, release);
+                }
             } else if is_kyx_file(&file) {
                 let js_output = build_dir.join("main.js");
                 match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
@@ -227,8 +260,10 @@ fn cmd_build(args: &[String]) {
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
     let _ = fs::create_dir_all(&build_dir);
 
-    if is_desktop && is_kyx_file(&file) {
-        build_desktop_kyx(&source, &file, &build_dir, release);
+    if let Some(backend_name) = ui_backend_name {
+        if is_kyx_file(&file) {
+            build_ui_backend_kyx(&source, &file, &build_dir, backend_name, release);
+        }
     } else if is_kyx_file(&file) {
         let js_output = build_dir.join(&file_stem).with_extension("js");
         match kyc_driver::pipeline::Pipeline::build_kyx_source(&source, &js_output) {
@@ -249,77 +284,101 @@ fn cmd_build(args: &[String]) {
     }
 }
 
-/// Build a .kyx file for desktop: UI-IR → main.ky → native binary
-fn build_desktop_kyx(source: &str, file: &str, build_dir: &Path, release: bool) {
-    let output = exe_path(&build_dir.join("main"));
-    let main_ky_path = build_dir.join("main.ky");
-
-    // Parse .kyx → UI-IR → Desktop backend → main.ky
+/// Build a .kyx file using a named UI backend (desktop, ios, etc.)
+fn build_ui_backend_kyx(source: &str, file: &str, build_dir: &Path, backend_name: &str, release: bool) {
     let file_ast = match kyc_ui::parser::parse(source) {
         Ok(f) => f,
         Err(e) => { eprintln!("kyx parse error: {}", e); process::exit(1); }
     };
     let program = kyc_ui::parser::to_ui_program(file_ast);
-    let backend = match kyc_ui::backend::get_backend("desktop") {
+    let backend = match kyc_ui::backend::get_backend(backend_name) {
         Some(b) => b,
-        None => { eprintln!("Desktop backend not available"); process::exit(1); }
+        None => { eprintln!("Backend '{}' not available", backend_name); process::exit(1); }
     };
     let output_files = backend.generate(&program);
 
-    // Write generated main.ky
+    // Write generated files
     for gen_file in &output_files.files {
-        let dst = build_dir.join(&gen_file.path);
+        let dst = if gen_file.path.starts_with("ios-app/") {
+            build_dir.join(&gen_file.path)
+        } else {
+            build_dir.join(&gen_file.path)
+        };
+        if let Some(parent) = dst.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
         if let Err(e) = fs::write(&dst, &gen_file.content) {
             eprintln!("Error writing {}: {}", gen_file.path, e);
             process::exit(1);
         }
     }
 
-    // Build the generated main.ky through the normal compiler pipeline
-    let main_ky_source = match fs::read_to_string(&main_ky_path) {
-        Ok(s) => s,
-        Err(e) => { eprintln!("Error reading generated main.ky: {}", e); process::exit(1); }
-    };
-
-    let build_result = if release {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(
-            &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
+    // For desktop, compile the generated main.ky through the LLVM pipeline
+    if backend_name == "desktop" || backend_name == "native" {
+        let main_ky_path = build_dir.join("main.ky");
+        let main_ky_source = match fs::read_to_string(&main_ky_path) {
+            Ok(s) => s,
+            Err(e) => { eprintln!("Error reading generated main.ky: {}", e); process::exit(1); }
+        };
+        let output = exe_path(&build_dir.join("main"));
+        let build_result = if release {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(
+                &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
+        } else {
+            kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(
+                &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
+        };
+        match build_result {
+            Ok(()) => println!("Build complete: {} (desktop target)", output.display()),
+            Err(e) => { eprintln!("Desktop build error: {}", e); process::exit(1); }
+        }
+    } else if backend_name == "ios" {
+        let ios_dir = build_dir.join("ios-app");
+        println!("Generated iOS project at: {}", ios_dir.display());
+        println!("To build:");
+        println!("  cd {} && swift build", ios_dir.display());
+        println!("  cd {} && xcodebuild -scheme KyleApp -destination 'platform=iOS Simulator,name=iPhone 15' build", ios_dir.display());
     } else {
-        kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(
-            &main_ky_source, &main_ky_path.to_string_lossy(), &output, build_dir, None)
-    };
-    match build_result {
-        Ok(()) => println!("Build complete: {} (desktop target)", output.display()),
-        Err(e) => { eprintln!("Desktop build error: {}", e); process::exit(1); }
+        println!("Build complete ({} target)", backend_name);
     }
 }
 
 fn cmd_run(args: &[String]) {
     let release = args.iter().any(|a| a == "--release");
-    let target = args.iter().position(|a| a == "--target")
-        .and_then(|i| args.get(i + 1)).cloned();
+    let target = build_target(args);
     let is_desktop = target.as_deref() == Some("desktop") || target.as_deref() == Some("native");
+    let is_ios = target.as_deref() == Some("ios") || target.as_deref() == Some("iphone");
+    let is_web = target.as_deref() == Some("web") || target.as_deref() == Some("wasm32");
+    let ui_backend_name = if is_ios { Some("ios") } else if is_desktop { Some("desktop") } else { None };
     let port = args.iter().position(|a| a == "--port")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    let file_arg = first_file_arg(args);
+    // Filter out target name from file arguments
+    let is_target_word = |a: &str| matches!(a, "web" | "desktop" | "ios" | "native" | "wasm32");
+    let file_arg = args.iter().skip(2).find(|a| {
+        !a.starts_with("--") && *a != "--release" && !is_target_word(a)
+    }).cloned();
 
-    if let Some(file) = file_arg {
+    if let Some(file) = &file_arg {
         // Single-file mode
         if let Some(project_root) = find_project_root(&std::env::current_dir().unwrap()) {
             resolve_and_check(&project_root);
         }
-        let file_idx = args.iter().position(|a| *a == file).unwrap();
+        let file_idx = args.iter().position(|a| a == file).unwrap();
         let source = load_source(args, file_idx);
 
-        if is_desktop && is_kyx_file(&file) {
-            run_desktop_app(&source, &file, release);
-        } else if is_kyx_file(&file) || kyc_ui::app_config::has_ui_content(&source) {
-            run_dev_server(&source, &file, port, true);
+        if is_web {
+            run_dev_server(&source, file, port, true);
+        } else if let Some(backend_name) = ui_backend_name {
+            if is_kyx_file(file) {
+                run_ui_app(&source, file, backend_name, release);
+            }
+        } else if is_kyx_file(file) || kyc_ui::app_config::has_ui_content(&source) {
+            run_dev_server(&source, file, port, true);
         } else {
-            compile_and_run_native(&source, &file, &args, release, target.as_deref());
+            compile_and_run_native(&source, file, &args, release, target.as_deref());
         }
     } else {
         // Project mode
@@ -336,8 +395,12 @@ fn cmd_run(args: &[String]) {
             });
             let file = source_path.to_string_lossy().to_string();
 
-            if is_desktop && is_kyx_file(&file) {
-                run_desktop_app(&source, &file, release);
+            if is_web {
+                run_dev_server_for_project(&project_root, &source, &file, port);
+            } else if let Some(backend_name) = ui_backend_name {
+                if is_kyx_file(&file) {
+                    run_ui_app(&source, &file, backend_name, release);
+                }
             } else if is_kyx_file(&file) || kyc_ui::app_config::has_ui_content(&source) {
                 run_dev_server_for_project(&project_root, &source, &file, port);
             } else {
@@ -345,9 +408,9 @@ fn cmd_run(args: &[String]) {
                 let _ = fs::create_dir_all(&build_dir);
                 let output = exe_path(&build_dir.join("main"));
                 let run_result = if release {
-                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, target.as_deref())
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, None)
                 } else {
-                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, target.as_deref())
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, None)
                 };
                 match run_result {
                     Ok(()) => {
@@ -369,19 +432,21 @@ fn cmd_run(args: &[String]) {
     }
 }
 
-/// Build and run a .kyx file as a desktop (native) application
-fn run_desktop_app(source: &str, file: &str, release: bool) {
+/// Build and run a .kyx file as a desktop/ios application
+fn run_ui_app(source: &str, file: &str, backend_name: &str, release: bool) {
     let build_dir = Path::new("target").join(if release { "release" } else { "debug" });
     let _ = fs::create_dir_all(&build_dir);
-    let output = exe_path(&build_dir.join("main"));
 
-    build_desktop_kyx(source, file, &build_dir, release);
+    build_ui_backend_kyx(source, file, &build_dir, backend_name, release);
 
-    let status = process::Command::new(&output)
-        .status()
-        .expect("Failed to execute desktop app");
-    if !status.success() {
-        process::exit(status.code().unwrap_or(1));
+    if backend_name == "desktop" || backend_name == "native" {
+        let output = exe_path(&build_dir.join("main"));
+        let status = process::Command::new(&output)
+            .status()
+            .expect("Failed to execute desktop app");
+        if !status.success() {
+            process::exit(status.code().unwrap_or(1));
+        }
     }
 }
 
@@ -722,7 +787,7 @@ fn cmd_new(args: &[String]) {
         project_name_arg = &args[2];
         // Check if the first arg is actually a type keyword
         let first = &args[2];
-        if first == "api" || first == "bare" || first == "webapp" {
+        if first == "api" || first == "bare" || first == "webapp" || first == "kyui" {
             eprintln!("Error: missing project name for type '{}'", first);
             eprintln!("Usage: {} new {} <project>", bin_name(), first);
             process::exit(1);
@@ -730,7 +795,7 @@ fn cmd_new(args: &[String]) {
     } else {
         eprintln!("Error: missing project name");
         eprintln!("Usage: {} new [type] <project>", bin_name());
-        eprintln!("Types: app     — standard project with UI support (default)");
+        eprintln!("Types: kyui    — UI project (web + desktop + iOS)");
         eprintln!("       api     — HTTP API server project");
         eprintln!("       bare    — single script file, no main");
         process::exit(1);
@@ -754,7 +819,7 @@ fn cmd_new(args: &[String]) {
     match project_type {
         "bare" => cmd_new_bare(&project_dir, &project_name, &exe_path),
         "api" => cmd_new_api(&project_dir, &project_name, &exe_path),
-        "webapp" => cmd_new_app(&project_dir, &project_name, &exe_path),  // webapp → app template
+        "kyui" | "webapp" => cmd_new_app(&project_dir, &project_name, &exe_path),
         _ => cmd_new_app(&project_dir, &project_name, &exe_path),
     }
 }
@@ -846,7 +911,9 @@ style<button> Primary:
     println!("   ├── .gitignore");
     println!("   └── .vscode/        — VS Code settings");
     println!();
-    println!("   cd {} && {} run", project_name, bin_name());
+    println!("   cd {} && ky run web      # Web (browser)", project_name);
+    println!("   cd {} && ky run desktop  # Desktop (SDL2)", project_name);
+    println!("   cd {} && ky run ios      # iOS (Xcode)", project_name);
 }
 
 fn cmd_new_api(project_dir: &Path, project_name: &str, exe_path: &str) {
@@ -905,9 +972,8 @@ fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
 }
 
 fn cmd_serve(args: &[String]) {
-    // Delegate to cmd_run for backward compat (ky serve == ky run for web projects)
-    // args[0] = "ky", args[1] = "serve"
-    let mut run_args = vec![args[0].clone(), "run".to_string()];
+    eprintln!("Note: 'ky serve' is deprecated. Use 'ky run web' instead.");
+    let mut run_args = vec![args[0].clone(), "run".to_string(), "web".to_string()];
     run_args.extend(args.iter().skip(2).cloned());
     cmd_run(&run_args);
 }
@@ -1217,8 +1283,8 @@ fn print_usage() {
     eprintln!("{} v{} — Kyle Programming Language Compiler", name, env!("CARGO_PKG_VERSION"));
     eprintln!();
     eprintln!("Project commands (run from a project directory with ky.toml):");
-    eprintln!("  {name} build [--release] [--target <triple>]   Compile project to native binary");
-    eprintln!("  {name} run   [--release] [--target <triple>]   Compile and execute project");
+    eprintln!("  {name} build [web|desktop|ios] [--release]   Build for platform");
+    eprintln!("  {name} run   [web|desktop|ios] [--port N]    Build and run for platform");
     eprintln!("  {name} test                Run project tests");
     eprintln!("  {name} info                Show project info");
     eprintln!("  {name} add   <dep>[@<ver>] Add dependency");
@@ -1231,18 +1297,16 @@ fn print_usage() {
     eprintln!();
     eprintln!("File commands:");
     eprintln!("  {name} build <file.ky> [--target <triple>]     Compile single file");
-    eprintln!("  {name} run   <file.kyx> [--port N]             Compile and serve UI project");
+    eprintln!("  {name} run   <file.kyx>                        Compile and serve UI project");
     eprintln!("  {name} run   <file.ky>  [--target <triple>]    Compile and run single file");
     eprintln!("  {name} check <file.ky>     Type-check without codegen");
-    eprintln!("  {name} serve [--port N]    (deprecated) Use 'ky run' instead");
     eprintln!("  {name} parse <file.ky>     Parse and dump AST");
     eprintln!("  {name} mir   <file.ky>     Parse and dump MIR");
-    eprintln!("  {name} fmt   [file/dir]    Format source files in project or specific file/dir");
-    eprintln!("  {name} fmt   [file.ky] --check  Check formatting (CI mode)");
+    eprintln!("  {name} fmt   [file/dir]    Format source files");
     eprintln!();
     eprintln!("Project creation:");
-    eprintln!("  {name} new   <project>     Create new KL project (app template with UI support)");
-    eprintln!("  {name} new   webapp <name>  (alias) Create UI project");
+    eprintln!("  {name} new   <project>     Create new project (default: kyui template)");
+    eprintln!("  {name} new   kyui <name>    Create UI project (web + desktop + iOS)");
     eprintln!("  {name} new   bare <name>    Create minimal script project");
     eprintln!("  {name} new   api <name>     Create HTTP API server project");
     eprintln!();
