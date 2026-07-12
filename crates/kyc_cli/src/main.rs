@@ -842,16 +842,16 @@ fn cmd_new(args: &[String]) {
 }
 
 fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
-    // Create directories: views, layouts, components, src
-    fs::create_dir_all(project_dir.join("views")).unwrap_or_else(|e| {
+    // Create directories: src/views, src/layouts, src/components, src
+    fs::create_dir_all(project_dir.join("src").join("views")).unwrap_or_else(|e| {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
-    fs::create_dir_all(project_dir.join("layouts")).unwrap_or_else(|e| {
+    fs::create_dir_all(project_dir.join("src").join("layouts")).unwrap_or_else(|e| {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
-    fs::create_dir_all(project_dir.join("components")).unwrap_or_else(|e| {
+    fs::create_dir_all(project_dir.join("src").join("components")).unwrap_or_else(|e| {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
@@ -860,13 +860,13 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
 
-    // Entry point: app.kyx
+    // Entry point: app.kyx (root level)
     let app_kyx = format!(
         r##"# {name} — Kyle UI App
-<app title=@"{name}" config=@config>
+<app title="{name}">
     <router>
-        <route path="/" component=@home_view layout=@main_layout title="Home" />
-        <route path="*" component=@not_found_view layout=@main_layout title="404" />
+        <route path="/" component=@home layout=@main title="Home" />
+        <route path="*" component=@not_found layout=@main title="404" />
     </router>
 </app>
 "##,
@@ -877,7 +877,7 @@ fn cmd_new_app(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
 
-    // Home view: views/home.kyx
+    // Home view: src/views/home.kyx
     let home_kyx = format!(
         r##"# Home view
 style<text> Title:
@@ -902,19 +902,19 @@ style<button> Primary:
     )
 
     <vstack alignment=alignment.center spacing=16>
-        <text value="Bienvenido a Kyle UI!" typography=Title />
+        <text style=Title value="Bienvenido a Kyle UI!" />
         <text value=@"Contador: " + count.to_str() />
-        <button tpl=Primary text="+" click=@increment />
+        <button style=Primary text="+" click=@increment />
     </vstack>
 </view>
 "##
     );
-    fs::write(project_dir.join("views").join("home.kyx"), &home_kyx).unwrap_or_else(|e| {
-        eprintln!("Error writing views/home.kyx: {}", e);
+    fs::write(project_dir.join("src").join("views").join("home.kyx"), &home_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing src/views/home.kyx: {}", e);
         process::exit(1);
     });
 
-    // Not found view: views/not_found.kyx
+    // Not found view: src/views/not_found.kyx
     let not_found_kyx = r##"# 404 view
 style<text> Display:
     font_size = 48
@@ -925,18 +925,18 @@ style<text> Display:
     @(set_title("404 — No Encontrado"))
 
     <vstack alignment=alignment.center spacing=12>
-        <text value="404" typography=Display />
+        <text value="404" style=Display />
         <text value="Página no encontrada" />
         <link to="/">Volver al inicio</link>
     </vstack>
 </view>
 "##;
-    fs::write(project_dir.join("views").join("not_found.kyx"), &not_found_kyx).unwrap_or_else(|e| {
-        eprintln!("Error writing views/not_found.kyx: {}", e);
+    fs::write(project_dir.join("src").join("views").join("not_found.kyx"), &not_found_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing src/views/not_found.kyx: {}", e);
         process::exit(1);
     });
 
-    // Main layout: layouts/main.kyx
+    // Main layout: src/layouts/main.kyx
     let main_layout_kyx = r##"# Persistent layout with navbar
 <layout>
     <navbar title="Mi App" />
@@ -948,13 +948,10 @@ style<text> Display:
     </footer>
 </layout>
 "##;
-    fs::write(project_dir.join("layouts").join("main.kyx"), &main_layout_kyx).unwrap_or_else(|e| {
-        eprintln!("Error writing layouts/main.kyx: {}", e);
+    fs::write(project_dir.join("src").join("layouts").join("main.kyx"), &main_layout_kyx).unwrap_or_else(|e| {
+        eprintln!("Error writing src/layouts/main.kyx: {}", e);
         process::exit(1);
     });
-
-    // Not found view: views/not_found.kyx (already created above with Display style)
-    // (styles are inline in each view file — no separate components/styles.kyx)
 
     // Library module
     let lib_kl = format!(
@@ -971,15 +968,15 @@ style<text> Display:
     write_vscode_settings(project_dir, exe_path);
 
     println!("✅ Created kyui project '{}'", project_name);
-    println!("   ├── app.kyx              — entry point");
-    println!("   ├── views/home.kyx       — home page view");
-    println!("   ├── views/not_found.kyx  — 404 page");
-    println!("   ├── layouts/main.kyx     — persistent layout");
-    println!("   ├── components/styles.kyx — shared styles");
-    println!("   ├── src/lib.ky            — library module");
-    println!("   ├── ky.toml              — manifest");
+    println!("   ├── app.kyx               — entry point");
+    println!("   ├── src/views/home.kyx    — home page view");
+    println!("   ├── src/views/not_found.kyx — 404 page");
+    println!("   ├── src/layouts/main.kyx  — persistent layout");
+    println!("   ├── src/components/        — shared components");
+    println!("   ├── src/lib.ky             — library module");
+    println!("   ├── ky.toml               — manifest");
     println!("   ├── .gitignore");
-    println!("   └── .vscode/             — VS Code settings");
+    println!("   └── .vscode/              — VS Code settings");
     println!();
     println!("   cd {} && ky run web      # Web (browser)", project_name);
     println!("   cd {} && ky run desktop  # Desktop (SDL2)", project_name);

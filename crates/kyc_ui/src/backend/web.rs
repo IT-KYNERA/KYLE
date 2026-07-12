@@ -101,6 +101,36 @@ impl UiBackend for WebBackend {
             js.push_str("}\n");
         }
 
+        // Extract app title/icon from body for top-level initialization
+        for node in &program.body {
+            if let UiNode::Element { tag, attrs, .. } = node {
+                if tag == &ComponentTag::App {
+                    for a in attrs {
+                        if a.name == "title" {
+                            let val = match &a.value {
+                                AttrValue::String(v) => format!("{:?}", v),
+                                AttrValue::Expr(v) => v.clone(),
+                                _ => continue,
+                            };
+                            if !val.is_empty() {
+                                js.push_str(&format!("document.title = {};\n", val));
+                            }
+                        }
+                        if a.name == "icon" {
+                            let val = match &a.value {
+                                AttrValue::String(v) => format!("{:?}", v),
+                                AttrValue::Expr(v) => v.clone(),
+                                _ => continue,
+                            };
+                            if !val.is_empty() {
+                                js.push_str(&format!("let _ic = document.querySelector('link[rel*=\"icon\"]'); if (!_ic) {{ _ic = document.createElement('link'); _ic.rel = 'icon'; document.head.appendChild(_ic); }} _ic.href = {};\n", val));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Route registration from RouteConfig
         if !program.routes.is_empty() {
             js.push_str("\n// Register and start router\n");
@@ -797,6 +827,15 @@ fn generate_html(call_render: bool) -> String {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kyle App</title>
+    <style>
+      * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+      html, body {{ width: 100%; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
+      button, input, select, textarea {{ font: inherit; border: none; background: none; outline: none; }}
+      button {{ cursor: pointer; }}
+      a {{ color: inherit; text-decoration: none; }}
+      ul, ol {{ list-style: none; }}
+      img {{ max-width: 100%; display: block; }}
+    </style>
 </head>
 <body>
     <div id="app"></div>

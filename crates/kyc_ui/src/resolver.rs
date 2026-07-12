@@ -62,20 +62,16 @@ fn build_search_paths(tag_name: &str, base_dir: &Path) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     for n in &names {
         let kyx = format!("{}.kyx", n);
-        // 1. ./views/<name>.kyx
-        paths.push(base.join("views").join(&kyx));
-        // 2. ./components/<name>.kyx
-        paths.push(base.join("components").join(&kyx));
-        // 3. ./layouts/<name>.kyx
-        paths.push(base.join("layouts").join(&kyx));
-        // 4. ./<name>.kyx
-        paths.push(base.join(&kyx));
-        // 5. src/views/<name>.kyx
+        // Priority: src/views, src/layouts, src/components first (new structure)
         paths.push(base.join("src").join("views").join(&kyx));
-        // 6. src/components/<name>.kyx
-        paths.push(base.join("src").join("components").join(&kyx));
-        // 7. src/layouts/<name>.kyx
         paths.push(base.join("src").join("layouts").join(&kyx));
+        paths.push(base.join("src").join("components").join(&kyx));
+        paths.push(base.join("src").join(&kyx));
+        // Fallback: root-level dirs (old structure)
+        paths.push(base.join("views").join(&kyx));
+        paths.push(base.join("layouts").join(&kyx));
+        paths.push(base.join("components").join(&kyx));
+        paths.push(base.join(&kyx));
     }
 
     paths
