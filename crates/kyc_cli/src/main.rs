@@ -523,6 +523,7 @@ fn run_dev_server_for_project(project_root: &Path, source: &str, _file: &str, po
 
 fn serve_static(port: u16, project_root: &Path) {
     println!("Serving on http://localhost:{}", port);
+    println!("Watch mode: edit src/main.kyx then refresh browser");
 
     let addr = format!("0.0.0.0:{}", port);
     let listener = std::net::TcpListener::bind(&addr).unwrap_or_else(|e| {
@@ -998,6 +999,29 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
         .and_then(|l| l.split_whitespace().nth(1))
         .unwrap_or("/");
 
+    // Auto-rebuild if source changed
+    let source_path = project_root.join("src/main.kyx");
+    if source_path.exists() {
+        if let Ok(meta) = std::fs::metadata(&source_path) {
+            if let Ok(mtime) = meta.modified() {
+                if let Ok(dur) = mtime.duration_since(std::time::UNIX_EPOCH) {
+                    use std::sync::atomic::{AtomicU64, Ordering};
+                    static LAST_BUILD: AtomicU64 = AtomicU64::new(0);
+                    let ms = dur.as_millis() as u64;
+                    if ms > LAST_BUILD.load(Ordering::Relaxed) {
+                        if let Ok(src) = std::fs::read_to_string(&source_path) {
+                            let bd = project_root.join("target/debug");
+                            let _ = std::fs::create_dir_all(&bd);
+                            let _ = kyc_driver::pipeline::Pipeline::build_kyx_source(&src, &bd.join("ui-runtime.js"));
+                            println!("  [auto-rebuild] src/main.kyx changed");
+                        }
+                        LAST_BUILD.store(ms, Ordering::Relaxed);
+                    }
+                }
+            }
+        }
+    }
+
     let (status, content, mime) = if path == "/" || path == "/index.html" {
         // Try custom index.html first, then generated one, then auto-generate
         let index_path = project_root.join("index.html");
@@ -1039,7 +1063,7 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
     };
 
     let response = format!(
-        "HTTP/1.1 {status} OK\r\nContent-Type: {mime}\r\nContent-Length: {len}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{content}",
+        "HTTP/1.1 {status} OK\r\nContent-Type: {mime}\r\nContent-Length: {len}\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{content}",
         status = status,
         mime = mime,
         len = content.len(),

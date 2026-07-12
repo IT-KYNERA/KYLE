@@ -899,6 +899,17 @@ fn translate_kyle_block_to_js(block: &str) -> String {
         let line = raw_line.trim();
         last_indent = Some(indent);
 
+        // Close functions when indentation decreases or matches parent
+        // Must come BEFORE function definition/variable checks
+        while let Some(&fn_indent) = open_fns.last() {
+            if indent <= fn_indent && !open_fns.is_empty() {
+                js.push_str("};\n");
+                open_fns.pop();
+            } else {
+                break;
+            }
+        }
+
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
@@ -934,16 +945,6 @@ fn translate_kyle_block_to_js(block: &str) -> String {
                 open_fns.push(indent);
             }
             continue;
-        }
-
-        // Close functions when indentation decreases or matches parent
-        while let Some(&fn_indent) = open_fns.last() {
-            if indent <= fn_indent && !open_fns.is_empty() {
-                js.push_str("};\n");
-                open_fns.pop();
-            } else {
-                break;
-            }
         }
 
         // Function body: "count = count + 1" → "state.set('count', state.get('count') + 1);"
