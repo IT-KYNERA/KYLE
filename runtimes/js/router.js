@@ -256,8 +256,8 @@ export function createRouter(options = {}) {
 
 // Global fallback for direct script inclusion
 // Snake_case aliases for Kyle-generated code
-export { setTitle as set_title, setMeta as set_meta };
-export { navigate as navigate, navigateBack as navigate_back, navigateReplace as navigate_replace };
+// navigate is already exported by name; alias the rest
+export { setTitle as set_title, setMeta as set_meta, navigateBack as navigate_back, navigateReplace as navigate_replace };
 
 if (typeof window !== 'undefined') {
     window.Router = Router;
