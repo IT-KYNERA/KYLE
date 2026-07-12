@@ -747,11 +747,13 @@ fn cmd_new_webapp(project_dir: &Path, project_name: &str, exe_path: &str) {
 </head>
 <body>
     <div id="app"></div>
-    <script type="module">
-        import createApp from './target/debug/main.js';
-        const app = document.getElementById('app');
-        const result = createApp();
-        app.appendChild(result.element);
+    <script>
+        (async () => {
+            const { render } = await import('./target/debug/main.js');
+            const app = document.getElementById('app');
+            const result = render();
+            app.appendChild(result.element);
+        })();
     </script>
 </body>
 </html>
@@ -848,6 +850,8 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
         let index_path = project_root.join("index.html");
         let content = fs::read_to_string(&index_path).unwrap_or_default();
         (200, content, "text/html")
+    } else if path == "/favicon.ico" {
+        (204, String::new(), "image/x-icon")
     } else if path.starts_with("/target/debug/") {
         let file_path = project_root.join(&path[1..]); // strip leading /
         match fs::read_to_string(&file_path) {
