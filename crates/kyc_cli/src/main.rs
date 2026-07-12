@@ -688,7 +688,7 @@ view("/")
 <app>
     <column layout=center spacing=16 padding=20>
         <text value="Bienvenido a Kyle UI!" font_size=24 font_weight=Bold />
-        <text value="Contador: " + count.to_str() />
+        <text value=@"Contador: " + count.to_str() />
         <button tpl=Primary text="+" click=@increment />
         <text value="Edit src/main.kyx to get started" color=#666666 font_size=14 />
     </column>

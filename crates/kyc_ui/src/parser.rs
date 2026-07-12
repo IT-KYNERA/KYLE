@@ -402,7 +402,8 @@ impl KyxParser {
                     }
                     Some('@') => {
                         self.advance();
-                        let expr = self.read_while(|c| c != ' ' && c != '\t' && c != '>' && c != '/' && c != '\n')?;
+                        // Read expression, handling string literals with spaces
+                        let expr = self.read_expression()?;
                         Ok(KyxAttr { name, value: AttrValue::Expr(expr) })
                     }
                     _ => {
@@ -524,6 +525,73 @@ impl KyxParser {
             s.push(c);
         }
         Ok(s)
+    }
+
+    /// Read a Kyle expression with string literal and paren support.
+    fn read_expression(&mut self) -> Result<String, String> {
+        let mut s = String::new();
+        let mut depth: i32 = 0;
+        let mut in_string = false;
+        let mut after_operator = false;
+        loop {
+            match self.peek() {
+                None => break,
+                Some(c) => {
+                    if c == '"' {
+                        in_string = !in_string;
+                        s.push(c);
+                        self.advance();
+                        after_operator = false;
+                    } else if c == '(' && !in_string {
+                        depth += 1;
+                        s.push(c);
+                        self.advance();
+                        after_operator = false;
+                    } else if c == ')' && !in_string {
+                        depth -= 1;
+                        s.push(c);
+                        self.advance();
+                        after_operator = false;
+                    } else if (c == ' ' || c == '\t') && !in_string && depth == 0 {
+                        if after_operator {
+                            // After an operator, spaces are part of the expression
+                            s.push(c);
+                            self.advance();
+                            after_operator = false;
+                        } else {
+                            // Peek ahead: if followed by an operator, continue reading
+                            let mut skip_pos = self.pos + 1;
+                            while let Some(&nc) = self.chars.get(skip_pos) {
+                                if nc == ' ' || nc == '\t' { skip_pos += 1; }
+                                else { break; }
+                            }
+                            let next = self.chars.get(skip_pos).copied().unwrap_or(' ');
+                            let is_operator = matches!(next, '+' | '-' | '*' | '/' | '!' | '<' | '>' | '&' | '|' | '?' | ':');
+                            if is_operator {
+                                s.push(c);
+                                self.advance();
+                            } else {
+                                break; // end of expression
+                            }
+                        }
+                    } else if c == '\n' && !in_string && depth == 0 {
+                        break;
+                    } else if c == '>' && !in_string {
+                        break;
+                    } else if c == '/' && !in_string
+                        && self.chars.get(self.pos + 1) == Some(&'>') {
+                        break;
+                    } else {
+                        // Check if this char is an operator (for tracking)
+                        let is_op = matches!(c, '+' | '-' | '*' | '/' | '=' | '!' | '<' | '>' | '&' | '|' | '?' | ':');
+                        after_operator = is_op;
+                        s.push(c);
+                        self.advance();
+                    }
+                }
+            }
+        }
+        Ok(s.trim().to_string())
     }
 
     fn find_matching_paren(&mut self) -> Result<usize, String> {

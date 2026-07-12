@@ -49,18 +49,24 @@ impl UiBackend for WebBackend {
         let anim_js = generate_animations(&program.animations);
         js.push_str(&anim_js);
 
-        // Determine component name from view path
-        let comp_name = if let Some(path) = program.view_paths.first() {
-            let name = path.trim_start_matches('/').replace('/', "_")
-                .replace(&['{', '}', '-'][..], "");
-            if name.is_empty() { "home".to_string() } else { name }
-        } else {
-            "component".to_string()
-        };
+        // Determine component name from view path — always export as 'render'
+        let comp_name = "render".to_string();
 
-        // Generate component function
-        js.push_str(&format!("export function render{}(container, initialState = {{}}) {{\n", comp_name));
+        // Generate component function (exported at end)
+        js.push_str("function render(container, initialState = {}) {\n");
         js.push_str("  const state = new ReactiveState(initialState);\n");
+
+        // Translate code blocks (@(...)) to JS
+        for block in &program.code_blocks {
+            let js_block = translate_kyle_block_to_js(block);
+            if !js_block.is_empty() {
+                js.push_str("  // From Kyle block:\n");
+                for line in js_block.lines() {
+                    js.push_str(&format!("  {}\n", line));
+                }
+            }
+        }
+
         js.push_str("  const el = document.createDocumentFragment();\n");
 
         for node in &program.body {
@@ -76,18 +82,16 @@ impl UiBackend for WebBackend {
             js.push_str("if (typeof window !== 'undefined') {\n");
             js.push_str("  if (!window.__KYLE_ROUTES) window.__KYLE_ROUTES = {};\n");
             for path in &program.view_paths {
-                js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render{};\n", path, comp_name));
+                js.push_str(&format!("  window.__KYLE_ROUTES[{:?}] = render;\n", path));
             }
             js.push_str("}\n\n");
         }
 
-        // Export
-        js.push_str("export const styles = styles;\n");
-        js.push_str("export const animations = animations;\n");
-        js.push_str(&format!("export {{ render{} }};\n", comp_name));
+        // Export render function
+        js.push_str("export { render };\n");
 
         // Build HTML shell
-        let html = generate_html(&comp_name, &program.view_paths);
+        let html = generate_html();
 
         BackendOutput {
             files: vec![GeneratedFile {
@@ -208,7 +212,15 @@ fn gen_node(node: &UiNode, js: &mut String, indent: usize, parent: &str) {
             js.push_str(&format!("{}// Expression: {}\n", ind, e));
             js.push_str(&format!("{}{}\n", ind, e));
         }
-        UiNode::CodeBlock(_code) => {}
+        UiNode::CodeBlock(code) => {
+            let js_block = translate_kyle_block_to_js(code);
+            if !js_block.is_empty() {
+                js.push_str(&format!("{}// From inline Kyle block:\n", ind));
+                for line in js_block.lines() {
+                    js.push_str(&format!("{}{}\n", ind, line));
+                }
+            }
+        }
         UiNode::Text(text) => {
             js.push_str(&format!("{}{}.appendChild(document.createTextNode({:?}));\n", ind, parent, text));
         }
@@ -334,9 +346,8 @@ fn js_tag(tag: &ComponentTag) -> &str {
 }
 
 /// Generate HTML shell from component config
-fn generate_html(comp_name: &str, _view_paths: &[String]) -> String {
-    format!(
-        r#"<!DOCTYPE html>
+fn generate_html() -> String {
+    r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -346,15 +357,14 @@ fn generate_html(comp_name: &str, _view_paths: &[String]) -> String {
 <body>
     <div id="app"></div>
     <script type="module">
-        import {{ render{} }} from './ui-runtime.js';
+        import { render } from './ui-runtime.js';
         const app = document.getElementById('app');
-        const result = render{}();
+        const result = render();
         app.appendChild(result.element);
     </script>
 </body>
 </html>
-"#, comp_name, comp_name
-    )
+"#.to_string()
 }
 
 // ── Style Generator ──────────────────────────────────────────────
@@ -629,6 +639,93 @@ fn to_js_easing(easing: &str) -> String {
         "Easing.Bounce" => "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
         _ => "ease",
     }.to_string()
+}
+
+/// Translate a Kyle code block (@(...)) to basic JavaScript.
+/// This is a temporary solution until the WASM bridge is implemented.
+fn translate_kyle_block_to_js(block: &str) -> String {
+    let mut js = String::new();
+    let mut open_fns: Vec<usize> = Vec::new(); // track indentation of open functions
+    let mut last_indent: Option<usize> = None;
+
+    for raw_line in block.lines() {
+        let indent = raw_line.len() - raw_line.trim_start().len();
+        let line = raw_line.trim();
+        last_indent = Some(indent);
+
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Variable declaration: "count: ^i32 = 0" → "state.set('count', 0);"
+        if line.contains('=') && !line.starts_with("fn ") && line.contains(':') {
+            if let Some(colon_pos) = line.find(':') {
+                let before_colon = line[..colon_pos].trim();
+                let after_colon = line[colon_pos + 1..].trim();
+                if let Some(eq_pos) = after_colon.find('=') {
+                    let name = before_colon;
+                    let ann = after_colon[..eq_pos].trim();
+                    let value = after_colon[eq_pos + 1..].trim();
+                    // Verify it looks like a type annotation
+                    if ann.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '^' || c == '&') {
+                        js.push_str(&format!("state.set('{}', {});\n", name, value));
+                    }
+                }
+            }
+            continue; // skip further processing
+        }
+
+        // Function definition: "fn name(args):" → "const name = (args) => {"
+        if line.starts_with("fn ") {
+            let rest = line.trim_start_matches("fn ").trim();
+            if let Some(paren_pos) = rest.find('(') {
+                let name = rest[..paren_pos].trim();
+                let params_end = rest.rfind(')').unwrap_or(rest.len());
+                let params = &rest[paren_pos..=params_end];
+                // Strip trailing colon from params
+                let params = params.trim_end_matches(':');
+                js.push_str(&format!("const {} = {} => {{\n", name, params));
+                open_fns.push(indent);
+            }
+            continue;
+        }
+
+        // Close functions when indentation decreases or matches parent
+        while let Some(&fn_indent) = open_fns.last() {
+            if indent <= fn_indent && !open_fns.is_empty() {
+                js.push_str("};\n");
+                open_fns.pop();
+            } else {
+                break;
+            }
+        }
+
+        // Function body: "count = count + 1" → "state.set('count', state.get('count') + 1);"
+        if line.contains('=') && !line.contains("==") {
+            if let Some(eq_pos) = line.find('=') {
+                let target = line[..eq_pos].trim();
+                let value = line[eq_pos + 1..].trim();
+                if !target.contains('(') && !target.contains(' ') && !target.starts_with("state.") {
+                    let js_value = value.replace(&target, &format!("state.get('{}')", target));
+                    js.push_str(&format!("  state.set('{}', {});\n", target, js_value));
+                } else {
+                    js.push_str(&format!("  {} = {};\n", target, value));
+                }
+            }
+            continue;
+        }
+
+        // Plain expression
+        js.push_str(&format!("{}\n", line));
+    }
+
+    // Close any remaining open functions
+    while !open_fns.is_empty() {
+        js.push_str("};\n");
+        open_fns.pop();
+    }
+
+    js
 }
 
 #[cfg(test)]

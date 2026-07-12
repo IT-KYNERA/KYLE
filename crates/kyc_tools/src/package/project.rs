@@ -14,8 +14,11 @@ pub fn find_project_root(start: &Path) -> Option<PathBuf> {
 
 /// Locate the main source file for a project.
 pub fn main_source_path(project_root: &Path) -> Option<PathBuf> {
-    let path = project_root.join("src").join("main.ky");
-    if path.exists() { Some(path) } else { None }
+    // Try .kyx first (UI projects), then .ky (native projects)
+    let kyx_path = project_root.join("src").join("main.kyx");
+    if kyx_path.exists() { return Some(kyx_path); }
+    let ky_path = project_root.join("src").join("main.ky");
+    if ky_path.exists() { Some(ky_path) } else { None }
 }
 
 /// Locate test files in a project.
@@ -26,7 +29,7 @@ pub fn test_source_paths(project_root: &Path) -> Vec<PathBuf> {
         if let Ok(entries) = std::fs::read_dir(&tests_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "ky") {
+                if path.extension().map_or(false, |e| e == "ky" || e == "kyx") {
                     paths.push(path);
                 }
             }
