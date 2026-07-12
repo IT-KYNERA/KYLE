@@ -313,8 +313,30 @@ fn build_ui_backend_kyx(source: &str, file: &str, build_dir: &Path, backend_name
         }
     }
 
-    // For desktop, compile the generated main.ky through the LLVM pipeline
-    if backend_name == "desktop" || backend_name == "native" {
+    // For web, copy runtime JS files
+    if backend_name == "web" || backend_name == "wasm32" {
+        let runtime_files = [
+            "reactivity.js", "router.js", "a11y.js", "portal.js",
+            "error_boundary.js", "i18n.js", "ssr.js", "testing.js", "glue.js",
+        ];
+        let runtime_source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtimes/js");
+        for file_name in &runtime_files {
+            let src = runtime_source_dir.join(file_name);
+            let dst = build_dir.join(file_name);
+            if src.exists() {
+                let _ = std::fs::copy(&src, &dst);
+            } else {
+                eprintln!("Warning: runtime file not found: {}", src.display());
+            }
+        }
+        // Write HTML shell
+        if let Some(html) = &output_files.html_shell {
+            if let Err(e) = fs::write(&build_dir.join("index.html"), html) {
+                eprintln!("Error writing index.html: {}", e);
+            }
+        }
+        println!("Build complete (web target)");
+    } else if backend_name == "desktop" || backend_name == "native" {
         let main_ky_path = build_dir.join("main.ky");
         let main_ky_source = match fs::read_to_string(&main_ky_path) {
             Ok(s) => s,
@@ -988,13 +1010,16 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
         .unwrap_or("/");
 
     let (status, content, mime) = if path == "/" || path == "/index.html" {
-        // Try custom index.html first, then auto-generate
+        // Try custom index.html first, then generated one, then auto-generate
         let index_path = project_root.join("index.html");
+        let gen_index = project_root.join("target/debug/index.html");
         if index_path.exists() {
             let content = fs::read_to_string(&index_path).unwrap_or_default();
             (200, content, "text/html")
+        } else if gen_index.exists() {
+            let content = fs::read_to_string(&gen_index).unwrap_or_default();
+            (200, content, "text/html")
         } else {
-            // Auto-generated HTML shell (no hardcode)
             let html = generate_html_shell();
             (200, html, "text/html")
         }
@@ -1035,7 +1060,7 @@ fn handle_connection(mut stream: std::net::TcpStream, project_root: &Path) {
     let _ = stream.flush();
 }
 
-/// Generate a minimal HTML shell for development (no hardcode in binary).
+/// Generate a minimal HTML shell for development (fallback).
 fn generate_html_shell() -> String {
     r#"<!DOCTYPE html>
 <html lang="en">

@@ -183,3 +183,4 @@ if (typeof window !== 'undefined') {
     window.Binding = Binding;
     window.createKyleEvent = createKyleEvent;
 }
+//# sourceURL=reactivity.js
