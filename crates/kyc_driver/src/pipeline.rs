@@ -1104,8 +1104,16 @@ impl Pipeline {
         }
 
         let context = Context::create();
+        let is_freestanding = target == Some("freestanding");
         let codegen = if let Some(triple) = target {
-            Codegen::new_with_target(&context, "ky_module", triple)
+            if triple == "freestanding" {
+                // Freestanding: use host triple but skip runtime
+                let mut cg = Codegen::new(&context, "ky_module");
+                cg.is_freestanding = true;
+                cg
+            } else {
+                Codegen::new_with_target(&context, "ky_module", triple)
+            }
         } else {
             Codegen::new(&context, "ky_module")
         };
@@ -1137,7 +1145,9 @@ impl Pipeline {
 
         // Link (ThinLTO in release mode)
         let is_release = optimization == OptimizationLevel::Aggressive;
-        let linker = if let Some(triple) = target {
+        let linker = if is_freestanding {
+            Linker::new_with_target("freestanding")
+        } else if let Some(triple) = target {
             Linker::new_with_target(triple)
         } else {
             Linker::new()

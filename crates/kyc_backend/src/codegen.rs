@@ -30,6 +30,7 @@ pub struct Codegen<'ctx> {
     field_ptr_allocas: Vec<Option<PointerValue<'ctx>>>,
     field_ptr_types: HashMap<usize, BasicTypeEnum<'ctx>>,
     needs_main_wrapper: bool,
+    pub is_freestanding: bool,
     /// Local IDs holding struct values via pointer (pass-by-reference semantics).
     /// Maps local_id → the original LLVM struct type (used for GEP/load).
     ref_param_struct_types: HashMap<usize, BasicTypeEnum<'ctx>>,
@@ -155,16 +156,22 @@ impl<'ctx> Codegen<'ctx> {
             field_ptr_allocas: Vec::new(),
             field_ptr_types: HashMap::new(),
             needs_main_wrapper: false,
+            is_freestanding: false,
             ref_param_struct_types: HashMap::new(),
             tbaa_nodes: HashMap::new(),
         }
     }
 
     pub fn new_with_target(context: &'ctx Context, module_name: &str, target_triple: &str) -> Self {
+        let is_freestanding = target_triple == "freestanding";
         let mut cg = Self::new(context, module_name);
         cg.target_triple = Some(target_triple.to_string());
-        let triple = inkwell::targets::TargetTriple::create(target_triple);
-        cg.module.set_triple(&triple);
+        cg.is_freestanding = is_freestanding;
+        // For freestanding, don't set host triple (use the native one)
+        if !is_freestanding {
+            let triple = inkwell::targets::TargetTriple::create(target_triple);
+            cg.module.set_triple(&triple);
+        }
         cg
     }
 
@@ -314,6 +321,8 @@ impl<'ctx> Codegen<'ctx> {
         let ssa_fns = result.ssa_functions;
         let non_ssa_fns = result.non_ssa_functions;
 
+        // Always declare runtime externs so LLVM IR is valid.
+        // In freestanding mode, the kernel must provide its own implementations.
         self.declare_runtime_externs();
 
         for ssa_fn in &ssa_fns {
@@ -328,7 +337,7 @@ impl<'ctx> Codegen<'ctx> {
         for func in &non_ssa_fns {
             self.compile_function(func)?;
         }
-        if self.needs_main_wrapper {
+        if self.needs_main_wrapper && !self.is_freestanding {
             self.generate_main_wrapper()?;
         }
         if let Err(e) = self.module.verify() {
@@ -346,7 +355,9 @@ impl<'ctx> Codegen<'ctx> {
                  else { self.llvm_type(p).into() })
             .collect();
 
-        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+        let fn_name = if self.is_freestanding {
+            &func.name
+        } else if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
             self.needs_main_wrapper = true; "kyle_main"
         } else { &func.name };
         let fn_type = ret_type.fn_type(&param_types, false);
@@ -379,7 +390,9 @@ impl<'ctx> Codegen<'ctx> {
     /// - `alloca_current` (global) tracks the current LLVM value for each promoted alloca
     /// - Phi nodes in LLVM carry cross-block values; `alloca_current` seeds per-block start
     fn compile_ssa_function(&mut self, func: &SsaFunction) -> Result<(), String> {
-        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+        let fn_name = if self.is_freestanding {
+            &func.name
+        } else if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
             "kyle_main"
         } else { &func.name };
         let fn_value = *self.fn_value_map.get(fn_name)
@@ -2872,7 +2885,10 @@ impl<'ctx> Codegen<'ctx> {
 
         // If main has a list parameter (e.g. args: [str]), rename to kyle_main
         // and generate a C-compatible main(i32, ptr) wrapper later.
-        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+        // In freestanding mode, keep function names as-is (no main wrapper).
+        let fn_name = if self.is_freestanding {
+            &func.name
+        } else if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
             self.needs_main_wrapper = true;
             "kyle_main"
         } else {
@@ -2902,7 +2918,9 @@ impl<'ctx> Codegen<'ctx> {
     }
 
     fn compile_function(&mut self, func: &MirFunction) -> Result<(), String> {
-        let fn_name = if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
+        let fn_name = if self.is_freestanding {
+            &func.name
+        } else if func.name == "main" && func.params.len() == 1 && matches!(&func.params[0], MirType::List(_)) {
             "kyle_main"
         } else {
             &func.name

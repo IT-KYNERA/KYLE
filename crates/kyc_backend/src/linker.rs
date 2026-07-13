@@ -18,8 +18,25 @@ impl Linker {
         self.target_triple.as_ref().map_or(false, |t| t.contains(suffix))
     }
 
+    fn is_freestanding(&self) -> bool {
+        self.target_triple.as_deref() == Some("freestanding")
+    }
+
     fn linker_cmd(&self) -> Command {
         let host_os = std::env::consts::OS;
+
+        // Freestanding: use native host linker (clang or cc)
+        if self.is_freestanding() {
+            if Command::new("clang").arg("--version").output().is_ok() {
+                return Command::new("clang");
+            }
+            if Command::new("cc").arg("--version").output().is_ok() {
+                return Command::new("cc");
+            }
+            // Fallback to ld (may need manual linking)
+            return Command::new("ld");
+        }
+
         // Cross-compilation: use appropriate linker based on target
         if self.is_target("windows") || self.is_target("win32") {
             if Command::new("clang").arg("--version").output().is_ok() {
@@ -80,6 +97,16 @@ impl Linker {
         }
 
         let mut cmd = self.linker_cmd();
+
+        // Freestanding: use _start as entry point instead of main
+        // We still link the runtime library (for ky_alloc, etc.)
+        // The user's _start function replaces C's main as entry point.
+        // NOTE: For a true bare-metal kernel, you'd also need -nostdlib -nostartfiles
+        // and a bare-metal version of the runtime. That comes in Phase 3.
+        if self.is_freestanding() {
+            cmd.arg("-e").arg("_start");
+        }
+
         cmd.arg("-o").arg(output);
 
         if release {
@@ -129,8 +156,9 @@ impl Linker {
             cmd.arg("-lm");
         }
 
-        // Native macOS linking (only for native target, not cross-compile)
-        if self.target_triple.is_none() && std::env::consts::OS == "macos" {
+        // macOS-specific: frameworks and Homebrew paths
+        // (also applies to freestanding since we still link the runtime)
+        if (self.target_triple.is_none() || self.is_freestanding()) && std::env::consts::OS == "macos" {
             let ver = std::env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| {
                 std::process::Command::new("sw_vers")
                     .arg("-productVersion")

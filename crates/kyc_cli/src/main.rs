@@ -171,7 +171,7 @@ fn build_target(args: &[String]) -> Option<String> {
     let first = args.iter().skip(2).find(|a| !a.starts_with("--") && *a != "--release");
     if let Some(f) = first {
         match f.as_str() {
-            "web" | "desktop" | "ios" | "native" => return Some(f.clone()),
+            "web" | "desktop" | "ios" | "native" | "freestanding" => return Some(f.clone()),
             _ => {}
         }
     }
@@ -186,17 +186,18 @@ fn cmd_build(args: &[String]) {
     let is_desktop = target.as_deref() == Some("desktop") || target.as_deref() == Some("native");
     let is_ios = target.as_deref() == Some("ios") || target.as_deref() == Some("iphone");
     let is_web = target.as_deref() == Some("web") || target.as_deref() == Some("wasm32");
+    let is_freestanding = target.as_deref() == Some("freestanding");
     let ui_backend_name = if is_ios { Some("ios") } else if is_desktop { Some("desktop") } else if is_web { Some("web") } else { None };
     let file_arg = first_file_arg(args);
 
     // In project mode, filter out the target keyword from file_arg
     let file_arg = if let Some(ref f) = file_arg {
         match f.as_str() {
-            "web" | "desktop" | "ios" | "native" => {
+            "web" | "desktop" | "ios" | "native" | "freestanding" => {
                 // Find next non-flag, non-target arg
                 args.iter().skip(2).filter(|a| {
                     !a.starts_with("--") && *a != "--release"
-                        && *a != "web" && *a != "desktop" && *a != "ios" && *a != "native"
+                        && *a != "web" && *a != "desktop" && *a != "ios" && *a != "native" && *a != "freestanding"
                 }).next().cloned()
             }
             _ => file_arg
@@ -220,7 +221,19 @@ fn cmd_build(args: &[String]) {
             let build_dir = project_root.join("target").join(if release { "release" } else { "debug" });
             let _ = fs::create_dir_all(&build_dir);
 
-            if let Some(backend_name) = ui_backend_name {
+            if is_freestanding {
+                // Freestanding: compile raw .ky to kernel binary (no UI, no runtime)
+                let output = exe_path(&build_dir.join("kernel"));
+                let build_result = if release {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_release_target(&source, &file, &output, &build_dir, Some("freestanding"))
+                } else {
+                    kyc_driver::pipeline::Pipeline::build_source_with_artifacts_target(&source, &file, &output, &build_dir, Some("freestanding"))
+                };
+                match build_result {
+                    Ok(()) => println!("Build complete (freestanding): {}", output.display()),
+                    Err(e) => { eprintln!("Build error: {}", e); process::exit(1); }
+                }
+            } else if let Some(backend_name) = ui_backend_name {
                 if is_kyx_file(&file) {
                     build_ui_backend_kyx(&source, &file, &build_dir, backend_name, release);
                 }
