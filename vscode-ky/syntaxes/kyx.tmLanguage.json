@@ -4,7 +4,8 @@
   "scopeName": "source.kyx",
   "patterns": [
     { "include": "#comments" },
-    { "include": "#view_decl" },
+    { "include": "#import_decl" },
+    { "include": "#link_directive" },
     { "include": "#style_decl" },
     { "include": "#theme_decl" },
     { "include": "#kyle_block" },
@@ -21,17 +22,27 @@
         { "name": "comment.line.number-sign.kyx", "match": "#[^#].*$|#$" }
       ]
     },
-    "view_decl": {
-      "name": "meta.view-declaration.kyx",
-      "match": "\\b(view)\\s*\\(\\s*\"([^\"]*)\"\\s*\\)",
+    "import_decl": {
+      "name": "meta.import.kyx",
+      "match": "\\b(from)\\s+([a-zA-Z_.][a-zA-Z0-9_.]*)\\s+(import)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
       "captures": {
-        "1": { "name": "keyword.declaration.view.kyx" },
+        "1": { "name": "keyword.control.import.kyx" },
+        "2": { "name": "entity.name.module.kyx" },
+        "3": { "name": "keyword.control.import.kyx" },
+        "4": { "name": "entity.name.function.kyx" }
+      }
+    },
+    "link_directive": {
+      "name": "meta.link-directive.kyx",
+      "match": "(@link)\\s+\"([^\"]*)\"",
+      "captures": {
+        "1": { "name": "keyword.directive.link.kyx" },
         "2": { "name": "string.quoted.double.kyx" }
       }
     },
     "style_decl": {
       "name": "meta.style-declaration.kyx",
-      "begin": "\\b(style|layout|tpl|animation)\\s*<([^>]+)>\\s*([A-Za-z_]\\w*)\\s*:",
+      "begin": "\\b(style|layout|animation)\\s*<([^>]+)>\\s*([A-Za-z_]\\w*)\\s*:",
       "end": "(?=^\\S|\\z)",
       "beginCaptures": {
         "1": { "name": "keyword.declaration.style.kyx" },
@@ -93,9 +104,13 @@
       "beginCaptures": {
         "1": { "name": "entity.name.tag.kyx" }
       },
+      "endCaptures": {
+        "1": { "name": "entity.name.tag.kyx" }
+      },
       "patterns": [
         { "include": "#xml_attr" },
         { "include": "#xml_attr_expr" },
+        { "include": "#import_decl" },
         { "include": "#kyle_block" },
         { "include": "#at_directive" },
         { "include": "#xml_element" },
@@ -103,8 +118,12 @@
         { "include": "#xml_slot" },
         { "include": "#kyle_inline" },
         { "include": "#strings" },
-        { "match": "</?([a-zA-Z_][a-zA-Z0-9_]*)>", "captures": { "1": { "name": "entity.name.tag.kyx" } } }
+        { "include": "#closing_tag" }
       ]
+    },
+    "closing_tag": {
+      "name": "entity.name.tag.kyx",
+      "match": "</([a-zA-Z_][a-zA-Z0-9_]*)>"
     },
     "xml_self_closing": {
       "name": "meta.xml-self-closing.kyx",
@@ -119,11 +138,8 @@
       ]
     },
     "xml_slot": {
-      "name": "meta.xml-slot.kyx",
-      "match": "<slot\\b[^>]*/?>",
-      "captures": {
-        "0": { "name": "entity.name.tag.slot.kyx" }
-      }
+      "name": "entity.name.tag.slot.kyx",
+      "match": "<slot\\b[^>]*/?>"
     },
     "xml_attr": {
       "name": "meta.xml-attribute.kyx",
@@ -204,7 +220,7 @@
     },
     "keywords_declaration": {
       "name": "keyword.declaration.kyx",
-      "match": "\\b(fn|class|final|abstract|enum|contract|type|static|prop|get|set)\\b"
+      "match": "\\b(fn|class|final|abstract|enum|contract|type|static|prop|get|set|from|import)\\b"
     },
     "keywords_operator": {
       "name": "keyword.operator.kyx",
@@ -212,15 +228,15 @@
     },
     "types_primitive": {
       "name": "storage.type.primitive.kyx",
-      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|char|str|ptr|void)\\b"
+      "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|char|str|ptr|void|any|bytes)\\b"
     },
     "types_complex": {
       "name": "storage.type.complex.kyx",
-      "match": "\\b(list|dict|set|Option|Result|future|channel|mutex|atomic)\\b"
+      "match": "\\b(list|dict|set|Option|Result|future|channel|mutex|atomic|file_data|color|spacing)\\b"
     },
     "builtins": {
       "name": "support.function.builtin.kyx",
-      "match": "\\b(print|println|input|error|ok|some|none|assert|range|len|to_str|to_i32|to_f64|str_builder|route_params|navigate|thread|parallel)\\b"
+      "match": "\\b(print|println|input|error|ok|some|none|assert|range|len|to_str|to_i32|to_f64|str_builder|route_params|navigate|navigate_back|navigate_replace|set_title|set_meta|thread|parallel|color|spacing)\\b"
     },
     "operators": {
       "name": "keyword.operator.kyx",
@@ -228,7 +244,7 @@
     },
     "variable_decl": {
       "name": "variable.other.kyx",
-      "match": "\\b([a-z_][a-zA-Z0-9_]*)\\s*(?=:=|:\\s*(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|char|str|ptr|void|\\^|&))"
+      "match": "\\b([a-z_][a-zA-Z0-9_]*)\\s*(?=:=|:\\s*(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool|char|str|ptr|void|bytes|\\^|&))"
     },
     "property_access": {
       "name": "variable.other.property.kyx",
