@@ -121,6 +121,35 @@ Una vez importado, se usa como tag nativo:
 
 Los componentes nativos (`view`, `vstack`, `text`, etc.) NO requieren import — son built-in.
 
+### 2.2.1 Importar solo estilos
+
+Un archivo con solo declaraciones `style<>` se importa igual y sus estilos se mezclan automáticamente:
+
+```kyx
+# src/components/theme.kyx — solo estilos, sin markup
+style<button> Primary:
+    background = color("#0066FF")
+    color = color("#FFFFFF")
+    border_radius = 8
+
+style<text> Title:
+    font_size = 24
+    font_weight = font_weight.bold
+```
+
+```kyx
+# app.kyx
+from components.theme import theme  # estilos mezclados automáticamente
+
+<app title="App">
+    <router>
+        <route path="/" component=home layout=main />
+    </router>
+</app>
+```
+
+El nombre `theme` queda disponible como referencia (aunque no tenga body). Los estilos `Primary` y `Title` se pueden usar en cualquier vista del proyecto.
+
 ### 2.3 Uso declarativo (`.kyx`)
 
 ```kyx

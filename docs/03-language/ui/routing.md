@@ -138,7 +138,7 @@ struct RouteConfig:
 Uso en `.kyx`:
 
 ```kyx
-<route path="/admin" component=@admin_panel layout=@admin_layout
+<route path="/admin" component=admin_panel layout=admin_layout
     guard=@auth_guard title="Admin Panel"
     target(Target.web):
         meta_description = "Panel de administración"
@@ -202,12 +202,12 @@ El layout se monta UNA VEZ. Solo el `<slot />` se re-renderiza al navegar.
 
 ```kyx
 <router>
-    <route path="/" component=@home layout=@main_layout title="Home" />
-    <route path="/login" component=@login layout=@blank_layout title="Login" />
-    <route path="/dashboard" component=@dashboard layout=@main_layout
+    <route path="/" component=home layout=main title="Home" />
+    <route path="/login" component=login layout=blank title="Login" />
+    <route path="/dashboard" component=dashboard layout=main
         guard=@auth_guard title="Dashboard"
     />
-    <route path="*" component=@not_found layout=@main_layout title="404" />
+    <route path="*" component=not_found layout=main title="404" />
 </router>
 ```
 
@@ -273,7 +273,7 @@ set_meta("description", "Página de inicio de sesión")
 ### 5.1 Sintaxis `{param}`
 
 ```kyx
-<route path="/users/{id}" component=@user_view layout=@main_layout
+<route path="/users/{id}" component=user_view layout=main
     title=@"'Perfil de ' + params.get('id')"
 />
 ```
@@ -320,7 +320,7 @@ set_meta("description", "Página de inicio de sesión")
 
 ```kyx
 <router>
-    <route path="/dashboard" component=@dashboard layout=@main_layout
+    <route path="/dashboard" component=dashboard layout=main
         guard=@auth_guard title="Dashboard"
     />
     <route path="/admin" component=@admin_panel layout=@admin_layout
@@ -365,7 +365,7 @@ fn admin_guard(ctx: NavCtx) bool:
 ## 7. 404 / Catch-all
 
 ```kyx
-<route path="*" component=@not_found_view layout=@main_layout title="No Encontrado" />
+<route path="*" component=not_found layout=main title="No Encontrado" />
 ```
 
 ```kyx
@@ -382,7 +382,7 @@ fn admin_guard(ctx: NavCtx) bool:
 
 ```kyx
 <router>
-    <route path="/" component=@home_view />         # eager
+    <route path="/" component=home />         # eager
     <route path="/heavy" component=@heavy_view
         lazy=true                                   # carga diferida
     />
@@ -403,8 +403,8 @@ const routes = {
 
 ```kyx
 <router transition=PageSlide transition_duration=300>
-    <route path="/" component=@home_view />
-    <route path="/login" component=@login_view />
+    <route path="/" component=home />
+    <route path="/login" component=login />
 </router>
 ```
 
@@ -417,7 +417,7 @@ Ver [animation.md](animation.md) para tipos de transición.
 ### 10.1 Por ruta
 
 ```kyx
-<route path="/profile" component=@profile_view layout=@main_layout
+<route path="/profile" component=@profile_view layout=main
     target(Target.ios):
         large_title = true
         hides_bottom_bar = false
@@ -506,7 +506,7 @@ Funciones built-in disponibles:
 | Reemplazar | `navigate_replace("/path")` |
 | Título dinámico | `set_title("Nuevo Título")` |
 | Guard | `<route guard=@fn />` |
-| 404 | `<route path="*" component=@not_found />` |
+| 404 | `<route path="*" component=not_found />` |
 | Config plataforma | `target(Target.web): port = 8080` |
 | Route struct | `RouteConfig { path, component, layout, title, guard, icon, lazy }` |
 
