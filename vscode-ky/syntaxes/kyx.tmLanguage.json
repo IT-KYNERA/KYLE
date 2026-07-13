@@ -13,7 +13,8 @@
     { "include": "#xml_element" },
     { "include": "#xml_self_closing" },
     { "include": "#xml_slot" },
-    { "include": "#kyle_inline" }
+    { "include": "#kyle_inline" },
+    { "include": "#closing_tag" }
   ],
   "repository": {
     "comments": {
@@ -117,8 +118,7 @@
         { "include": "#xml_self_closing" },
         { "include": "#xml_slot" },
         { "include": "#kyle_inline" },
-        { "include": "#strings" },
-        { "include": "#closing_tag" }
+        { "include": "#strings" }
       ]
     },
     "closing_tag": {

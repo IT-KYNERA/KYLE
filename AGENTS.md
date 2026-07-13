@@ -23,21 +23,42 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 
 | Area | Status |
 |------|--------|
-| **Compiler (Fases 1-17)** | ✅ **Complete** — Lexer, parser, semantic, MIR, SSA, LLVM codegen, O3 pipeline |
-| **Types (46 total)** | ✅ **Complete** — 14 primitives, 7 compound, 6 ownership, 5 concurrency, 14 specialized |
+| **Compiler (Fases 1-17)** | ✅ **Complete** |
+| **Types (46 total)** | ✅ **Complete** |
 | **Borrow checker** | ✅ **Complete** |
-| **Cross-platform** | ✅ **Complete** — macOS ARM, Linux ARM/x64, Windows x64 (4 platforms via CI) |
-| **Tooling** | ✅ **Complete** — LSP, cross-platform VS Code ext, formatter, test framework, package manager |
-| **FFI (extern fn, @link, ptr)** | ✅ **Complete** — Pure Kyle FFI to C libraries |
+| **Cross-platform build** | ✅ **Complete** — macOS ARM, Linux ARM/x64, Windows x64 |
+| **Tooling** | ✅ **Complete** — LSP, formatter, test framework, package manager |
+| **FFI (extern fn, @link, ptr)** | ✅ **Complete** |
 | **Runtime in Kyle** | ✅ **Complete** |
-| **kyc_platform** | ✅ **Complete** |
-| **UI framework (16 design docs)** | ✅ **FASE A-C completa** — UI-IR, Web Backend (ESM), `ky run` unificado |
-| **Diseño v2 (RFC-0005)** | ✅ **Aprobado** — Rutas centralizadas, props via visibilidad, layouts persistentes, targets por SO |
-| **Routing + Module Resolver** | 📅 **v0.8.0** — `<router>`, `<route>`, `<layout>`, `<slot>`, props via `_name` |
-| **Desktop nativos (macOS/Windows/Linux)** | 📅 **FASE D** — Pendiente |
-| **iOS / Android** | 📅 **FASE E** — Pendiente |
-| **Terminal / TUI** | 📅 **FASE F** — Pendiente |
-| **u8-u64 codegen** | ✅ **Complete** — MirType, unsigned ops, zext for call args |
+| **kyc_platform** (fs, time) | ✅ **Complete** |
+| **u8-u64 codegen** | ✅ **Complete** |
+| **HTTP / JSON / SQLite packages** | ✅ **Complete** |
+| **VSCode extension** | ✅ Syntax highlighting, snippets (48 kyui), LSP, debugger, testing UI |
+| | |
+
+### UI Framework (v0.8.0) — Estado por funcionalidad
+
+| Funcionalidad | Estado | Detalle |
+|--------------|:------:|---------|
+| **Web backend** | ✅ **Funcional** | Genera ESM JS, HTML con CSS reset, router automático |
+| **`ky new kyui` template** | ✅ **Funcional** | `app.kyx` + `src/views/` + `src/layouts/` + imports |
+| **Routing** (`<router>`, `<route>`) | ✅ **Funcional** | Centralizado, rutas por path, wildcard `*` |
+| **Layout persistente** (`<layout>`, `<slot>`) | ✅ **Funcional** | Se genera como función render separada |
+| **Module resolver** (`from X import Y`) | ✅ **Funcional** | Resuelve imports + auto-detecta tags custom |
+| **File picker** (`<file_picker>`) | ✅ **Funcional** | Web: `<input type="file">` + FileReader + `file_data` |
+| **Form models** (`<form model=@form>`) | ✅ **Funcional** | `field="name"` binding automático a modelo |
+| **Styles** (`style<button> Primary:`) | ✅ **Funcional** | CSS generado correctamente (`color("#...")` → `'#...'`) |
+| **navigate() / set_title() / <link>** | ✅ **Funcional** | Built-in en runtime JS |
+| **Document title / icon** | ✅ **Funcional** | `document.title` desde `<app title="...">` |
+| **CSS reset** | ✅ **Funcional** | `* { margin:0; padding:0 }` en HTML generado |
+| **Component tags** (vstack, hstack, etc.) | ✅ **Funcional** | 46 tipos nativos en ComponentTag |
+| **Condicionales / loops / match** | ✅ **Funcional** | `@if`, `@for`, `@match` en templates |
+| | | |
+| **Desktop backend (SDL2)** | 🟡 **Roto** | Sin `SDL_PollEvent`, ventana no responsive, solo 11/46 tags |
+| **iOS backend (SwiftUI)** | 🟡 **Roto** | Swift inválido (`.fontWeight(.bold())`, `Color(hex:)`), routes ignorados |
+| **WASM target** | ❌ **No probado** | `kyc_runtime_wasm` excluded de tests |
+| **Android backend** | ❌ **No existe** | Pendiente |
+| **Terminal / TUI backend** | ❌ **No existe** | Pendiente |
 
 See [ROADMAP.md](ROADMAP.md) for full implementation plan.
 
@@ -165,6 +186,9 @@ ky/
 | UI framework (.kyx + imports) | `docs/03-language/syntax/ui-syntax.md` |
 | UI routing | `docs/03-language/ui/routing.md` |
 | UI layout + slots | `docs/03-language/ui/composition.md` |
+| File picker | `docs/03-language/ui/file-picker.md` |
+| Form models | `docs/03-language/ui/state-events.md` (Section 8) |
+| VSCode extension | `docs/07-tools/vscode-extension.md` |
 | UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |
 | Multi-platform install | `docs/07-tools/distribution.md` |
 | Runtime internals | `docs/05-runtime/` |
