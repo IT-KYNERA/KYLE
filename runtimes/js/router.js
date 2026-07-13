@@ -13,8 +13,13 @@ export class Route {
     }
 
     // Compile "/users/{id}" → /^\/users\/([^\/]+)$/
+    // Special case: "*" → /^.*$/ (catch-all wildcard)
     _compilePattern(pattern) {
         this._paramNames = [];
+        // Wildcard catch-all
+        if (pattern === '*' || pattern === '/*') {
+            return new RegExp('^.*$');
+        }
         const parts = pattern.replace(/\*$/, '.*').split(/\{(\w+)\}/);
         let regexStr = '^';
         for (let i = 0; i < parts.length; i++) {

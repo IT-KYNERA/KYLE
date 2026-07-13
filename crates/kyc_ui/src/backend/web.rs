@@ -588,7 +588,10 @@ fn gen_attrs(attrs: &[UiAttr], js: &mut String, indent: usize, el: &str) {
                             let js_expr = kyle_to_js_expr(expr);
                             js.push_str(&format!("{}const __upd = () => {{ {}.textContent = {}; }};\n", ind, el, js_expr));
                             js.push_str(&format!("{}__upd();\n", ind));
-                            js.push_str(&format!("{}state.watch('count', __upd);\n", ind));
+                            let state_keys = extract_state_keys(expr);
+                            for key in &state_keys {
+                                js.push_str(&format!("{}state.watch({:?}, __upd);\n", ind, key));
+                            }
                         }
                     }
                     "tpl" => {
@@ -1323,16 +1326,128 @@ fn translate_kyle_block_to_js(block: &str) -> String {
     js
 }
 
-/// Translate a Kyle expression to JS, replacing state vars and method names.
+/// Known JS/Kyle built-in identifiers that should NOT be replaced with state.get()
+const JS_BUILTINS: &[&str] = &[
+    "true", "false", "null", "undefined",
+    "state", "navigate", "set_title", "set_meta", "routeParams",
+    "navigate_back", "navigate_replace",
+    "if", "else", "for", "while", "return", "fn",
+    "new", "this", "typeof", "instanceof", "in", "of",
+    "console", "window", "document",
+    "Math", "JSON", "Array", "Object", "String", "Number",
+    "Boolean", "Map", "Set", "Promise", "Error",
+    "parseInt", "parseFloat", "isNaN", "isFinite",
+    "event", "e", "file", "fileData", "files",
+    "el", "container", "params",
+];
+
+/// Check if a token is a known JS/Kyle built-in (not a state variable)
+fn is_builtin(token: &str) -> bool {
+    JS_BUILTINS.contains(&token)
+}
+
+/// Extract potential state variable names from an expression.
+fn extract_state_keys(expr: &str) -> Vec<String> {
+    let mut keys = Vec::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut chars = expr.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '"' || c == '\'' {
+            in_string = !in_string;
+            flush_ident(&mut current, &mut keys);
+            continue;
+        }
+        if in_string {
+            continue;
+        }
+        if c.is_alphanumeric() || c == '_' {
+            current.push(c);
+        } else {
+            if c != '.' {
+                flush_ident(&mut current, &mut keys);
+            }
+        }
+    }
+    flush_ident(&mut current, &mut keys);
+    keys
+}
+
+fn flush_ident(current: &mut String, keys: &mut Vec<String>) {
+    if !current.is_empty() {
+        let token = current.clone();
+        if !is_builtin(&token) {
+            keys.push(token);
+        }
+        current.clear();
+    }
+}
+
+/// Translate a Kyle expression to JS, replacing state vars with state.get()
 fn kyle_to_js_expr(expr: &str) -> String {
+    // Phase 1: shorten Kyle method names to JS equivalents
     let mut result = expr.to_string();
-    // Replace .to_str() with .toString()
     result = result.replace(".to_str()", ".toString()");
     result = result.replace(".to_string()", ".toString()");
-    // Replace common Kyle variable references with state.get(...)
-    // We handle known state keys from the code blocks
-    result = result.replace("count", "state.get('count')");
-    result
+    result = result.replace(".len()", ".length");
+    result = result.replace(".is_empty()", " === ''");
+    result = result.replace(".contains(", ".includes(");
+
+    // Phase 2: Replace state variable references with state.get('var')
+    // We scan for identifiers (outside strings) and wrap them in state.get()
+    let mut out = String::new();
+    let mut current = String::new();
+    let mut in_string = false;
+    let mut after_dot = false;
+    let mut chars = result.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '"' || c == '\'' {
+            flush_token(&mut current, &mut out, after_dot, true);
+            in_string = !in_string;
+            out.push(c);
+            after_dot = false;
+            continue;
+        }
+        if in_string {
+            out.push(c);
+            continue;
+        }
+        if c.is_alphanumeric() || c == '_' {
+            current.push(c);
+        } else {
+            if c == '(' {
+                // Function call — don't wrap function name
+                flush_token(&mut current, &mut out, false, false);
+                out.push(c);
+                after_dot = false;
+            } else if c == '.' {
+                flush_token(&mut current, &mut out, false, false);
+                after_dot = true;
+                out.push(c);
+            } else {
+                flush_token(&mut current, &mut out, after_dot, false);
+                out.push(c);
+                after_dot = false;
+            }
+        }
+    }
+    flush_token(&mut current, &mut out, after_dot, false);
+
+    out
+}
+
+fn flush_token(current: &mut String, out: &mut String, after_dot: bool, in_string: bool) {
+    if !current.is_empty() {
+        let token = current.clone();
+        if after_dot || in_string || is_builtin(&token) || token.starts_with("state.") {
+            out.push_str(&token);
+        } else {
+            out.push_str(&format!("state.get('{}')", token));
+        }
+        current.clear();
+    }
 }
 
 #[cfg(test)]
