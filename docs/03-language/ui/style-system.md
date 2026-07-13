@@ -275,31 +275,20 @@ style<button> Secondary:
 
 ### 3.2 Layouts
 
-```kyle
-layout<vstack> Center:
-    align_items = alignment.center
-    justify_content = alignment.center
-    gap = 16
+Los layouts se definen inline con props de flex en cada componente:
 
-layout<hstack> SpaceBetween:
-    justify_content = alignment.space_between
-    align_items = alignment.center
+```kyx
+<vstack alignment=alignment.center spacing=16>
+    <text value="Centrado" />
+</vstack>
+
+<hstack alignment=alignment.center spacing=8>
+    <button text="Aceptar" />
+    <button text="Cancelar" />
+</hstack>
 ```
 
-### 3.3 Templates (combinan style + layout + animation)
-
-```kyle
-tpl<button> Primary:
-    style = Primary
-    animation = ripple_animation
-    cursor = cursor.pointer
-    ripple = true
-
-tpl<card> Elevated:
-    style = elevated_card_style
-    animation = hover_elevation
-    shadow = shadow(0, 4, 8, 0, color.black().with_alpha(0.15))
-```
+No hay `layout<>` nombrados — se usa directamente `alignment=`, `spacing=`, `gap=`.
 
 ### 3.4 Themes
 
@@ -355,9 +344,9 @@ theme DarkTheme: LightTheme:
 ### 4.1 Aplicar estilo
 
 ```kyx
-<button tpl=Primary text="Ingresar" />
+<button style=Primary text="Ingresar" />
 <button style=Secondary text="Cancelar" />
-<card tpl=Elevated>
+<card style=Elevated>
     <text value="Contenido" />
 </card>
 ```
@@ -383,6 +372,19 @@ theme DarkTheme: LightTheme:
 ---
 
 ## 5. Compilación por Target
+
+### 5.0 CSS Reset
+
+Por defecto, el HTML generado incluye un CSS reset que elimina estilos default del navegador:
+
+```css
+* { margin: 0; padding: 0; box-sizing: border-box; }
+button, input, select, textarea { font: inherit; border: none; background: none; outline: none; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+```
+
+Esto asegura que los componentes Kyle se vean igual en todos los navegadores, sin margenes, paddings, ni bordes predeterminados.
 
 ### 5.1 Web target
 

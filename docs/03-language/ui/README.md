@@ -6,7 +6,7 @@ Esta sección contiene la documentación de diseño del framework UI de Kyle.
 
 | Documento | Descripción |
 |-----------|-------------|
-| [style-system.md](style-system.md) | Sistema de estilos tipado (Color, Spacing, Layout, Theme, Responsive) |
+| [style-system.md](style-system.md) | Sistema de estilos tipado (color, spacing, layout, theme, responsive, CSS reset) |
 | [state-events.md](state-events.md) | Estado, eventos, binding, formularios, validación |
 | [animation.md](animation.md) | Animaciones y transiciones (tipadas, multi-target) |
 | [routing.md](routing.md) | Routing centralizado, `<route>`, `<layout>`, `<slot>`, guards, navegación |

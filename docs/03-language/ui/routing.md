@@ -31,11 +31,11 @@ enum Target:
 ```
 <app>                                    ← 1 ventana nativa (UIWindowScene / NSWindow / HWND / Activity)
   └── <router>                           ← NavigationStack / History API / NavHost
-        ├── <route path="/" ...>         ← home renderizado DENTRO de main_layout
+        ├── <route path="/" ...>         ← home renderizado DENTRO de main
         │     └── <layout>               ← PERSISTE: navbar, sidebar NO se refrescan
         │           └── <slot />         ← SOLO ESTO cambia
         │
-        ├── <route path="/login" ...>    ← login DENTRO de blank_layout
+        ├── <route path="/login" ...>    ← login DENTRO de blank
         │     └── <layout>
         │           └── <slot />
         │
@@ -138,7 +138,7 @@ struct RouteConfig:
 Uso en `.kyx`:
 
 ```kyx
-<route path="/admin" component=admin_panel layout=admin_layout
+<route path="/admin" component=admin_panel layout=admin
     guard=@auth_guard title="Admin Panel"
     target(Target.web):
         meta_description = "Panel de administración"
@@ -182,18 +182,18 @@ Cuando el usuario navega de `/` a `/login`:
 
 ```
 Antes:                      Después:
-<main_layout>               <main_layout>        ← PERSISTE (no se recrea)
+<main>               <main>        ← PERSISTE (no se recrea)
   <navbar />                  <navbar />         ← PERSISTE
   <vstack>                    <vstack>            ← PERSISTE
     <sidebar />                 <sidebar />       ← PERSISTE
     <main>                      <main>            ← PERSISTE
       <slot>                      <slot>
-        <home_view />    →         <login_view />  ← SOLO ESTO CAMBIA
+        <home />    →         <login />  ← SOLO ESTO CAMBIA
       </slot>                     </slot>
     </main>                     </main>
   </vstack>                   </vstack>
   <footer />                  <footer />          ← PERSISTE
-</main_layout>              </main_layout>
+</main>              </main>
 ```
 
 El layout se monta UNA VEZ. Solo el `<slot />` se re-renderiza al navegar.
@@ -211,10 +211,10 @@ El layout se monta UNA VEZ. Solo el `<slot />` se re-renderiza al navegar.
 </router>
 ```
 
-- `/` → main_layout con navbar + sidebar
-- `/login` → blank_layout (solo formulario, sin navbar)
-- `/dashboard` → main_layout (requiere auth)
-- `*` → main_layout (página no encontrada)
+- `/` → main con navbar + sidebar
+- `/login` → blank (solo formulario, sin navbar)
+- `/dashboard` → main (requiere auth)
+- `*` → main (página no encontrada)
 
 ---
 
@@ -256,7 +256,7 @@ set_meta("description", "Página de inicio de sesión")
 
 ```kyx
 # Desde la ruta (parámetro title del <route>)
-<route path="/profile" component=@profile_view title="Mi Perfil" />
+<route path="/profile" component=profile title="Mi Perfil" />
 ```
 
 ```kyx
@@ -273,13 +273,13 @@ set_meta("description", "Página de inicio de sesión")
 ### 5.1 Sintaxis `{param}`
 
 ```kyx
-<route path="/users/{id}" component=user_view layout=main
+<route path="/users/{id}" component=user layout=main
     title=@"'Perfil de ' + params.get('id')"
 />
 ```
 
 ```kyx
-# user_view.kyx
+# user.kyx
 <view>
     params: {str: str} = route_params()
     id: str = params.get("id") ?? ""
@@ -293,7 +293,7 @@ set_meta("description", "Página de inicio de sesión")
 ### 5.2 Múltiples parámetros
 
 ```kyx
-<route path="/posts/{year}/{slug}" component=@post_view />
+<route path="/posts/{year}/{slug}" component=post />
 ```
 
 ```kyx
@@ -307,7 +307,7 @@ set_meta("description", "Página de inicio de sesión")
 ### 5.3 Parámetros opcionales
 
 ```kyx
-<route path="/search/{query?}" component=@search_view />
+<route path="/search/{query?}" component=search />
 # /search/foo → params.query = "foo"
 # /search     → params.query = None
 ```
@@ -323,7 +323,7 @@ set_meta("description", "Página de inicio de sesión")
     <route path="/dashboard" component=dashboard layout=main
         guard=@auth_guard title="Dashboard"
     />
-    <route path="/admin" component=@admin_panel layout=@admin_layout
+    <route path="/admin" component=admin_panel layout=admin
         guard=@admin_guard title="Admin"
     />
 </router>
@@ -355,7 +355,7 @@ fn admin_guard(ctx: NavCtx) bool:
 | `before_leave` | Antes de salir | Confirmar cambios no guardados |
 
 ```kyx
-<route path="/edit" component=@edit_form
+<route path="/edit" component=edit_form
     before_leave=@fn (): has_unsaved_changes() ? confirm("¿Descartar?") : true
 />
 ```
@@ -383,7 +383,7 @@ fn admin_guard(ctx: NavCtx) bool:
 ```kyx
 <router>
     <route path="/" component=home />         # eager
-    <route path="/heavy" component=@heavy_view
+    <route path="/heavy" component=heavy
         lazy=true                                   # carga diferida
     />
 </router>
@@ -417,7 +417,7 @@ Ver [animation.md](animation.md) para tipos de transición.
 ### 10.1 Por ruta
 
 ```kyx
-<route path="/profile" component=@profile_view layout=main
+<route path="/profile" component=profile layout=main
     target(Target.ios):
         large_title = true
         hides_bottom_bar = false
@@ -497,7 +497,7 @@ Funciones built-in disponibles:
 
 | Concepto | Sintaxis |
 |----------|----------|
-| Ruta fija | `<route path="/" component=@comp />` |
+| Ruta fija | `<route path="/" component=comp />` |
 | Ruta con params | `<route path="/users/{id}" ... />` |
 | Layout persistente | `<layout><slot /></layout>` |
 | Link | `<link to="/path">texto</link>` |

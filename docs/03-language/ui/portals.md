@@ -93,12 +93,12 @@ sigue perteneciendo al componente que lo declara.
 @if show_modal:
     <portal target="body">
         <overlay>
-            <dialog tpl=Elevated>
+            <dialog style=Elevated>
                 <text value="¿Confirmar acción?" />
-                <row gap=8>
+                <hstack gap=8>
                     <button text="Aceptar" click=@confirm />
                     <button text="Cancelar" click=@close_modal />
-                </row>
+                </hstack>
             </dialog>
         </overlay>
     </portal>

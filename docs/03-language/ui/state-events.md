@@ -377,7 +377,7 @@ Runtime detecta cambios → re-renderiza
             error=if errors.contains("Email requerido"): "Requerido" else: "" />
         <password_field label="Contraseña" bind=@password
             error=if errors.contains("Contraseña requerida"): "Requerido" else: "" />
-        <button tpl=Primary text=@"Ingresar" disabled=@loading />
+        <button style=Primary text=@"Ingresar" disabled=@loading />
     </form>
 </view>
 ```
@@ -448,7 +448,7 @@ final class UserForm:
         <text_field field="email" label="Email" />
         <number_field field="age" label="Edad" />
         <file_picker field="avatar" accept="image/*" label="Foto de perfil" />
-        <button tpl=Primary text="Guardar" />
+        <button style=Primary text="Guardar" />
     </form>
 </view>
 ```

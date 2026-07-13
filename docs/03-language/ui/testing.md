@@ -46,7 +46,7 @@ from .lib import test, expect, render
 test("Button renders with text"):
     # Renderiza el componente en aislamiento
     btn = render("""
-        <button text="Click me" tpl=Primary />
+        <button text="Click me" style=Primary />
     """)
 
     expect(btn.text).to_equal("Click me")
@@ -69,7 +69,7 @@ test("Button with disabled state"):
 ```kyle
 test("Card renders slot content"):
     card = render("""
-        <card tpl=Elevated>
+        <card style=Elevated>
             <text value="Contenido" />
         </card>
     """)
@@ -188,7 +188,7 @@ test("Async data loading"):
 ```kyle
 test("Button snapshot"):
     btn = render("""
-        <button text="OK" tpl=Primary />
+        <button text="OK" style=Primary />
     """)
 
     expect(btn).to_match_snapshot("button-primary")

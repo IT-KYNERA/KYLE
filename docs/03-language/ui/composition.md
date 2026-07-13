@@ -76,9 +76,9 @@ Antes:                      Después:
 
 ```kyx
 <router>
-    <route path="/" component=@home layout=@main_layout />
-    <route path="/login" component=@login layout=@blank_layout />
-    <route path="/dashboard" component=@dashboard layout=@main_layout />
+    <route path="/" component=home layout=main />
+    <route path="/login" component=login layout=blank />
+    <route path="/dashboard" component=dashboard layout=main />
 </router>
 ```
 
@@ -170,15 +170,15 @@ El slot puede recibir datos del componente padre:
 ```kyx
 <data_table columns=@cols rows=@rows>
     <header>
-        <row>
+        <hstack>
             @for(col in data):
                 <text value=col.label />
-        </row>
+        </hstack>
     </header>
-    <row>
+    <hstack>
         <text value=data.name />
         <text value=data.email />
-    </row>
+    </hstack>
 </data_table>
 ```
 

@@ -63,7 +63,7 @@ la app se rompa.
 
 ```kyx
 <error_boundary>
-    @(fallback: ^View = error_view())
+    @(    fallback: ^view = error_view())
     <profile_card user_id=@user_id />
 </error_boundary>
 ```
@@ -314,7 +314,7 @@ Error boundaries en rutas:
         <home_view />
     </error_boundary>
     <error_boundary>
-        <route path="/dashboard" component=@dashboard_view />
+        <route path="/dashboard" component=dashboard />
     </error_boundary>
 </router>
 ```

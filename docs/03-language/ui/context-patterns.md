@@ -46,7 +46,7 @@ globales o compartidos.
 @(
     context ThemeContext:
         theme: Theme = DarkTheme
-        primary_color: Color = theme.primary
+        primary_color: color = theme.primary
 
     # Componentes hijos acceden con use_context()
     ctx = use_context(ThemeContext)

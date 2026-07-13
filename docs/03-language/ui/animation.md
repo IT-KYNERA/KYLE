@@ -10,7 +10,7 @@
 
 ## 1. Tipos de Animación
 
-### 1.1 AnimationState
+### 1.1 animation_state
 
 Estado animable en un fotograma. Es un tipo Kyle con todas las propiedades
 que pueden animarse:
@@ -31,7 +31,7 @@ final class animation_state:
     height: length?
 ```
 
-### 1.2 AnimationFrame
+### 1.2 animation_frame
 
 Un fotograma en la línea de tiempo:
 
@@ -195,7 +195,7 @@ enum AnimationType:
 )
 <view>
     <button
-        tpl=Primary
+        style=Primary
         text="Mostrar / Ocultar"
         click=@toggle
     />
@@ -296,11 +296,11 @@ fn animate_fade_in(el, start_time: i64):
 <style<card>> Elevated:
     background = color("#FFFFFF")
     border_radius = 8
-    shadow = Shadow(0, 2, 4, 0, Color.black().with_alpha(0.1))
+    shadow = shadow(0, 2, 4, 0, Color.black().with_alpha(0.1))
     transition = transition("all", 200, easing.ease_out, 0)
 
 <style<card>> ElevatedHover: Elevated:
-    shadow = Shadow(0, 8, 16, 0, Color.black().with_alpha(0.2))
+    shadow = shadow(0, 8, 16, 0, Color.black().with_alpha(0.2))
 
 <card
     style=if hover: ElevatedHover else: Elevated

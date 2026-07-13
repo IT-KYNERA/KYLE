@@ -358,7 +358,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 5. Variables y Binding
+## 4. Variables y Binding
 
 ### 5.1 Variables normales (no reactivas)
 
@@ -392,7 +392,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 6. Condicionales
+## 5. Condicionales
 
 ```kyx
 @if(user.is_admin):
@@ -406,7 +406,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 7. Match
+## 6. Match
 
 ```kyx
 @match(state):
@@ -420,7 +420,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 8. For
+## 7. For
 
 ```kyx
 @for(product in products):
@@ -429,7 +429,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 9. Eventos
+## 8. Eventos
 
 ```kyx
 <button click=@login />
@@ -444,7 +444,7 @@ Para expresiones pequeñas dentro del markup:
 
 ---
 
-## 10. Ciclo de Vida
+## 9. Ciclo de Vida
 
 ```kyle
 fn on_created(this):
@@ -465,7 +465,7 @@ fn on_error(this, error: str):
 
 ---
 
-## 11. Estilos
+## 10. Estilos
 
 ### 11.1 Estilos declarados
 
@@ -499,19 +499,9 @@ style<button> Secondary:
 
 ---
 
-## 12. Recursos (Template, Theme)
+## 11. Recursos (Theme)
 
-### 12.1 Templates
-
-```kyle
-tpl<button> Primary:
-    style = Primary
-    animation = ripple_animation
-    cursor = cursor.pointer
-    ripple = true
-```
-
-### 12.2 Themes
+### 12.1 Themes
 
 ```kyle
 theme LightTheme:
@@ -532,7 +522,7 @@ theme DarkTheme: LightTheme:
 
 ---
 
-## 13. Ejemplo completo: Login
+## 12. Ejemplo completo: Login
 
 ```kyx
 # app.kyx
@@ -587,7 +577,7 @@ from layouts.main import main
 
 ---
 
-## 14. Referencias
+## 13. Referencias
 
 - [routing.md](../ui/routing.md) — Routing y navegación
 - [state-events.md](../ui/state-events.md) — Estado y eventos
