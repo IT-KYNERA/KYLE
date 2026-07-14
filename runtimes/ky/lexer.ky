@@ -1,561 +1,309 @@
-# Lexer Kyle — Portado de Rust
-# Convierte source code (.ky) en tokens (TokenKind).
-
-# ===============================================================
-# Char helpers
-# ===============================================================
-
-fn is_alpha(c: str) bool:
-    return (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
-
-fn is_digit(c: str) bool:
-    return c >= "0" and c <= "9"
-
-fn is_alnum(c: str) bool:
-    return is_alpha(c) or is_digit(c)
-
-fn is_hex(c: str) bool:
-    return is_digit(c) or (c >= "a" and c <= "f") or (c >= "A" and c <= "F")
-
-fn is_ident_start(c: str) bool:
-    return is_alpha(c) or c == "_"
-
-fn is_ident_continue(c: str) bool:
-    return is_alnum(c) or c == "_"
-
-# ===============================================================
-# Token types
-# ===============================================================
+# Lexer Kyle — TODO inline dentro de tokenize, sin helpers ni borrows
 
 enum TokenKind:
-    Identifier(str)
-    Integer(str)
-    Float(str)
-    String(str)
-    Fn
-    If
-    Else
-    While
-    Return
-    True
-    False
-    KwNone
-    Plus
-    Minus
-    Star
-    Slash
-    Equals
-    EqualsEquals
-    Bang
-    BangEquals
-    Less
-    Greater
-    PlusEquals
-    MinusEquals
-    Arrow
-    StarEquals
-    StarStar
-    SlashEquals
-    FatArrow
-    LessEquals
-    LessLess
-    LessLessEquals
-    GreaterEquals
-    GreaterGreater
-    GreaterGreaterEquals
-    Comma
-    Colon
-    Walrus
-    LParen
-    RParen
-    LBrace
-    RBrace
-    Newline
-    Indent
-    Dedent
-    Eof
-    LexError(str)
+    Identifier(str) Integer(str) Float(str) String(str)
+    Fn If Else While Return True False KwNone
+    Plus Minus Star Slash Equals EqualsEquals Bang BangEquals
+    Less Greater PlusEquals MinusEquals Arrow StarEquals StarStar
+    SlashEquals FatArrow LessEquals LessLess LessLessEquals
+    GreaterEquals GreaterGreater GreaterGreaterEquals
+    Comma Colon Walrus LParen RParen LBrace RBrace
+    Newline Indent Dedent Eof LexError(str)
 
 final class Token:
     kind: TokenKind
     text: str
 
-# ===============================================================
-# Keywords
-# ===============================================================
-
-fn keyword(w: &str) TokenKind:
-    if w == "fn": return TokenKind.Fn
-    elif w == "if": return TokenKind.If
-    elif w == "else": return TokenKind.Else
-    elif w == "while": return TokenKind.While
-    elif w == "return": return TokenKind.Return
-    elif w == "true": return TokenKind.True
-    elif w == "false": return TokenKind.False
-    elif w == "none": return TokenKind.KwNone
-    return TokenKind.Identifier(w)
-
-# ===============================================================
-# Lexer struct
-# ===============================================================
-
-final class Lexer:
-    chars: ^{str}
-    pos: ^i32
-    line: ^i32
-    column: ^i32
-    indent_stack: ^{i32}
-    pending: ^{Token}
-    at_bol: ^bool
-
-fn lexer_new(source: str) Lexer:
-    cs: ^{str} = {""}
-    cs.pop()
-    for c in source:
-        cs.push(c)
-    st: ^{i32} = {0}
-    pend: ^{Token} = {Token{kind: TokenKind.Eof, text: ""}}
-    pend.pop()
-    return Lexer{
-        chars: cs,
-        pos: 0,
-        line: 1,
-        column: 1,
-        indent_stack: st,
-        pending: pend,
-        at_bol: true
-    }
-
-# ===============================================================
-# Position helpers
-# ===============================================================
-
-fn at_end(lex: &Lexer) bool:
-    return lex.pos.get() >= lex.chars.len()
-
-fn current(lex: &Lexer) str?:
-    if at_end(&lex):
-        return none
-    return some(lex.chars[lex.pos.get()])
-
-fn peek(lex: &Lexer) str?:
-    p = lex.pos.get() + 1
-    if p >= lex.chars.len():
-        return none
-    return some(lex.chars[p])
-
-fn advance(lex: ^&Lexer):
-    if at_end(&lex):
-        return
-    c = lex.chars[lex.pos.get()]
-    if c == "\n":
-        lex.line.set(lex.line.get() + 1)
-        lex.column.set(1)
-    else:
-        lex.column.set(lex.column.get() + 1)
-    lex.pos.set(lex.pos.get() + 1)
-
-# ===============================================================
-# Indentation
-# ===============================================================
-
-fn measure_indent(lex: &Lexer) i32:
-    result: ^i32 = 0
-    p: ^i32 = 0
-    p.set(lex.pos.get())
-    while p.get() < lex.chars.len():
-        c = lex.chars[p.get()]
-        if c == " ":
-            result.set(result.get() + 1)
-            p.set(p.get() + 1)
-        elif c == "\t":
-            result.set(result.get() + 4)
-            p.set(p.get() + 1)
-        elif c == "#":
-            while p.get() < lex.chars.len():
-                if lex.chars[p.get()] == "\n":
-                    break
-                p.set(p.get() + 1)
-        elif c == "\n":
-            result.set(0)
-            p.set(p.get() + 1)
-        elif c == "\r":
-            p.set(p.get() + 1)
-        else:
-            break
-    return result.get()
-
-fn handle_newline(lex: ^&Lexer):
-    if lex.at_bol.get():
-        return
-    lex.at_bol.set(true)
-    lex.pending.push(Token{kind: TokenKind.Newline, text: ""})
-    indent = measure_indent(&lex)
-    sz = lex.indent_stack.len()
-    ci = lex.indent_stack[sz - 1]
-    if indent > ci:
-        lex.indent_stack.push(indent)
-        lex.pending.push(Token{kind: TokenKind.Indent, text: ""})
-    elif indent < ci:
-        while indent < lex.indent_stack[lex.indent_stack.len() - 1]:
-            lex.indent_stack.pop()
-            lex.pending.push(Token{kind: TokenKind.Dedent, text: ""})
-
-# ===============================================================
-# Skip whitespace
-# ===============================================================
-
-fn skip_ws(lex: ^&Lexer):
-    while true:
-        co = current(&lex)
-        if co:
-            c = co
-            if c == " " or c == "\t" or c == "\r":
-                advance(^&lex)
-            elif c == "#":
-                advance(^&lex)
-                while true:
-                    no = current(&lex)
-                    if no:
-                        if no == "\n":
-                            break
-                        advance(^&lex)
-                    else:
-                        break
-            else:
-                break
-        else:
-            break
-
-# ===============================================================
-# Number lexer
-# ===============================================================
-
-fn lex_number(lex: ^&Lexer, first: str) Token:
-    result: ^str = ""
-    result.set(first)
-    advance(^&lex)
-    if first == "0":
-        no = current(&lex)
-        if no:
-            nv = no
-            if nv == "x" or nv == "X":
-                result.set(result.get() + nv)
-                advance(^&lex)
-                while true:
-                    ho = current(&lex)
-                    if ho:
-                        hv = ho
-                        if is_hex(hv):
-                            result.set(result.get() + hv)
-                            advance(^&lex)
-                        else:
-                            break
-                    else:
-                        break
-                return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
-            elif nv == "b" or nv == "B":
-                result.set(result.get() + nv)
-                advance(^&lex)
-                while true:
-                    bo = current(&lex)
-                    if bo:
-                        bv = bo
-                        if bv == "0" or bv == "1":
-                            result.set(result.get() + bv)
-                            advance(^&lex)
-                        else:
-                            break
-                    else:
-                        break
-                return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
-    is_float: ^bool = false
-    while true:
-        no = current(&lex)
-        if no:
-            nv = no
-            if is_digit(nv):
-                result.set(result.get() + nv)
-                advance(^&lex)
-            elif no == ".":
-                result.set(result.get() + ".")
-                is_float = true
-                advance(^&lex)
-            else:
-                break
-        else:
-            break
-    if is_float:
-        return Token{kind: TokenKind.Float(result.get()), text: result.get()}
-    return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
-
-# ===============================================================
-# String lexer
-# ===============================================================
-
-fn lex_string(lex: ^&Lexer, quote: str) Token:
-    result: ^str = ""
-    advance(^&lex)
-    while true:
-        co = current(&lex)
-        if co:
-            c = co
-            if c == quote:
-                advance(^&lex)
-                return Token{kind: TokenKind.String(result.get()), text: result.get()}
-            elif c == "\\":
-                advance(^&lex)
-                eo = current(&lex)
-                if eo:
-                    ec = eo
-                    if ec == "n": result.set(result.get() + "\n")
-                    elif ec == "t": result.set(result.get() + "\t")
-                    elif ec == "\\": result.set(result.get() + "\\")
-                    elif ec == quote: result.set(result.get() + quote)
-                    else: result.set(result.get() + ec)
-                    advance(^&lex)
-            else:
-                result.set(result.get() + c)
-                advance(^&lex)
-        else:
-            break
-    return Token{kind: TokenKind.LexError("Unterminated string"), text: ""}
-
-# ===============================================================
-# Identifier
-# ===============================================================
-
-fn lex_ident(lex: ^&Lexer, first: str) Token:
-    word: ^str = ""
-    word.set(first)
-    advance(^&lex)
-    while true:
-        no = current(&lex)
-        if no:
-            nv = no
-            if is_ident_continue(nv):
-                word.set(word.get() + nv)
-                advance(^&lex)
-            else:
-                break
-        else:
-            break
-    w = word.get()
-    k = keyword(&w)
-    return Token{kind: k, text: w}
-
-# ===============================================================
-# Ch helper
-# ===============================================================
-
-fn ch(lex: &Lexer) str?:
-    return current(lex)
-
-# ===============================================================
-# Next token
-# ===============================================================
-
-fn next_token(lex: ^&Lexer) Token?:
-    if lex.pending.len() > 0:
-        t = lex.pending.pop_first()
-        return some(t)
-
-    skip_ws(^&lex)
-
-    if at_end(&lex):
-        while lex.indent_stack.len() > 1:
-            lex.indent_stack.pop()
-            return some(Token{kind: TokenKind.Dedent, text: ""})
-        return some(Token{kind: TokenKind.Eof, text: ""})
-
-    co = ch(&lex)
-    if co:
-        c = co
-    else:
-        return some(Token{kind: TokenKind.Eof, text: ""})
-
-    if c == "\n":
-        advance(^&lex)
-        handle_newline(^&lex)
-        return some(Token{kind: TokenKind.Newline, text: ""})
-
-    if c == "+":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.PlusEquals, text: "+="})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Plus, text: "+"})
-
-    elif c == "-":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.MinusEquals, text: "-="})
-        elif np and np == ">":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.Arrow, text: "->"})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Minus, text: "-"})
-
-    elif c == "*":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.StarEquals, text: "*="})
-        elif np and np == "*":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.StarStar, text: "**"})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Star, text: "*"})
-
-    elif c == "/":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.SlashEquals, text: "/="})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Slash, text: "/"})
-
-    elif c == "=":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.EqualsEquals, text: "=="})
-        elif np and np == ">":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.FatArrow, text: "=>"})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Equals, text: "="})
-
-    elif c == "!":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.BangEquals, text: "!="})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Bang, text: "!"})
-
-    elif c == "<":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.LessEquals, text: "<="})
-        elif np and np == "<":
-            advance(^&lex)
-            n2 = peek(&lex)
-            if n2 and n2 == "=":
-                advance(^&lex)
-                advance(^&lex)
-                return some(Token{kind: TokenKind.LessLessEquals, text: "<<="})
-            advance(^&lex)
-            return some(Token{kind: TokenKind.LessLess, text: "<<"})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Less, text: "<"})
-
-    elif c == ">":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.GreaterEquals, text: ">="})
-        elif np and np == ">":
-            advance(^&lex)
-            n2 = peek(&lex)
-            if n2 and n2 == "=":
-                advance(^&lex)
-                advance(^&lex)
-                return some(Token{kind: TokenKind.GreaterGreaterEquals, text: ">>="})
-            advance(^&lex)
-            return some(Token{kind: TokenKind.GreaterGreater, text: ">>"})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Greater, text: ">"})
-
-    elif c == ",":
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Comma, text: ","})
-
-    elif c == ":":
-        np = peek(&lex)
-        if np and np == "=":
-            advance(^&lex)
-            advance(^&lex)
-            return some(Token{kind: TokenKind.Walrus, text: ":="})
-        advance(^&lex)
-        return some(Token{kind: TokenKind.Colon, text: ":"})
-
-    elif c == "(":
-        advance(^&lex)
-        return some(Token{kind: TokenKind.LParen, text: "("})
-    elif c == ")":
-        advance(^&lex)
-        return some(Token{kind: TokenKind.RParen, text: ")"})
-    elif c == "{":
-        advance(^&lex)
-        return some(Token{kind: TokenKind.LBrace, text: "{"})
-    elif c == "}":
-        advance(^&lex)
-        return some(Token{kind: TokenKind.RBrace, text: "}"})
-
-    elif is_ident_start(c):
-        return some(lex_ident(^&lex, c))
-
-    elif is_digit(c):
-        return some(lex_number(^&lex, c))
-
-    elif c == "\"" or c == "'":
-        return some(lex_string(^&lex, c))
-
-    else:
-        advance(^&lex)
-        return some(Token{kind: TokenKind.LexError("Unexpected: " + c), text: c})
-
-# ===============================================================
-# Tokenize
-# ===============================================================
-
-fn tokenize(lex: ^&Lexer) ^{Token}:
+fn tokenize(source: &str) ^{Token}:
     result: ^{Token} = {Token{kind: TokenKind.Eof, text: ""}}
     result.pop()
+    pos: ^i32 = 0
+    indent_stack: ^{i32} = {0}
+    pending: ^{Token} = {Token{kind: TokenKind.Eof, text: ""}}
+    pending.pop()
+    at_bol: ^bool = true
+    slen = source.len()
+
     while true:
-        t = next_token(^&lex)
-        if t:
+        if pending.len() > 0:
+            t = pending.pop_first()
             result.push(t)
-            match t.kind:
-                TokenKind.Eof: break
-                _: none
-        else:
+            if t.kind == TokenKind.Eof:
+                break
+            continue
+
+        # skip whitespace
+        while true:
+            if pos.get() >= slen: break
+            c = source[pos.get()]
+            if c == " " or c == "\t" or c == "\r":
+                pos.set(pos.get() + 1)
+            elif c == "#":
+                pos.set(pos.get() + 1)
+                while true:
+                    if pos.get() >= slen: break
+                    if source[pos.get()] == "\n": break
+                    pos.set(pos.get() + 1)
+            else: break
+
+        if pos.get() >= slen:
+            while indent_stack.len() > 1:
+                indent_stack.pop()
+                result.push(Token{kind: TokenKind.Dedent, text: ""})
             result.push(Token{kind: TokenKind.Eof, text: ""})
             break
+
+        c = source[pos.get()]
+
+        if c == "\n":
+            pos.set(pos.get() + 1)
+            if at_bol:
+                continue
+            at_bol = true
+            pending.push(Token{kind: TokenKind.Newline, text: ""})
+            # measure indent
+            ind: ^i32 = 0
+            p: ^i32 = pos.get()
+            while p.get() < slen:
+                ch = source[p.get()]
+                if ch == " ":
+                    ind.set(ind.get() + 1)
+                    p.set(p.get() + 1)
+                elif ch == "\t":
+                    ind.set(ind.get() + 4)
+                    p.set(p.get() + 1)
+                elif ch == "#":
+                    while p.get() < slen:
+                        if source[p.get()] == "\n": break
+                        p.set(p.get() + 1)
+                elif ch == "\n":
+                    ind.set(0)
+                    p.set(p.get() + 1)
+                elif ch == "\r":
+                    p.set(p.get() + 1)
+                else: break
+            ci = indent_stack[indent_stack.len() - 1]
+            if ind.get() > ci:
+                indent_stack.push(ind.get())
+                pending.push(Token{kind: TokenKind.Indent, text: ""})
+            elif ind.get() < ci:
+                while ind.get() < indent_stack[indent_stack.len() - 1]:
+                    indent_stack.pop()
+                    pending.push(Token{kind: TokenKind.Dedent, text: ""})
+            continue
+
+        # Operators
+        if c == "+":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.PlusEquals, text: "+="})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Plus, text: "+"})
+        elif c == "-":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.MinusEquals, text: "-="})
+            elif pos.get() + 1 < slen and source[pos.get() + 1] == ">":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.Arrow, text: "->"})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Minus, text: "-"})
+        elif c == "*":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.StarEquals, text: "*="})
+            elif pos.get() + 1 < slen and source[pos.get() + 1] == "*":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.StarStar, text: "**"})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Star, text: "*"})
+        elif c == "/":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.SlashEquals, text: "/="})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Slash, text: "/"})
+        elif c == "=":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.EqualsEquals, text: "=="})
+            elif pos.get() + 1 < slen and source[pos.get() + 1] == ">":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.FatArrow, text: "=>"})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Equals, text: "="})
+        elif c == "!":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.BangEquals, text: "!="})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Bang, text: "!"})
+        elif c == "<":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.LessEquals, text: "<="})
+            elif pos.get() + 1 < slen and source[pos.get() + 1] == "<":
+                if pos.get() + 2 < slen and source[pos.get() + 2] == "=":
+                    pos.set(pos.get() + 3)
+                    result.push(Token{kind: TokenKind.LessLessEquals, text: "<<="})
+                else:
+                    pos.set(pos.get() + 2)
+                    result.push(Token{kind: TokenKind.LessLess, text: "<<"})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Less, text: "<"})
+        elif c == ">":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.GreaterEquals, text: ">="})
+            elif pos.get() + 1 < slen and source[pos.get() + 1] == ">":
+                if pos.get() + 2 < slen and source[pos.get() + 2] == "=":
+                    pos.set(pos.get() + 3)
+                    result.push(Token{kind: TokenKind.GreaterGreaterEquals, text: ">>="})
+                else:
+                    pos.set(pos.get() + 2)
+                    result.push(Token{kind: TokenKind.GreaterGreater, text: ">>"})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Greater, text: ">"})
+        elif c == ",":
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.Comma, text: ","})
+        elif c == ":":
+            if pos.get() + 1 < slen and source[pos.get() + 1] == "=":
+                pos.set(pos.get() + 2)
+                result.push(Token{kind: TokenKind.Walrus, text: ":="})
+            else:
+                pos.set(pos.get() + 1)
+                result.push(Token{kind: TokenKind.Colon, text: ":"})
+        elif c == "(":
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.LParen, text: "("})
+        elif c == ")":
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.RParen, text: ")"})
+        elif c == "{":
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.LBrace, text: "{"})
+        elif c == "}":
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.RBrace, text: "}"})
+
+        # Identifier/keyword
+        elif (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_":
+            word: ^str = ""
+            word.set(c)
+            pos.set(pos.get() + 1)
+            while pos.get() < slen:
+                nc = source[pos.get()]
+                if (nc >= "a" and nc <= "z") or (nc >= "A" and nc <= "Z") or (nc >= "0" and nc <= "9") or nc == "_":
+                    word.set(word.get() + nc)
+                    pos.set(pos.get() + 1)
+                else: break
+            w = word.get()
+            if w == "fn": result.push(Token{kind: TokenKind.Fn, text: w})
+            elif w == "if": result.push(Token{kind: TokenKind.If, text: w})
+            elif w == "else": result.push(Token{kind: TokenKind.Else, text: w})
+            elif w == "while": result.push(Token{kind: TokenKind.While, text: w})
+            elif w == "return": result.push(Token{kind: TokenKind.Return, text: w})
+            elif w == "true": result.push(Token{kind: TokenKind.True, text: w})
+            elif w == "false": result.push(Token{kind: TokenKind.False, text: w})
+            elif w == "none": result.push(Token{kind: TokenKind.KwNone, text: w})
+            else: result.push(Token{kind: TokenKind.Identifier(w), text: w})
+
+        # Number
+        elif c >= "0" and c <= "9":
+            num: ^str = ""
+            num.set(c)
+            pos.set(pos.get() + 1)
+            if c == "0" and pos.get() < slen:
+                nc = source[pos.get()]
+                if nc == "x" or nc == "X":
+                    num.set(num.get() + nc)
+                    pos.set(pos.get() + 1)
+                    while pos.get() < slen:
+                        hc = source[pos.get()]
+                        if (hc >= "0" and hc <= "9") or (hc >= "a" and hc <= "f") or (hc >= "A" and hc <= "F"):
+                            num.set(num.get() + hc)
+                            pos.set(pos.get() + 1)
+                        else: break
+                    result.push(Token{kind: TokenKind.Integer(num.get()), text: num.get()})
+                    continue
+                elif nc == "b" or nc == "B":
+                    num.set(num.get() + nc)
+                    pos.set(pos.get() + 1)
+                    while pos.get() < slen:
+                        bc = source[pos.get()]
+                        if bc == "0" or bc == "1":
+                            num.set(num.get() + bc)
+                            pos.set(pos.get() + 1)
+                        else: break
+                    result.push(Token{kind: TokenKind.Integer(num.get()), text: num.get()})
+                    continue
+            is_float: ^bool = false
+            while pos.get() < slen:
+                nc = source[pos.get()]
+                if nc >= "0" and nc <= "9":
+                    num.set(num.get() + nc)
+                    pos.set(pos.get() + 1)
+                elif nc == ".":
+                    num.set(num.get() + ".")
+                    is_float = true
+                    pos.set(pos.get() + 1)
+                else: break
+            if is_float:
+                result.push(Token{kind: TokenKind.Float(num.get()), text: num.get()})
+            else:
+                result.push(Token{kind: TokenKind.Integer(num.get()), text: num.get()})
+
+        # String
+        elif c == "\"" or c == "'":
+            quote = c
+            s: ^str = ""
+            pos.set(pos.get() + 1)
+            while pos.get() < slen:
+                sc = source[pos.get()]
+                if sc == quote:
+                    pos.set(pos.get() + 1)
+                    result.push(Token{kind: TokenKind.String(s.get()), text: s.get()})
+                    break
+                elif sc == "\\":
+                    pos.set(pos.get() + 1)
+                    if pos.get() < slen:
+                        ec = source[pos.get()]
+                        if ec == "n": s.set(s.get() + "\n")
+                        elif ec == "t": s.set(s.get() + "\t")
+                        elif ec == "\\": s.set(s.get() + "\\")
+                        elif ec == quote: s.set(s.get() + quote)
+                        else: s.set(s.get() + ec)
+                        pos.set(pos.get() + 1)
+                else:
+                    s.set(s.get() + sc)
+                    pos.set(pos.get() + 1)
+            if pos.get() >= slen:
+                result.push(Token{kind: TokenKind.LexError("Unterminated string"), text: ""})
+
+        else:
+            pos.set(pos.get() + 1)
+            result.push(Token{kind: TokenKind.LexError("Unexpected: " + c), text: c})
+
     return result
 
-# ===============================================================
-# Tests
-# ===============================================================
-
 fn test_simple():
-    source = "fn add(a: i32, b: i32) i32:\n    return a + b\n"
-    lex = lexer_new(source)
-    tokens = tokenize(^&lex)
+    s = "fn add(a: i32, b: i32) i32:\n    return a + b\n"
+    tokens = tokenize(&s)
     print("Simple: " + tokens.len().to_str() + " tokens")
 
 fn test_expr():
-    source = "result = 42 + 15\n"
-    lex = lexer_new(source)
-    tokens = tokenize(^&lex)
+    s = "result = 42 + 15\n"
+    tokens = tokenize(&s)
     print("Expr: " + tokens.len().to_str() + " tokens")
-    for tok in tokens:
-        print("  " + tok.text)
 
 fn main():
     test_simple()
