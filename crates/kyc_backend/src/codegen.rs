@@ -361,7 +361,14 @@ impl<'ctx> Codegen<'ctx> {
             self.needs_main_wrapper = true; "kyle_main"
         } else { &func.name };
         let fn_type = ret_type.fn_type(&param_types, false);
-        let fn_value = self.module.add_function(fn_name, fn_type, None);
+        // If function was already declared (e.g. from prelude extern fn),
+        // reuse the existing declaration so the body fills it in.
+        // This allows Kyle runtime code to define prelude-declared extern fns.
+        let fn_value = if let Some(existing) = self.module.get_function(fn_name) {
+            existing
+        } else {
+            self.module.add_function(fn_name, fn_type, None)
+        };
         // Parameter attributes: noundef on all, noalias on pointer types
         let noundef_kind = Attribute::get_named_enum_kind_id("noundef");
         let noalias_kind = Attribute::get_named_enum_kind_id("noalias");
@@ -2896,7 +2903,13 @@ impl<'ctx> Codegen<'ctx> {
         };
 
         let fn_type = ret_type.fn_type(&param_types, false);
-        let fn_value = self.module.add_function(fn_name, fn_type, None);
+        // If function was already declared (e.g. from prelude extern fn),
+        // reuse the existing declaration so the body fills it in.
+        let fn_value = if let Some(existing) = self.module.get_function(fn_name) {
+            existing
+        } else {
+            self.module.add_function(fn_name, fn_type, None)
+        };
         // Parameter attributes: noundef on all, noalias on pointer types
         let noundef_kind = Attribute::get_named_enum_kind_id("noundef");
         let noalias_kind = Attribute::get_named_enum_kind_id("noalias");

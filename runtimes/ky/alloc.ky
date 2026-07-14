@@ -1,0 +1,24 @@
+# Runtime Kyle — Memory allocation
+# Reemplaza kyc_runtime/src/memory.rs
+#
+# Todas las funciones se exportan con C ABI para que el código
+# generado por el compilador pueda llamarlas.
+
+@link "c"
+extern fn malloc(size: i64) ptr
+extern fn free(ptr)
+
+fn ky_alloc(size: i64) ptr:
+    return malloc(size)
+
+fn ky_free(ptr):
+    free(ptr)
+
+fn ky_retain(ptr):
+    # Ref counting simplificado (como en el Rust actual)
+    # En el futuro: incrementar refcount
+    none
+
+fn ky_release(ptr):
+    # Decrementar refcount, hacer free si llega a 0
+    free(ptr)

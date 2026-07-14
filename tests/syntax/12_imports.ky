@@ -1,0 +1,6 @@
+# Imports — from X import Y
+# Nota: los import requieren el modulo existente.
+# En el proyecto real se usan los packages (http, json, sqlite).
+
+fn main():
+    print("see packages/ for import examples")
