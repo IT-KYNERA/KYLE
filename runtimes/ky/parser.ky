@@ -1,0 +1,338 @@
+# Parser Kyle — expressiones con Pratt parser.
+# Globales: SRC, POS, OUT (result string builder)
+
+SRC: ^str = ""
+POS: ^i32 = 0
+OUT: ^str = ""
+
+fn append(s: &str):
+    OUT.set(OUT.get() + s)
+
+fn is_alpha(c: str) bool:
+    return (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+
+fn is_digit(c: str) bool:
+    return c >= "0" and c <= "9"
+
+fn is_alnum(c: str) bool:
+    a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+    d = c >= "0" and c <= "9"
+    return a or d
+
+fn is_ident_start(c: str) bool:
+    a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+    return a or c == "_"
+
+fn is_ident_continue(c: str) bool:
+    a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+    d = c >= "0" and c <= "9"
+    return a or d or c == "_"
+
+fn peek() str:
+    if POS.get() >= SRC.len():
+        return ""
+    return SRC[POS.get()]
+
+fn advance():
+    if POS.get() < SRC.len():
+        POS.set(POS.get() + 1)
+
+fn skip_ws():
+    slen = SRC.len()
+    while POS.get() < slen:
+        c = SRC[POS.get()]
+        if c == " " or c == "\t" or c == "\r":
+            POS.set(POS.get() + 1)
+        elif c == "#":
+            POS.set(POS.get() + 1)
+            while POS.get() < slen:
+                if SRC[POS.get()] == "\n":
+                    break
+                POS.set(POS.get() + 1)
+        else:
+            break
+
+fn parse_ident():
+    w: ^str = ""
+    slen = SRC.len()
+    while POS.get() < slen:
+        c = SRC[POS.get()]
+        if is_ident_continue(&c):
+            w.set(w.get() + c)
+            POS.set(POS.get() + 1)
+        else:
+            break
+    append(&w.get())
+
+fn parse_number():
+    r: ^str = ""
+    c = peek()
+    r.set(c)
+    advance()
+    slen = SRC.len()
+    while POS.get() < slen:
+        nc = SRC[POS.get()]
+        if is_digit(&nc):
+            r.set(r.get() + nc)
+            POS.set(POS.get() + 1)
+        else:
+            break
+    append(&r.get())
+
+fn parse_string():
+    q = peek()
+    advance()
+    slen = SRC.len()
+    while POS.get() < slen:
+        c = SRC[POS.get()]
+        if c == q:
+            advance()
+            return
+        elif c == "\\":
+            advance()
+            if POS.get() < slen:
+                ec = SRC[POS.get()]
+                if ec == "n":
+                    append(&"\n")
+                elif ec == "t":
+                    append(&"\t")
+                elif ec == "\\":
+                    append(&"\\")
+                elif ec == q:
+                    append(&q)
+                else:
+                    append(&ec)
+                advance()
+        else:
+            append(&c)
+            advance()
+
+fn parse_expr(min_p: i32):
+    skip_ws()
+    c = peek()
+    if c == "" or c == ")" or c == "}" or c == "]" or c == "," or c == "\n" or c == ":":
+        return
+
+    saved = OUT.get()
+
+    if c == "(":
+        advance()
+        items: ^i32 = 0
+        append(&"(")
+        while true:
+            skip_ws()
+            if peek() == ")":
+                advance()
+                break
+            if items.get() > 0:
+                append(&" ")
+            items.set(items.get() + 1)
+            parse_expr(0)
+            skip_ws()
+            if peek() == ",":
+                advance()
+            elif peek() == ")":
+                advance()
+                break
+        append(&")")
+    elif c == "\"" or c == "'":
+        append(&"\"")
+        parse_string()
+        append(&"\"")
+    elif is_digit(c):
+        parse_number()
+    elif is_ident_start(c):
+        name_start = POS.get()
+        parse_ident()
+        skip_ws()
+        if peek() == "(":
+            advance()
+            append(&"(")
+            # Get the function name from what was just appended
+            items: ^i32 = 0
+            while true:
+                skip_ws()
+                if peek() == ")":
+                    advance()
+                    break
+                if items.get() > 0:
+                    append(&" ")
+                items.set(items.get() + 1)
+                a = parse_expr(0)
+                skip_ws()
+                if peek() == ",":
+                    advance()
+                elif peek() == ")":
+                    advance()
+                    break
+            append(&")")
+    elif c == "{":
+        advance()
+        append(&"{")
+        items: ^i32 = 0
+        while true:
+            skip_ws()
+            if peek() == "}":
+                advance()
+                break
+            if items.get() > 0:
+                append(&", ")
+            items.set(items.get() + 1)
+            parse_expr(0)
+            skip_ws()
+            if peek() == ",":
+                advance()
+            elif peek() == "}":
+                advance()
+                break
+        append(&"}")
+    else:
+        OUT.set(saved)
+        return
+
+    # Postfix operators
+    while true:
+        skip_ws()
+        cp = peek()
+        if cp == "(":
+            advance()
+            append(&"(")
+            items: ^i32 = 0
+            while true:
+                skip_ws()
+                if peek() == ")":
+                    advance()
+                    break
+                if items.get() > 0:
+                    append(&" ")
+                items.set(items.get() + 1)
+                parse_expr(0)
+                skip_ws()
+                if peek() == ",":
+                    advance()
+                elif peek() == ")":
+                    advance()
+                    break
+            append(&")")
+        elif cp == ".":
+            advance()
+            append(&".")
+            parse_ident()
+        elif cp == "[":
+            advance()
+            append(&"[")
+            parse_expr(0)
+            if peek() == "]":
+                advance()
+            append(&"]")
+        else:
+            break
+
+    # Binary operators (Pratt)
+    while true:
+        skip_ws()
+        op_start = POS.get()
+        cp = peek()
+        op: ^str = ""
+
+        if cp == "+":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set("+=")
+                advance()
+        elif cp == "-":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set("-=")
+                advance()
+        elif cp == "*":
+            op.set(cp)
+            advance()
+            if peek() == "*":
+                op.set("**")
+                advance()
+            elif peek() == "=":
+                op.set("*=")
+                advance()
+        elif cp == "/":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set("/=")
+                advance()
+        elif cp == "=":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set("==")
+                advance()
+        elif cp == "<":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set("<=")
+                advance()
+            elif peek() == "<":
+                op.set("<<")
+                advance()
+        elif cp == ">":
+            op.set(cp)
+            advance()
+            if peek() == "=":
+                op.set(">=")
+                advance()
+            elif peek() == ">":
+                op.set(">>")
+                advance()
+        else:
+            break
+
+        if op.get() == "":
+            break
+
+        p: ^i32 = 0
+        if op.get() == "=" or op.get() == "+=" or op.get() == "-=" or op.get() == "*=" or op.get() == "/=":
+            p.set(1)
+        elif op.get() == "==" or op.get() == "!=":
+            p.set(4)
+        elif op.get() == "<" or op.get() == ">" or op.get() == "<=" or op.get() == ">=":
+            p.set(5)
+        elif op.get() == "<<" or op.get() == ">>":
+            p.set(9)
+        elif op.get() == "+" or op.get() == "-":
+            p.set(10)
+        elif op.get() == "*" or op.get() == "/":
+            p.set(11)
+        elif op.get() == "**":
+            p.set(12)
+
+        if p.get() == 0 or p.get() < min_p:
+            POS.set(op_start)
+            break
+
+        # Save left, parse right, wrap in parens
+        left_expr = OUT.get()
+        OUT.set("")
+        right = parse_expr(p.get() + 1)
+        right_expr = OUT.get()
+        OUT.set("(" + op.get() + " " + left_expr + " " + right_expr + ")")
+
+fn test(source: &str):
+    SRC = source
+    POS = 0
+    OUT = ""
+    parse_expr(0)
+    print(source + " => " + OUT.get() + "\n")
+
+fn main():
+    test(&"42")
+    test(&"42 + 15")
+    test(&"a + b * c")
+    test(&"(1 + 2) * 3")
+    test(&"a.b")
+    test(&"f(x)")
+    test(&"a + b + c")
+    test(&"1 + 2 * 3 + 4")
+    test(&"items[i]")
