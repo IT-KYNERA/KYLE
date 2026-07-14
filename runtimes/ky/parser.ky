@@ -1,11 +1,11 @@
-# Parser Kyle — expressiones con Pratt parser.
-# Globales: SRC, POS, OUT (result string builder)
+# Parser Kyle completo — expressions + statements
+# Globales: SRC, POS, OUT
 
 SRC: ^str = ""
 POS: ^i32 = 0
 OUT: ^str = ""
 
-fn append(s: &str):
+fn ap(s: str):
     OUT.set(OUT.get() + s)
 
 fn is_alpha(c: str) bool:
@@ -13,15 +13,6 @@ fn is_alpha(c: str) bool:
 
 fn is_digit(c: str) bool:
     return c >= "0" and c <= "9"
-
-fn is_alnum(c: str) bool:
-    a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
-    d = c >= "0" and c <= "9"
-    return a or d
-
-fn is_ident_start(c: str) bool:
-    a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
-    return a or c == "_"
 
 fn is_ident_continue(c: str) bool:
     a = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
@@ -38,301 +29,407 @@ fn advance():
         POS.set(POS.get() + 1)
 
 fn skip_ws():
-    slen = SRC.len()
-    while POS.get() < slen:
+    while POS.get() < SRC.len():
         c = SRC[POS.get()]
         if c == " " or c == "\t" or c == "\r":
             POS.set(POS.get() + 1)
         elif c == "#":
             POS.set(POS.get() + 1)
-            while POS.get() < slen:
+            while POS.get() < SRC.len():
                 if SRC[POS.get()] == "\n":
                     break
                 POS.set(POS.get() + 1)
         else:
             break
 
+fn skip_line():
+    while POS.get() < SRC.len():
+        if SRC[POS.get()] == "\n":
+            advance()
+            break
+        POS.set(POS.get() + 1)
+
+fn measure_indent() i32:
+    ind: ^i32 = 0
+    p: ^i32 = POS.get()
+    while p.get() < SRC.len():
+        c = SRC[p.get()]
+        if c == " ":
+            ind.set(ind.get() + 1)
+            p.set(p.get() + 1)
+        elif c == "\t":
+            ind.set(ind.get() + 4)
+            p.set(p.get() + 1)
+        elif c == "#":
+            while p.get() < SRC.len():
+                if SRC[p.get()] == "\n":
+                    break
+                p.set(p.get() + 1)
+        elif c == "\n":
+            ind.set(0)
+            p.set(p.get() + 1)
+        elif c == "\r":
+            p.set(p.get() + 1)
+        else:
+            break
+    return ind.get()
+
 fn parse_ident():
-    w: ^str = ""
-    slen = SRC.len()
-    while POS.get() < slen:
+    while POS.get() < SRC.len():
         c = SRC[POS.get()]
-        if is_ident_continue(&c):
-            w.set(w.get() + c)
+        if is_ident_continue(c):
+            ap(c)
             POS.set(POS.get() + 1)
         else:
             break
-    append(&w.get())
 
-fn parse_number():
-    r: ^str = ""
-    c = peek()
-    r.set(c)
-    advance()
-    slen = SRC.len()
-    while POS.get() < slen:
-        nc = SRC[POS.get()]
-        if is_digit(&nc):
-            r.set(r.get() + nc)
-            POS.set(POS.get() + 1)
-        else:
-            break
-    append(&r.get())
+# ─── Parse expression (Pratt) ────────────────────────────────
 
-fn parse_string():
-    q = peek()
-    advance()
-    slen = SRC.len()
-    while POS.get() < slen:
-        c = SRC[POS.get()]
-        if c == q:
-            advance()
-            return
-        elif c == "\\":
-            advance()
-            if POS.get() < slen:
-                ec = SRC[POS.get()]
-                if ec == "n":
-                    append(&"\n")
-                elif ec == "t":
-                    append(&"\t")
-                elif ec == "\\":
-                    append(&"\\")
-                elif ec == q:
-                    append(&q)
-                else:
-                    append(&ec)
-                advance()
-        else:
-            append(&c)
-            advance()
-
-fn parse_expr(min_p: i32):
+fn parse_expr():
     skip_ws()
     c = peek()
-    if c == "" or c == ")" or c == "}" or c == "]" or c == "," or c == "\n" or c == ":":
+    if c == "" or c == ")" or c == "}" or c == "]" or c == "," or c == "\n" or c == ":" or c == "#":
         return
-
-    saved = OUT.get()
 
     if c == "(":
         advance()
-        items: ^i32 = 0
-        append(&"(")
+        n: ^i32 = 0
+        ap("(")
         while true:
             skip_ws()
             if peek() == ")":
                 advance()
                 break
-            if items.get() > 0:
-                append(&" ")
-            items.set(items.get() + 1)
-            parse_expr(0)
+            if n.get() > 0: ap(" ")
+            n.set(n.get() + 1)
+            parse_expr()
             skip_ws()
-            if peek() == ",":
-                advance()
-            elif peek() == ")":
+            if peek() == ",": advance()
+            elif peek() == ")": advance()
+                break
+        ap(")")
+    elif c == "\"" or c == "'":
+        q = c
+        ap("\"")
+        advance()
+        while POS.get() < SRC.len():
+            sc = SRC[POS.get()]
+            if sc == q:
                 advance()
                 break
-        append(&")")
-    elif c == "\"" or c == "'":
-        append(&"\"")
-        parse_string()
-        append(&"\"")
+            elif sc == "\\":
+                advance()
+                if POS.get() < SRC.len():
+                    ec = SRC[POS.get()]
+                    if ec == "n": ap("\n")
+                    elif ec == "t": ap("\t")
+                    elif ec == "\\": ap("\\")
+                    elif ec == q: ap(q)
+                    else: ap(ec)
+                    advance()
+            else:
+                ap(sc)
+                advance()
+        ap("\"")
     elif is_digit(c):
-        parse_number()
-    elif is_ident_start(c):
-        name_start = POS.get()
+        while POS.get() < SRC.len() and is_digit(SRC[POS.get()]):
+            ap(SRC[POS.get()])
+            POS.set(POS.get() + 1)
+    elif is_ident_continue(c):
         parse_ident()
         skip_ws()
         if peek() == "(":
             advance()
-            append(&"(")
-            # Get the function name from what was just appended
-            items: ^i32 = 0
+            ap("(")
+            n: ^i32 = 0
             while true:
                 skip_ws()
-                if peek() == ")":
-                    advance()
+                if peek() == ")": advance()
                     break
-                if items.get() > 0:
-                    append(&" ")
-                items.set(items.get() + 1)
-                a = parse_expr(0)
+                if n.get() > 0: ap(" ")
+                n.set(n.get() + 1)
+                parse_expr()
                 skip_ws()
-                if peek() == ",":
-                    advance()
-                elif peek() == ")":
-                    advance()
+                if peek() == ",": advance()
+                elif peek() == ")": advance()
                     break
-            append(&")")
+            ap(")")
+        elif peek() == ".":
+            advance()
+            ap(".")
+            parse_ident()
     elif c == "{":
         advance()
-        append(&"{")
-        items: ^i32 = 0
+        ap("{")
+        n: ^i32 = 0
         while true:
             skip_ws()
-            if peek() == "}":
-                advance()
+            if peek() == "}": advance()
                 break
-            if items.get() > 0:
-                append(&", ")
-            items.set(items.get() + 1)
-            parse_expr(0)
+            if n.get() > 0: ap(", ")
+            n.set(n.get() + 1)
+            parse_expr()
             skip_ws()
-            if peek() == ",":
-                advance()
-            elif peek() == "}":
-                advance()
+            if peek() == ",": advance()
+            elif peek() == "}": advance()
                 break
-        append(&"}")
+        ap("}")
     else:
-        OUT.set(saved)
         return
 
-    # Postfix operators
+    # Postfix
     while true:
         skip_ws()
         cp = peek()
         if cp == "(":
             advance()
-            append(&"(")
-            items: ^i32 = 0
+            ap("(")
+            n: ^i32 = 0
             while true:
                 skip_ws()
-                if peek() == ")":
-                    advance()
+                if peek() == ")": advance()
                     break
-                if items.get() > 0:
-                    append(&" ")
-                items.set(items.get() + 1)
-                parse_expr(0)
+                if n.get() > 0: ap(" ")
+                n.set(n.get() + 1)
+                parse_expr()
                 skip_ws()
-                if peek() == ",":
-                    advance()
-                elif peek() == ")":
-                    advance()
+                if peek() == ",": advance()
+                elif peek() == ")": advance()
                     break
-            append(&")")
+            ap(")")
         elif cp == ".":
             advance()
-            append(&".")
+            ap(".")
             parse_ident()
         elif cp == "[":
             advance()
-            append(&"[")
-            parse_expr(0)
-            if peek() == "]":
-                advance()
-            append(&"]")
+            ap("[")
+            parse_expr()
+            if peek() == "]": advance()
+            ap("]")
         else:
             break
 
-    # Binary operators (Pratt)
+# ─── Parse block (inline in stmt to avoid recursion issues) ──
+
+fn parse_block(indent: i32):
+    ap("(block")
     while true:
         skip_ws()
-        op_start = POS.get()
-        cp = peek()
-        op: ^str = ""
-
-        if cp == "+":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set("+=")
-                advance()
-        elif cp == "-":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set("-=")
-                advance()
-        elif cp == "*":
-            op.set(cp)
-            advance()
-            if peek() == "*":
-                op.set("**")
-                advance()
-            elif peek() == "=":
-                op.set("*=")
-                advance()
-        elif cp == "/":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set("/=")
-                advance()
-        elif cp == "=":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set("==")
-                advance()
-        elif cp == "<":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set("<=")
-                advance()
-            elif peek() == "<":
-                op.set("<<")
-                advance()
-        elif cp == ">":
-            op.set(cp)
-            advance()
-            if peek() == "=":
-                op.set(">=")
-                advance()
-            elif peek() == ">":
-                op.set(">>")
-                advance()
+        if POS.get() >= SRC.len(): break
+        if peek() == "\n": advance()
+            continue
+        if peek() == "#": skip_line()
+            continue
+        # Check dedent
+        if measure_indent() < indent: break
+        ap(" ")
+        # Parse one statement
+        skip_ws()
+        c = peek()
+        if c == "" or c == "\n" or c == "#":
+            continue
+        if c == "r":
+            saved = POS.get()
+            parse_ident()
+            w = OUT.get()
+            if w == "return":
+                OUT.set(OUT.get()[:OUT.get().len() - 6])
+                ap("(return")
+                skip_ws()
+                if peek() != "\n" and peek() != "" and peek() != "#":
+                    ap(" ")
+                    parse_expr()
+                ap(")")
+                skip_ws()
+                if peek() == "\n": advance()
+                continue
+            POS.set(saved)
+            OUT.set(OUT.get()[:OUT.get().len() - 1])
+        elif c == "i":
+            saved = POS.get()
+            parse_ident()
+            w = OUT.get()
+            if w == "if":
+                OUT.set(OUT.get()[:OUT.get().len() - 2])
+                ap("(if ")
+                parse_expr()
+                skip_ws()
+                if peek() == ":": advance()
+                # Parse then block
+                skip_ws()
+                if peek() == "\n":
+                    advance()
+                    bi = measure_indent()
+                    parse_block(bi)
+                else:
+                    ap("(block ")
+                    parse_expr()
+                    ap(")")
+                # elif/else
+                skip_ws()
+                while true:
+                    if measure_indent() < bi: break
+                    saved2 = POS.get()
+                    parse_ident()
+                    ew = OUT.get()
+                    if ew == "elif":
+                        OUT.set("")
+                        ap(" (elif ")
+                        parse_expr()
+                        skip_ws()
+                        if peek() == ":": advance()
+                        skip_ws()
+                        if peek() == "\n":
+                            advance()
+                            parse_block(bi)
+                        else:
+                            ap("(block ")
+                            parse_expr()
+                            ap(")")
+                        skip_ws()
+                        continue
+                    elif ew == "else":
+                        OUT.set("")
+                        skip_ws()
+                        if peek() == ":": advance()
+                        skip_ws()
+                        if peek() == "\n":
+                            advance()
+                            ap(" (else ")
+                            parse_block(bi)
+                            ap(")")
+                        else:
+                            ap(" (else (block ")
+                            parse_expr()
+                            ap("))")
+                        break
+                    else:
+                        POS.set(saved2)
+                        OUT.set("")
+                        break
+                ap(")")
+                skip_ws()
+                if peek() == "\n": advance()
+                continue
+            POS.set(saved)
+            OUT.set(OUT.get()[:OUT.get().len() - 1])
+        elif c == "w":
+            saved = POS.get()
+            parse_ident()
+            w = OUT.get()
+            if w == "while":
+                OUT.set(OUT.get()[:OUT.get().len() - 5])
+                ap("(while ")
+                parse_expr()
+                skip_ws()
+                if peek() == ":": advance()
+                skip_ws()
+                if peek() == "\n":
+                    advance()
+                    parse_block(measure_indent())
+                else:
+                    ap("(block ")
+                    parse_expr()
+                    ap(")")
+                ap(")")
+                skip_ws()
+                if peek() == "\n": advance()
+                continue
+            POS.set(saved)
+            OUT.set(OUT.get()[:OUT.get().len() - 1])
         else:
-            break
+            # Expression statement
+            parse_expr()
+            skip_ws()
+            if peek() == "\n": advance()
+            continue
+    ap(")")
 
-        if op.get() == "":
-            break
+# ─── Parse top-level ─────────────────────────────────────────
 
-        p: ^i32 = 0
-        if op.get() == "=" or op.get() == "+=" or op.get() == "-=" or op.get() == "*=" or op.get() == "/=":
-            p.set(1)
-        elif op.get() == "==" or op.get() == "!=":
-            p.set(4)
-        elif op.get() == "<" or op.get() == ">" or op.get() == "<=" or op.get() == ">=":
-            p.set(5)
-        elif op.get() == "<<" or op.get() == ">>":
-            p.set(9)
-        elif op.get() == "+" or op.get() == "-":
-            p.set(10)
-        elif op.get() == "*" or op.get() == "/":
-            p.set(11)
-        elif op.get() == "**":
-            p.set(12)
-
-        if p.get() == 0 or p.get() < min_p:
-            POS.set(op_start)
-            break
-
-        # Save left, parse right, wrap in parens
-        left_expr = OUT.get()
-        OUT.set("")
-        right = parse_expr(p.get() + 1)
-        right_expr = OUT.get()
-        OUT.set("(" + op.get() + " " + left_expr + " " + right_expr + ")")
-
-fn test(source: &str):
+fn parse_top(source: str):
     SRC = source
     POS = 0
     OUT = ""
-    parse_expr(0)
-    print(source + " => " + OUT.get() + "\n")
+    while POS.get() < SRC.len():
+        skip_ws()
+        if POS.get() >= SRC.len(): break
+        if peek() == "\n": advance()
+            continue
+        if peek() == "#": skip_line()
+            continue
+        saved = POS.get()
+        parse_ident()
+        w = OUT.get()
+        if w == "return":
+            OUT.set("")
+            ap("(return")
+            skip_ws()
+            if peek() != "\n" and peek() != "" and peek() != "#":
+                ap(" ")
+                parse_expr()
+            ap(")")
+        elif w == "if":
+            OUT.set("")
+            ap("(if ")
+            parse_expr()
+            skip_ws()
+            if peek() == ":": advance()
+            skip_ws()
+            if peek() == "\n":
+                advance()
+                bi = measure_indent()
+                parse_block(bi)
+            else:
+                ap("(block ")
+                parse_expr()
+                ap(")")
+            ap(")")
+        elif w == "while":
+            OUT.set("")
+            ap("(while ")
+            parse_expr()
+            skip_ws()
+            if peek() == ":": advance()
+            skip_ws()
+            if peek() == "\n":
+                advance()
+                parse_block(measure_indent())
+            else:
+                ap("(block ")
+                parse_expr()
+                ap(")")
+            ap(")")
+        else:
+            POS.set(saved)
+            OUT.set("")
+            parse_expr()
+        if OUT.get() != "":
+            print(OUT.get())
+            OUT.set("")
+
+# ─── Tests ───────────────────────────────────────────────────
+
+fn test_expr(source: str):
+    SRC = source
+    POS = 0
+    OUT = ""
+    parse_expr()
+    print(source + " => " + OUT.get())
+
+fn test_top(source: str):
+    print("\nInput: " + source)
+    parse_top(source)
 
 fn main():
-    test(&"42")
-    test(&"42 + 15")
-    test(&"a + b * c")
-    test(&"(1 + 2) * 3")
-    test(&"a.b")
-    test(&"f(x)")
-    test(&"a + b + c")
-    test(&"1 + 2 * 3 + 4")
-    test(&"items[i]")
+    print("=== Expressions ===")
+    test_expr("42")
+    test_expr("a + b")
+    test_expr("f(x, y)")
+    test_expr("a.b")
+    print("")
+    print("=== Top-level ===")
+    test_top("return 42")
+    test_top("if x > 0:\n    return x\n")
+    test_top("while i < 10:\n    i += 1\n")
