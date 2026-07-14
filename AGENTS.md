@@ -34,6 +34,7 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | **u8-u64 codegen** | ✅ **Complete** |
 | **HTTP / JSON / SQLite packages** | ✅ **Complete** |
 | **VSCode extension** | ✅ Syntax highlighting, snippets (48 kyui), LSP, debugger, testing UI |
+| **`--target freestanding`** | ✅ **Complete** | Entry point `_start`, no main wrapper. `ky build freestanding kernel.ky` |
 | | |
 
 ### UI Framework (v0.8.0) — Estado por funcionalidad
@@ -112,7 +113,8 @@ locally per-platform and let CI verify any changes via a tagged release.
 - **No `self`**: use `this.field` for field access
 - **Generic params**: uppercase `T` (only exception to snake_case)
 
-**This file (AGENTS.md) does NOT contain syntax reference.**
+**Syntax reference for porting the compiler:** see `docs/15-kyle-syntax-reference.md` in the KYOS project (`/Users/kynera/HCA/KYNERA/kyos/docs/15-kyle-syntax-reference.md`) or the docs below.
+
 Do not guess Kyle syntax — always check the docs.
 
 ---
@@ -595,7 +597,71 @@ See `docs/07-tools/distribution.md` for full details.
 
 ---
 
-*Version: v0.8.0 · Last updated: 2026-07-11 — See sections above for release process and cross-platform guide.*
+## Self-hosting: Rust → Kyle
+
+**El compilador de Kyle está escrito en Rust (~50k líneas). Podemos portearlo a Kyle pieza por pieza, porque Kyle ya tiene todo lo necesario para compilarse a sí mismo.**
+
+### ¿Qué se puede pasar a Kyle AHORA?
+
+| Componente | Rust | Kyle | Cómo |
+|-----------|:----:|:----:|------|
+| **Runtime** (alloc, strings, listas, dicts, I/O) | `kyc_runtime/` | ✅ **Ahora** | `extern fn` a libc (`malloc`, `write`), mismo patrón que `packages/http/` |
+| **Lexer + Parser** (texto → AST) | `kyc_frontend/` | ✅ **Ahora** | Lógica pura: `match`, enums, strings |
+| **Type Checker** (tipos, scopes) | `kyc_semantic/` | ✅ **Ahora** | Lógica pura: algoritmos de inferencia |
+| **MIR + SSA** (lowering, optimizaciones) | `kyc_mir/` | ✅ **Ahora** | Lógica pura: grafos, `for`, `match` |
+| **LLVM codegen** (MIR → binario) | `kyc_backend/` | 🟡 FFI a C API | `extern fn` para ~200 funciones de LLVM C API |
+| **Linker** (.o → ejecutable) | `kyc_backend/linker.rs` | ✅ **Ahora** | `system()` via FFI para llamar a clang/ld |
+| **CLI** (`ky build`, `ky run`) | `kyc_cli/` | ✅ **Ahora** | `read_file()` + `system()` via FFI |
+
+**La sintaxis completa de Kyle con ejemplos funcionales está en:** `/Users/kynera/HCA/KYNERA/kyos/docs/15-kyle-syntax-reference.md`
+
+### Orden de migración
+
+```
+FASE 1 (2-3 sem): Runtime + Lexer + Parser en Kyle
+  → El runtime Kyle se compila con el ky actual (Rust)
+  → El parser Kyle se compila con el ky actual (Rust)
+  → Todo Kyle, pero compilado por Rust
+
+FASE 2 (4-6 sem): Type Checker + MIR + LLVM bindings en Kyle
+  → Type checker + MIR: lógica pura en Kyle
+  → LLVM: wrappear C API con extern fn
+  → Sigue compilado por Rust
+
+FASE 3 (1 sem): Bootstrap
+  → El ky Rust compila el ky Kyle → binario ky (Kyle)
+  → El ky (Kyle) compila su propio código fuente
+  → Kyle corre Kyle. Rust ya no es necesario.
+```
+
+### Referencia de sintaxis rápida
+
+```
+Variables:        name = "hola"              # inmutable
+                  count: ^i32 = 0            # mutable con ^
+                  count += 1                 # += existe (no ++)
+Funciones:        fn add(a: i32, b: i32) i32:
+                      return a + b
+                  fn view(s: &str):          # borrow con &
+                  fn update(s: ^&str):       # mutable borrow
+Extern fn:        @link "c"
+                  extern fn malloc(size: i64) ptr
+Control flow:     if/elif/else, while, for, match
+Match:            match x: 0: "cero" 1: "uno" _: "otro"
+Enum:             enum Color: Red(g: i32) Green Blue(b: i32, a: i32)
+Clases:           final class Point: x: i32 y: i32
+Listas:           items: ^{i32} = {1, 2, 3}; items.push(4)
+Dicts:            scores: ^{str: i32} = {"ana": 100}
+Opcional:         name: str? = none; if name: ...
+Errores:          fn div(a: i32, b: i32) i32!: result = div(10, 0)!
+Interpolación:    msg = "Hola, {name}!"
+```
+
+Ver la referencia completa en `kyos/docs/15-kyle-syntax-reference.md` para todos los detalles con ejemplos funcionales.
+
+---
+
+*Version: v0.8.0 · Last updated: 2026-07-13 — Self-hosting plan + syntax reference added.*
 
 
 
