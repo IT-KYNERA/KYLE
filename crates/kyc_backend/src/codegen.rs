@@ -1311,10 +1311,10 @@ impl<'ctx> Codegen<'ctx> {
             let ft = ptr_ty.fn_type(&params, false);
             self.module.add_function("ky_alloc", ft, None);
         }
-        // void kl_free(ptr)
+        // i32 ky_free(ptr)
         {
             let params = [ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
+            let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_free", ft, None);
         }
         // ptr kl_i64_to_str(i64)
@@ -1811,9 +1811,9 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_await_task", ft, None);
         }
-        // void kl_yield()  — cooperative yield hint
+        // i32 ky_yield()  — cooperative yield hint
         {
-            let ft = void_ty.fn_type(&[], false);
+            let ft = i32_ty.fn_type(&[], false);
             self.module.add_function("ky_yield", ft, None);
         }
         // i64 kl_spawn_thread(ptr, i64)  — spawn dedicated OS thread
@@ -2526,16 +2526,16 @@ impl<'ctx> Codegen<'ctx> {
         }
 
         // === RC / ARC (reference counting) ===
-        // void ky_retain(ptr)
+        // i32 ky_retain(ptr)
         {
             let params = [ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
+            let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_retain", ft, None);
         }
-        // void ky_release(ptr)
+        // i32 ky_release(ptr)
         {
             let params = [ptr_ty.into()];
-            let ft = void_ty.fn_type(&params, false);
+            let ft = i32_ty.fn_type(&params, false);
             self.module.add_function("ky_release", ft, None);
         }
 
@@ -4379,6 +4379,18 @@ impl<'ctx> Codegen<'ctx> {
                 self.builder.build_ptr_to_int(val.into_pointer_value(), *t, "").map_err(|e| format!("ptoi: {}", e))?.as_basic_value_enum(),
             (BasicValueEnum::IntValue(_), BasicTypeEnum::PointerType(t)) =>
                 self.builder.build_int_to_ptr(self.to_int_value(val), *t, "").map_err(|e| format!("itop: {}", e))?.as_basic_value_enum(),
+            (BasicValueEnum::StructValue(struct_val), BasicTypeEnum::IntType(t)) => {
+                // Struct → i64: store to alloca, convert address to int
+                let struct_ty = struct_val.get_type();
+                let temp_alloca = self.builder.build_alloca(struct_ty, "_tmp_struct")
+                    .map_err(|e| format!("alloca: {}", e))?;
+                self.builder.build_store(temp_alloca, *struct_val)
+                    .map_err(|e| format!("store struct: {}", e))?;
+                let ptr = temp_alloca.as_basic_value_enum();
+                self.builder.build_ptr_to_int(ptr.into_pointer_value(), *t, "_ptrint")
+                    .map_err(|e| format!("ptrtoint: {}", e))?
+                    .as_basic_value_enum()
+            }
             _ => val,
         })
     }

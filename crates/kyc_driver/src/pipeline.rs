@@ -293,7 +293,7 @@ fn random_bytes(count: i32) ptr:
     buf
 
 extern fn ky_alloc(i64) ptr
-extern fn ky_free(ptr)
+extern fn ky_free(ptr) i32
 
 # ═══════════════════════════════════════
 # bytes (extras)
@@ -396,7 +396,7 @@ fn iter_collect(it: i64) ptr:
 
 extern fn ky_spawn_task(ptr, i64) i64
 extern fn ky_await_task(i64) i64
-extern fn ky_yield()
+extern fn ky_yield() i32
 
 fn spawn_task(fn_ptr: ptr, arg: i64) i64:
     ky_spawn_task(fn_ptr, arg)
@@ -599,8 +599,8 @@ fn big_int_free(n: i64):
 # Uses the runtime's built-in retain/release
 # ═══════════════════════════════════════
 
-extern fn ky_retain(ptr)
-extern fn ky_release(ptr)
+extern fn ky_retain(ptr) i32
+extern fn ky_release(ptr) i32
 
 fn rc_new(val: ptr) ptr:
     ky_retain(val)
