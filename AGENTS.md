@@ -113,7 +113,7 @@ locally per-platform and let CI verify any changes via a tagged release.
 - **No `self`**: use `this.field` for field access
 - **Generic params**: uppercase `T` (only exception to snake_case)
 
-**Syntax reference for porting the compiler:** see `docs/15-kyle-syntax-reference.md` in the KYOS project (`/Users/kynera/HCA/KYNERA/kyos/docs/15-kyle-syntax-reference.md`) or the docs below.
+**Syntax reference for porting the compiler:** see `docs/15-kyle-syntax-reference.md` (this project) or the docs below.
 
 Do not guess Kyle syntax — always check the docs.
 
@@ -195,6 +195,8 @@ ky/
 | Multi-platform install | `docs/07-tools/distribution.md` |
 | Runtime internals | `docs/05-runtime/` |
 | Compiler pipeline | `docs/06-compiler/` |
+| **Syntax reference (self-hosting)** | **`docs/15-kyle-syntax-reference.md`** |
+| **Self-hosting plan** | **`docs/14-self-hosting.md`** |
 
 ---
 
@@ -613,7 +615,7 @@ See `docs/07-tools/distribution.md` for full details.
 | **Linker** (.o → ejecutable) | `kyc_backend/linker.rs` | ✅ **Ahora** | `system()` via FFI para llamar a clang/ld |
 | **CLI** (`ky build`, `ky run`) | `kyc_cli/` | ✅ **Ahora** | `read_file()` + `system()` via FFI |
 
-**La sintaxis completa de Kyle con ejemplos funcionales está en:** `/Users/kynera/HCA/KYNERA/kyos/docs/15-kyle-syntax-reference.md`
+**La sintaxis completa de Kyle con ejemplos funcionales está en:** `docs/15-kyle-syntax-reference.md` (en este proyecto)
 
 ### Orden de migración
 
@@ -657,7 +659,7 @@ Errores:          fn div(a: i32, b: i32) i32!: result = div(10, 0)!
 Interpolación:    msg = "Hola, {name}!"
 ```
 
-Ver la referencia completa en `kyos/docs/15-kyle-syntax-reference.md` para todos los detalles con ejemplos funcionales.
+Ver la referencia completa en `docs/15-kyle-syntax-reference.md` para todos los detalles con ejemplos funcionales.
 
 ---
 
