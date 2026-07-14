@@ -1,0 +1,541 @@
+# Lexer Kyle — Portado de Rust (kyc_frontend/src/lexer.rs + token.rs)
+#
+# Convierte source code (.ky) en tokens (TokenKind).
+# Funciona como modulo independiente, todo en un archivo.
+
+# ===============================================================
+# Char helpers
+# ===============================================================
+
+fn is_alpha(c: str) bool:
+    return (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+
+fn is_digit(c: str) bool:
+    return c >= "0" and c <= "9"
+
+fn is_alnum(c: str) bool:
+    return is_alpha(c) or is_digit(c)
+
+fn is_hex(c: str) bool:
+    return is_digit(c) or (c >= "a" and c <= "f") or (c >= "A" and c <= "F")
+
+fn is_ident_start(c: str) bool:
+    return is_alpha(c) or c == "_"
+
+fn is_ident_continue(c: str) bool:
+    return is_alnum(c) or c == "_"
+
+# ===============================================================
+# Token types (reduced for testability)
+# ===============================================================
+
+enum TokenKind:
+    Identifier(str)
+    Integer(str)
+    Float(str)
+    String(str)
+    Fn
+    If
+    Else
+    While
+    Return
+    True
+    False
+    KwNone
+    Plus
+    Minus
+    Star
+    Slash
+    Equals
+    EqualsEquals
+    Bang
+    BangEquals
+    Less
+    Greater
+    Comma
+    Colon
+    LParen
+    RParen
+    LBrace
+    RBrace
+    Newline
+    Indent
+    Dedent
+    Eof
+    LexError(str)
+
+final class Token:
+    kind: TokenKind
+    text: str
+
+# ===============================================================
+# Keywords
+# ===============================================================
+
+fn keyword(word: &str) TokenKind:
+    if word == "fn": return TokenKind.Fn
+    elif word == "if": return TokenKind.If
+    elif word == "else": return TokenKind.Else
+    elif word == "while": return TokenKind.While
+    elif word == "return": return TokenKind.Return
+    elif word == "true": return TokenKind.True
+    elif word == "false": return TokenKind.False
+    elif word == "none": return TokenKind.KwNone
+    return TokenKind.Identifier(word)
+
+# ===============================================================
+# Lexer struct
+# ===============================================================
+
+final class Lexer:
+    chars: ^{str}
+    pos: ^i32
+    line: ^i32
+    column: ^i32
+    indent_stack: ^{i32}
+    pending: ^{Token}
+    at_bol: ^bool
+
+fn lexer_new(source: str) Lexer:
+    cs: ^{str} = {}
+    for c in source:
+        cs.push(c)
+    return Lexer{
+        chars: cs,
+        pos: 0,
+        line: 1,
+        column: 1,
+        indent_stack: {0},
+        pending: {},
+        at_bol: true
+    }
+
+# ===============================================================
+# Position helpers
+# ===============================================================
+
+fn at_end(lex: &Lexer) bool:
+    return lex.pos.get() >= lex.chars.len()
+
+fn current(lex: &Lexer) str?:
+    if at_end(lex):
+        return none
+    return some(lex.chars[lex.pos.get()])
+
+fn peek(lex: &Lexer) str?:
+    p = lex.pos.get() + 1
+    if p >= lex.chars.len():
+        return none
+    return some(lex.chars[p])
+
+fn advance(lex: ^Lexer):
+    c = current(&lex)
+    if c:
+        ch = c
+        if ch == "\n":
+            lex.line.set(lex.line.get() + 1)
+            lex.column.set(1)
+        else:
+            lex.column.set(lex.column.get() + 1)
+    lex.pos.set(lex.pos.get() + 1)
+
+# ===============================================================
+# Indentation
+# ===============================================================
+
+fn measure_indent(lex: &Lexer) i32:
+    result: ^i32 = 0
+    pos: ^i32 = lex.pos.get()
+    while pos.get() < lex.chars.len():
+        c = lex.chars[pos.get()]
+        if c == " ":
+            result.set(result.get() + 1)
+            pos.set(pos.get() + 1)
+        elif c == "\t":
+            result.set(result.get() + 4)
+            pos.set(pos.get() + 1)
+        elif c == "#":
+            while pos.get() < lex.chars.len():
+                if lex.chars[pos.get()] == "\n":
+                    break
+                pos.set(pos.get() + 1)
+        elif c == "\n":
+            result.set(0)
+            pos.set(pos.get() + 1)
+        elif c == "\r":
+            pos.set(pos.get() + 1)
+        else:
+            break
+    return result.get()
+
+fn handle_newline(lex: ^Lexer):
+    if lex.at_bol.get():
+        return
+    lex.at_bol.set(true)
+    lex.pending.push(Token{kind: TokenKind.Newline, text: ""})
+    indent = measure_indent(&lex)
+    stack_size = lex.indent_stack.len()
+    current_indent = lex.indent_stack[stack_size - 1]
+    if indent > current_indent:
+        lex.indent_stack.push(indent)
+        lex.pending.push(Token{kind: TokenKind.Indent, text: ""})
+    elif indent < current_indent:
+        while indent < lex.indent_stack[lex.indent_stack.len() - 1]:
+            lex.indent_stack.pop()
+            lex.pending.push(Token{kind: TokenKind.Dedent, text: ""})
+
+# ===============================================================
+# Skip whitespace
+# ===============================================================
+
+fn skip_ws(lex: ^Lexer):
+    while true:
+        c = current(&lex)
+        if c:
+            ch = c
+            if ch == " " or ch == "\t" or ch == "\r":
+                advance(lex)
+            elif ch == "#":
+                advance(lex)
+                while true:
+                    nc = current(&lex)
+                    if nc:
+                        if nc == "\n":
+                            break
+                        advance(lex)
+                    else:
+                        break
+            else:
+                break
+        else:
+            break
+
+# ===============================================================
+# Number lexer
+# ===============================================================
+
+fn lex_number(lex: ^Lexer, first: str) Token:
+    result: ^str = ""
+    result.set(first)
+    advance(lex)
+    if first == "0":
+        n = current(&lex)
+        if n:
+            ch = n
+            if ch == "x" or ch == "X":
+                result.set(result.get() + ch)
+                advance(lex)
+                while true:
+                    nc = current(&lex)
+                    if nc and is_hex(nc):
+                        result.set(result.get() + nc)
+                        advance(lex)
+                    else:
+                        break
+                return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
+            elif ch == "b" or ch == "B":
+                result.set(result.get() + ch)
+                advance(lex)
+                while true:
+                    nc = current(&lex)
+                    if nc and (nc == "0" or nc == "1"):
+                        result.set(result.get() + nc)
+                        advance(lex)
+                    else:
+                        break
+                return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
+    is_float: ^bool = false
+    while true:
+        nc = current(&lex)
+        if nc:
+            if is_digit(nc):
+                result.set(result.get() + nc)
+                advance(lex)
+            elif nc == ".":
+                result.set(result.get() + nc)
+                is_float = true
+                advance(lex)
+            else:
+                break
+        else:
+            break
+    if is_float:
+        return Token{kind: TokenKind.Float(result.get()), text: result.get()}
+    return Token{kind: TokenKind.Integer(result.get()), text: result.get()}
+
+# ===============================================================
+# String lexer
+# ===============================================================
+
+fn lex_string(lex: ^Lexer, quote: str) Token:
+    result: ^str = ""
+    advance(lex)
+    while true:
+        c = current(&lex)
+        if c:
+            ch = c
+            if ch == quote:
+                advance(lex)
+                return Token{kind: TokenKind.String(result.get()), text: result.get()}
+            elif ch == "\\":
+                advance(lex)
+                esc = current(&lex)
+                if esc:
+                    ec = esc
+                    if ec == "n": result.set(result.get() + "\n")
+                    elif ec == "t": result.set(result.get() + "\t")
+                    elif ec == "\\": result.set(result.get() + "\\")
+                    elif ec == quote: result.set(result.get() + quote)
+                    else: result.set(result.get() + ec)
+                    advance(lex)
+            else:
+                result.set(result.get() + ch)
+                advance(lex)
+        else:
+            break
+    return Token{kind: TokenKind.LexError("Unterminated string"), text: ""}
+
+# ===============================================================
+# Identifier
+# ===============================================================
+
+fn lex_ident(lex: ^Lexer, first: str) Token:
+    word: ^str = ""
+    word.set(first)
+    advance(lex)
+    while true:
+        nc = current(&lex)
+        if nc and is_ident_continue(nc):
+            word.set(word.get() + nc)
+            advance(lex)
+        else:
+            break
+    kind = keyword(&word.get())
+    return Token{kind: kind, text: word.get()}
+
+# ===============================================================
+# Operator helpers
+# ===============================================================
+
+fn ch(lex: ^Lexer) str:
+    c = current(lex)
+    if c: return c
+    return ""
+
+fn advance_and_return(lex: ^Lexer, kind: TokenKind, text: str) Token:
+    advance(lex)
+    return Token{kind: kind, text: text}
+
+# (operator helpers are inline in next_token)
+
+# ===============================================================
+# Next token
+# ===============================================================
+
+fn next_token(lex: ^Lexer) Token?:
+    # Drain pending (indent/dedent)
+    if lex.pending.len() > 0:
+        return some(lex.pending.pop_first())
+
+    skip_ws(lex)
+
+    # End of file
+    if at_end(lex):
+        while lex.indent_stack.len() > 1:
+            lex.indent_stack.pop()
+            return some(Token{kind: TokenKind.Dedent, text: ""})
+        return some(Token{kind: TokenKind.Eof, text: ""})
+
+    c = ch(lex)
+
+    # Newline
+    if c == "\n":
+        advance(lex)
+        handle_newline(lex)
+        return some(Token{kind: TokenKind.Newline, text: ""})
+
+    # Single-character tokens and multi-char operators
+    if c == "+":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.PlusEquals, text: "+="})
+        advance(lex)
+        return some(Token{kind: TokenKind.Plus, text: "+"})
+
+    elif c == "-":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.MinusEquals, text: "-="})
+        elif n and n == ">":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.Arrow, text: "->"})
+        advance(lex)
+        return some(Token{kind: TokenKind.Minus, text: "-"})
+
+    elif c == "*":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.StarEquals, text: "*="})
+        elif n and n == "*":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.StarStar, text: "**"})
+        advance(lex)
+        return some(Token{kind: TokenKind.Star, text: "*"})
+
+    elif c == "/":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.SlashEquals, text: "/="})
+        advance(lex)
+        return some(Token{kind: TokenKind.Slash, text: "/"})
+
+    elif c == "=":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.EqualsEquals, text: "=="})
+        elif n and n == ">":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.FatArrow, text: "=>"})
+        advance(lex)
+        return some(Token{kind: TokenKind.Equals, text: "="})
+
+    elif c == "!":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.BangEquals, text: "!="})
+        advance(lex)
+        return some(Token{kind: TokenKind.Bang, text: "!"})
+
+    elif c == "<":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.LessEquals, text: "<="})
+        elif n and n == "<":
+            advance(lex)
+            n2 = peek(lex)
+            if n2 and n2 == "=":
+                advance(lex)
+                advance(lex)
+                return some(Token{kind: TokenKind.LessLessEquals, text: "<<="})
+            advance(lex)
+            return some(Token{kind: TokenKind.LessLess, text: "<<"})
+        advance(lex)
+        return some(Token{kind: TokenKind.Less, text: "<"})
+
+    elif c == ">":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.GreaterEquals, text: ">="})
+        elif n and n == ">":
+            advance(lex)
+            n2 = peek(lex)
+            if n2 and n2 == "=":
+                advance(lex)
+                advance(lex)
+                return some(Token{kind: TokenKind.GreaterGreaterEquals, text: ">>="})
+            advance(lex)
+            return some(Token{kind: TokenKind.GreaterGreater, text: ">>"})
+        advance(lex)
+        return some(Token{kind: TokenKind.Greater, text: ">"})
+
+    elif c == ",":
+        advance(lex)
+        return some(Token{kind: TokenKind.Comma, text: ","})
+
+    elif c == ":":
+        n = peek(lex)
+        if n and n == "=":
+            advance(lex)
+            advance(lex)
+            return some(Token{kind: TokenKind.Walrus, text: ":="})
+        advance(lex)
+        return some(Token{kind: TokenKind.Colon, text: ":"})
+
+    elif c == "(":
+        advance(lex)
+        return some(Token{kind: TokenKind.LParen, text: "("})
+    elif c == ")":
+        advance(lex)
+        return some(Token{kind: TokenKind.RParen, text: ")"})
+    elif c == "{":
+        advance(lex)
+        return some(Token{kind: TokenKind.LBrace, text: "{"})
+    elif c == "}":
+        advance(lex)
+        return some(Token{kind: TokenKind.RBrace, text: "}"})
+
+    # Identifier or keyword
+    elif is_ident_start(c):
+        return some(lex_ident(lex, c))
+
+    # Number
+    elif is_digit(c):
+        return some(lex_number(lex, c))
+
+    # String
+    elif c == "\"" or c == "'":
+        return some(lex_string(lex, c))
+
+    else:
+        advance(lex)
+        return some(Token{kind: TokenKind.LexError("Unexpected char: " + c), text: c})
+
+# ===============================================================
+# Tokenize
+# ===============================================================
+
+fn tokenize(lex: ^Lexer) ^{Token}:
+    result: ^{Token} = {}
+    while true:
+        t = next_token(lex)
+        if t:
+            tok = t
+            result.push(tok)
+            match tok.kind:
+                TokenKind.Eof: break
+                _: none
+        else:
+            result.push(Token{kind: TokenKind.Eof, text: ""})
+            break
+    return result
+
+# ===============================================================
+# Test
+# ===============================================================
+
+fn test_simple():
+    source = "fn add(a: i32, b: i32) i32:\n    return a + b\n"
+    lex = lexer_new(source)
+    tokens = tokenize(&lex)
+    print("Simple: " + tokens.len().to_str() + " tokens")
+
+fn test_expr():
+    source = "result = 42 + 15\n"
+    lex = lexer_new(source)
+    tokens = tokenize(&lex)
+    print("Expr: " + tokens.len().to_str() + " tokens")
+    for tok in tokens:
+        print("  " + tok.text)
+
+fn main():
+    test_simple()
+    test_expr()
