@@ -583,14 +583,9 @@ impl<'ctx> Codegen<'ctx> {
                         match val {
                             MirValue::Constant(c) => self.constant_to_llvm(c),
                             MirValue::Local(mir_id) => {
-                                if let Some(ssa_id) = func.block_local_map.get(bi).and_then(|m| m.get(mir_id)).copied() {
-                                    ssa_read!(ssa_id)
-                                } else if let Some(&v) = alloca_current.get(mir_id) {
-                                    v
-                                } else if let Some(v) = block_vals.get(bi).and_then(|bv| bv.get(mir_id)).copied() {
-                                    v
-                                } else if let Some(Some(ptr)) = self.alloca_map.get(*mir_id) {
-                                    // Load from actual alloca as fallback (handles non-promotable)
+                                // For non-promotable allocas (str types), load from alloca directly.
+                                // Promotable allocas use block_local_map for SSA-tracked values.
+                                if let Some(Some(ptr)) = self.alloca_map.get(*mir_id) {
                                     if let Some(pointee_type) = self.alloca_types.get(mir_id) {
                                         self.builder.build_load(*pointee_type, *ptr, "_ssaload")
                                             .map_err(|e| format!("ssa-load {}: {}", mir_id, e))?
@@ -598,6 +593,12 @@ impl<'ctx> Codegen<'ctx> {
                                     } else {
                                         self.context.i32_type().const_zero().as_basic_value_enum()
                                     }
+                                } else if let Some(ssa_id) = func.block_local_map.get(bi).and_then(|m| m.get(mir_id)).copied() {
+                                    ssa_read!(ssa_id)
+                                } else if let Some(&v) = alloca_current.get(mir_id) {
+                                    v
+                                } else if let Some(v) = block_vals.get(bi).and_then(|bv| bv.get(mir_id)).copied() {
+                                    v
                                 } else {
                                     self.context.i32_type().const_zero().as_basic_value_enum()
                                 }
@@ -1228,6 +1229,10 @@ impl<'ctx> Codegen<'ctx> {
                         if let Some(pred_bb) = block_map.get(pred_label).copied() {
                             if let Some(pred_bi) = func.blocks.iter().position(|b| &b.label == pred_label) {
                                  let mut val = block_vals[pred_bi].get(&val_id).copied()
+                                     .or_else(|| {
+                                         block_vals[..pred_bi].iter().rev()
+                                             .filter_map(|bv| bv.get(&val_id).copied()).next()
+                                     })
                                      .or_else(|| {
                                          func.const_values.get(&val_id)
                                              .map(|c| self.constant_to_llvm(c))

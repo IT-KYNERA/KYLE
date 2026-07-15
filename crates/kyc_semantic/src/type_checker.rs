@@ -833,7 +833,7 @@ impl TypeChecker {
                                             AstType::Ptr { .. } => Some("ptr"),
                                             _ => None,
                                         };
-                                        let is_copy_type = type_name.map_or(false, |n| n != "str" && n != "void" && n != "any" && n != "__array__")
+                                        let is_copy_type = type_name.map_or(false, |n| n != "void" && n != "any" && n != "__array__")
                                             || matches!(&param.type_, AstType::Array { .. });
                                         match param.mode {
                                             ParamMode::Borrow if !has_borrow && !is_copy_type => {

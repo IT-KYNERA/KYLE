@@ -1,0 +1,177 @@
+# ky2c.ky — Kyle→C compiler in Kyle
+
+fn main():
+    src = ""
+    empty = 0
+    while empty < 3:
+        line = input()
+        if line == "":
+            empty = empty + 1
+            if empty >= 3: break
+            src = src + "\n"
+        else:
+            empty = 0
+            src = src + line + "\n"
+
+    slen = src.len()
+    pos = 0
+    indent = 0
+    in_fn = false
+
+    println("// ky2c.ky")
+    println("#include <stdio.h>")
+    println("#include <string.h>")
+    println("#include <stdlib.h>")
+    println("")
+    println("extern char* ky_input();")
+    println("extern char* ky_concat(char* a, int a_len, char* b, int b_len);")
+    println("extern int ky_strlen(char* s);")
+    println("extern int ky_eq_str(char* a, char* b);")
+    println("extern void ky_print(char* s, int len);")
+    println("extern void ky_println(char* s, int len);")
+    println("extern char* ky_i64_to_str(long long v);")
+    println("")
+    println("char* _s(long long v) \{ return ky_i64_to_str(v); }")
+    println("char* _c(char* a, char* b) \{ return ky_concat(a, ky_strlen(a), b, ky_strlen(b)); }")
+    println("int _eq(char* a, char* b) \{ return ky_eq_str(a, b); }")
+    println("int _ne(char* a, char* b) \{ return !ky_eq_str(a, b); }")
+    println("int _len(char* s) \{ return ky_strlen(s); }")
+    println("void _p(char* s) \{ ky_print(s, ky_strlen(s)); }")
+    println("void _pl(char* s) \{ ky_println(s, ky_strlen(s)); }")
+    println("")
+
+    while pos < slen:
+        ls = pos
+        while pos < slen and src[pos] != "\n":
+            pos = pos + 1
+        le = pos
+        if pos < slen: pos = pos + 1
+
+        sp = 0
+        i = ls
+        while i < le and src[i] == " ":
+            sp = sp + 1
+            i = i + 1
+        col = ls + sp
+
+        if col >= le or src[col] == "#":
+            println("")
+        elif not in_fn:
+            if le - ls >= 2 and src[ls] == "f" and src[ls+1] == "n":
+                in_fn = true
+                idx = ls + 2
+                if idx < le and src[idx] == " ": idx = idx + 1
+                if le - idx == 4 and src[idx] == "m" and src[idx+1] == "a" and src[idx+2] == "i" and src[idx+3] == "n":
+                    println("void kyle_main() \{")
+                else:
+                    print("void ")
+                    while idx < le:
+                        c = src[idx]
+                        if c == "(" or c == ")" or c == ":": break
+                        print(c)
+                        idx = idx + 1
+                    println("() \{")
+                indent = 1
+            else:
+                println("")
+        else:
+            ni = sp / 4
+            while ni < indent:
+                indent = indent - 1
+                println("}")
+            indent = ni
+
+            if indent > 0:
+                print("    ")
+
+                if le - ls >= 6 and src[col] == "r":
+                    print("return ")
+                    ci = col + 6
+                    while ci < le:
+                        print(src[ci])
+                        ci = ci + 1
+                    println(";")
+                elif le - ls >= 2 and src[col] == "i" and src[col+1] == "f":
+                    ci = col + 2
+                    while ci < le and src[ci] == " ": ci = ci + 1
+                    print("if (")
+                    while ci < le and src[ci] != ":":
+                        print(src[ci])
+                        ci = ci + 1
+                    println(") \{")
+                    indent = indent + 1
+                elif le - ls >= 4 and src[col] == "e" and src[col+1] == "l" and src[col+2] == "i" and src[col+3] == "f":
+                    indent = indent - 1
+                    println("}")
+                    ci = col + 4
+                    while ci < le and src[ci] == " ": ci = ci + 1
+                    print("else if (")
+                    while ci < le and src[ci] != ":":
+                        print(src[ci])
+                        ci = ci + 1
+                    println(") \{")
+                    indent = indent + 1
+                elif le - ls >= 4 and src[col] == "e" and src[col+1] == "l" and src[col+2] == "s" and src[col+3] == "e":
+                    indent = indent - 1
+                    println("}")
+                    println("else \{")
+                    indent = indent + 1
+                elif le - ls >= 5 and src[col] == "w" and src[col+1] == "h" and src[col+2] == "i" and src[col+3] == "l" and src[col+4] == "e":
+                    ci = col + 5
+                    while ci < le and src[ci] == " ": ci = ci + 1
+                    print("while (")
+                    while ci < le and src[ci] != ":":
+                        print(src[ci])
+                        ci = ci + 1
+                    println(") \{")
+                    indent = indent + 1
+                elif le - col >= 7 and src[col] == "p" and src[col+1] == "r" and src[col+2] == "i" and src[col+3] == "n" and src[col+4] == "t" and src[col+5] == "l" and src[col+6] == "n":
+                    print("_pl")
+                    ci = col + 7
+                    while ci < le:
+                        print(src[ci])
+                        ci = ci + 1
+                    println(";")
+                elif le - col >= 5 and src[col] == "p" and src[col+1] == "r" and src[col+2] == "i" and src[col+3] == "n" and src[col+4] == "t":
+                    print("_p")
+                    ci = col + 5
+                    while ci < le:
+                        print(src[ci])
+                        ci = ci + 1
+                    println(";")
+                else:
+                    xi = col
+                    while xi < le:
+                        nn = le - xi
+                        if nn >= 5 and src[xi] == "i" and src[xi+1] == "n" and src[xi+2] == "p" and src[xi+3] == "u" and src[xi+4] == "t":
+                            print("ky_input")
+                            xi = xi + 5
+                        elif nn >= 4 and src[xi] == "t" and src[xi+1] == "r" and src[xi+2] == "u" and src[xi+3] == "e":
+                            print("1")
+                            xi = xi + 4
+                        elif nn >= 5 and src[xi] == "f" and src[xi+1] == "a" and src[xi+2] == "l" and src[xi+3] == "s" and src[xi+4] == "e":
+                            print("0")
+                            xi = xi + 5
+                        elif nn >= 3 and src[xi] == "n" and src[xi+1] == "o" and src[xi+2] == "t":
+                            print("!")
+                            xi = xi + 3
+                        elif nn >= 3 and src[xi] == "a" and src[xi+1] == "n" and src[xi+2] == "d":
+                            print("&&")
+                            xi = xi + 3
+                        elif nn >= 2 and src[xi] == "o" and src[xi+1] == "r":
+                            print("||")
+                            xi = xi + 2
+                        else:
+                            print(src[xi])
+                            xi = xi + 1
+                    println(";")
+
+    while indent > 0:
+        indent = indent - 1
+        if in_fn: println("}")
+
+    println("")
+    println("int main() \{")
+    println("    kyle_main();")
+    println("    return 0;")
+    println("}")

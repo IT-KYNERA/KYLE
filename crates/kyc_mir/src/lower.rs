@@ -666,8 +666,8 @@ impl Lowerer {
                             } else {
                                 MirType::Struct(c.name.clone(), vec![])
                             };
-                            let this_local = ctx.alloc_local("this", this_type);
-        ctx.locals.insert("this".to_string(), this_local);
+                            let this_local = ctx.alloc_local("this", this_type.clone());
+         ctx.locals.insert("this".to_string(), this_local);
         ctx.locals.insert("self".to_string(), this_local);
                             // Bind constructor params to locals
                             for (i, param) in ctor.params.iter().enumerate() {
@@ -710,8 +710,14 @@ impl Lowerer {
                                     let val_local = ctx.next_local - 1;
                                     ctx.emit_return(MirValue::Local(val_local));
                                 } else {
-                                    // Return `this` (the struct constructed via field assignments)
-                                    ctx.emit_return(MirValue::Local(this_local));
+                                    // Load struct value from alloca before returning
+                                    // (MirValue::Local(this_local) is a pointer, but return type is Struct)
+                                    let val_local = ctx.alloc_local("_retval", this_type.clone());
+                                    ctx.current_block.insts.push(MirInst::Load {
+                                        dest: val_local,
+                                        src: this_local,
+                                    });
+                                    ctx.emit_return(MirValue::Local(val_local));
                                 }
                             }
                             mir_func.local_count = ctx.next_local;
@@ -3412,11 +3418,17 @@ impl Lowerer {
                         args: vec![MirValue::Local(left_local), MirValue::Local(right_local)],
                     });
                     if matches!(operator, BinaryOp::Neq) {
+                        let one = ctx.alloc_local("_one", MirType::I32);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: one,
+                            value: MirValue::Constant(MirConstant::I32(1)),
+                        });
                         let neq = ctx.alloc_local("_bin", MirType::I32);
-                        ctx.current_block.insts.push(MirInst::UnaryOp {
+                        ctx.current_block.insts.push(MirInst::BinaryOp {
                             dest: neq,
-                            op: MirUnaryOp::Not,
-                            operand: MirValue::Local(result),
+                            op: MirBinaryOp::Xor,
+                            left: MirValue::Local(result),
+                            right: MirValue::Local(one),
                         });
                         return ctx;
                     }
@@ -3994,7 +4006,7 @@ impl Lowerer {
                         });
                         return ctx;
                     }
-                    if is_str && property == "to_upper" && arguments.is_empty() {
+                    if is_str && (property == "to_upper" || property == "upper") && arguments.is_empty() {
                         let result = ctx.alloc_local("_s", MirType::Str);
                         ctx.string_locals.push(result);
                         ctx.current_block.insts.push(MirInst::Call {
@@ -4003,7 +4015,7 @@ impl Lowerer {
                         });
                         return ctx;
                     }
-                    if is_str && property == "to_lower" && arguments.is_empty() {
+                    if is_str && (property == "to_lower" || property == "lower") && arguments.is_empty() {
                         let result = ctx.alloc_local("_s", MirType::Str);
                         ctx.string_locals.push(result);
                         ctx.current_block.insts.push(MirInst::Call {
@@ -4329,7 +4341,26 @@ impl Lowerer {
                         });
                         return ctx;
                     }
-
+                    // === STR GET (char_at via ky_substr) ===
+                    if is_str && property == "get" && arguments.len() == 1 {
+                        ctx = self.lower_expr(ctx, &arguments[0]);
+                        let idx = ctx.next_local - 1;
+                        let idx_i64 = ctx.alloc_local("_sg64", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: idx_i64, value: MirValue::Local(idx), to_type: MirType::I64,
+                        });
+                        let one_i64 = ctx.alloc_local("_one64", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: one_i64, value: MirValue::Constant(MirConstant::I64(1)),
+                        });
+                        let result = ctx.alloc_local("_sg", MirType::Str);
+                        ctx.string_locals.push(result);
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(result), name: "ky_substr".to_string(),
+                            args: vec![MirValue::Local(obj_local), MirValue::Local(idx_i64), MirValue::Local(one_i64)],
+                        });
+                        return ctx;
+                    }
                     // === LIST METHODS ===
                     if is_list {
                         if property == "pop" {
@@ -4724,6 +4755,44 @@ impl Lowerer {
                                     name: fn_name.to_string(),
                                     args: vec![MirValue::Local(obj_local)],
                                 });
+                                return ctx;
+                            }
+                        }
+                    }
+
+                    // === MUTABLE PRIMITIVE GET/SET ===
+                    if property == "get" && arguments.is_empty() {
+                        if let Some(t) = &obj_type {
+                            if matches!(t, MirType::I1 | MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64
+                                        | MirType::U8 | MirType::U16 | MirType::U32 | MirType::U64
+                                        | MirType::F32 | MirType::F64 | MirType::Bool | MirType::Char) {
+                                return ctx;
+                            }
+                        }
+                    }
+                    if property == "set" && arguments.len() == 1 {
+                        if let Some(t) = &obj_type {
+                            if matches!(t, MirType::I1 | MirType::I8 | MirType::I16 | MirType::I32 | MirType::I64
+                                        | MirType::U8 | MirType::U16 | MirType::U32 | MirType::U64
+                                        | MirType::F32 | MirType::F64 | MirType::Bool | MirType::Char) {
+                                ctx = self.lower_expr(ctx, &arguments[0]);
+                                let sv = ctx.next_local - 1;
+                                let st = ctx.local_types.get(&sv).cloned().unwrap_or(t.clone());
+                                let sv2 = if st != *t {
+                                    let cv = ctx.alloc_local("_msv", t.clone());
+                                    ctx.current_block.insts.push(MirInst::Cast {
+                                        dest: cv, value: MirValue::Local(sv), to_type: t.clone(),
+                                    });
+                                    MirValue::Local(cv)
+                                } else { MirValue::Local(sv) };
+                                if let Expr::Identifier { name, .. } = object.as_ref() {
+                                    if let Some(&alloca) = ctx.locals.get(name) {
+                                        ctx.current_block.insts.push(MirInst::Store {
+                                            dest: alloca,
+                                            value: sv2,
+                                        });
+                                    }
+                                }
                                 return ctx;
                             }
                         }
@@ -5217,18 +5286,14 @@ impl Lowerer {
                         let is_str = ctx.string_locals.contains(id)
                             || ctx.local_types.get(id).map_or(false, |t| *t == MirType::Str);
                         if is_str {
-                            // This local holds a string pointer — need to get its length
+                            // Use the str value directly — no extra Load needed
+                            // (the expression result IS the pointer)
+                            let print_arg = *id;
                             let len_dest = ctx.alloc_local("_strlen", MirType::I32);
                             ctx.current_block.insts.push(MirInst::Call {
                                 dest: Some(len_dest),
                                 name: "ky_strlen".to_string(),
-                                args: vec![MirValue::Local(*id)],
-                            });
-                            // Load a fresh temp for print/println (strlen above consumed *id)
-                            let print_arg = ctx.alloc_local("_parg", MirType::Str);
-                            ctx.current_block.insts.push(MirInst::Load {
-                                dest: print_arg,
-                                src: *id,
+                                args: vec![MirValue::Local(print_arg)],
                             });
                             let call_name = if name == "println" { "ky_println" } else { "ky_print" };
                             let pret = ctx.alloc_local("_pret", call_type.clone());
@@ -5443,7 +5508,7 @@ impl Lowerer {
                     name: resolved_name.clone(),
                     args,
                 });
-                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify" | "serialize" | "ky_struct_to_json") {
+                if matches!(resolved_name.as_str(), "to_upper" | "to_lower" | "upper" | "lower" | "trim" | "replace" | "input" | "input_with_prompt" | "read_str" | "substr" | "json_stringify" | "serialize" | "ky_struct_to_json") {
                     ctx.string_locals.push(dest);
                 }
                 ctx
@@ -7491,7 +7556,7 @@ fn builtin_return_type(name: &str) -> Option<MirType> {
     match name {
         "print" | "println" => Some(MirType::Void),
         "contains" => Some(MirType::I32),
-        "to_upper" | "to_lower" | "trim" | "replace" | "input" | "input_with_prompt" => Some(MirType::Str),
+        "to_upper" | "to_lower" | "upper" | "lower" | "trim" | "replace" | "input" | "input_with_prompt" => Some(MirType::Str),
         "open" | "close" | "write_str" => Some(MirType::I32),
         "read_str" => Some(MirType::Str),
         "char_at" => Some(MirType::Char),

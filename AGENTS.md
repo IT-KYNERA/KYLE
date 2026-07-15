@@ -5,6 +5,29 @@
 
 ---
 
+## Benchmarks
+
+```bash
+cd benchmarks && bash run_benchmarks.sh
+```
+
+Corre 4 benchmarks (primes, fib, concat, matmul) en 8 lenguajes (C, C++, Rust, C#, Go, Java, Python, Kyle). El script compila todo automáticamente y muestra resultados en ms.
+
+Para agregar un nuevo benchmark:
+```bash
+mkdir -p benchmarks/mibench
+# Crear mibench.c, mibench.cpp, mibench.rs, mibench.go, mibench.py, mibench.java, mibench.ky
+# El script detecta automáticamente los archivos existentes
+```
+
+Para rebuildear solo Kyle:
+```bash
+./target/release/ky build benchmarks/primes/primes.ky
+cp target/debug/primes benchmarks/primes/primes_ky
+```
+
+---
+
 ## What is Kyle?
 
 A compiled, statically-typed language for backend systems, CLI tools, and full-stack development.
