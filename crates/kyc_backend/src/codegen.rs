@@ -1340,6 +1340,12 @@ impl<'ctx> Codegen<'ctx> {
             let ft = i64_ty.fn_type(&params, false);
             self.module.add_function("ky_str_to_i64", ft, None);
         }
+        // i32 kl_str_to_i32(ptr)
+        {
+            let params = [ptr_ty.into()];
+            let ft = i32_ty.fn_type(&params, false);
+            self.module.add_function("ky_str_to_i32", ft, None);
+        }
         // i32 kl_strlen(ptr) — readonly
         {
             let params = [ptr_ty.into()];

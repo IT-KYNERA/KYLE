@@ -4224,13 +4224,29 @@ impl Lowerer {
                     }
                     // Type-specific conversion methods
                     if property == "to_i32" && arguments.is_empty() {
+                        let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I32);
                         let result = ctx.alloc_local("_ti32", MirType::I32);
-                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32 });
+                        if id_type == MirType::Str {
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_str_to_i32".to_string(),
+                                args: vec![MirValue::Local(obj_local)],
+                            });
+                        } else {
+                            ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I32 });
+                        }
                         return ctx;
                     }
                     if property == "to_i64" && arguments.is_empty() {
+                        let id_type = ctx.local_types.get(&obj_local).cloned().unwrap_or(MirType::I64);
                         let result = ctx.alloc_local("_ti64", MirType::I64);
-                        ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I64 });
+                        if id_type == MirType::Str {
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result), name: "ky_str_to_i64".to_string(),
+                                args: vec![MirValue::Local(obj_local)],
+                            });
+                        } else {
+                            ctx.current_block.insts.push(MirInst::Cast { dest: result, value: MirValue::Local(obj_local), to_type: MirType::I64 });
+                        }
                         return ctx;
                     }
                     if property == "to_i16" && arguments.is_empty() {

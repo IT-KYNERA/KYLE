@@ -175,6 +175,11 @@ pub extern "C" fn ky_f64_to_str(val: f64) -> *const u8 {
 ///
 /// This is the inverse of `ky_i64_to_str`.
 #[unsafe(no_mangle)]
+pub extern "C" fn ky_str_to_i32(ptr: *const u8) -> i32 {
+    ky_str_to_i64(ptr) as i32
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn ky_str_to_i64(ptr: *const u8) -> i64 {
     if ptr.is_null() {
         return 0;
