@@ -805,7 +805,7 @@ fn cmd_fmt(args: &[String]) {
 }
 
 fn cmd_new(args: &[String]) {
-    let mut project_type = "app";
+    let mut project_type = "bare";
     let mut project_name_arg: &str;
 
     if args.len() == 4 {
@@ -825,9 +825,9 @@ fn cmd_new(args: &[String]) {
     } else {
         eprintln!("Error: missing project name");
         eprintln!("Usage: {} new [type] <project>", bin_name());
-        eprintln!("Types: kyui    — UI project (web + desktop + iOS)");
+        eprintln!("Types: bare    — simple script (default)");
         eprintln!("       api     — HTTP API server project");
-        eprintln!("       bare    — single script file, no main");
+        eprintln!("       kyui    — UI project (web + desktop + iOS)");
         process::exit(1);
     }
 
@@ -1419,7 +1419,7 @@ fn print_usage() {
     eprintln!("  {name} fmt   [file/dir]    Format source files");
     eprintln!();
     eprintln!("Project creation:");
-    eprintln!("  {name} new   <project>     Create new project (default: kyui template)");
+    eprintln!("  {name} new   <project>     Create new project (default: bare template)");
     eprintln!("  {name} new   kyui <name>    Create UI project (web + desktop + iOS)");
     eprintln!("  {name} new   bare <name>    Create minimal script project");
     eprintln!("  {name} new   api <name>     Create HTTP API server project");
