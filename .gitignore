@@ -72,6 +72,11 @@ vscode-ky/*.vsix
 Thumbs.db
 Desktop.ini
 
+# === Root build artifacts ===
+/ky
+/ky-macos-arm64.tar.gz
+/libkyc_runtime.a
+
 # === Distribution / Release artifacts ===
 dist/
 
