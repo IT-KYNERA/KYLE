@@ -60,7 +60,7 @@ Written in **Rust** (compiler + runtime), compiles via **LLVM 18**.
 | **`--target freestanding`** | ✅ **Complete** | Entry point `_start`, no main wrapper. `ky build freestanding kernel.ky` |
 | | |
 
-### UI Framework (v0.8.1) — Estado por funcionalidad
+### UI Framework (v0.8.2) — Estado por funcionalidad
 
 | Funcionalidad | Estado | Detalle |
 |--------------|:------:|---------|
@@ -686,7 +686,7 @@ Ver la referencia completa en `docs/15-kyle-syntax-reference.md` para todos los 
 
 ---
 
-*Version: v0.8.1 · Last updated: 2026-07-13 — Self-hosting plan + syntax reference added.*
+*Version: v0.8.2 · Last updated: 2026-07-15 — Fix str.to_i32() + str.to_i64() runtime parsing.*
 
 
 
