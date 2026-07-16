@@ -36,8 +36,14 @@ impl ContractChecker {
             let found = class.members.iter().any(|member| {
                 if let ClassMember::Method(m) = member {
                     if m.name != req_method.name { return false; }
-                    if m.params.len() != req_method.params.len() { return false; }
-                    m.params.iter().zip(&req_method.params).all(|(a, b)| {
+                    // Skip auto-injected `this`/`self` param for instance methods
+                    let class_params = if !m.is_static && m.params.first().map_or(false, |p| p.name == "this" || p.name == "self") {
+                        &m.params[1..]
+                    } else {
+                        &m.params[..]
+                    };
+                    if class_params.len() != req_method.params.len() { return false; }
+                    class_params.iter().zip(&req_method.params).all(|(a, b)| {
                         a.type_ == b.type_
                     })
                 } else {
