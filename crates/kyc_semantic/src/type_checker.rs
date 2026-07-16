@@ -169,6 +169,27 @@ impl TypeChecker {
         self.current_fn = None;
     }
 
+    /// Check if a field is mutable, walking the inheritance chain if needed.
+    fn is_field_mutable(&self, class_decl: &ClassDecl, property: &str) -> bool {
+        // Check current class members
+        for member in &class_decl.members {
+            match member {
+                ClassMember::Field(f) => if f.name == property { return f.is_mutable; }
+                ClassMember::Property(p) => if p.name == property && p.setter.is_some() { return true; }
+                _ => {}
+            }
+        }
+        // Walk inheritance chain
+        if let Some(parent_name) = &class_decl.parent {
+            if let Some(sym) = self.symbols.lookup(parent_name) {
+                if let SymKind::Class(parent_decl) = &sym.kind {
+                    return self.is_field_mutable(parent_decl, property);
+                }
+            }
+        }
+        false
+    }
+
     fn check_class(&mut self, c: &ClassDecl) {
         self.symbols.push_scope();
         let _ = self.symbols.insert("this".to_string(),
@@ -709,13 +730,7 @@ impl TypeChecker {
                                 if let Type::Named(class_name) = &obj_ty {
                                     if let Some(sym) = self.symbols.lookup(class_name.as_str()) {
                                         if let SymKind::Class(class_decl) = &sym.kind {
-                                            let is_mutable = class_decl.members.iter().any(|m| {
-                                                if let ClassMember::Field(f) = m {
-                                                    f.name == *property && f.is_mutable
-                                                } else if let ClassMember::Property(p) = m {
-                                                    p.name == *property && p.setter.is_some()
-                                                } else { false }
-                                            });
+                                            let is_mutable = self.is_field_mutable(class_decl, property);
                                             if !is_mutable {
                                                 self.reporter.report(
                                                     Diagnostic::error(ErrorCode::E0001,
