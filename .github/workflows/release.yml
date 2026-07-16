@@ -17,10 +17,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Delete existing release if any (supports force-pushed tags)
+          gh release delete ${{ github.ref_name }} --yes 2>/dev/null || true
           gh release create ${{ github.ref_name }} \
             --title "Kyle ${{ github.ref_name }}" \
             --notes "See commit history for changes." \
-            --repo ${{ github.repository }} 2>/dev/null || true
+            --repo ${{ github.repository }}
 
   package-vsix:
     needs: create-release
