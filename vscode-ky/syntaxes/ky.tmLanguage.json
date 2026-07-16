@@ -21,6 +21,7 @@
     { "include": "#keywords_declaration" },
     { "include": "#keywords_operator" },
     { "include": "#keywords_other" },
+    { "include": "#storage_modifiers" },
     { "include": "#types_primitive" },
     { "include": "#types_complex" },
     { "include": "#types_special" },
@@ -66,7 +67,7 @@
     },
     "link_directive": {
       "name": "keyword.control.link.ky",
-      "match": "^@link\\s+\"(.*?)\""
+      "match": "@link\\s+\"(.*?)\""
     },
     "char_literals": {
       "name": "string.quoted.single.ky",
@@ -100,6 +101,12 @@
         { "name": "storage.modifier.ky", "match": "\\b(static|override|const|abstract)\\b" }
       ]
     },
+    "storage_modifiers": {
+      "patterns": [
+        { "name": "storage.modifier.move.ky", "match": "\\^(?=[A-Za-z_])" },
+        { "name": "storage.modifier.borrow.ky", "match": "&(?=[A-Za-z_])" }
+      ]
+    },
     "keywords_operator": {
       "name": "keyword.operator.ky",
       "match": "\\b(and|or|not|is)\\b"
@@ -119,8 +126,7 @@
         { "name": "storage.type.array.ky", "match": "\\[[A-Za-z_][A-Za-z0-9_]*\\s*;\\s*\\d+\\]" },
         { "name": "storage.type.list.ky", "match": "\\{[A-Za-z_][A-Za-z0-9_]*\\}" },
         { "name": "storage.type.dict.ky", "match": "\\{[A-Za-z_][A-Za-z0-9_]*\\s*:\\s*[A-Za-z_][A-Za-z0-9_]*\\}" },
-        { "name": "storage.type.generic.ky", "match": "[A-Za-z_][A-Za-z0-9_]*<[A-Za-z_][A-Za-z0-9_]*>" },
-        { "name": "keyword.operator.move.ky", "match": "\\^[A-Za-z_][A-Za-z0-9_]*" }
+        { "name": "storage.type.generic.ky", "match": "[A-Za-z_][A-Za-z0-9_]*<[A-Za-z_][A-Za-z0-9_]*>" }
       ]
     },
     "types_special": {
@@ -165,7 +171,8 @@
             { "match": "<", "name": "punctuation.bracket.ky" },
             { "match": ">", "name": "punctuation.bracket.ky" },
             { "match": ",", "name": "punctuation.separator.ky" },
-            { "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b", "name": "entity.name.type.ky" }
+            { "include": "#types_primitive" },
+            { "match": "\\b[A-Z][a-zA-Z0-9_]*\\b", "name": "entity.name.type.ky" }
           ]
         }
       ]
@@ -250,7 +257,7 @@
             { "match": ",", "name": "punctuation.separator.ky" },
             { "match": "\\(", "name": "punctuation.bracket.round.ky" },
             { "match": "\\)", "name": "punctuation.bracket.round.ky" },
-            { "match": "\\b([a-z_][a-zA-Z0-9_]*)(?=\\s*:)", "name": "variable.parameter.ky" },
+            { "match": "\\b([A-Za-z_][a-zA-Z0-9_]*)(?=\\s*:)", "name": "variable.parameter.ky" },
             { "match": ":", "name": "punctuation.separator.colon.ky" }
           ]
         }
@@ -297,7 +304,7 @@
       "patterns": [
         { "name": "variable.other.constant.ky", "match": "([A-Z_][A-Z0-9_]*)(?=\\s*:=)" },
         { "name": "variable.other.mutable.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*:\\s*&)" },
-        { "name": "variable.other.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*=)" }
+        { "name": "variable.other.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*=(!=))" }
       ]
     }
   }

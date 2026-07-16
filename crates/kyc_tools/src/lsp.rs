@@ -2097,9 +2097,12 @@ impl LanguageServer {
         let mut data: Vec<SemanticToken> = Vec::new();
         let mut prev_line: usize = 0;
         let mut prev_col: usize = 0;
+        // Spans from the lexer are 1-indexed; LSP positions are 0-indexed.
         for (line, col, len, ty, mods) in &semantic_tokens {
-            let d_line = if data.is_empty() { *line as u32 } else { (*line - prev_line) as u32 };
-            let d_start = if data.is_empty() || *line != prev_line { *col as u32 } else { (*col - prev_col) as u32 };
+            let line0 = line.saturating_sub(1);
+            let col0 = col.saturating_sub(1);
+            let d_line = if data.is_empty() { line0 as u32 } else { (line0 - prev_line) as u32 };
+            let d_start = if data.is_empty() || line0 != prev_line { col0 as u32 } else { (col0 - prev_col) as u32 };
             data.push(SemanticToken {
                 delta_line: d_line,
                 delta_start: d_start,
@@ -2107,8 +2110,8 @@ impl LanguageServer {
                 token_type: *ty,
                 token_modifiers_bitset: *mods,
             });
-            prev_line = *line;
-            prev_col = *col;
+            prev_line = line0;
+            prev_col = col0;
         }
 
         let result = SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data });
