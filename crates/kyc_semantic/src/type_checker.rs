@@ -12,6 +12,7 @@ pub struct TypeChecker {
     pub fn_return_types: HashMap<String, Type>,
     fn_const_flags: HashMap<String, bool>,
     current_fn: Option<String>,
+    in_constructor: bool,
 }
 
 impl Default for TypeChecker {
@@ -28,6 +29,7 @@ impl TypeChecker {
             fn_return_types: HashMap::new(),
             fn_const_flags: HashMap::new(),
             current_fn: None,
+            in_constructor: false,
         }
     }
 
@@ -173,6 +175,22 @@ impl TypeChecker {
         for member in &c.members {
             if let ClassMember::Method(f) = member {
                 self.check_function(f);
+            }
+        }
+        // Type-check constructor bodies (permiten asignar a campos inmutables)
+        for member in &c.members {
+            if let ClassMember::Constructor(ctor) = member {
+                self.symbols.push_scope();
+                for param in &ctor.params {
+                    let ty = self.resolve_ast_type(&param.type_);
+                    let is_mutable = matches!(param.mode, ParamMode::MutableBorrow | ParamMode::Move);
+                    let _ = self.symbols.insert(param.name.clone(),
+                        Symbol::new_var(param.name.clone(), Some(ty), is_mutable));
+                }
+                self.in_constructor = true;
+                self.check_block(&ctor.body);
+                self.in_constructor = false;
+                self.symbols.pop_scope();
             }
         }
         // Type-check field defaults against declared field types
@@ -684,21 +702,25 @@ impl TypeChecker {
                         self.infer_expr(right);
                         if let Expr::PropertyAccess { object, property, .. } = left.as_ref() {
                             let obj_ty = self.infer_expr(object);
-                            if let Type::Named(class_name) = &obj_ty {
-                                if let Some(sym) = self.symbols.lookup(class_name.as_str()) {
-                                    if let SymKind::Class(class_decl) = &sym.kind {
-                                        let is_mutable = class_decl.members.iter().any(|m| {
-                                            if let ClassMember::Field(f) = m {
-                                                f.name == *property && f.is_mutable
-                                            } else if let ClassMember::Property(p) = m {
-                                                p.name == *property && p.setter.is_some()
-                                            } else { false }
-                                        });
-                                        if !is_mutable {
-                                            self.reporter.report(
-                                                Diagnostic::error(ErrorCode::E0001,
-                                                    format!("cannot assign to immutable field '{}' in class '{}'", property, class_name))
-                                            );
+                            // Inside a constructor, this.field = value is permitted (field initialization)
+                            let is_this_ref = matches!(object.as_ref(), Expr::Identifier { name, .. } if name == "this" || name == "self");
+                            if !(self.in_constructor && is_this_ref) {
+                                if let Type::Named(class_name) = &obj_ty {
+                                    if let Some(sym) = self.symbols.lookup(class_name.as_str()) {
+                                        if let SymKind::Class(class_decl) = &sym.kind {
+                                            let is_mutable = class_decl.members.iter().any(|m| {
+                                                if let ClassMember::Field(f) = m {
+                                                    f.name == *property && f.is_mutable
+                                                } else if let ClassMember::Property(p) = m {
+                                                    p.name == *property && p.setter.is_some()
+                                                } else { false }
+                                            });
+                                            if !is_mutable {
+                                                self.reporter.report(
+                                                    Diagnostic::error(ErrorCode::E0001,
+                                                        format!("cannot assign to immutable field '{}' in class '{}'", property, class_name))
+                                                );
+                                            }
                                         }
                                     }
                                 }
