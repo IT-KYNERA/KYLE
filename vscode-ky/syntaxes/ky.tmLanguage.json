@@ -10,8 +10,8 @@
     { "include": "#numbers" },
     { "include": "#attributes" },
     { "include": "#class_def" },
-    { "include": "#enum_def" },
     { "include": "#contract_def" },
+    { "include": "#enum_def" },
     { "include": "#type_alias" },
     { "include": "#extern_decl" },
     { "include": "#function_def" },
@@ -88,10 +88,10 @@
     },
     "keywords_declaration": {
       "patterns": [
-        { "name": "keyword.declaration.struct.ky", "match": "\\bfinal\\s+class\\b" },
-        { "name": "keyword.declaration.class.ky", "match": "\\babstract\\s+class\\b" },
+        { "name": "keyword.declaration.class.ky", "match": "\\b(final\\s+class|abstract\\s+class|class)\\b" },
         { "name": "keyword.declaration.enum.ky", "match": "\\benum\\b" },
         { "name": "keyword.declaration.contract.ky", "match": "\\bcontract\\b" },
+        { "name": "keyword.declaration.fn.ky", "match": "\\bfn\\b" },
         { "name": "keyword.declaration.import.ky", "match": "\\bimport\\b" },
         { "name": "keyword.declaration.from.ky", "match": "\\bfrom\\b" },
         { "name": "keyword.declaration.as.ky", "match": "\\bas\\b" },
@@ -159,20 +159,19 @@
     "class_def": {
       "patterns": [
         {
+          "name": "meta.class.ky",
           "begin": "\\b(final\\s+class|abstract\\s+class|class)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
-            "1": { "name": "keyword.declaration.ky" },
+            "1": { "name": "keyword.declaration.class.ky" },
             "2": { "name": "entity.name.type.ky" }
           },
-          "end": "(?=:|\n)",
+          "end": "(?=(?:[^:]):|$|\\n)",
           "patterns": [
             { "include": "#types_primitive" },
-            { "match": "::", "name": "keyword.operator.inheritance.ky" },
             { "match": "<", "name": "punctuation.bracket.ky" },
             { "match": ">", "name": "punctuation.bracket.ky" },
             { "match": ",", "name": "punctuation.separator.ky" },
-            { "include": "#types_primitive" },
-            { "match": "\\b[A-Z][a-zA-Z0-9_]*\\b", "name": "entity.name.type.ky" }
+            { "match": "::", "name": "keyword.operator.inheritance.ky" }
           ]
         }
       ]
@@ -180,9 +179,10 @@
     "enum_def": {
       "patterns": [
         {
+          "name": "meta.enum.ky",
           "begin": "\\b(enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
-            "1": { "name": "keyword.declaration.ky" },
+            "1": { "name": "keyword.declaration.enum.ky" },
             "2": { "name": "entity.name.type.ky" }
           },
           "end": "(?=:|\n)",
@@ -196,9 +196,10 @@
     "contract_def": {
       "patterns": [
         {
+          "name": "meta.contract.ky",
           "begin": "\\b(contract)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
-            "1": { "name": "keyword.declaration.ky" },
+            "1": { "name": "keyword.declaration.contract.ky" },
             "2": { "name": "entity.name.type.ky" }
           },
           "end": "(?=:|\n)"
@@ -210,7 +211,7 @@
         {
           "begin": "\\b(type)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
-            "1": { "name": "keyword.declaration.ky" },
+            "1": { "name": "keyword.declaration.type.ky" },
             "2": { "name": "entity.name.type.ky" }
           },
           "end": "(?=\n)"
@@ -241,6 +242,7 @@
     "function_def": {
       "patterns": [
         {
+          "name": "meta.function.ky",
           "begin": "(?:(const|async|abstract|static)\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "beginCaptures": {
             "1": { "name": "storage.modifier.ky" },
@@ -304,7 +306,7 @@
       "patterns": [
         { "name": "variable.other.constant.ky", "match": "([A-Z_][A-Z0-9_]*)(?=\\s*:=)" },
         { "name": "variable.other.mutable.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*:\\s*&)" },
-        { "name": "variable.other.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*=(!=))" }
+        { "name": "variable.other.ky", "match": "([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*=(?!=))" }
       ]
     }
   }
