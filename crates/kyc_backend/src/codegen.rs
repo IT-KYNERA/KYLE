@@ -427,11 +427,20 @@ impl<'ctx> Codegen<'ctx> {
                 if let SsaInst::Store { dest, value } = inst {
                     if let Some(param_idx) = func.param_value_ids.iter().position(|&p| p == *value) {
                         if matches!(&func.params[param_idx], MirType::Struct(_, _)) {
+                            // Struct params are passed by pointer in LLVM.
+                            // The alloca type may be Struct (direct) or Ptr(Struct) (indirect).
+                            // In either case, change the alloca to store ptr_ty and track the original.
                             if let Some(&llvm_type) = self.alloca_types.get(dest) {
-                                if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
-                                    let orig_type = self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum()).unwrap();
-                                    self.ref_param_struct_types.insert(*dest, orig_type);
-                                }
+                                let orig_type = if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
+                                    llvm_type
+                                } else if llvm_type.is_pointer_type() {
+                                    // For Ptr(Struct) allocas, the actual struct type comes from func.params
+                                    self.llvm_type(&func.params[param_idx])
+                                } else {
+                                    continue;
+                                };
+                                self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum());
+                                self.ref_param_struct_types.insert(*dest, orig_type);
                             }
                         }
                     }
@@ -3067,12 +3076,17 @@ impl<'ctx> Codegen<'ctx> {
         // so they receive a pointer to the caller's struct (pass-by-reference ABI).
         for bb in &func.basic_blocks {
             for inst in &bb.insts {
-                if let MirInst::Store { dest, value: MirValue::Param(_) } = inst {
+                if let MirInst::Store { dest, value: MirValue::Param(param_idx) } = inst {
                     if let Some(&llvm_type) = self.alloca_types.get(dest) {
-                        if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
-                            let orig_type = self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum()).unwrap();
-                            self.ref_param_struct_types.insert(*dest, orig_type);
-                        }
+                        let orig_type = if matches!(llvm_type, BasicTypeEnum::StructType(_)) {
+                            llvm_type
+                        } else if llvm_type.is_pointer_type() {
+                            self.llvm_type(&func.params[*param_idx])
+                        } else {
+                            continue;
+                        };
+                        self.alloca_types.insert(*dest, ptr_ty.as_basic_type_enum());
+                        self.ref_param_struct_types.insert(*dest, orig_type);
                     }
                 }
             }

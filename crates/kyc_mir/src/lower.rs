@@ -3085,15 +3085,15 @@ impl Lowerer {
                         if let Expr::Identifier { name, .. } = object.as_ref() {
                             if let Some(&obj_local) = ctx.locals.get(name) {
                                 let local_type = ctx.local_types.get(&obj_local).cloned();
-                                let struct_fields = match local_type {
-                                    Some(MirType::Struct(_, fields)) => Some(fields),
-                                    Some(MirType::Ptr(inner)) => match inner.as_ref() {
-                                        MirType::Struct(_, fields) => Some(fields.clone()),
-                                        _ => None,
+                                let (struct_name_first, struct_fields_first): (Option<String>, Option<Vec<(String, MirType)>>) = match local_type {
+                                    Some(MirType::Struct(n, fields)) => (Some(n), Some(fields)),
+                                    Some(MirType::Ptr(inner)) => match *inner {
+                                        MirType::Struct(n, fields) => (Some(n), Some(fields)),
+                                        _ => (None, None),
                                     },
-                                    _ => None,
+                                    _ => (None, None),
                                 };
-                                if let Some(fields) = struct_fields {
+                                if let Some(ref fields) = struct_fields_first {
                                     let backing = format!("_{}", property);
                                     let field_idx = fields.iter().position(|(fname, _)| fname == property.as_str())
                                         .or_else(|| fields.iter().position(|(fname, _)| fname == &backing));
@@ -3137,13 +3137,13 @@ impl Lowerer {
                         };
                         if let Some(obj_ptr) = obj_ptr {
                             let local_type = ctx.local_types.get(&obj_ptr).cloned();
-                            let struct_fields = match local_type {
-                                Some(MirType::Struct(_, fields)) => Some(fields),
-                                Some(MirType::Ptr(inner)) => match inner.as_ref() {
-                                    MirType::Struct(_, fields) => Some(fields.clone()),
-                                    _ => None,
+                            let (struct_name_opt, struct_fields): (Option<String>, Option<Vec<(String, MirType)>>) = match local_type {
+                                Some(MirType::Struct(n, fields)) => (Some(n), Some(fields)),
+                                Some(MirType::Ptr(inner)) => match *inner {
+                                    MirType::Struct(n, fields) => (Some(n), Some(fields)),
+                                    _ => (None, None),
                                 },
-                                _ => None,
+                                _ => (None, None),
                             };
                             if let Some(fields) = struct_fields {
                                 // Check if this field is actually a property with a setter
@@ -3183,7 +3183,7 @@ impl Lowerer {
                                             dest: ft,
                                             ptr: obj_ptr,
                                             field_index: field_idx,
-                                            struct_type: Box::new(MirType::Struct("_".to_string(), fields)),
+                                            struct_type: Box::new(MirType::Struct(struct_name_opt.clone().unwrap_or("_".to_string()), fields.clone())),
                                         });
                                         ctx.current_block.insts.push(MirInst::Store {
                                             dest: ft,
