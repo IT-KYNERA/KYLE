@@ -706,7 +706,8 @@ impl TypeChecker {
                     | BinaryOp::Pow | BinaryOp::AddPercent | BinaryOp::SubPercent | BinaryOp::MulPercent
                     | BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor
                     | BinaryOp::Shl | BinaryOp::Shr => {
-                        if lt == Type::F64 || rt == Type::F64 { Type::F64 }
+                        if lt == Type::Str || rt == Type::Str { Type::Str }
+                        else if lt == Type::F64 || rt == Type::F64 { Type::F64 }
                         else if lt == Type::I64 || rt == Type::I64 { Type::I64 }
                         else if lt == Type::F32 || rt == Type::F32 { Type::F32 }
                         else { Type::I32 }

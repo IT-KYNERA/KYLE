@@ -8,11 +8,46 @@ use kyc_core::ast::*;
 /// - Validates `final class` has no parent (final classes cannot extend)
 /// - Validates `abstract class` has abstract methods or empty body
 pub fn desugar(program: &Program) -> Program {
-    let declarations = program.declarations.iter().map(desugar_decl).collect();
+    // Collect all contract names to resolve parent-vs-contract ambiguity
+    let contract_names: std::collections::HashSet<&str> = program.declarations.iter()
+        .filter_map(|d| {
+            if let Decl::Contract(c) = d { Some(c.name.as_str()) } else { None }
+        })
+        .collect();
+    let declarations: Vec<Decl> = program.declarations.iter()
+        .map(|d| desugar_decl_with_contracts(d, &contract_names))
+        .collect();
     Program {
         declarations,
         links: program.links.clone(),
         span: program.span.clone(),
+    }
+}
+
+fn desugar_decl_with_contracts(decl: &Decl, contract_names: &std::collections::HashSet<&str>) -> Decl {
+    match decl {
+        Decl::Class(c) => {
+            let mut c2 = c.clone();
+            // If the parent is actually a contract, move it to contracts
+            if let Some(ref parent) = c2.parent {
+                if contract_names.contains(parent.as_str()) {
+                    c2.contracts.push(parent.clone());
+                    c2.parent = None;
+                }
+            }
+            Decl::Class(c2)
+        }
+        Decl::AbstractClass(a) => {
+            let mut a2 = a.clone();
+            if let Some(ref parent) = a2.parent {
+                if contract_names.contains(parent.as_str()) {
+                    a2.contracts.push(parent.clone());
+                    a2.parent = None;
+                }
+            }
+            Decl::AbstractClass(a2)
+        }
+        _ => desugar_decl(decl),
     }
 }
 
