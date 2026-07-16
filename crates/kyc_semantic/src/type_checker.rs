@@ -132,6 +132,7 @@ impl TypeChecker {
                 }
                 Decl::Class(c) => { self.check_class(c); }
                 Decl::AbstractClass(c) => { self.check_abstract_class(c); }
+                Decl::Expression(e) => { self.infer_expr(e); }
                 _ => {}
             }
         }
