@@ -354,6 +354,28 @@ impl LanguageServer {
         paths
     }
 
+    /// Resolve a dotted module path (e.g. "http.server") to its parsed Program.
+    fn resolve_module(&self, mod_path: &str) -> Option<Program> {
+        let uri = self.sources.keys().next()?;
+        let search_dirs = self.collect_search_paths(uri);
+        let file_name = mod_path.replace('.', std::path::MAIN_SEPARATOR_STR);
+        for dir in &search_dirs {
+            // Try <dir>/<path>.ky and <dir>/<path>/lib.ky
+            let ky_file = dir.join(&file_name).with_extension("ky");
+            let lib_file = dir.join(&file_name).join("lib.ky");
+            let path = if ky_file.exists() { ky_file } else if lib_file.exists() { lib_file } else { continue; };
+            if let Ok(source) = std::fs::read_to_string(&path) {
+                let mut lexer = kyc_frontend::lexer::Lexer::new(&source);
+                let tokens = lexer.tokenize();
+                let mut parser = kyc_frontend::parser::Parser::new(tokens);
+                if let Ok(program) = parser.parse() {
+                    return Some(program);
+                }
+            }
+        }
+        None
+    }
+
     fn publish_diagnostics(&self, uri: &str) {
         let source = match self.sources.get(uri) {
             Some(s) => s.clone(),
@@ -803,32 +825,72 @@ impl LanguageServer {
         }
 
         // Suggest importable modules when typing "from " or "import "
+        // and exported names after "from X import "
         let line_text: String = source.lines().nth(pos.line as usize).unwrap_or("").to_string();
         let trimmed = line_text.trim_start();
         if trimmed.starts_with("from ") || trimmed.starts_with("import ") {
-            // Scan search paths for available .ky files and directories
-            let search_dirs = self.collect_search_paths(&uri);
-            let mut seen_mods = std::collections::HashSet::new();
-            for dir in &search_dirs {
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        let name = path.file_stem()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s.to_string())
-                            .unwrap_or_default();
-                        if name.starts_with('.') || name.starts_with('_') { continue; }
-                        if !seen_mods.insert(name.clone()) { continue; }
-                        let is_pkg = path.is_dir() && path.join("lib.ky").exists();
-                        if prefix.is_empty() || name.starts_with(&prefix) || name.to_lowercase().starts_with(&prefix_lower) {
-                            items.push(CompletionItem {
-                                label: name.clone(),
-                                kind: Some(if is_pkg { CompletionItemKind::MODULE } else { CompletionItemKind::FILE }),
-                                detail: Some(if is_pkg { format!("package {}", name) } else { format!("module {}", name) }),
-                                insert_text: Some(name.clone()),
-                                sort_text: Some(format!("1{}", &name)),
-                                ..Default::default()
-                            });
+            // Check if this is "from <module> import <prefix>" — suggest exported names
+            if let Some(rest) = trimmed.strip_prefix("from ") {
+                if let Some(import_pos) = rest.find(" import") {
+                    let mod_path = rest[..import_pos].trim();
+                    let after_import = rest[import_pos + 7..].trim_start();
+                    let export_prefix = if after_import.is_empty() { "" } else { after_import };
+                    if let Some(program) = self.resolve_module(mod_path) {
+                        for decl in &program.declarations {
+                            let (name, kind, detail) = match decl {
+                                Decl::Class(c) => (c.name.clone(), CompletionItemKind::CLASS, "class"),
+                                Decl::Struct(s) => (s.name.clone(), CompletionItemKind::STRUCT, "struct"),
+                                Decl::Enum(e) => (e.name.clone(), CompletionItemKind::ENUM, "enum"),
+                                Decl::Contract(c) => (c.name.clone(), CompletionItemKind::INTERFACE, "contract"),
+                                Decl::Function(f) => (f.name.clone(), CompletionItemKind::FUNCTION, "fn"),
+                                Decl::Variable(v) => (v.name.clone(), CompletionItemKind::VARIABLE, "var"),
+                                Decl::Constant(c) => (c.name.clone(), CompletionItemKind::CONSTANT, "const"),
+                                Decl::TypeAlias(t) => (t.name.clone(), CompletionItemKind::TYPE_PARAMETER, "type"),
+                                _ => continue,
+                            };
+                            if name.starts_with('.') || name.starts_with('_') { continue; }
+                            let match_prefix = if export_prefix.is_empty() { true }
+                                else { name.starts_with(export_prefix) || name.to_lowercase().starts_with(&export_prefix.to_lowercase()) };
+                            if match_prefix {
+                                items.push(CompletionItem {
+                                    label: name.clone(),
+                                    kind: Some(kind),
+                                    detail: Some(detail.to_string()),
+                                    sort_text: Some(format!("2{}", &name)),
+                                    ..Default::default()
+                                });
+                            }
+                        }
+                        // Skip module scanning if we're suggesting exports
+                        // (don't add "from X import " AND module paths)
+                    }
+                }
+            }
+            // Only scan for modules if we're not in "from X import" context
+            if !trimmed.contains(" import") {
+                let search_dirs = self.collect_search_paths(&uri);
+                let mut seen_mods = std::collections::HashSet::new();
+                for dir in &search_dirs {
+                    if let Ok(entries) = std::fs::read_dir(dir) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            let name = path.file_stem()
+                                .and_then(|s| s.to_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_default();
+                            if name.starts_with('.') || name.starts_with('_') { continue; }
+                            if !seen_mods.insert(name.clone()) { continue; }
+                            let is_pkg = path.is_dir() && path.join("lib.ky").exists();
+                            if prefix.is_empty() || name.starts_with(&prefix) || name.to_lowercase().starts_with(&prefix_lower) {
+                                items.push(CompletionItem {
+                                    label: name.clone(),
+                                    kind: Some(if is_pkg { CompletionItemKind::MODULE } else { CompletionItemKind::FILE }),
+                                    detail: Some(if is_pkg { format!("package {}", name) } else { format!("module {}", name) }),
+                                    insert_text: Some(name.clone()),
+                                    sort_text: Some(format!("1{}", &name)),
+                                    ..Default::default()
+                                });
+                            }
                         }
                     }
                 }
@@ -848,9 +910,12 @@ impl LanguageServer {
 
         let hover_text = self.find_hover_info(&source, pos.line as usize, pos.character as usize);
 
+        // Compute word range for highlighting the hover target
+        let word_range = self.word_range(&source, pos.line as usize, pos.character as usize);
+
         let result = Hover {
             contents: HoverContents::Scalar(MarkedString::String(hover_text)),
-            range: None,
+            range: word_range,
         };
         let resp = Response::new_ok(req.id, serde_json::to_value(result).unwrap());
         let _ = self.connection.sender.send(Message::Response(resp));
@@ -1030,6 +1095,31 @@ impl LanguageServer {
             _ => return None,
         };
         Some(info.to_string())
+    }
+
+    /// Find the word range at a position (for hover highlighting).
+    fn word_range(&self, source: &str, line: usize, col: usize) -> Option<Range> {
+        for (i, l) in source.lines().enumerate() {
+            if i == line {
+                let chars: Vec<char> = l.chars().collect();
+                if chars.is_empty() { return None; }
+                let anchor = if col == 0 { 0 } else if col >= chars.len() { chars.len() - 1 } else { col - 1 };
+                if !chars[anchor].is_alphanumeric() && chars[anchor] != '_' { return None; }
+                let mut start = anchor;
+                let mut end = anchor + 1;
+                while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+                    start -= 1;
+                }
+                while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '_') {
+                    end += 1;
+                }
+                return Some(Range {
+                    start: Position { line: line as u32, character: start as u32 },
+                    end: Position { line: line as u32, character: end as u32 },
+                });
+            }
+        }
+        None
     }
 
     fn word_at(&self, source: &str, line: usize, col: usize) -> String {
@@ -2083,7 +2173,17 @@ impl LanguageServer {
                 }
                 Decl::FromImport(fi) => {
                     for name in &fi.imported_names {
-                        semantic_tokens.push((fi.span.start.line, fi.span.start.column, name.len(), T_TYPE, 0));
+                        // Heuristic: uppercase → type/class, lowercase → function/variable
+                        let token_type = if name.chars().next().map_or(false, |c| c.is_uppercase()) {
+                            T_TYPE
+                        } else {
+                            T_FUNCTION
+                        };
+                        // Use rough position: span.end minus name length for each name
+                        let col = if name.len() < fi.span.end.column as usize {
+                            fi.span.end.column as usize - name.len()
+                        } else { 0 };
+                        semantic_tokens.push((fi.span.end.line, col, name.len(), token_type, 0));
                     }
                 }
                 _ => {}
