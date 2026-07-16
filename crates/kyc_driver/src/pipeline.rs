@@ -888,13 +888,19 @@ impl Pipeline {
             resolver.source_dir = old_source_dir;
         }
 
-        // Now pull any class declarations from cached modules that serve as
-        // parent classes for classes already in program.declarations but whose
-        // declarations aren't yet in the program.
+        // Now pull any class and contract declarations from cached modules
+        // that serve as parent classes or contracts for classes already in
+        // program.declarations but whose declarations aren't yet in the program.
         loop {
             let class_names: std::collections::HashSet<String> = program.declarations.iter()
                 .filter_map(|d| {
                     if let kyc_core::ast::Decl::Class(c) = d { Some(c.name.clone()) }
+                    else { None }
+                })
+                .collect();
+            let contract_names: std::collections::HashSet<String> = program.declarations.iter()
+                .filter_map(|d| {
+                    if let kyc_core::ast::Decl::Contract(c) = d { Some(c.name.clone()) }
                     else { None }
                 })
                 .collect();
@@ -907,14 +913,32 @@ impl Pipeline {
                     } else { None }
                 })
                 .collect();
+            let needed_contracts: Vec<String> = program.declarations.iter()
+                .filter_map(|d| {
+                    if let kyc_core::ast::Decl::Class(c) = d {
+                        let missing: Vec<String> = c.contracts.iter()
+                            .filter(|ct| !contract_names.contains(ct.as_str()))
+                            .cloned()
+                            .collect();
+                        if missing.is_empty() { None } else { Some(missing) }
+                    } else { None }
+                })
+                .flatten()
+                .collect();
 
-            if needed_parents.is_empty() { break; }
+            if needed_parents.is_empty() && needed_contracts.is_empty() { break; }
 
             let mut any_added = false;
             for cached in resolver.cache.values() {
                 for cd in &cached.program.declarations {
                     if let kyc_core::ast::Decl::Class(pc) = cd {
                         if needed_parents.contains(&pc.name) && !class_names.contains(&pc.name) {
+                            program.declarations.push(cd.clone());
+                            any_added = true;
+                        }
+                    }
+                    if let kyc_core::ast::Decl::Contract(ct) = cd {
+                        if needed_contracts.contains(&ct.name) && !contract_names.contains(&ct.name) {
                             program.declarations.push(cd.clone());
                             any_added = true;
                         }
