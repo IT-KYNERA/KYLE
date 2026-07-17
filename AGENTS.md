@@ -202,7 +202,7 @@ ky/
 | How to test | `docs/02-getting-started/testing.md` |
 | Standard library | `docs/04-standard-library/` |
 | Package manager | `docs/02-getting-started/package-manager.md` |
-| VS Code extension | `docs/07-tools/vscode.md` |
+| VS Code extension | `docs/07-tools/vscode-extension.md` — LSP handlers, grammar, bugs conocidos |
 | Performance tips | `docs/02-getting-started/performance.md` |
 | FFI (extern fn, @link, ptr) | `docs/03-language/ffi/abi.md` |
 | Operator overloading | `docs/03-language/syntax/operator-overloading.md` |
@@ -213,13 +213,14 @@ ky/
 | UI layout + slots | `docs/03-language/ui/composition.md` |
 | File picker | `docs/03-language/ui/file-picker.md` |
 | Form models | `docs/03-language/ui/state-events.md` (Section 8) |
-| VSCode extension | `docs/07-tools/vscode-extension.md` |
+| VSCode extension | `docs/07-tools/vscode-extension.md` — LSP handlers, grammar, bugs conocidos |
 | UI roadmap + WASM | `docs/10-design/rfc/0002-ui-architecture.md` |
 | Multi-platform install | `docs/07-tools/distribution.md` |
 | Runtime internals | `docs/05-runtime/` |
 | Compiler pipeline | `docs/06-compiler/` |
 | **Syntax reference (self-hosting)** | **`docs/15-kyle-syntax-reference.md`** |
 | **Self-hosting plan** | **`docs/14-self-hosting.md`** |
+| **Syntax checklist (368 features)** | **`tests/SYNTAX_CHECKLIST.md`** — 181 ✅ 175 ❓ 12 ❌ |
 
 ---
 
