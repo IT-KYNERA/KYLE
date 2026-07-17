@@ -2,7 +2,8 @@
 set -eu
 
 REPO="IT-KYNERA/KYLE"
-VERSION="${KY_VERSION:-v0.8.3}"
+# Default a latest release; override con KY_VERSION=vX.Y.Z para pin versión
+VERSION="${KY_VERSION:-v0.8.4}"
 
 # ─── Functions ──────────────────────────────────────────────
 
@@ -10,7 +11,7 @@ usage() {
     echo "Usage: curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sh"
     echo ""
     echo "Environment variables:"
-    echo "  KY_VERSION=v0.8.3     Version to install (default: v0.8.3)"
+    echo "  KY_VERSION=v0.8.4     Version to install (default: latest)"
     echo "  KY_PREFIX=/custom/path Install directory (default: ~/.ky or /usr/local)"
     echo ""
     echo "  install.sh uninstall   Remove Kyle from the system"
@@ -79,8 +80,13 @@ PLATFORM=$(detect_platform)
 echo "Detected: $PLATFORM"
 
 BUNDLE="ky-${PLATFORM}.tar.gz"
-BUNDLE_URL="https://github.com/$REPO/releases/download/$VERSION/$BUNDLE"
-SHA256_URL="$BUNDLE_URL.sha256"
+if [ "$VERSION" = "latest" ]; then
+    BUNDLE_URL="https://github.com/$REPO/releases/latest/download/$BUNDLE"
+    SHA256_URL="$BUNDLE_URL.sha256"
+else
+    BUNDLE_URL="https://github.com/$REPO/releases/download/$VERSION/$BUNDLE"
+    SHA256_URL="$BUNDLE_URL.sha256"
+fi
 
 # ─── Download ───────────────────────────────────────────────
 

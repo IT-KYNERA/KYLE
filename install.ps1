@@ -8,7 +8,7 @@
 #   $env:KY_PREFIX = "C:\ky"       Install directory (default: ~\.ky)
 
 param(
-    [string]$Version = "v0.8.3",
+    [string]$Version = "v0.8.4",
     [string]$Prefix = ""
 )
 

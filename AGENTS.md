@@ -686,7 +686,7 @@ Ver la referencia completa en `docs/15-kyle-syntax-reference.md` para todos los 
 
 ---
 
-*Version: v0.8.3 · Last updated: 2026-07-16 — Fix field mutability + contracts + inheritance.*
+*Version: v0.8.4 · Last updated: 2026-07-16 — Fix field mutability + contracts + inheritance.*
 
 
 

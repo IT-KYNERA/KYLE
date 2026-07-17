@@ -2,7 +2,7 @@
   "name": "ky",
   "displayName": "Kyle Language Support",
   "description": "Kyle programming language — syntax highlighting, LSP, snippets, and language support",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "publisher": "kynera",
   "icon": "icons/ky_128.png",
   "repository": {
