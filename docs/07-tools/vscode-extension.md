@@ -1,272 +1,230 @@
-# VS Code Extension — Kyle Language Support
+# VS Code Extension for Kyle
 
-**File:** `vscode-ky/`
+> File: `vscode-ky/` — Extension runtime (TypeScript)
+> File: `crates/kyc_tools/src/lsp.rs` — LSP server (Rust, via `ky lsp`)
 
----
-
-## 1. Architecture
-
-```
-vscode-ky/
-├── package.json                  # Manifest: languages, grammars, commands, debugger, tasks
-├── language-configuration.json   # Comments, brackets, auto-closing, indentation, folding
-├── syntaxes/
-│   ├── ky.tmLanguage.json        # TextMate grammar for .ky (Kyle language)
-│   └── kyx.tmLanguage.json       # TextMate grammar for .kyx (Kyle UI)
-├── snippets/
-│   ├── ky.json                   # 53 snippets for .ky files
-│   └── kyx.json                  # 48 snippets for .kyx files
-├── src/
-│   ├── extension.ts              # LSP client, commands, diagnostics, binary discovery
-│   ├── tasks.ts                  # VS Code Task provider
-│   ├── debugger.ts               # Debug Adapter Protocol implementation
-│   └── testUI.ts                 # Testing UI integration
-├── themes/
-│   └── kl-color-theme.json       # "Kyle Pastel" dark theme
-└── icons/
-    ├── ky.png
-    └── ky_128.png
-```
-
----
-
-## 2. Languages
-
-| Language ID | File Extensions | Grammar |
-|-------------|----------------|---------|
-| `kl` | `.ky`, `ky.toml` | `syntaxes/ky.tmLanguage.json` |
-| `kyx` | `.kyx` | `syntaxes/kyx.tmLanguage.json` |
-
----
-
-## 3. .kyx Grammar (`kyx.tmLanguage.json`)
-
-### 3.1 Top-level patterns (in order)
-
-| Pattern | Description |
-|---------|-------------|
-| `#comments` | `##` doc comments, `#` line comments |
-| `#import_decl` | `from views.home import home` |
-| `#link_directive` | `@link "SDL2"` |
-| `#style_decl` | `style<button> Primary:`, `layout<view>`, `animation<view>` |
-| `#theme_decl` | `theme LightTheme:` |
-| `#kyle_block` | `@(...)` multi-line code block |
-| `#at_directive` | `@if(...):`, `@for(...):`, `@match(...):` |
-| `#xml_element` | `<tagname>...</tagname>` (recursive, includes closing tag coloring) |
-| `#xml_self_closing` | `<tagname .../>` |
-| `#xml_slot` | `<slot />` |
-| `#kyle_inline` | `@expr` inline expressions |
-
-### 3.2 XML tag names — coloring
-
-- **Opening tag**: `<view>`, `<vstack>`, `<app>` → `entity.name.tag.kyx`
-- **Closing tag**: `</view>`, `</vstack>` → `entity.name.tag.kyx` (via `#closing_tag` pattern)
-- **Self-closing**: `<button />` → `entity.name.tag.kyx`
-- **Attributes**: `style=`, `click=`, `field=` → `entity.other.attribute-name.kyx`
-- **Attribute values**: `"Primary"`, `"image/*"` → `string.quoted.double.kyx`
-- **Expression attrs**: `@handler`, `@count.to_str()` → `keyword.operator.kyx` prefix
-
-### 3.3 Import syntax
+## Architecture
 
 ```
-from views.home import home
-└────┘ └──────────┘ └──────┘ └────┘
-  keyword   module     keyword  name
+VS Code (extension.ts)
+    │
+    ├── LSP Client ↔ ky lsp (Rust binary)
+    │     ├── textDocument/didOpen     → publishDiagnostics
+    │     ├── textDocument/didChange   → publishDiagnostics (on every keystroke)
+    │     ├── textDocument/completion  → module paths, symbols, keywords, exports
+    │     ├── textDocument/hover       → type info + docs
+    │     ├── textDocument/definition  → go-to-definition
+    │     ├── textDocument/references  → find references (text-based)
+    │     ├── textDocument/documentSymbol → outline (flat, not hierarchical)
+    │     ├── textDocument/semanticTokens/full → syntax coloring (9 token types)
+    │     ├── textDocument/codeAction  → quick fixes (E0009 only)
+    │     ├── textDocument/formatting  → ky fmt
+    │     ├── textDocument/rename      → rename symbol
+    │     ├── textDocument/signatureHelp → param hints
+    │     ├── textDocument/codeLens    → test run buttons
+    │     └── textDocument/inlayHint   → type hints on vars/fns
+    │
+    ├── Commands (Terminal tasks)
+    │     ├── ky.run      → ky run current file
+    │     ├── ky.build    → ky build current file
+    │     ├── ky.check    → ky check current file
+    │     └── ky.test     → ky test
+    │
+    └── Debugger (DAP)
+          └── ky debug (VSCode Debug Adapter Protocol)
+
+Language Grammar (TextMate)
+    ├── syntaxes/ky.tmLanguage.json    → .ky files
+    └── syntaxes/kyx.tmLanguage.json   → .kyx files (UI templates)
+
+Snippets
+    ├── snippets/ky.json               → .ky snippets
+    └── snippets/kyx.json              → .kyx snippets
+
+Theme
+    └── themes/kl-color-theme.json     → Custom Kyle theme
 ```
 
-- `from`, `import` → `keyword.control.import.kyx`
-- Module path → `entity.name.module.kyx`
-- Imported name → `entity.name.function.kyx`
+## Key Files and Their Locations
 
-### 3.4 Code blocks `@(...)` and `@expr`
+### Extension (TypeScript) — `vscode-ky/src/`
 
-Inside `@(...)`, the following are highlighted:
-- **Types**: `i32`, `str`, `bool`, `color`, `spacing`, `file_data`, `bytes`, etc.
-- **Keywords**: `fn`, `if`, `for`, `while`, `return`, `and`, `or`, `not`, `is`
-- **Builtins**: `print`, `navigate`, `set_title`, `set_meta`, `color`, `spacing`, etc.
-- **Operators**: `+=`, `==`, `!=`, `->`, `::`, `?.`
-- **Numbers**: `42`, `0xFF`, `0b1010`
-- **Strings**: `"hello {name}"` with interpolation
-- **Variables**: `counter`, `name: ^i32`
+| File | Purpose | Key Lines |
+|------|---------|:---------:|
+| `extension.ts` | Activation, commands, LSP client, debugger | 238 lines |
+| `tasks.ts` | Terminal tasks (ky run/build/check/test) | — |
+| `debugger.ts` | DAP debugger adapter | — |
+| `testUI.ts` | Testing UI | — |
 
-### 3.5 Style/animation declarations
+### LSP Server (Rust) — `crates/kyc_tools/src/lsp.rs`
 
-```
-style<text> Title:       layout<view> Center:       animation<view> FadeIn:
-└─────┘ └────┘ └─────┘   └──────┘ └────┘ └──────┘   └────────┘ └────┘ └──────┘
-keyword  comp   name      keyword   comp   name      keyword    comp   name
-```
+| Section | Lines | Description |
+|---------|:-----:|-------------|
+| Server capabilities | 55–100 | What features the LSP advertises |
+| Request handlers | 110–135 | Route table for 15 handlers |
+| Notification handlers | 137–144 | didOpen, didChange, didSave, didClose |
+| `publish_diagnostics` | 378–441 | Parse + analyze + send diagnostics |
+| `resolve_and_analyze` | 219–327 | The CORE analysis pipeline for LSP |
+| `collect_search_paths` | 330–375 | Filesystem paths for module resolution |
+| `handle_completion` | 637–861 | Autocomplete: keywords, symbols, modules |
+| `handle_hover` | 867–935 | Hover info with type/docs |
+| `handle_definition` | 1640–1700 | Go-to-definition |
+| `handle_references` | 1826–1843 | Find references (text-based) |
+| `handle_document_symbol` | 1750–1758 | Outline (flat list) |
+| `handle_semantic_tokens_full` | 1992–2177 | All semantic token computation |
+| Semantic token encoding | 2178–2210 | Delta encoding for VS Code |
+| `walk_semantic_block` | 2221–2340 | Recursive block tokenization |
+| `walk_semantic_type` | 2461–2502 | Type annotation tokenization |
 
----
+### Syntax Highlighting — `vscode-ky/syntaxes/ky.tmLanguage.json`
 
-## 4. .ky Grammar (`ky.tmLanguage.json`)
+| Rule | Lines | Description |
+|------|:-----:|-------------|
+| `comments` | 35–39 | `#` single-line, `##` doc-comment |
+| `strings` | 41–50 | `"..."` with escape sequences + interpolation |
+| `interpolation` | 53–57 | `{expr}` inside strings |
+| `storage_modifiers` | 104–108 | `^` (mutable), `&` (borrow) as type modifiers |
+| `keywords_declaration` | 89–102 | `class`, `fn`, `enum`, `contract`, etc. |
+| `types_primitive` | 120–122 | `i32`, `str`, `bool`, `f64`, etc. |
+| `types_complex` | 124–130 | `[T;N]`, `{T}`, `{K:V}`, `T<U>` |
+| `operators` | 146–157 | `::`, `:=`, `==`, `+=`, etc. |
+| `class_def` | 159–178 | `class Name :: Parent, Contract:` highlight |
+| `function_def` | 241–264 | `fn name(params) Type:` highlight |
+| `variable_decl` | 303–308 | `name = value` highlight (excludes `==`) |
+| `builtins` | 138–140 | `print`, `len`, `push`, etc. |
+| `constants` | 142–144 | `SCREAMING_SNAKE` constants |
+| `constructor_call` | 283–297 | `Name(...)` and `Name{...}` as type refs |
 
-### 4.1 Key features
+## How the LSP Analysis Pipeline Works
 
-| Feature | Pattern |
-|---------|---------|
-| Comments | `##`, `#` |
-| Strings | `"..."` with `{interpolation}` |
-| `@link` | `@link "library"` |
-| Characters | `'a'`, `'\n'` |
-| Numbers | `0xFF`, `0b1010`, `42`, `3.14` |
-| Attributes | `#[test]`, `#[deprecated]` |
-| Class def | `final class Name:`, `abstract class Name:` |
-| Enum def | `enum Name:` |
-| Contract def | `contract Name:` |
-| Type alias | `type Name = ...` |
-| Extern fn | `extern fn name(...) type` |
-| Function def | `fn name(...) type:`, `static fn`, `async fn` |
-| Imports | `from http.server import Router` |
-| Constructor | `TypeName(...)` |
-| Keywords | control flow, declarations, operators |
-| Types | `i32`, `str`, `bool`, `^T`, `&T`, `T?`, `T!` |
-| Builtins | `print`, `len`, `map`, `filter`, `serialize`, etc. |
+### `resolve_and_analyze(uri, source)` — Lines 219–327
 
----
+1. Lex + parse the file into AST
+2. Create `ModuleResolver` with search paths
+3. Resolve `from X import Y` → fetch file, parse, cache, splice ALL declarations
+4. Resolve transitive imports (recursive in cached modules)
+5. Pull contracts from cached modules (for imported classes with contract dependencies)
+6. Run `SemanticAnalyzer::analyze(&program)` (Phase 1–3)
+7. Return `(program, analyzer, file_name)`
 
-## 5. Snippets
+### How Diagnostics Work
 
-### 5.1 .kyx snippets (48 total)
-
-| Prefix | Component | Description |
-|--------|-----------|-------------|
-| `app` | App entry | `from views.home import home` + router |
-| `view` | View | `<view>$0</view>` |
-| `vstack` | VStack | Vertical flex layout |
-| `hstack` | HStack | Horizontal flex layout |
-| `zstack` | ZStack | Overlay layout |
-| `text` | Text | `<text value="..." />` |
-| `button` | Button | With `style=Primary` + `click=@handler` |
-| `link` | Link | `<link to="/">text</link>` |
-| `text_field` | TextField | With `bind=` or `field=` |
-| `password_field` | PasswordField | Password input |
-| `text_area` | TextArea | Multi-line input |
-| `checkbox` | Checkbox | Toggle |
-| `radio` | Radio | Option |
-| `switch` | Switch | Toggle switch |
-| `slider` | Slider | Range slider |
-| `image` | Image | `<image src="..." />` |
-| `spacer` | Spacer | `<spacer />` |
-| `divider` | Divider | `<divider />` |
-| `scroll` | Scroll | Scrollable container |
-| `modal` | Modal | Dialog overlay |
-| `sheet` | Sheet | Bottom sheet |
-| `alert` | Alert | Alert dialog |
-| `form` | Form | With `model=` + `submit=` |
-| `field` | Form field | `<text_field field="name">` |
-| `file_picker` | FilePicker | Native file picker |
-| `file_picker_cb` | FilePicker cb | With inline callback |
-| `router` | Router | Route container |
-| `route` | Route | `<route path="/" component=home layout=main>` |
-| `layout` | Layout | Persistent layout with `<slot />` |
-| `slot` | Slot | `<slot />` |
-| `navbar` | Navbar | Navigation bar |
-| `sidebar` | Sidebar | Side panel |
-| `import` | Import | `from views.name import name` |
-| `style` | Style | `style<text> Name: prop = value` |
-| `code` | Code block | `@(...)` |
-| `@if` | If | `@if(cond): ... @else:` |
-| `@for` | For | `@for(item in list):` |
-| `@match` | Match | `@match(expr): Pattern:` |
-| `click` | Click attr | `click=@handler` |
-| `bind` | Bind attr | `bind=@variable` |
-| `model` | Model attr | `model=@form` |
-| `target` | Target config | `target(Target.web): port = 8080` |
-| `fn` | Function | `fn name(args):` |
-| `on_click` | Inline event | `click=@fn ():` |
-
-### 5.2 .ky snippets (53 total)
-
-From `snippets/ky.json` — includes function, class, enum, contract, import, async, debugging, and type snippets.
-
----
-
-## 6. Semantic Highlighting (LSP)
-
-The LSP server (`ky lsp`) provides semantic tokens for:
-- Variables (mutable, immutable)
-- Functions (declarations, calls)
-- Types (built-in, user-defined)
-- Keywords
-- Parameters
-
-Configured via `ky.semanticHighlighting` setting (default: `true`).
-
----
-
-## 7. Commands
-
-| Command | Title | Action |
-|---------|-------|--------|
-| `ky.run` | KL: Run current file | Terminal: `ky run <file>` |
-| `ky.build` | KL: Build current file | Terminal: `ky build <file>` |
-| `ky.check` | KL: Type-check file | Terminal: `ky check <file>` |
-| `ky.test` | KL: Run tests | Terminal: `ky test <file>` |
-| `ky.runTest` | KL: Run specific test | Wraps test + runs |
-
----
-
-## 8. Tasks
-
-`KyleTaskProvider` discovers `*.ky` files and creates:
-- `kl: run <file>` → `ky run <file>`
-- `kl: build <file>` → `ky build <file>`
-- `kl: check <file>` → `ky check <file>`
-
----
-
-## 9. Debugger
-
-Uses Debug Adapter Protocol. Configured in `launch.json`:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "KL: Launch",
-      "type": "kl",
-      "request": "launch",
-      "program": "${workspaceFolder}/src/main.ky",
-      "klcPath": "ky"
+```rust
+fn publish_diagnostics(uri) {
+    let (program, analyzer, _) = resolve_and_analyze(uri, source);
+    for diagnostic in analyzer.reporter().diagnostics() {
+        // map span → Range, severity → DiagnosticSeverity
+        // send textDocument/publishDiagnostics notification
     }
-  ]
 }
 ```
 
----
+Called on:
+- `didOpen` — when file opens
+- `didChange` — on every keystroke (NOT debounced)
+- `didSave` — runs analysis but diagnostic publishing is handled by `didChange`
 
-## 10. Testing UI
+## Semantic Tokens (Coloring)
 
-- Discovers `#[test]` annotated functions via regex
-- Creates VS Code Test Controller items
-- Run profile: compiles + executes binary
-- Debug profile: same runner with debug output
-- Watches filesystem for `.ky` changes
+9 token types, 3 modifiers:
 
----
+| Index | Type | Used For |
+|:-----:|------|----------|
+| 0 | `VARIABLE` | Variables (with `DECLARATION`, `MODIFICATION`, or `READONLY`) |
+| 1 | `TYPE` | Type annotations, imported types |
+| 2 | `CLASS` | Class names (declaration + reference) |
+| 3 | `STRUCT` | Struct names |
+| 4 | `ENUM` | Enum names |
+| 5 | `FUNCTION` | Function names |
+| 6 | `METHOD` | Method calls via `.name()` |
+| 7 | `PARAMETER` | Function parameters |
+| 8 | `PROPERTY` | Struct/class fields, property access |
 
-## 11. Theme: "Kyle Pastel"
+Tokenized in `walk_semantic_block` (lines 2221+) by walking the AST.
 
-Dark theme with:
-- Background: `#1a1a2e` (dark navy)
-- Accent: `#e94560` (coral red)
-- Strings: `#7bed9f` (green)
-- Functions: `#70a1ff` (blue)
-- Types: `#a29bfe` (purple)
-- Numbers/constants: `#f9ca24` (yellow)
-- Operators: `#f8a5c2` (pink)
-- Comments: `#6a6a8a` (muted purple, italic)
+## Common Issues & Fixes
 
----
+### 1. Semantic tokens offset by 1 (first letter wrong color)
 
-## 12. Building the Extension
-
-```bash
-cd vscode-ky
-npm install
-npx tsc -p tsconfig.json           # Compile TypeScript
-npx @vscode/vsce package            # Create .vsix
-code --install-extension ky-*.vsix  # Install locally
+**File**: `lsp.rs`, lines 2201–2202
+**Fix**: Convert 1-indexed spans to 0-indexed before delta encoding:
+```rust
+let line0 = line.saturating_sub(1);
+let col0 = col.saturating_sub(1);
 ```
+
+### 2. LSP shows "undefined symbol" for imported types
+
+**File**: `lsp.rs`, lines 277–284
+**Fix**: Import ALL declarations from the module, not just the requested names:
+```rust
+import_decls.push((i, module.program.declarations.clone()));
+```
+
+### 3. LSP shows "contract not found" for imported classes
+
+**File**: `lsp.rs`, lines 303–319
+**Fix**: After resolving imports, scan cached modules for contracts referenced by imported classes.
+
+### 4. Syntax highlight breaks on `::`
+
+**File**: `ky.tmLanguage.json`, `class_def` end pattern
+**Fix**: Use `end: "(?=(?:[^:]):|$|\\n)"` instead of `end: "(?=:|\n)"` to avoid matching the first `:` of `::`.
+
+### 5. `fn` keyword not colored
+
+**File**: `ky.tmLanguage.json`, `keywords_declaration`
+**Fix**: Add explicit pattern:
+```json
+{ "name": "keyword.declaration.fn.ky", "match": "\\bfn\\b" }
+```
+
+### 6. Variables highlighted on `==`
+
+**File**: `ky.tmLanguage.json`, `variable_decl`
+**Fix**: Use `(?=\\s*=(?!=))` instead of `(?=\\s*=)` to exclude `==`.
+
+### 7. No debouncing on diagnostics
+
+**File**: `lsp.rs`, `handle_did_change`
+**Impact**: Every keystroke triggers full parse + analyze + publish. Slow on large files.
+**Fix**: Add a 300ms debounce timer before calling `publish_diagnostics`.
+
+### 8. `kyx` files not supported by LSP
+
+**File**: `vscode-ky/src/extension.ts`, line 128
+**Fix**: Add `kyx` to `documentSelector`:
+```typescript
+documentSelector: [{ scheme: 'file', language: 'kl' }, { scheme: 'file', language: 'kyx' }],
+```
+
+### 9. `@link` directive only matches at line start
+
+**File**: `ky.tmLanguage.json`, `link_directive`
+**Fix**: Remove `^` anchor: `"match": "@link\\s+\"(.*?)\""`.
+
+## How to Test LSP Changes
+
+1. **Build**: `cargo build --release --bin ky`
+2. **Start LSP manually**:
+   ```bash
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}' | ./target/release/ky lsp
+   ```
+3. **Test with VS Code**: `code --disable-extensions --extensionDevelopmentPath=./vscode-ky`
+4. **Test diagnostics**: Open a `.ky` file, check Problems panel
+5. **Test semantic tokens**: Open a `.ky` file, check colors match expected scopes
+
+## How to Release a New Extension Version
+
+1. Bump version in `vscode-ky/package.json`
+2. Update `vscode-ky/install-extension.sh` TAG
+3. Push tag → CI builds `.vsix` and uploads to GitHub Release
+4. User runs `install-extension.sh` or downloads from Marketplace
+
+## Files Not to Modify Without Cross-Platform Testing
+
+| File | Risk |
+|------|------|
+| `install-extension.sh` | Wrong tag breaks install |
+| `package.json` | Wrong engine version breaks VS Code compatibility |
+| `src/extension.ts` | LSP client configuration affects ALL platforms |
