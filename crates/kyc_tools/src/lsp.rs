@@ -277,13 +277,9 @@ impl LanguageServer {
                 Decl::FromImport(fi) => {
                     if seen_modules.insert(fi.module_name.clone()) {
                         if let Ok(module) = resolver.resolve_import(&fi.module_name, fi.relative) {
-                            let mut selected = Vec::new();
-                            for name in &fi.imported_names {
-                                if let Ok(decl) = resolver.get_imported_declaration(&fi.module_name, name, fi.relative) {
-                                    selected.push(decl);
-                                }
-                            }
-                            import_decls.push((i, selected));
+                            // Import ALL declarations from the module (not just requested names)
+                            // so that types like enums referenced by class fields are in scope.
+                            import_decls.push((i, module.program.declarations.clone()));
                         }
                     }
                 }
