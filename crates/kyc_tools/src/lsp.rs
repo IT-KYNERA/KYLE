@@ -298,6 +298,26 @@ impl LanguageServer {
             }
         }
 
+        // Pull contracts from cached modules that are referenced by imported classes
+        let class_contracts: std::collections::HashSet<String> = program.declarations.iter()
+            .filter_map(|d| {
+                if let Decl::Class(c) = d {
+                    if c.contracts.is_empty() { None } else { Some(c.contracts.clone()) }
+                } else { None }
+            })
+            .fold(std::collections::HashSet::new(), |mut acc, v| { acc.extend(v); acc });
+        if !class_contracts.is_empty() {
+            for cached in resolver.cache.values() {
+                for cd in &cached.program.declarations {
+                    if let Decl::Contract(ct) = cd {
+                        if class_contracts.contains(&ct.name) {
+                            program.declarations.push(cd.clone());
+                        }
+                    }
+                }
+            }
+        }
+
         let mut source_map = kyc_core::source_map::SourceMap::new();
         let _file_id = source_map.add(file_name.to_string(), source.to_string());
         let mut analyzer = kyc_semantic::analyzer::SemanticAnalyzer::new()
