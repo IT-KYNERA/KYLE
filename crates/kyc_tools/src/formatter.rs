@@ -570,7 +570,11 @@ impl Formatter {
 
     fn write_for(&mut self, out: &mut String, s: &ForStmt, depth: usize) {
         self.indent(out, depth);
-        write!(out, "for {} in ", s.variable).unwrap();
+        if let Some(ref idx_var) = s.index_variable {
+            write!(out, "for {}, {} in ", idx_var, s.variable).unwrap();
+        } else {
+            write!(out, "for {} in ", s.variable).unwrap();
+        }
         self.write_expr(out, &s.iterable);
         out.push_str(":\n");
         self.write_block(out, &s.body, depth + 1);

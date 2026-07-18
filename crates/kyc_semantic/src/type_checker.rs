@@ -670,17 +670,17 @@ impl TypeChecker {
                 }
                 // Operator overloading: check if left type has an op_X method
                 let overloaded_op_name = match operator {
-                    BinaryOp::Add => Some("op_+"),
-                    BinaryOp::Sub => Some("op_-"),
-                    BinaryOp::Mul => Some("op_*"),
-                    BinaryOp::Div => Some("op_/"),
-                    BinaryOp::Rem => Some("op_%"),
-                    BinaryOp::Eq => Some("op_=="),
-                    BinaryOp::Neq => Some("op_!="),
-                    BinaryOp::Lt => Some("op_<"),
-                    BinaryOp::Gt => Some("op_>"),
-                    BinaryOp::Le => Some("op_<="),
-                    BinaryOp::Ge => Some("op_>="),
+                    BinaryOp::Add => Some("op_add"),
+                    BinaryOp::Sub => Some("op_sub"),
+                    BinaryOp::Mul => Some("op_mul"),
+                    BinaryOp::Div => Some("op_div"),
+                    BinaryOp::Rem => Some("op_mod"),
+                    BinaryOp::Eq => Some("op_eq"),
+                    BinaryOp::Neq => Some("op_ne"),
+                    BinaryOp::Lt => Some("op_lt"),
+                    BinaryOp::Gt => Some("op_gt"),
+                    BinaryOp::Le => Some("op_le"),
+                    BinaryOp::Ge => Some("op_ge"),
                     _ => None,
                 };
                 if let Some(op_name) = overloaded_op_name {

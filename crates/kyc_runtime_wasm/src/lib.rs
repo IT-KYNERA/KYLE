@@ -6,6 +6,7 @@ use alloc::alloc::{alloc, dealloc, Layout};
 use core::panic::PanicInfo;
 use core::ptr;
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}

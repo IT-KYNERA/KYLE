@@ -418,3 +418,32 @@ pub extern "C" fn ky_json_to_struct(json: *const u8, descriptor: *const u8, out:
 
     0
 }
+
+/// Returns a list of string keys from a dict.
+/// Each key is a heap-allocated string (caller must free via ky_free).
+/// Returns pointer to KlList, or null if dict is null.
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_dict_keys(dict: *mut std::ffi::c_void) -> *mut crate::list::KlList {
+    if dict.is_null() {
+        return std::ptr::null_mut();
+    }
+    let map = unsafe { &*(dict as *const HashMap<String, i64>) };
+    let list = crate::list::ky_list_new();
+    if list.is_null() {
+        return list;
+    }
+    for key in map.keys() {
+        let bytes = key.as_bytes();
+        let len = bytes.len();
+        let buf = crate::memory::ky_alloc((len + 1) as i64);
+        if !buf.is_null() {
+            unsafe {
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, len);
+                *buf.add(len) = 0;
+            }
+            let ptr_val = buf as i64;
+            crate::list::ky_list_push(list, ptr_val);
+        }
+    }
+    list
+}

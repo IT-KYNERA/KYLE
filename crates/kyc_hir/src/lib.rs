@@ -128,7 +128,7 @@ fn desugar_stmt(stmt: &Stmt) -> Stmt {
         Stmt::BindingIf(b) => Stmt::BindingIf(desugar_binding_if(b)),
         Stmt::While(w) => Stmt::While(desugar_while(w)),
         Stmt::WhileBind(w) => Stmt::WhileBind(w.clone()),
-        Stmt::For(f) => Stmt::For(f.clone()),
+        Stmt::For(f) => Stmt::For(desugar_for(f)),
         Stmt::Match(m) => Stmt::Match(desugar_match(m)),
         Stmt::Defer(d) => Stmt::Defer(d.clone()),
         Stmt::Guard(g) => Stmt::Guard(g.clone()),
@@ -158,6 +158,18 @@ fn desugar_binding_if(b: &BindingIf) -> BindingIf {
         body: desugar_block(&b.body),
         else_branch: b.else_branch.as_ref().map(|b| desugar_block(b)),
         span: b.span.clone(),
+    }
+}
+
+fn desugar_for(f: &ForStmt) -> ForStmt {
+    ForStmt {
+        variable: f.variable.clone(),
+        index_variable: f.index_variable.clone(),
+        iterable: Box::new(desugar_expr(&f.iterable)),
+        body: desugar_block(&f.body),
+        else_branch: f.else_branch.as_ref().map(|b| desugar_block(b)),
+        label: f.label.clone(),
+        span: f.span.clone(),
     }
 }
 

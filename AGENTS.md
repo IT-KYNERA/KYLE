@@ -660,6 +660,27 @@ FASE 3 (1 sem): Bootstrap
   → Kyle corre Kyle. Rust ya no es necesario.
 ```
 
+### Known Bugs
+
+#### 1. `return ok(val)` returns garbage payload (Result struct = 0)
+- **Location:** `crates/kyc_mir/src/lower.rs`, `Expr::FunctionCall` arm, `ok()` handler at ~line 5658
+- **Symptom:** `return ok(42)` returns `{disc=0, payload=0}` instead of `{disc=0, payload=42}`
+- **Root cause:** The `ok()` handler executes correctly (confirmed via debug), creates all locals and instructions, but the returned `LowerCtx` from `lower_expr` has `next_local=1` instead of the expected value (the handler's 5+ allocs are lost). This ONLY happens when `ok(val)` is the direct argument of a `return` statement. When `ok(val)` is assigned to a temp variable first (`tmp = ok(42); return tmp`), it works correctly.
+- **Workaround:** Use `tmp = ok(val); return tmp` instead of `return ok(val)`.
+- **Debug trace:** `DBG_OK` shows handler IS reached. `DBG_RET2` shows `nlocal=1` after `lower_expr`. The actual discard happens somewhere between the handler returning `ctx` and `lower_expr` returning to the return statement handler — likely a Rust move semantics issue or a deep compiler bug in LLVM 18 interaction.
+
+#### 2. Prelude types (decimal, url, regex, big_int, json, path, sha256)
+- **Location:** `crates/kyc_runtime/src/` (Rust crate)
+- **Symptom:** These types compile but produce garbage output or crash at runtime
+- **Root cause:** Individual bugs in the Rust runtime implementation of each type
+- **Status:** Not investigated
+
+#### 3. Mutable borrow iteration `for val in ^&arr`
+- **Location:** `crates/kyc_mir/src/lower.rs`, list-based for loop at ~line 1922
+- **Symptom:** Using `^&` (mutable borrow) as the iterable in a for loop causes infinite loop
+- **Root cause:** The `^&` borrow expression produces a `Ptr(I8)` type (from `BorrowRef` lowering), which doesn't match `List(inner)` needed for the for loop lowering. The element type defaults to `I64` with wrong semantics.
+- **Status:** Feature not fully implemented. List iteration without borrow (`for v in list`) works correctly.
+
 ### Referencia de sintaxis rápida
 
 ```

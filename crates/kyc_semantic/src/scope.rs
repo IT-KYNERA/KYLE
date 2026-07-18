@@ -213,6 +213,10 @@ impl ScopeResolver {
                 self.symbols.push_scope();
                 let _ = self.symbols.insert(f.variable.clone(),
                     Symbol::new_var(f.variable.clone(), None, false));
+                if let Some(ref idx_var) = f.index_variable {
+                    let _ = self.symbols.insert(idx_var.clone(),
+                        Symbol::new_var(idx_var.clone(), None, false));
+                }
                 self.resolve_block(&f.body);
                 self.symbols.pop_scope();
                 if let Some(el) = &f.else_branch { self.resolve_block(el); }

@@ -326,6 +326,7 @@ pub struct WhileBind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ForStmt {
     pub variable: String,
+    pub index_variable: Option<String>,
     pub iterable: Box<Expr>,
     pub body: Block,
     pub else_branch: Option<Block>,

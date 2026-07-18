@@ -1430,6 +1430,9 @@ impl LanguageServer {
                 }
                 Stmt::For(fs) => {
                     vars.insert(fs.variable.clone(), "i32".to_string());
+                    if let Some(ref idx_var) = fs.index_variable {
+                        vars.insert(idx_var.clone(), "i32".to_string());
+                    }
                     Self::walk_block_for_vars(&fs.body, vars);
                     if let Some(eb) = &fs.else_branch {
                         Self::walk_block_for_vars(eb, vars);
@@ -2400,7 +2403,13 @@ impl LanguageServer {
                     Self::walk_semantic_block(&wb.body, tokens, symbols);
                 }
                 Stmt::For(fs) => {
-                    tokens.push((fs.span.start.line, fs.span.start.column, fs.variable.len(), T_VARIABLE, M_DECLARATION));
+                    let base_col = fs.span.start.column;
+                    if let Some(ref idx_var) = fs.index_variable {
+                        tokens.push((fs.span.start.line, base_col + 4, idx_var.len(), T_VARIABLE, M_DECLARATION));
+                        tokens.push((fs.span.start.line, base_col + 5 + idx_var.len(), fs.variable.len(), T_VARIABLE, M_DECLARATION));
+                    } else {
+                        tokens.push((fs.span.start.line, fs.span.start.column, fs.variable.len(), T_VARIABLE, M_DECLARATION));
+                    }
                     Self::walk_semantic_expr(&fs.iterable, tokens, symbols);
                     Self::walk_semantic_block(&fs.body, tokens, symbols);
                     if let Some(ref eb) = fs.else_branch {

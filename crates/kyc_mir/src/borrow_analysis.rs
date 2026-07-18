@@ -393,7 +393,7 @@ impl BorrowAnalysis {
                 }
                 MirTerminator::CondBr { cond, .. } => {
                     if let MirValue::Local(l) = cond {
-                        self.check_alive(*l, &alive, &local_names, &local_types, "read");
+                        self.check_alive(*l, &alive, &move_locals, &local_names, &local_types, "read");
                     }
                 }
                 _ => {}
@@ -449,34 +449,34 @@ impl BorrowAnalysis {
             }
             MirInst::Load { dest, src } => {
                 // Check that the source is alive (use-after-move detection)
-                self.check_alive(*src, alive, local_names, local_types, "read");
+                self.check_alive(*src, alive, move_locals, local_names, local_types, "read");
                 if move_locals.contains(dest) {
                     alive.insert(*dest);
                 }
             }
             MirInst::BinaryOp { left, right, .. } => {
                 if let MirValue::Local(l) = left {
-                    self.check_alive(*l, alive, local_names, local_types, "read");
+                    self.check_alive(*l, alive, move_locals, local_names, local_types, "read");
                 }
                 if let MirValue::Local(r) = right {
-                    self.check_alive(*r, alive, local_names, local_types, "read");
+                    self.check_alive(*r, alive, move_locals, local_names, local_types, "read");
                 }
             }
             MirInst::UnaryOp { operand, .. } => {
                 if let MirValue::Local(l) = operand {
-                    self.check_alive(*l, alive, local_names, local_types, "read");
+                    self.check_alive(*l, alive, move_locals, local_names, local_types, "read");
                 }
             }
             MirInst::Store { dest, value } => {
                 if let MirValue::Local(src) = value {
-                    self.check_alive(*src, alive, local_names, local_types, "move");
+                    self.check_alive(*src, alive, move_locals, local_names, local_types, "move");
                     if alive.contains(src) {
                         alive.remove(src);
                     }
                     // Also mark the original source of a Load alias as consumed, if still alive
                     if let Some(&orig) = load_map.get(src) {
                         if alive.contains(&orig) {
-                            self.check_alive(orig, alive, local_names, local_types, "move");
+                            self.check_alive(orig, alive, move_locals, local_names, local_types, "move");
                             alive.remove(&orig);
                         }
                     }
@@ -493,7 +493,7 @@ impl BorrowAnalysis {
                         let mode = modes.and_then(|m| m.get(i).copied());
                         match mode {
                             Some(ParamMode::Borrow) => {
-                                self.check_alive(*l, alive, local_names, local_types, "borrow");
+                                self.check_alive(*l, alive, move_locals, local_names, local_types, "borrow");
                                 let orig = *load_map.get(l).unwrap_or(l);
                                 let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
                                 match state {
@@ -510,7 +510,7 @@ impl BorrowAnalysis {
                                 }
                             }
                             Some(ParamMode::MutableBorrow) => {
-                                self.check_alive(*l, alive, local_names, local_types, "mut borrow");
+                                self.check_alive(*l, alive, move_locals, local_names, local_types, "mut borrow");
                                 let orig = *load_map.get(l).unwrap_or(l);
                                 let state = borrow_states.get(&orig).copied().unwrap_or(BorrowState::NotBorrowed);
                                 match state {
@@ -535,13 +535,13 @@ impl BorrowAnalysis {
                                 // Builtins NOT in func_map: assume they DON'T consume Move args
                                 if modes.is_some() {
                                     // MOVE (default for user-defined functions)
-                                    self.check_alive(*l, alive, local_names, local_types, "move");
+                                    self.check_alive(*l, alive, move_locals, local_names, local_types, "move");
                                     if alive.contains(l) {
                                         alive.remove(l);
                                     }
                                     let orig = *load_map.get(l).unwrap_or(l);
                                     if alive.contains(&orig) && *l != orig {
-                                        self.check_alive(orig, alive, local_names, local_types, "move");
+                                        self.check_alive(orig, alive, move_locals, local_names, local_types, "move");
                                         alive.remove(&orig);
                                     }
                                     // A move releases all borrows on the source
@@ -568,23 +568,23 @@ impl BorrowAnalysis {
                 }
             }
             MirInst::PtrOffset { ptr, .. } => {
-                self.check_alive(*ptr, alive, local_names, local_types, "read");
+                self.check_alive(*ptr, alive, move_locals, local_names, local_types, "read");
             }
             MirInst::PtrStore { ptr, value, .. } => {
-                self.check_alive(*ptr, alive, local_names, local_types, "read");
+                self.check_alive(*ptr, alive, move_locals, local_names, local_types, "read");
                 if let MirValue::Local(id) = value {
-                    self.check_alive(*id, alive, local_names, local_types, "read");
+                    self.check_alive(*id, alive, move_locals, local_names, local_types, "read");
                 }
             }
             MirInst::Memcpy { dest_ptr_local, src_alloca_local, .. } => {
-                self.check_alive(*dest_ptr_local, alive, local_names, local_types, "read");
-                self.check_alive(*src_alloca_local, alive, local_names, local_types, "read");
+                self.check_alive(*dest_ptr_local, alive, move_locals, local_names, local_types, "read");
+                self.check_alive(*src_alloca_local, alive, move_locals, local_names, local_types, "read");
             }
             MirInst::FieldPtr { ptr, .. } => {
-                self.check_alive(*ptr, alive, local_names, local_types, "read");
+                self.check_alive(*ptr, alive, move_locals, local_names, local_types, "read");
             }
             MirInst::AsyncAwait { handle, .. } => {
-                self.check_alive(*handle, alive, local_names, local_types, "read");
+                self.check_alive(*handle, alive, move_locals, local_names, local_types, "read");
             }
             _ => {}
         }
@@ -594,11 +594,12 @@ fn check_alive(
     &mut self,
     local: usize,
     alive: &BTreeSet<usize>,
+    move_locals: &BTreeSet<usize>,
     local_names: &HashMap<usize, String>,
     local_types: &HashMap<usize, MirType>,
     context: &str,
 ) {
-    if !self.is_move_local(local, local_types) {
+    if !move_locals.contains(&local) {
         return;
     }
     if !alive.contains(&local) {

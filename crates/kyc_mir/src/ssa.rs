@@ -62,7 +62,7 @@ pub enum SsaInst {
     /// Get pointer to struct field (non-promotable)
     FieldPtr { dest: usize, ptr: usize, field_index: usize, struct_type: Box<MirType> },
     /// Get pointer to array element (non-promotable)
-    ArrayElemPtr { dest: usize, ptr: usize, index: SsaValueId, arr_type: Box<MirType>, elem_type: Box<MirType> },
+    ArrayElemPtr { dest: usize, mir_dest: usize, ptr: usize, index: SsaValueId, arr_type: Box<MirType>, elem_type: Box<MirType> },
     /// Copy struct memory (non-promotable)
     Memcpy { dest_ptr_local: usize, src_alloca_local: usize, struct_type: Box<MirType> },
     /// Allocate stack space (non-promotable)
@@ -355,9 +355,14 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                         .unwrap_or(MirType::I32);
                     let new_dest = ssa.values.len();
                     ssa.values.push(SsaValue { type_: load_type, name: format!("_l{}", dest) });
-                    ssa_block.insts.push(SsaInst::Load { dest: new_dest, src: *src });
-                    alloca_current.insert(*dest, new_dest);
-                    stacks.entry(*dest).or_default().push(new_dest);
+                     ssa_block.insts.push(SsaInst::Load { dest: new_dest, src: *src });
+                     alloca_current.insert(*dest, new_dest);
+                     stacks.entry(*dest).or_default().push(new_dest);
+                     // Emit Store for non-promotable load dests so the codegen's
+                     // resolve_mir! fallback (which checks alloca_map) finds the value.
+                     if !promotable.contains(dest) {
+                         ssa_block.insts.push(SsaInst::Store { dest: *dest, value: new_dest });
+                     }
                 }
                 MirInst::BinaryOp { dest, op, left, right } => {
                     let left_id = resolve_value(left, &mut ssa, &stacks, &param_value_ids);
@@ -487,7 +492,7 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
                         type_: MirType::Ptr(Box::new(MirType::I8)),
                         name: format!("_aep{}", *dest),
                     });
-                    ssa_block.insts.push(SsaInst::ArrayElemPtr { dest: result_id, ptr: *ptr, index: index_id, arr_type: arr_type.clone(), elem_type: elem_type.clone() });
+                    ssa_block.insts.push(SsaInst::ArrayElemPtr { dest: result_id, mir_dest: *dest, ptr: *ptr, index: index_id, arr_type: arr_type.clone(), elem_type: elem_type.clone() });
                     alloca_current.insert(*dest, result_id);
                     stacks.entry(*dest).or_default().push(result_id);
                 }
@@ -746,7 +751,7 @@ fn find_promotable_allocas(func: &MirFunction) -> HashSet<usize> {
                 MirInst::Alloca { dest, type_, .. } => {
                     allocas.insert(*dest);
                     // Move types, structs, ptrs, slices cannot be promoted (SSA codegen handles them poorly)
-                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_) | MirType::Slice(_) | MirType::Box(_)) {
+                    if is_move_type(type_) || matches!(type_, MirType::Struct(_, _) | MirType::Ptr(_) | MirType::Slice(_) | MirType::Box(_) | MirType::Array(_, _)) {
                         escaped.insert(*dest);
                     }
                 }

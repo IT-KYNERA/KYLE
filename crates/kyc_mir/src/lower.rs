@@ -1128,6 +1128,8 @@ impl Lowerer {
             }
         }
 
+        for b in &ctx.blocks {
+        }
         mir_func.basic_blocks = ctx.blocks;
         mir_func.local_count = ctx.next_local;
         Some(mir_func)
@@ -1469,6 +1471,13 @@ impl Lowerer {
                 }
                 if let Some(expr) = ret_val {
                     let mut val_ctx = self.lower_expr(ctx, expr);
+                    // If the expression already finished the block (e.g., ok/error handler),
+                    // return directly without adding another return
+                    if val_ctx.current_block.insts.is_empty()
+                        && val_ctx.current_block.terminator != MirTerminator::Unreachable
+                    {
+                        return val_ctx;
+                    }
                     let val = if let Some(last) = val_ctx.current_block.insts.last() {
                         match last {
                             MirInst::Call { dest: Some(d), .. } => MirValue::Local(*d),
@@ -1928,13 +1937,38 @@ impl Lowerer {
                     };
 
                     // 1. Lower the iterable expression
-                    ctx = self.lower_expr(ctx, &s.iterable);
-                    let iter_val = ctx.next_local - 1;
-
-                    // Determine element type from the list type
-                    let elem_type = match ctx.local_types.get(&iter_val) {
-                        Some(MirType::List(inner)) => inner.as_ref().clone(),
-                        _ => MirType::I64,
+                    // Check for dict iteration: for key in &dict
+                    let is_dict_iter = if let Expr::BorrowRef { expression, .. } = &*s.iterable {
+                        if let Expr::Identifier { name, .. } = expression.as_ref() {
+                            if let Some(&local) = ctx.locals.get(name) {
+                                matches!(ctx.local_types.get(&local), Some(MirType::Dict(_, _)))
+                            } else { false }
+                        } else { false }
+                    } else { false };
+                    let (iter_val, elem_type) = if is_dict_iter {
+                        let var_name = match &*s.iterable {
+                            Expr::BorrowRef { expression, .. } => {
+                                if let Expr::Identifier { name, .. } = expression.as_ref() { name.clone() }
+                                else { String::new() }
+                            }
+                            _ => String::new(),
+                        };
+                        let dict_local = ctx.locals.get(&var_name).copied().unwrap_or(0);
+                        let keys_list = ctx.alloc_local("_dkeys", MirType::List(Box::new(MirType::I64)));
+                        ctx.current_block.insts.push(MirInst::Call {
+                            dest: Some(keys_list),
+                            name: "ky_dict_keys".to_string(),
+                            args: vec![MirValue::Local(dict_local)],
+                        });
+                        (keys_list, MirType::Str)
+                    } else {
+                        ctx = self.lower_expr(ctx, &s.iterable);
+                        let iv = ctx.next_local - 1;
+                        let et = match ctx.local_types.get(&iv) {
+                            Some(MirType::List(inner)) => inner.as_ref().clone(),
+                            _ => MirType::I64,
+                        };
+                        (iv, et)
                     };
 
                     // Allocate loop variable with proper type
@@ -2200,7 +2234,7 @@ impl Lowerer {
                             let mv = match_val.unwrap();
                             let mv_type = ctx.local_types.get(&mv).cloned().unwrap_or(MirType::I64);
                             let struct_ptr = if matches!(mv_type, MirType::Struct(_, _)) {
-                                let alloca = ctx.alloc_local("_mvtmp", mv_type);
+                                let alloca = ctx.alloc_local("_mvtmp", mv_type.clone());
                                 ctx.current_block.insts.push(MirInst::Store {
                                     dest: alloca,
                                     value: MirValue::Local(mv),
@@ -2225,10 +2259,18 @@ impl Lowerer {
                             });
 
                             // Compare discriminant with variant index
+                            // Option.Some has disc=1 (not variant index 0), Option.None has disc=0
+                            let expected_disc = if enum_name == "Option" && variant == "Some" {
+                                1_i32
+                            } else if enum_name == "Option" && variant == "None" {
+                                0_i32
+                            } else {
+                                variant_idx as i32
+                            };
                             let idx_local = ctx.alloc_local("_vidx", MirType::I32);
                             ctx.current_block.insts.push(MirInst::Store {
                                 dest: idx_local,
-                                value: MirValue::Constant(MirConstant::I32(variant_idx as i32)),
+                                value: MirValue::Constant(MirConstant::I32(expected_disc)),
                             });
                             let eq = ctx.alloc_local("_eq", MirType::Bool);
                             ctx.current_block.insts.push(MirInst::BinaryOp {
@@ -2265,16 +2307,39 @@ impl Lowerer {
                                     field_index: 1,
                                     struct_type: Box::new(struct_type),
                                 });
-
+                                // Determine inner type for Option/Result
+                                let inner_type = match mv_type.clone() {
+                                    MirType::Struct(ref name, _) => {
+                                        if let Some(inner) = name.strip_prefix("Option__") {
+                                            match inner {
+                                                "str" => MirType::Str, "i32" => MirType::I32,
+                                                "i64" => MirType::I64, "f64" => MirType::F64,
+                                                "bool" => MirType::Bool, _ => MirType::I64,
+                                            }
+                                        } else if name == "Result" { MirType::I64 }
+                                        else { MirType::I64 }
+                                    }
+                                    _ => MirType::I64,
+                                };
                                 for (_pi, arg) in args.iter().enumerate() {
                                     match arg {
                                         Pattern::Identifier { name, .. } => {
-                                            let pay_val = ctx.alloc_local("_pay", MirType::I64);
-                                            ctx.current_block.insts.push(MirInst::Load {
-                                                dest: pay_val,
-                                                src: payload_ptr,
-                                            });
-                                            let local = ctx.alloc_local(name, MirType::I64);
+                                            let pay_val = ctx.alloc_local("_pay", inner_type.clone());
+                                            if inner_type == MirType::I64 {
+                                                ctx.current_block.insts.push(MirInst::Load {
+                                                    dest: pay_val, src: payload_ptr,
+                                                });
+                                            } else {
+                                                let pay_i64 = ctx.alloc_local("_pay_i64", MirType::I64);
+                                                ctx.current_block.insts.push(MirInst::Load {
+                                                    dest: pay_i64, src: payload_ptr,
+                                                });
+                                                ctx.current_block.insts.push(MirInst::Cast {
+                                                    dest: pay_val, value: MirValue::Local(pay_i64),
+                                                    to_type: inner_type.clone(),
+                                                });
+                                            }
+                                            let local = ctx.alloc_local(name, inner_type.clone());
                                             ctx.current_block.insts.push(MirInst::Store {
                                                 dest: local,
                                                 value: MirValue::Local(pay_val),
@@ -2524,14 +2589,86 @@ impl Lowerer {
                 ctx
             }
             Stmt::BindingIf(b) => {
+                // Lower the optional expression
+                ctx = self.lower_expr(ctx, &b.value);
+                let opt_val = ctx.next_local - 1;
+                let opt_type = ctx.local_types.get(&opt_val).cloned().unwrap_or(MirType::I32);
+                // Determine inner type from Option type name
+                let inner_type = if let MirType::Struct(name, _) = &opt_type {
+                    if let Some(inner) = name.strip_prefix("Option__") {
+                        match inner {
+                            "str" => MirType::Str, "i32" => MirType::I32,
+                            "i64" => MirType::I64, "f64" => MirType::F64,
+                            "bool" => MirType::Bool, _ => MirType::I64,
+                        }
+                    } else { MirType::I64 }
+                } else { MirType::I64 };
+                // Read disc field (disc == 1 means Some)
+                let disc_ptr = ctx.alloc_local("_disc_ptr", MirType::I32);
+                ctx.current_block.insts.push(MirInst::FieldPtr {
+                    dest: disc_ptr, ptr: opt_val, field_index: 0,
+                    struct_type: Box::new(opt_type.clone()),
+                });
+                let disc_val = ctx.alloc_local("_disc_val", MirType::I32);
+                ctx.current_block.insts.push(MirInst::Load {
+                    dest: disc_val, src: disc_ptr,
+                });
+                // Compare disc == 1 (Some)
+                let cmp = ctx.alloc_local("_bif_cmp", MirType::Bool);
+                ctx.current_block.insts.push(MirInst::BinaryOp {
+                    dest: cmp, op: MirBinaryOp::Eq,
+                    left: MirValue::Local(disc_val),
+                    right: MirValue::Constant(MirConstant::I32(1)),
+                });
+                let then_label = ctx.fresh_block();
+                let else_label = ctx.fresh_block();
+                let end_label = ctx.fresh_block();
+                ctx.finish_block(MirTerminator::CondBr {
+                    cond: MirValue::Local(cmp),
+                    true_block: then_label.clone(),
+                    false_block: else_label.clone(),
+                });
+                // Then block: extract payload, bind variable, execute body
+                ctx.current_block = MirBasicBlock::new(then_label);
+                let pay_ptr = ctx.alloc_local("_pay_ptr", MirType::I32);
+                ctx.current_block.insts.push(MirInst::FieldPtr {
+                    dest: pay_ptr, ptr: opt_val, field_index: 1,
+                    struct_type: Box::new(opt_type.clone()),
+                });
+                let pay_val = ctx.alloc_local("_pay_val", inner_type.clone());
+                if inner_type == MirType::I64 {
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: pay_val, src: pay_ptr,
+                    });
+                } else {
+                    let pay_i64 = ctx.alloc_local("_pay_i64", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: pay_i64, src: pay_ptr,
+                    });
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: pay_val, value: MirValue::Local(pay_i64),
+                        to_type: inner_type.clone(),
+                    });
+                }
+                let var_local = ctx.alloc_local(&b.name, inner_type.clone());
+                ctx.locals.insert(b.name.clone(), var_local);
+                ctx.current_block.insts.push(MirInst::Store {
+                    dest: var_local, value: MirValue::Local(pay_val),
+                });
                 for stmt in &b.body.statements {
                     ctx = self.lower_stmt(ctx, stmt);
                 }
+                ctx.finish_block(MirTerminator::Br(end_label.clone()));
+                // Else block
+                ctx.current_block = MirBasicBlock::new(else_label);
                 if let Some(el) = &b.else_branch {
                     for stmt in &el.statements {
                         ctx = self.lower_stmt(ctx, stmt);
                     }
                 }
+                ctx.finish_block(MirTerminator::Br(end_label.clone()));
+                // Merge
+                ctx.current_block = MirBasicBlock::new(end_label);
                 ctx
             }
             Stmt::Break(_, _) => {
@@ -3437,17 +3574,17 @@ impl Lowerer {
 
                 // Operator overloading: dispatch to op_X method for struct types
                 let overload_op_name = match operator {
-                    BinaryOp::Add => Some("op_+"),
-                    BinaryOp::Sub => Some("op_-"),
-                    BinaryOp::Mul => Some("op_*"),
-                    BinaryOp::Div => Some("op_/"),
-                    BinaryOp::Rem => Some("op_%"),
-                    BinaryOp::Eq => Some("op_=="),
-                    BinaryOp::Neq => Some("op_!="),
-                    BinaryOp::Lt => Some("op_<"),
-                    BinaryOp::Gt => Some("op_>"),
-                    BinaryOp::Le => Some("op_<="),
-                    BinaryOp::Ge => Some("op_>="),
+                    BinaryOp::Add => Some("op_add"),
+                    BinaryOp::Sub => Some("op_sub"),
+                    BinaryOp::Mul => Some("op_mul"),
+                    BinaryOp::Div => Some("op_div"),
+                    BinaryOp::Rem => Some("op_mod"),
+                    BinaryOp::Eq => Some("op_eq"),
+                    BinaryOp::Neq => Some("op_ne"),
+                    BinaryOp::Lt => Some("op_lt"),
+                    BinaryOp::Gt => Some("op_gt"),
+                    BinaryOp::Le => Some("op_le"),
+                    BinaryOp::Ge => Some("op_ge"),
                     _ => None,
                 };
                 if let Some(op_name) = overload_op_name {
@@ -3593,6 +3730,31 @@ impl Lowerer {
             }
             Expr::Unary { operator, operand, .. } => {
                 ctx = self.lower_expr(ctx, operand);
+                let operand_type = ctx.local_types.get(&(ctx.next_local - 1)).cloned().unwrap_or(MirType::I32);
+                // Operator overloading for struct types
+                let overload_method_name = match operator {
+                    UnaryOp::Neg => Some("op_neg"),
+                    UnaryOp::Not => Some("op_not"),
+                    _ => None,
+                };
+                if let Some(method_name) = overload_method_name {
+                    if let MirType::Struct(class_name, _) = &operand_type {
+                        let method_table = self.method_table.borrow();
+                        if let Some(methods) = method_table.get(class_name) {
+                            if let Some(mangled) = methods.get(method_name) {
+                                let ret_type = self.fn_returns.borrow()
+                                    .get(mangled).cloned().unwrap_or(MirType::I64);
+                                let dest = ctx.alloc_local("_un", ret_type);
+                                ctx.current_block.insts.push(MirInst::Call {
+                                    dest: Some(dest),
+                                    name: mangled.clone(),
+                                    args: vec![MirValue::Local(ctx.next_local - 2)],
+                                });
+                                return ctx;
+                            }
+                        }
+                    }
+                }
                 let dest = ctx.alloc_local("_un", MirType::I32);
                 let op = match operator {
                     UnaryOp::Neg => MirUnaryOp::Neg,
@@ -3607,6 +3769,41 @@ impl Lowerer {
                 ctx
             }
             Expr::FunctionCall { target, arguments, type_args, .. } => {
+                // Early handler for ok(val) / error(msg) — bypass FunctionCall handler
+                if let Expr::Identifier { name, .. } = target.as_ref() {
+                    if (name == "ok" || name == "error") && arguments.len() == 1 {
+                        ctx = self.lower_expr(ctx, &arguments[0]);
+                        let arg_local = ctx.next_local - 1;
+                        let result_type = MirType::Struct("Result".to_string(), vec![
+                            ("disc".to_string(), MirType::I32),
+                            ("payload".to_string(), MirType::I64),
+                        ]);
+                        let disc_val = if name == "ok" { 0_i32 } else { 1_i32 };
+                        let result_local = ctx.alloc_local("_res", result_type.clone());
+                        let disc_ptr = ctx.alloc_local("_rdp", MirType::I32);
+                        let pay_i64 = ctx.alloc_local("_rpv", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::Cast {
+                            dest: pay_i64, value: MirValue::Local(arg_local), to_type: MirType::I64,
+                        });
+                        let pay_ptr = ctx.alloc_local("_rpp", MirType::I64);
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: disc_ptr, ptr: result_local, field_index: 0,
+                            struct_type: Box::new(result_type.clone()),
+                        });
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: disc_ptr, value: MirValue::Constant(MirConstant::I32(disc_val)),
+                        });
+                        ctx.current_block.insts.push(MirInst::FieldPtr {
+                            dest: pay_ptr, ptr: result_local, field_index: 1,
+                            struct_type: Box::new(result_type.clone()),
+                        });
+                        ctx.current_block.insts.push(MirInst::Store {
+                            dest: pay_ptr, value: MirValue::Local(pay_i64),
+                        });
+                        ctx.finish_block(MirTerminator::Return(MirValue::Local(result_local)));
+                        return ctx;
+                    }
+                }
                 // Method dispatch: obj.method(args) → Call ClassName::method(obj, args...)
                 // Checked BEFORE the list-specific shortcuts so real class methods win
                 // over the generic list.add/list.pop fallbacks.
@@ -4738,7 +4935,7 @@ impl Lowerer {
                         }
                     }
 
-                    // Dict method shortcuts (len, set, get)
+                    // Dict method shortcuts (len, set, get, has, clear, remove)
                     let is_dict = obj_type.as_ref().map(|t| matches!(t, MirType::Dict(_, _))).unwrap_or(false);
                     if is_dict {
                         if property == "len" {
@@ -4747,6 +4944,69 @@ impl Lowerer {
                                 dest: Some(result),
                                 name: "ky_dict_len".to_string(),
                                 args: vec![MirValue::Local(obj_local)],
+                            });
+                            return ctx;
+                        }
+                        if property == "has" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let key_val = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_dicthas", MirType::I32);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result),
+                                name: "ky_dict_contains".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(key_val)],
+                            });
+                            return ctx;
+                        }
+                        if property == "remove" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let key_val = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_dictrm", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result),
+                                name: "ky_dict_remove".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(key_val)],
+                            });
+                            return ctx;
+                        }
+                        if property == "get" && arguments.len() == 1 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let key_val = ctx.next_local - 1;
+                            let result = ctx.alloc_local("_dictget", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(result),
+                                name: "ky_dict_get".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(key_val)],
+                            });
+                            return ctx;
+                        }
+                        if property == "set" && arguments.len() == 2 {
+                            ctx = self.lower_expr(ctx, &arguments[0]);
+                            let key_val = ctx.next_local - 1;
+                            ctx = self.lower_expr(ctx, &arguments[1]);
+                            let val_val = ctx.next_local - 1;
+                            let val_i64 = ctx.alloc_local("_dval64", MirType::I64);
+                            ctx.current_block.insts.push(MirInst::Cast {
+                                dest: val_i64, value: MirValue::Local(val_val), to_type: MirType::I64,
+                            });
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: None, name: "ky_dict_set".to_string(),
+                                args: vec![MirValue::Local(obj_local), MirValue::Local(key_val), MirValue::Local(val_i64)],
+                            });
+                            return ctx;
+                        }
+                        if property == "clear" && arguments.is_empty() {
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: None, name: "ky_dict_free".to_string(),
+                                args: vec![MirValue::Local(obj_local)],
+                            });
+                            let new_dict = ctx.alloc_local("_newdict", obj_type.clone().unwrap_or(MirType::Dict(Box::new(MirType::Str), Box::new(MirType::I64))));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(new_dict), name: "ky_dict_new".to_string(),
+                                args: vec![],
+                            });
+                            ctx.current_block.insts.push(MirInst::Store {
+                                dest: obj_local, value: MirValue::Local(new_dict),
                             });
                             return ctx;
                         }
@@ -5456,6 +5716,51 @@ impl Lowerer {
                     ctx.current_block.insts.push(MirInst::Load {
                         dest: result_load,
                         src: result_local,
+                    });
+                    return ctx;
+                }
+
+                // Special case: some(val) — construct Some option variant
+                if name == "some" && arguments.len() == 1 {
+                    let arg_val = &args[0];
+                    let arg_type = args.first().and_then(|id| {
+                        if let MirValue::Local(id) = id {
+                            ctx.local_types.get(id).cloned()
+                        } else { None }
+                    }).unwrap_or(MirType::I32);
+                    let concrete_name = make_concrete_name("Option", &[arg_type.clone()]);
+                    let opt_type = MirType::Struct(concrete_name.clone(), vec![
+                        ("disc".to_string(), MirType::I32),
+                        ("payload".to_string(), MirType::I64),
+                    ]);
+                    ctx.struct_defs.entry(concrete_name).or_insert_with(|| vec![
+                        ("disc".to_string(), MirType::I32),
+                        ("payload".to_string(), MirType::I64),
+                    ]);
+                    let disc_ptr = ctx.alloc_local("_sdp", MirType::I32);
+                    let payload_val = ctx.alloc_local("_spv", MirType::I64);
+                    ctx.current_block.insts.push(MirInst::Cast {
+                        dest: payload_val, value: arg_val.clone(), to_type: MirType::I64,
+                    });
+                    let payload_ptr = ctx.alloc_local("_spp", MirType::I64);
+                    let result_local = ctx.alloc_local("_someres", opt_type.clone());
+                    ctx.current_block.insts.push(MirInst::FieldPtr {
+                        dest: disc_ptr, ptr: result_local, field_index: 0,
+                        struct_type: Box::new(opt_type.clone()),
+                    });
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: disc_ptr, value: MirValue::Constant(MirConstant::I32(1)),
+                    });
+                    ctx.current_block.insts.push(MirInst::FieldPtr {
+                        dest: payload_ptr, ptr: result_local, field_index: 1,
+                        struct_type: Box::new(opt_type.clone()),
+                    });
+                    ctx.current_block.insts.push(MirInst::Store {
+                        dest: payload_ptr, value: MirValue::Local(payload_val),
+                    });
+                    let result_load = ctx.alloc_local("_someres_v", opt_type.clone());
+                    ctx.current_block.insts.push(MirInst::Load {
+                        dest: result_load, src: result_local,
                     });
                     return ctx;
                 }
@@ -6180,10 +6485,10 @@ impl Lowerer {
                     src: disc_ptr,
                 });
 
-                // Check if disc == 0 (error / None)
-                let is_error = ctx.alloc_local("_eeq", MirType::Bool);
+                // Check if disc == 0 (ok/success) — ok() sets disc=0, error() sets disc=1
+                let is_ok = ctx.alloc_local("_eeq", MirType::Bool);
                 ctx.current_block.insts.push(MirInst::BinaryOp {
-                    dest: is_error,
+                    dest: is_ok,
                     op: MirBinaryOp::Eq,
                     left: MirValue::Local(disc),
                     right: MirValue::Constant(MirConstant::I32(0)),
@@ -6192,14 +6497,18 @@ impl Lowerer {
                 let error_block = ctx.fresh_block();
                 let continue_block = ctx.fresh_block();
                 ctx.finish_block(MirTerminator::CondBr {
-                    cond: MirValue::Local(is_error),
-                    true_block: error_block.clone(),
-                    false_block: continue_block.clone(),
+                    cond: MirValue::Local(is_ok),
+                    true_block: continue_block.clone(),
+                    false_block: error_block.clone(),
                 });
 
-                // Error block: early-return the struct as-is (already has disc = 0)
+                // Error block: early-return the error if fallible
                 ctx.current_block = MirBasicBlock::new(error_block);
-                ctx.finish_block(MirTerminator::Return(MirValue::Local(result_local)));
+                if ctx.is_fallible {
+                    ctx.emit_return(MirValue::Local(result_local));
+                } else {
+                    ctx.finish_block(MirTerminator::Unreachable);
+                }
 
                 // Continue block: extract payload (field 1)
                 ctx.current_block = MirBasicBlock::new(continue_block);

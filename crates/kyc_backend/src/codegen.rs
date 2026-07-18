@@ -653,7 +653,7 @@ impl<'ctx> Codegen<'ctx> {
                                 if let Some(fpa) = self.field_ptr_allocas[*src] {
                                     let gep = self.builder.build_load(ptr_ty, fpa, "_fgepl")
                                         .map_err(|e| format!("sfld: {}", e))?;
-                                    let ft = self.field_ptr_types.get(src).copied();
+                                    let ft = self.field_ptr_types.get(src).cloned();
                                     let lt = ft.or_else(|| {
                                         let t = func.values.get(*dest).map(|sv| {
                                             eprintln!("DBG Load fallback: dest={} sv_type={}", dest, sv.type_);
@@ -919,8 +919,8 @@ impl<'ctx> Codegen<'ctx> {
                                 self.builder.build_in_bounds_gep(self.context.i8_type(), ptr_val, &[self.to_int_value(idx_val)], "_ssgep")
                                     .map_err(|e| format!("ssgep: {}", e))?
                             };
-                            block_vals[bi].insert(*dest, gep.as_basic_value_enum());
-                            if *dest < self.field_ptr_allocas.len() {
+                                     block_vals[bi].insert(*dest, gep.as_basic_value_enum());
+                                     if *dest < self.field_ptr_allocas.len() {
                                 if let Some(fpa) = self.field_ptr_allocas[*dest] {
                                     let _ = self.builder.build_store(fpa, gep.as_basic_value_enum());
                                 }
@@ -1019,7 +1019,7 @@ impl<'ctx> Codegen<'ctx> {
                                 }
                             }
                         }
-                        SsaInst::ArrayElemPtr { dest, ptr, index, arr_type, elem_type } => {
+                        SsaInst::ArrayElemPtr { dest, mir_dest, ptr, index, arr_type, elem_type } => {
                             let base_ptr = if *ptr < self.field_ptr_allocas.len() && self.field_ptr_allocas[*ptr].is_some() {
                                 let p = self.field_ptr_allocas[*ptr].unwrap();
                                 Some(self.builder.build_load(
@@ -1055,12 +1055,25 @@ impl<'ctx> Codegen<'ctx> {
                                                 .map_err(|e| format!("aelem fpa store: {}", e))?;
                                         }
                                     }
-                                    // Also store to alloca_map for ssa_read! fallback
-                                    if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
-                                        let _ = self.builder.build_store(dest_ptr, gep.as_basic_value_enum());
-                                    }
-                                    let elem_llvm = self.llvm_type(elem_type);
-                                    self.field_ptr_types.insert(*dest, elem_llvm);
+                                     // Also store to alloca_map for ssa_read! fallback
+                                     if let Some(dest_ptr) = self.alloca_map.get(*dest).and_then(|p| *p) {
+                                         let _ = self.builder.build_store(dest_ptr, gep.as_basic_value_enum());
+                                     }
+                                     // Track at mir_dest for SsaInst::Store fallback
+                                     while self.field_ptr_allocas.len() <= *mir_dest { self.field_ptr_allocas.push(None); }
+                                     if self.field_ptr_allocas[*mir_dest].is_none() {
+                                         self.field_ptr_allocas[*mir_dest] = Some(
+                                             self.builder.build_alloca(self.context.ptr_type(Default::default()), "_aelem_mir")
+                                                 .map_err(|e| format!("ssa aep mir: {}", e))?
+                                         );
+                                     }
+                                     if let Some(fpa) = self.field_ptr_allocas[*mir_dest] {
+                                         self.builder.build_store(fpa, gep)
+                                             .map_err(|e| format!("aelem mir store: {}", e))?;
+                                     }
+                                     let elem_llvm = self.llvm_type(elem_type);
+                                     self.field_ptr_types.insert(*dest, elem_llvm);
+                                     self.field_ptr_types.insert(*mir_dest, elem_llvm);
                                 }
                             }
                         }
@@ -2856,7 +2869,7 @@ impl<'ctx> Codegen<'ctx> {
             MirType::U64 => self.context.i64_type().as_basic_type_enum(),
             MirType::F32 => self.context.f32_type().as_basic_type_enum(),
             MirType::F64 => self.context.f64_type().as_basic_type_enum(),
-            MirType::Bool => self.context.bool_type().as_basic_type_enum(),
+            MirType::Bool => self.context.i8_type().as_basic_type_enum(),
             MirType::Char => self.context.i32_type().as_basic_type_enum(),
             MirType::Str | MirType::Box(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
             MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) => self.context.ptr_type(Default::default()).as_basic_type_enum(),
@@ -4391,7 +4404,7 @@ impl<'ctx> Codegen<'ctx> {
                 let vi = self.to_int_value(val);
                 let sw = vi.get_type().get_bit_width();
                 let dw = t.get_bit_width();
-                (if sw < dw { self.builder.build_int_z_extend(vi, *t, "") }
+                (if sw < dw { self.builder.build_int_s_extend(vi, *t, "") }
                  else if sw > dw { self.builder.build_int_truncate(vi, *t, "") }
                  else { self.builder.build_int_cast(vi, *t, "") })
                     .map_err(|e| format!("ics: {}", e))?.as_basic_value_enum()

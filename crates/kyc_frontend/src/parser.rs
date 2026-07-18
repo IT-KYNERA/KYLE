@@ -1806,7 +1806,14 @@ impl Parser {
     fn parse_for(&mut self, label: Option<String>) -> Result<Stmt, String> {
         let start = self.pos;
         self.advance();
-        let variable = self.eat_identifier();
+        let first = self.eat_identifier();
+        let (variable, index_variable) = if self.at(TokenKind::Comma) {
+            self.advance();
+            let second = self.eat_identifier();
+            (second, Some(first))
+        } else {
+            (first, None)
+        };
         self.expect_keyword("in")?;
         let iterable = self.parse_expr()?;
         self.expect(TokenKind::Colon)?;
@@ -1816,7 +1823,7 @@ impl Parser {
             self.expect(TokenKind::Colon)?;
             Some(self.parse_block()?)
         } else { None };
-        Ok(Stmt::For(ForStmt { variable, iterable: Box::new(iterable), body, else_branch, label, span: self.span_from(start) }))
+        Ok(Stmt::For(ForStmt { variable, index_variable, iterable: Box::new(iterable), body, else_branch, label, span: self.span_from(start) }))
     }
 
     fn parse_match(&mut self) -> Result<Stmt, String> {
@@ -2564,6 +2571,17 @@ fn test():\n\
     for item in items:\n\
         print(item)\n";
         assert!(parse(source).is_ok());
+    }
+
+    #[test]
+    fn test_for_with_index() {
+        let source = "\
+fn test():\n\
+    items: ^{str} = {\"a\"}\n\
+    for i, item in items:\n\
+        print(i.to_str() + \": \" + item)\n";
+        // Just check parse succeeds - any deeper inspection requires body unwrap
+        parse(source).expect("for with index parse failed");
     }
 
     #[test]
