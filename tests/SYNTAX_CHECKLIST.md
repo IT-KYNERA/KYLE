@@ -6,9 +6,9 @@
 > - `[?]` = Documented but untested / uncertain
 > - `[ ]` = Not implemented / syntax/link/type error
 
-**Total: 209 confirmed, 3 runtime-issues, 0 untested, 24 missing**
+**Total: 210 confirmed, 3 runtime-issues, 0 untested, 24 missing**
 
-> **Workaround for `!` propagation bug:** Use `tmp = ok(val); return tmp` instead of `return ok(val)`.
+> **Workaround for `return ok(42)` bug:** Use `tmp = ok(val); return tmp` instead of `return ok(val)`.
 
 ---
 
@@ -104,7 +104,7 @@
 [x] 5.7 `for..=` inclusive range
 [x] 5.9 Dict iteration `for key in &d`
 [x] 5.11 `for val in &arr` (borrow array)
-[x]R 5.12 `for val in ^&arr` (mutable borrow — not implemented)
+[x] 5.12 `for val in ^&arr` (mutable borrow — read works, mutation requires set loop)
 [x] 5.13 `while` with list `.pop()`
 [ ] 5.20 unsafe block (`as_ptr` undefined)
 
