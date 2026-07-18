@@ -195,7 +195,7 @@ else:
 # if como expresión
 status = if x > 0: "ok" else: "error"
 
-# if let (binding pattern)
+# Binding if (pattern binding)
 if name = optional_value:
     print(name)  # name existe dentro del bloque
 
@@ -203,7 +203,7 @@ if name = optional_value:
 while i < 10:
     i += 1
 
-# while let (binding pattern)
+# Binding while (pattern binding)
 while line = read_line():
     print(line)
 

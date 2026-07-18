@@ -31,7 +31,7 @@ Cada token tiene:
 
 | Category | Examplis |
 |-----------|----------|
-| Keywords | `fn`, `class`, `if`, `while`, `return`, `match`, `let`, `async`, `await` |
+| Keywords | `fn`, `class`, `if`, `while`, `return`, `match`, `async`, `await` |
 | Identifiers | `name`, `foo`, `mi_funcion` |
 | Literals | Integer(`42`), Float(`3.14`), String(`"hola"`), Char(`'a'`), Boolean(`true`/`false`) |
 | Operators | `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `\|\|` |
