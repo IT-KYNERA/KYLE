@@ -1937,15 +1937,7 @@ impl Lowerer {
                     };
 
                     // 1. Lower the iterable expression
-                    // Check for dict iteration: for key in &dict
-                    let is_dict_iter = if let Expr::BorrowRef { expression, .. } = &*s.iterable {
-                        if let Expr::Identifier { name, .. } = expression.as_ref() {
-                            if let Some(&local) = ctx.locals.get(name) {
-                                matches!(ctx.local_types.get(&local), Some(MirType::Dict(_, _)))
-                            } else { false }
-                        } else { false }
-                    } else { false };
-                    let (iter_val, elem_type) = if is_dict_iter {
+                    let (iter_val, elem_type) = if let Expr::BorrowRef { expression, .. } = &*s.iterable {
                         let var_name = match &*s.iterable {
                             Expr::BorrowRef { expression, .. } => {
                                 if let Expr::Identifier { name, .. } = expression.as_ref() { name.clone() }
@@ -1953,14 +1945,24 @@ impl Lowerer {
                             }
                             _ => String::new(),
                         };
-                        let dict_local = ctx.locals.get(&var_name).copied().unwrap_or(0);
-                        let keys_list = ctx.alloc_local("_dkeys", MirType::List(Box::new(MirType::I64)));
-                        ctx.current_block.insts.push(MirInst::Call {
-                            dest: Some(keys_list),
-                            name: "ky_dict_keys".to_string(),
-                            args: vec![MirValue::Local(dict_local)],
-                        });
-                        (keys_list, MirType::Str)
+                        let var_local = ctx.locals.get(&var_name).copied().unwrap_or(0);
+                        let var_type = ctx.local_types.get(&var_local).cloned().unwrap_or(MirType::I64);
+                        if matches!(&var_type, MirType::Dict(_, _)) {
+                            // Dict iteration
+                            let keys_list = ctx.alloc_local("_dkeys", MirType::List(Box::new(MirType::I64)));
+                            ctx.current_block.insts.push(MirInst::Call {
+                                dest: Some(keys_list),
+                                name: "ky_dict_keys".to_string(),
+                                args: vec![MirValue::Local(var_local)],
+                            });
+                            (keys_list, MirType::Str)
+                        } else if let MirType::List(inner) = &var_type {
+                            // List borrow: use original list variable directly (skip borrow)
+                            (var_local, inner.as_ref().clone())
+                        } else {
+                            ctx = self.lower_expr(ctx, &s.iterable);
+                            (ctx.next_local - 1, MirType::I64)
+                        }
                     } else {
                         ctx = self.lower_expr(ctx, &s.iterable);
                         let iv = ctx.next_local - 1;
@@ -3822,7 +3824,7 @@ impl Lowerer {
                                             if let Some(&local) = ctx.locals.get(name) {
                                                 if let Some(MirType::Struct(inner, _)) = ctx.local_types.get(&local) {
                                                     Some(inner.clone())
-                                                } else {
+                    } else {
                                                     None
                                                 }
                                             } else {
