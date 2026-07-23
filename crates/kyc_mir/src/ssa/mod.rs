@@ -245,9 +245,15 @@ pub fn convert_function(func: &MirFunction) -> Option<SsaFunction> {
             if idom != usize::MAX {
                 if let Some(saved) = saved_stacks.get(&idom) {
                     stacks = saved.clone();
+                    // Prune non-promotable entries from stacks (they'd give stale SsaValueIds).
+                    stacks.retain(|k, _| promotable.contains(k));
                 }
                 if let Some(saved) = saved_alloca.get(&idom) {
                     alloca_current = saved.clone();
+                    // Remove non-promotable entries from alloca_current so
+                    // resolve_value creates _np dummies (force alloca load in codegen)
+                    // instead of reusing stale SsaValueIds from the dominator.
+                    alloca_current.retain(|k, _| promotable.contains(k));
                 }
             }
         }
