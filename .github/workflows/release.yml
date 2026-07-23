@@ -98,6 +98,8 @@ jobs:
         run: |
           mkdir -p dist
           cp target/release/ky dist/
+          # Ad-hoc sign binary so macOS Gatekeeper doesn't kill it on first run
+          codesign -f -s - --deep dist/ky 2>/dev/null || true
           cp target/release/libkyc_runtime.a dist/
           cp LICENSE dist/
           cd dist && tar czf ky-macos-arm64.tar.gz ky libkyc_runtime.a LICENSE && cd ..

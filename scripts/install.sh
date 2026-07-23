@@ -144,8 +144,18 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
-# Re-sign ad-hoc: macOS kills CI-built binaries with invalid code signature
-codesign -f -s - ky 2>/dev/null || true
+# macOS: remove quarantine + ad-hoc sign (CI-built binaries get killed by Gatekeeper)
+if [ "$(uname -s)" = "Darwin" ]; then
+    echo "  Signing binary for macOS..."
+    xattr -d com.apple.quarantine ky 2>/dev/null && echo "  Removed quarantine attr" || true
+    if codesign -f -s - --deep ky 2>/dev/null; then
+        echo "  Code signature applied"
+    else
+        echo "  Warning: could not sign binary. If 'ky' is killed by macOS, run:"
+        echo "    xattr -d com.apple.quarantine ~/.ky/bin/ky"
+        echo "    codesign -f -s - ~/.ky/bin/ky"
+    fi
+fi
 
 chmod +x ky
 
