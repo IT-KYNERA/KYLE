@@ -144,16 +144,15 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
-# macOS: fix code signing (CI-built binaries link Homebrew libs with different Team ID)
+# macOS: bundle libs + ad-hoc sign to avoid Gatekeeper killing the binary
 if [ "$(uname -s)" = "Darwin" ]; then
-    echo "  Signing binary for macOS..."
+    echo "  Preparing binary for macOS..."
     xattr -d com.apple.quarantine ky 2>/dev/null || true
-    # Re-sign Homebrew dependencies to match ad-hoc signature of ky binary
-    for lib in /opt/homebrew/opt/zstd/lib/libzstd.1.dylib /opt/homebrew/opt/llvm@18/lib/libunwind.1.dylib; do
-        if [ -f "$lib" ]; then
-            codesign -f -s - "$lib" 2>/dev/null || true
-        fi
-    done
+    # If the archive includes a lib/ folder with .dylib dependencies, copy them alongside
+    if [ -d "lib" ]; then
+        mkdir -p "$PWD/../lib" 2>/dev/null || true
+        cp lib/*.dylib . 2>/dev/null || true
+    fi
     codesign -f -s - ky 2>/dev/null && echo "  Code signature applied" || echo "  Warning: code signing failed"
 fi
 
@@ -187,6 +186,7 @@ if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
         if [ -f libkyc_runtime.a ]; then
             sudo cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
+        for f in *.dylib; do [ -f "$f" ] && sudo cp "$f" /usr/local/lib/ 2>/dev/null; done
     fi
     INSTALL_DIR="/usr/local/bin"
     KY_PREFIX="/usr/local"
@@ -197,6 +197,7 @@ elif [ -n "${KY_PREFIX:-}" ]; then
     if [ -f libkyc_runtime.a ]; then
         cp libkyc_runtime.a "$KY_PREFIX/lib/libkyc_runtime.a"
     fi
+    for f in *.dylib; do [ -f "$f" ] && cp "$f" "$KY_PREFIX/lib/" 2>/dev/null; done
     INSTALL_DIR="$KY_PREFIX/bin"
 else
     echo "Installing to $HOME/.ky..."
@@ -205,6 +206,7 @@ else
     if [ -f libkyc_runtime.a ]; then
         cp libkyc_runtime.a "$HOME/.ky/lib/libkyc_runtime.a"
     fi
+    for f in *.dylib; do [ -f "$f" ] && cp "$f" "$HOME/.ky/lib/" 2>/dev/null; done
     INSTALL_DIR="$HOME/.ky/bin"
     KY_PREFIX="$HOME/.ky"
 fi

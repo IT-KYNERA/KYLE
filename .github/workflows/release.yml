@@ -96,13 +96,20 @@ jobs:
         run: cargo build -p kyc_runtime --release
       - name: Package
         run: |
-          mkdir -p dist
-          cp target/release/ky dist/
-          # Ad-hoc sign binary so macOS Gatekeeper doesn't kill it on first run
+          mkdir -p dist/lib
+          cp target/release/ky dist/ky
+          # Bundle required dylibs + fix library search paths
+          for lib in /opt/homebrew/opt/zstd/lib/libzstd.1.dylib /opt/homebrew/opt/llvm@18/lib/libunwind.1.dylib; do
+            if [ -f "$lib" ]; then
+              cp "$lib" dist/lib/
+              install_name_tool -change "$lib" "@executable_path/../lib/$(basename $lib)" dist/ky
+            fi
+          done
+          # Ad-hoc sign so Gatekeeper doesn't kill the binary
           codesign -f -s - --deep dist/ky 2>/dev/null || true
           cp target/release/libkyc_runtime.a dist/
           cp LICENSE dist/
-          cd dist && tar czf ky-macos-arm64.tar.gz ky libkyc_runtime.a LICENSE && cd ..
+          cd dist && tar czf ky-macos-arm64.tar.gz ky lib/ libkyc_runtime.a LICENSE && cd ..
           cd dist && shasum -a 256 ky-macos-arm64.tar.gz > ky-macos-arm64.tar.gz.sha256
       - name: Upload
         env:
