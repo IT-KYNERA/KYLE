@@ -22,13 +22,13 @@ Readable like Python · Typed like Rust · Simple like Go · Fast like C
 **macOS / Linux** (one command):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/scripts/install.sh | sh
 ```
 
 **Windows** (PowerShell):
 
 ```powershell
-iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | iex
+iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/scripts/install.ps1" | iex
 ```
 
 | Platform | Arch | Direct link |
