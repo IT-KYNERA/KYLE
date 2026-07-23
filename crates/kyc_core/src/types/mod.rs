@@ -77,7 +77,7 @@ impl Type {
 
     fn from_primitive_name(name: &str) -> Self {
         match name {
-            "i8" => Type::I8, "i16" => Type::I16, "i32" => Type::I32, "i64" => Type::I64,
+            "i8" => Type::I8, "i16" => Type::I16,             "i32" | "int" => Type::I32, "i64" => Type::I64,
             "u8" => Type::U8, "u16" => Type::U16, "u32" => Type::U32, "u64" => Type::U64,
             "f32" => Type::F32, "f64" => Type::F64,
             "bool" => Type::Bool, "char" => Type::Char, "str" => Type::Str,
@@ -91,7 +91,7 @@ impl Type {
     /// Handles the fact that the parser emits AstType::User{name} for primitives.
     fn from_user_type_name(name: &str) -> Self {
         match name {
-            "i8" => Type::I8, "i16" => Type::I16, "i32" => Type::I32, "i64" => Type::I64,
+            "i8" => Type::I8, "i16" => Type::I16,             "i32" | "int" => Type::I32, "i64" => Type::I64,
             "u8" => Type::U8, "u16" => Type::U16, "u32" => Type::U32, "u64" => Type::U64,
             "f32" => Type::F32, "f64" => Type::F64,
             "bool" => Type::Bool, "char" => Type::Char, "str" => Type::Str,

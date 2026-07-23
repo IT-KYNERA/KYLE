@@ -389,6 +389,7 @@ impl ScopeResolver {
                 self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
             }
             AstType::User { name, .. } => {
+                if name == "int" { return Type::I32; }
                 self.symbols.lookup_type(name).unwrap_or(Type::Named(name.clone()))
             }
             AstType::Generic { name, args, .. } => {

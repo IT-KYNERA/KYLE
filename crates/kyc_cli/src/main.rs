@@ -1034,6 +1034,15 @@ fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
         eprintln!("Error creating project: {}", e);
         process::exit(1);
     });
+    // ky.toml manifest
+    let toml = format!(
+        "[project]\nname = \"{}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        project_name
+    );
+    fs::write(project_dir.join("ky.toml"), &toml).unwrap_or_else(|e| {
+        eprintln!("Error writing ky.toml: {}", e);
+        process::exit(1);
+    });
     let bare_kl = format!(
         "# {} — bare script\nfn main():\n    name := \"Kyle\"  # compile-time constant\n    println(\"Hello from \" + name)\n",
         project_name
@@ -1044,13 +1053,12 @@ fn cmd_new_bare(project_dir: &Path, project_name: &str, exe_path: &str) {
         process::exit(1);
     });
 
-    write_vscode_settings(project_dir, exe_path);
     write_gitignore(project_dir);
 
     println!("✅ Created bare script '{}'", project_name);
+    println!("   ├── ky.toml         — manifest");
     println!("   ├── {}.ky        — script", project_name);
-    println!("   ├── .gitignore");
-    println!("   └── .vscode/        — VS Code settings");
+    println!("   └── .gitignore");
     println!();
     println!("   cd {} && {} run {}.ky", project_name, bin_name(), project_name);
 }
