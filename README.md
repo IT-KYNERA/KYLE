@@ -7,7 +7,7 @@
 Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=for-the-badge)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v0.8.5-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
+[![Release](https://img.shields.io/badge/release-v0.8.6-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-macOS%20ARM/x64%20%7C%20Linux%20ARM/x64%20%7C%20Windows%20x64-6C3FC5?style=for-the-badge)](#install)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=for-the-badge)](https://www.rust-lang.org)
 
@@ -33,10 +33,10 @@ iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/scripts/install.
 
 | Platform | Arch | Direct link |
 | :--- | :--- | :--- |
-| **macOS** | ARM64 | [ky-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.5/ky-macos-arm64.tar.gz) |
-| **Linux** | ARM64 | [ky-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.5/ky-linux-arm64.tar.gz) |
-| **Linux** | x64 | [ky-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.5/ky-linux-x64.tar.gz) |
-| **Windows** | x64 | [ky-windows-x64.zip](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.5/ky-windows-x64.zip) |
+| **macOS** | ARM64 | [ky-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.6/ky-macos-arm64.tar.gz) |
+| **Linux** | ARM64 | [ky-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.6/ky-linux-arm64.tar.gz) |
+| **Linux** | x64 | [ky-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.6/ky-linux-x64.tar.gz) |
+| **Windows** | x64 | [ky-windows-x64.zip](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.6/ky-windows-x64.zip) |
 
 > **Note**: macOS Intel (x64) is no longer supported. Use Apple Silicon (ARM64) on all modern Macs.
 
