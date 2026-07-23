@@ -144,16 +144,19 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
-# macOS: bundle libs + ad-hoc sign to avoid Gatekeeper killing the binary
+# macOS: ad-hoc sign binary + bundled dylibs to avoid Gatekeeper killing
 if [ "$(uname -s)" = "Darwin" ]; then
-    echo "  Preparing binary for macOS..."
+    echo "  Signing binary for macOS..."
     xattr -d com.apple.quarantine ky 2>/dev/null || true
-    # If the archive includes a lib/ folder with .dylib dependencies, copy them alongside
+    # Copy bundled dylibs to current dir so install step picks them up
     if [ -d "lib" ]; then
-        mkdir -p "$PWD/../lib" 2>/dev/null || true
         cp lib/*.dylib . 2>/dev/null || true
     fi
-    codesign -f -s - ky 2>/dev/null && echo "  Code signature applied" || echo "  Warning: code signing failed"
+    # Sign the binary and any bundled dylibs with ad-hoc signature
+    for f in ky *.dylib; do
+        [ -f "$f" ] && codesign -f -s - "$f" 2>/dev/null || true
+    done
+    echo "  Code signature applied"
 fi
 
 chmod +x ky
