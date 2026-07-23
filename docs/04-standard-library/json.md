@@ -1,12 +1,12 @@
 # jare — JSON
 
 > Module de parseo y serializacion JSON.
-> Import: `from jare import json`
+> Import: `use jare.json`
 
 ## json: parseo y stringify
 
 ```ky
-from jare import json
+use jare.json
 
 data: {str: i64} = json.parse('{"name": "Kyle", "age": 30}')
 name: str = data["name"]
@@ -29,7 +29,7 @@ pretty: str = json.pretty(data)
 ### Serialization de structs
 
 ```ky
-from jare import json
+use jare.json
 
 class User:
  name: str

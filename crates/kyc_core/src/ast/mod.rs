@@ -38,6 +38,14 @@ pub enum AstType {
     Mutable { inner: Box<AstType>, span: Span },
     /// `&T` — borrow type
     Borrow { inner: Box<AstType>, span: Span },
+    /// `set{T}` — set type (unique elements, no order)
+    Set { inner: Box<AstType>, span: Span },
+    /// `queue{T}` — FIFO queue type
+    Queue { inner: Box<AstType>, span: Span },
+    /// `stack{T}` — LIFO stack type
+    Stack { inner: Box<AstType>, span: Span },
+    /// `[T]` — dynamic list type (heap-allocated)
+    List { inner: Box<AstType>, span: Span },
     /// `[T, N]` — fixed-size native array type
     Array { inner: Box<AstType>, size: usize, span: Span },
     /// `ptr` — raw pointer type (for FFI/unsafe)
@@ -75,6 +83,19 @@ pub enum Pattern {
 // ---------------------------------------------------------------------------
 // Declarations
 // ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct UseDecl {
+    /// Dot-separated path parts. e.g. ["std", "io"] or ["std", "io", "print"]
+    pub path: Vec<String>,
+    /// Selective names from braces: use std.io.{print, read}
+    pub names: Option<Vec<String>>,
+    /// Alias: use std.io as io
+    pub alias: Option<String>,
+    /// Relative: use ~utils.helpers
+    pub relative: bool,
+    pub span: Span,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Import {
@@ -256,6 +277,7 @@ pub struct TypeAlias {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Decl {
+    Use(UseDecl),
     Import(Import),
     FromImport(FromImport),
     Variable(VariableDecl),
@@ -444,6 +466,10 @@ pub enum Expr {
         span: Span,
     },
     List {
+        elements: Vec<Expr>,
+        span: Span,
+    },
+    SetLiteral {
         elements: Vec<Expr>,
         span: Span,
     },
@@ -637,6 +663,7 @@ fn display_block(f: &mut fmt::Formatter<'_>, d: usize, label: &str, block: &Bloc
 impl DisplayDepth for Decl {
     fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
         match self {
+            Decl::Use(u) => u.fmt_depth(f, d),
             Decl::Import(i) => i.fmt_depth(f, d),
             Decl::FromImport(fi) => fi.fmt_depth(f, d),
             Decl::Variable(v) => v.fmt_depth(f, d),
@@ -656,6 +683,35 @@ impl DisplayDepth for Decl {
                 write_indent(f, d)?;
                 writeln!(f, "ExprDecl")?;
                 e.fmt_depth(f, d + 1)
+            }
+        }
+    }
+}
+
+impl DisplayDepth for UseDecl {
+    fn fmt_depth(&self, f: &mut fmt::Formatter<'_>, d: usize) -> fmt::Result {
+        write_indent(f, d)?;
+        let path_str = self.path.join(".");
+        if let Some(names) = &self.names {
+            let names_str = names.join(", ");
+            if let Some(alias) = &self.alias {
+                writeln!(f, "Use module=\"{}\" names=\"{}\" as=\"{}\"{}",
+                    path_str, names_str, alias,
+                    if self.relative { " relative" } else { "" })
+            } else {
+                writeln!(f, "Use module=\"{}\" names=\"{}\"{}",
+                    path_str, names_str,
+                    if self.relative { " relative" } else { "" })
+            }
+        } else {
+            if let Some(alias) = &self.alias {
+                writeln!(f, "Use path=\"{}\" as=\"{}\"{}",
+                    path_str, alias,
+                    if self.relative { " relative" } else { "" })
+            } else {
+                writeln!(f, "Use path=\"{}\"{}",
+                    path_str,
+                    if self.relative { " relative" } else { "" })
             }
         }
     }
@@ -1177,6 +1233,14 @@ impl DisplayDepth for Expr {
                 value.fmt_depth(f, d + 1)?;
                 count.fmt_depth(f, d + 1)
             }
+            Expr::SetLiteral { elements, .. } => {
+                write_indent(f, d)?;
+                writeln!(f, "SetLiteral ({} elements)", elements.len())?;
+                for elem in elements {
+                    elem.fmt_depth(f, d + 1)?;
+                }
+                Ok(())
+            }
             Expr::List { elements, .. } => {
                 write_indent(f, d)?;
                 writeln!(f, "List ({} elements)", elements.len())?;
@@ -1368,6 +1432,10 @@ impl fmt::Display for AstType {
             }
             AstType::Mutable { inner, .. } => write!(f, "^{}", inner),
             AstType::Borrow { inner, .. } => write!(f, "&{}", inner),
+            AstType::Set { inner, .. } => write!(f, "set<{}>", inner),
+            AstType::Queue { inner, .. } => write!(f, "queue<{}>", inner),
+            AstType::Stack { inner, .. } => write!(f, "stack<{}>", inner),
+            AstType::List { inner, .. } => write!(f, "[{}]", inner),
             AstType::Array { inner, size, .. } => write!(f, "[{}; {}]", inner, size),
             AstType::Ptr { .. } => write!(f, "ptr"),
             AstType::Slice { inner, .. } => write!(f, "&[{}]", inner),

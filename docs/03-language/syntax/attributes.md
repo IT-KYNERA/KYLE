@@ -38,8 +38,8 @@ fn bench_fib():
 ## Attributis en modulis (import)
 
 ```ky
-from jare import json
-from http import client
+use jare.json
+use http.client
 ```
 
 ## See also

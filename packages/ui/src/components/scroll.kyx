@@ -1,6 +1,0 @@
-# scroll — componente built-in
-# Props: standard UI props
-
-<scroll>
-    <slot />
-</scroll>

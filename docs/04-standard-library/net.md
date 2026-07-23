@@ -1,12 +1,12 @@
 # net — Red
 
 > Module de redis (TCP).
-> Import: `from net import tcp`
+> Import: `use net.tcp`
 
 ## tcp: conexionis TCP
 
 ```ky
-from net import tcp
+use net.tcp
 
 # Servidor
 server: tcp = tcp.listen(8080)

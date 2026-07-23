@@ -347,7 +347,7 @@ impl TypeChecker {
                 self.check_const_expr(target, context);
                 self.check_const_expr(value, context);
             }
-            Expr::List { elements, .. } => {
+            Expr::List { elements, .. } | Expr::SetLiteral { elements, .. } => {
                 for e in elements { self.check_const_expr(e, context); }
             }
             Expr::ArrayRepeat { value, count, .. } => {
@@ -868,12 +868,12 @@ impl TypeChecker {
                                         let has_mut_borrow = matches!(arg, Expr::BorrowRef { mutable: true, .. });
                                         let type_name = match &param.type_ {
                                             AstType::User { name, .. } | AstType::Primitive { name, .. } => Some(name.as_str()),
-                                            AstType::Array { .. } => Some("__array__"),
+                                            AstType::Set { .. } | AstType::Queue { .. } | AstType::Stack { .. } | AstType::List { .. } | AstType::Array { .. } => Some("__array__"),
                                             AstType::Ptr { .. } => Some("ptr"),
                                             _ => None,
                                         };
                                         let is_copy_type = type_name.map_or(false, |n| n != "void" && n != "any" && n != "__array__")
-                                            || matches!(&param.type_, AstType::Array { .. });
+                                            || matches!(&param.type_, AstType::Set { .. } | AstType::Queue { .. } | AstType::Stack { .. } | AstType::List { .. } | AstType::Array { .. });
                                         match param.mode {
                                             ParamMode::Borrow if !has_borrow && !is_copy_type => {
                                                 self.reporter.report(
@@ -1060,6 +1060,10 @@ impl TypeChecker {
                     }
                 }
                 Type::I32
+            }
+            Expr::SetLiteral { elements, .. } => {
+                if elements.is_empty() { return Type::Set(Box::new(Type::I32)); }
+                Type::Set(Box::new(self.infer_expr(&elements[0])))
             }
             Expr::List { elements, .. } => {
                 if elements.is_empty() { return Type::List(Box::new(Type::I32)); }
@@ -1369,6 +1373,10 @@ impl TypeChecker {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,
+            AstType::Set { inner, .. } => Type::Set(Box::new(self.resolve_ast_type(inner))),
+            AstType::Queue { inner, .. } => Type::Queue(Box::new(self.resolve_ast_type(inner))),
+            AstType::Stack { inner, .. } => Type::Stack(Box::new(self.resolve_ast_type(inner))),
+            AstType::List { inner, .. } => Type::List(Box::new(self.resolve_ast_type(inner))),
             AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
             AstType::Slice { inner, .. } => Type::Slice(Box::new(self.resolve_ast_type(inner))),
         }
@@ -1406,6 +1414,9 @@ impl TypeChecker {
             (Type::I16, Type::U32) | (Type::U32, Type::I16) => return true,
             (Type::I16, Type::U64) | (Type::U64, Type::I16) => return true,
             (Type::I32, Type::U64) | (Type::U64, Type::I32) => return true,
+            // Collection literal coercion: set{...} → Queue<T>, set{...} → Stack<T>
+            (Type::Set(a), Type::Queue(b)) | (Type::Queue(a), Type::Set(b)) if a == b => return true,
+            (Type::Set(a), Type::Stack(b)) | (Type::Stack(a), Type::Set(b)) if a == b => return true,
             // Empty array [] matches any [T, N] (zero-init)
             (Type::Array(ia, 0), Type::Array(_, _)) |
             (Type::Array(_, _), Type::Array(ia, 0)) if **ia == Type::I32 => return true,
@@ -1423,138 +1434,5 @@ fn is_namespace(name: &str) -> bool {
         | "dict" | "str_builder" | "fs" | "set" | "file")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    fn check(source: &str) -> Vec<Diagnostic> {
-        let mut lexer = kyc_frontend::lexer::Lexer::new(source);
-        let tokens = lexer.tokenize();
-        let mut parser = kyc_frontend::parser::Parser::new(tokens);
-        let program = parser.parse().unwrap();
-        let mut tc = TypeChecker::new();
-        tc.check_program(&program);
-        tc.reporter.diagnostics().to_vec()
-    }
-
-    fn check_has_error(source: &str, code: ErrorCode) -> bool {
-        let diags = check(source);
-        diags.iter().any(|d| d.code == code)
-    }
-
-    #[test]
-    fn test_undefined_symbol() {
-        assert!(check_has_error("fn f():\n    x\n", ErrorCode::E0009));
-    }
-
-    #[test]
-    fn test_valid_variable() {
-        let diags = check("x = 42\n");
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_immutable_param_assign() {
-        // Function parameters are immutable; reassignment should error
-        assert!(check_has_error("fn f(x: i32):\n    x = 2\n", ErrorCode::E0007));
-    }
-
-    #[test]
-    fn test_mutable_variable() {
-        let diags = check("x: &i32 = 1\n");
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_function_call() {
-        let source = "fn add(a: i32, b: i32) i32:\n    a + b\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_undefined_in_expr() {
-        assert!(check_has_error("fn f():\n    x + 1\n", ErrorCode::E0009));
-    }
-
-    #[test]
-    fn test_mutable_var_assign_in_fn() {
-        // mutable var declared inside fn, then reassigned
-        let source = "fn f():\n    x: ^i32 = 1\n    x = 2\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_if_statement_valid() {
-        let source = "fn f():\n    if true:\n        42\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_import_no_errors() {
-        let source = "import math\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors for import, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_while_statement_nested_assign() {
-        // Just the while without the nested assignment
-        let source = "fn f():\n    while true:\n        42\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_assign_inside_while() {
-        // A variable declared in fn body and assigned inside a while
-        let source = "fn f():\n    x: ^i32 = 0\n    while true:\n        x = 1\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_while_condition_variable_ref() {
-        let source = "fn f():\n    x: &i32 = 0\n    while x < 5:\n        42\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_while_body_var_read() {
-        let source = "fn f():\n    x := 0\n    while true:\n        x\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_while_body_expr_read() {
-        let source = "fn f():\n    x := 0\n    while true:\n        x + 1\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "expected no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_const_fn_no_errors() {
-        let source = "const fn factorial(n: i32) i32:\n    if n <= 1:\n        1\n    else:\n        n * factorial(n - 1)\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "const fn should have no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_ternary_type_unification() {
-        let source = "fn f(x: i32):\n    result = x > 0 ? x : 0\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "ternary with matching types should have no errors, got: {:?}", diags);
-    }
-
-    #[test]
-    fn test_dict_type_inference() {
-        let source = "fn f():\n    config = {name: \"Alice\"}\n";
-        let diags = check(source);
-        assert!(diags.is_empty(), "dict literal should have no errors, got: {:?}", diags);
-    }
-
-}
+pub mod tests;

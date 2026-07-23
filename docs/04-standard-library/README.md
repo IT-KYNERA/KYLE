@@ -1,6 +1,6 @@
 # 04-standard-library
 
-> Kyle standard library. Each module is a namespace that you import with `from module import ...`.
+> Kyle standard library. Each module is a namespace that you import with `use module....`.
 
 ## Modules
 
@@ -29,7 +29,7 @@
 
 ## Conventions
 
-- All modulis imported explicitly: `from math import math`
+- All modulis imported explicitly: `use math`
 - Functions called with namespace: `math.max(a, b)`
 - snake_case everywhere: functions, types, methods
 - `T` uppercase = type parameter (generics)

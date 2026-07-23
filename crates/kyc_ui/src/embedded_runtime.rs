@@ -1,15 +1,15 @@
 /// Embedded JS runtime files — compiled into the binary at build time.
 /// This avoids needing to find runtime files at runtime (e.g. in installed binaries).
 
-pub const REACTIVITY_JS: &str = include_str!("../../../runtimes/js/reactivity.js");
-pub const ROUTER_JS: &str = include_str!("../../../runtimes/js/router.js");
-pub const A11Y_JS: &str = include_str!("../../../runtimes/js/a11y.js");
-pub const PORTAL_JS: &str = include_str!("../../../runtimes/js/portal.js");
-pub const ERROR_BOUNDARY_JS: &str = include_str!("../../../runtimes/js/error_boundary.js");
-pub const I18N_JS: &str = include_str!("../../../runtimes/js/i18n.js");
-pub const SSR_JS: &str = include_str!("../../../runtimes/js/ssr.js");
-pub const TESTING_JS: &str = include_str!("../../../runtimes/js/testing.js");
-pub const GLUE_JS: &str = include_str!("../../../runtimes/js/glue.js");
+pub const REACTIVITY_JS: &str = include_str!("runtime/reactivity.js");
+pub const ROUTER_JS: &str = include_str!("runtime/router.js");
+pub const A11Y_JS: &str = include_str!("runtime/a11y.js");
+pub const PORTAL_JS: &str = include_str!("runtime/portal.js");
+pub const ERROR_BOUNDARY_JS: &str = include_str!("runtime/error_boundary.js");
+pub const I18N_JS: &str = include_str!("runtime/i18n.js");
+pub const SSR_JS: &str = include_str!("runtime/ssr.js");
+pub const TESTING_JS: &str = include_str!("runtime/testing.js");
+pub const GLUE_JS: &str = include_str!("runtime/glue.js");
 
 pub const RUNTIME_FILES: &[(&str, &str)] = &[
     ("reactivity.js", REACTIVITY_JS),

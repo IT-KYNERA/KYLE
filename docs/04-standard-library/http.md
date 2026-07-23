@@ -1,12 +1,12 @@
 # http — HTTP Client
 
 > Module de cliente y servidor HTTP.
-> Import: `from http import client, server, status, method`
+> Import: `use http.{client, server, status, method}`
 
 ## client: HTTP Client
 
 ```ky
-from http import client
+use http.client
 
 c: client = client { timeout: 30 }
 res: response = c.get("https://api.example.com/users")
@@ -26,7 +26,7 @@ ris = c.post("https://api.example.com/users", '{"name": "Kyle"}')
 ## server: HTTP Server
 
 ```ky
-from http import server, status
+use http.{server, status}
 
 app: server = server()
 
@@ -40,7 +40,7 @@ app.listen(8080)
 ## status: codis de answer
 
 ```ky
-from http import status
+use http.status
 
 status.ok() # 200
 status.created() # 201
@@ -51,7 +51,7 @@ status.internal_server_error() # 500
 ## method: methods HTTP
 
 ```ky
-from http import method
+use http.method
 
 println(method.get) # "GET"
 println(method.post) # "POST"

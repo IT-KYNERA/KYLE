@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="vscode-ky/icons/ky_128.png" width="128" alt="Kyle">
-
 # Kyle
 
 **A compiled, statically-typed language for backend systems and CLI tools.**
@@ -9,12 +7,9 @@
 Readable like Python · Typed like Rust · Simple like Go · Fast like C
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-6C3FC5?style=for-the-badge)](LICENSE)
-[![CI](https://github.com/IT-KYNERA/KYLE/actions/workflows/ci.yml/badge.svg)](https://github.com/IT-KYNERA/KYLE/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.7.0-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
+[![Release](https://img.shields.io/badge/release-v0.8.4-6C3FC5?style=for-the-badge)](https://github.com/IT-KYNERA/KYLE/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-macOS%20ARM/x64%20%7C%20Linux%20ARM/x64%20%7C%20Windows%20x64-6C3FC5?style=for-the-badge)](#install)
-[![VS Code](https://img.shields.io/badge/VS%20Code-extension-6C3FC5?style=for-the-badge)](vscode-ky/)
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-6C3FC5?style=for-the-badge)](https://www.rust-lang.org)
-[![Docs](https://img.shields.io/badge/docs-kyle.kynera.lol-6C3FC5?style=for-the-badge)](https://kyle.kynera.lol)
 
 </div>
 
@@ -38,25 +33,12 @@ iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | i
 
 | Platform | Arch | Direct link |
 | :--- | :--- | :--- |
-| **macOS** | ARM64 | [ky-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.7.0/ky-macos-arm64.tar.gz) |
-| **Linux** | ARM64 | [ky-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.7.0/ky-linux-arm64.tar.gz) |
-| **Linux** | x64 | [ky-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.7.0/ky-linux-x64.tar.gz) |
-| **Windows** | x64 | [ky-windows-x64.zip](https://github.com/IT-KYNERA/KYLE/releases/download/v0.7.0/ky-windows-x64.zip) |
+| **macOS** | ARM64 | [ky-macos-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.4/ky-macos-arm64.tar.gz) |
+| **Linux** | ARM64 | [ky-linux-arm64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.4/ky-linux-arm64.tar.gz) |
+| **Linux** | x64 | [ky-linux-x64.tar.gz](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.4/ky-linux-x64.tar.gz) |
+| **Windows** | x64 | [ky-windows-x64.zip](https://github.com/IT-KYNERA/KYLE/releases/download/v0.8.4/ky-windows-x64.zip) |
 
-### VS Code Extension
-
-**macOS / Linux**:
-```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
-```
-
-**Windows** (PowerShell):
-```powershell
-iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.ps1" | iex
-```
-
-> **Platform note**: macOS Intel (x64) is no longer supported. Apple stopped shipping Intel Macs.
-> Use Apple Silicon (ARM64) on all modern Macs.
+> **Note**: macOS Intel (x64) is no longer supported. Use Apple Silicon (ARM64) on all modern Macs.
 
 ---
 
@@ -65,15 +47,13 @@ iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/instal
 ```bash
 ky new myapp && cd myapp
 ky run
-# → Hello, World!
 ```
 
-Or run a single file like a script:
+Or run a single file:
 
 ```bash
-echo 'println("Hello from Kyle!")' > hello.ky
+echo 'print("Hello from Kyle!")' > hello.ky
 ky run hello.ky
-# → Hello from Kyle!
 ```
 
 ---
@@ -81,17 +61,37 @@ ky run hello.ky
 ## Hello World
 
 ```kyle
-fn main() i32:
-    println("Hello, World!")
-    0
+fn main():
+    print("Hello, World!")
 ```
 
 ## Variables
 
 ```kyle
 name = "Kyle"          # immutable (default)
-age: &i32 = 30         # mutable (& in type)
-PI := 3.14159          # compile-time constant
+count: ^i32 = 0        # mutable with ^
+count += 1
+
+items: ^[str] = []     # mutable list
+```
+
+## Collections
+
+```kyle
+items = [1, 2, 3]                    # list [i32]
+items: ^[str] = ["a", "b"]           # mutable list
+nums = set{1, 2, 3}                  # set set<i32>
+dict = {"name": "kyle", "ver": 1}    # dict {str: i32}
+q = queue{1, 2, 3}                   # queue queue<i32>
+s = stack{"a", "b"}                  # stack stack<str>
+```
+
+## Imports
+
+```kyle
+use std.io                       # module
+use std.io.{print, read}         # selective
+use ~utils.helpers               # relative
 ```
 
 ## Functions
@@ -99,61 +99,63 @@ PI := 3.14159          # compile-time constant
 ```kyle
 fn add(a: i32, b: i32) i32:
     a + b
-```
 
-## Classes
-
-```kyle
-class Greeter:
-    name: str
-    Greeter(name: str):
-        this.name = name
-    fn greet() str:
-        "Hello, " + this.name + "!"
+fn greet(name: &str):
+    print("Hello, " + name)
 ```
 
 ## Error Handling
 
 ```kyle
-fn parse(s: str) i32!:
-    n := int(s)?
+fn parse(s: &str) i32!:
+    n = int(s)?
     if n < 0: return error("negative")
     n
+
+x: i32! = parse("42")
+y = x!   # propagate on error
+```
+
+## Types
+
+```kyle
+x: i32            # primitive
+x: i32?           # optional (Option)
+x: i32!           # fallible (Result)
+x: ^i32           # mutable
+x: &str           # borrow
+x: ^&[i32]!       # mutable borrow of list, may error
+x: ^&[str]?       # mutable borrow of list, optional
+x: ^set<i32>!     # mutable set with error
 ```
 
 ---
 
-## Performance
+## Commands
 
-Kyle compila a código nativo via **LLVM 18** con optimizaciones SSA-form.
-Benchmarks reales en **Apple M1/macOS**. 3 warmup + 5 mediciones.
-
-Ejecutar: `bash benchmarks/run_benchmarks.sh`
-
-| Benchmark | C | C++ | Rust | C# | Java | Go | Python | **Kyle** |
-|-----------|:--:|:---:|:----:|:--:|:----:|:--:|:------:|:--------:|
-| Prime Sieve (3M) | 9ms | 9ms | 9ms | 26ms | 31ms | 9ms | 193ms | **23ms** |
-| Fibonacci (500M) | 121ms | 121ms | 123ms | 260ms | 139ms | 124ms | TO | **243ms** |
-| String Concat (500k) | 9ms | 8ms | 3ms | 25ms | 30ms | 5ms | 22ms | **80ms** |
-| MatMul (100x100x10) | 7ms | 7ms | 8ms | 33ms | 38ms | 14ms | 1206ms | **7ms** |
-
-> **Kyle compite con C/Rust** en cómputo numérico (Prime Sieve, MatMul).
-> En Fibonacci es ~2x más lento que C (runtime overhead).
-> En string concat es ~10x más lento (overhead de `str_builder`).
-> Python es 8-170x más lento que Kyle.
+```bash
+ky new <project>      # create new project
+ky run <file.ky>      # compile and run
+ky build <file.ky>    # compile to binary
+ky check <file.ky>    # type-check only
+ky parse <file.ky>    # dump AST
+ky mir <file.ky>      # dump MIR
+ky fmt <file.ky>      # format source
+ky test               # run project tests
+```
 
 ---
 
 ## Documentation
 
-| Resource | Link |
-| :------- | :--- |
-| Website & docs | [kyle.kynera.lol](https://kyle.kynera.lol) |
-| Language Reference | [docs/01-language-reference.md](docs/01-language-reference.md) |
-| Types, Errors & Memory | [docs/02-types-errors-memory.md](docs/02-types-errors-memory.md) |
-| Modules, Packages & Tooling | [docs/03-modules-packages-tooling.md](docs/03-modules-packages-tooling.md) |
-| Compiler Architecture | [docs/04-compiler-architecture.md](docs/04-compiler-architecture.md) |
-| Roadmap & Status | [docs/05-roadmap-status.md](docs/05-roadmap-status.md) |
+| Resource | Location |
+| :------- | :------- |
+| Language Syntax | `docs/03-language/syntax/` |
+| Type System | `docs/09-specification/type-system.md` |
+| Collections | `docs/03-language/syntax/collections.md` |
+| Modules & Imports | `docs/03-language/syntax/modules.md` |
+| Syntax Reference | `docs/15-kyle-syntax-reference.md` |
+| Roadmap | `docs/11-project/roadmap.md` |
 
 ---
 
@@ -171,15 +173,12 @@ export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
 
 # Windows (PowerShell as Admin)
 choco install llvm --version=18.1.8
-# Or download from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8
 $env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
 
-# Build (all platforms)
+# Build
 git clone https://github.com/IT-KYNERA/KYLE.git
 cd KYLE
 cargo build --release --bin ky
-
-# Binary at: target/release/ky (or ky.exe on Windows)
 ```
 
 ---
@@ -187,10 +186,7 @@ cargo build --release --bin ky
 ## Development
 
 ```bash
-# Run all tests (9 crates, 157+ tests)
 cargo test --workspace
-
-# Build all crates
 cargo build --workspace
 ```
 

@@ -1,6 +1,0 @@
-# skeleton — componente built-in
-# Props: standard UI props
-
-<skeleton>
-    <slot />
-</skeleton>

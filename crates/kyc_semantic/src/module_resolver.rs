@@ -183,7 +183,7 @@ impl ModuleResolver {
                     Decl::Contract(c) => &c.name,
                     Decl::TypeAlias(t) => &t.name,
                     Decl::Link(_, _) => return false,
-                    Decl::Import(_) | Decl::FromImport(_) => return false,
+                    Decl::Use(_) | Decl::Import(_) | Decl::FromImport(_) => return false,
                     Decl::Expression(_) => return false,
                 };
                 Self::is_public(name)
@@ -209,7 +209,7 @@ impl ModuleResolver {
                 Decl::Contract(c) => &c.name,
                 Decl::TypeAlias(t) => &t.name,
                 Decl::Link(_, _) => continue,
-                Decl::Import(_) | Decl::FromImport(_) => continue,
+                Decl::Use(_) | Decl::Import(_) | Decl::FromImport(_) => continue,
                 Decl::Expression(_) => continue,
             };
             if decl_name == name {

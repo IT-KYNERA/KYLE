@@ -1,6 +1,0 @@
-# checkbox — componente built-in
-# Props: standard UI props
-
-<checkbox>
-    <slot />
-</checkbox>

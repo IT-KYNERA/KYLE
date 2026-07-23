@@ -56,7 +56,7 @@ print(user.age) # 30
 ## 4. En HTTP
 
 ```kyle
-from http.client import client
+use http.client
 
 class Todo:
  title: str
@@ -80,7 +80,7 @@ print(todo.title)
 ## 5. En servidor
 
 ```kyle
-from http.server import router
+use http.server.router
 
 app = router()
 

@@ -214,7 +214,7 @@ AHORA → Backend Packagis + websocket/WASM — ✅ ENFOQUE ACTUAL
 | 4 | HTTP Server: callbacks, `{id:i32}` params, middleware | Fase 1 + 3 | 🔜 |
 | 5 | websocket + SSE about Server | Fase 4 | 🔜 |
 
-**Current state:** Packagis work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completeds (Kyle vs Rust vs C). Bugs recientis arreglados: constructor without `fn`, `@link` propagation, `from X import a, b, c`, tuple destructuring, `close()` name conflict.
+**Current state:** Packagis work (http client, json, sqlite, env) in 100% Kyle with FFI. HTTP Server TCP accept working. Function pointers implemented. Benchmarks completeds (Kyle vs Rust vs C). Bugs recientis arreglados: constructor without `fn`, `@link` propagation, `use X.{a, b, c}`, tuple destructuring, `close()` name conflict.
 
 **Runtime rewrite en Kyle: PAUSADA.** El file `crates/kyc_runtime/src/string.ky` existe with 18 functions pero NO se usa. Reactivar solo cuando Kyle se use en proyectos realis y auto-suficiencia sea necesaria. Mientras tanto, runtime Rust funciona y is estable.
 
@@ -255,8 +255,8 @@ See `docs/05-packages/registry.md` for full documentation.
 
 | Feature | Example |
 |---------|---------|
-| Functions importadas de modulis | `from http.server import send_json` ✅ |
-| Clasis importadas de modulis | `from http.server import router` ✅ |
+| Functions importadas de modulis | `use http.server.send_json` ✅ |
+| Clasis importadas de modulis | `use http.server.router` ✅ |
 | Struct return with strings | `fn json_res(data: str) Res: Ris { body: data }` ✅ |
 | Generic function calls with `<T>` | `identity<i32>(42)`, `deserialize<LoginReq>(body)` ✅ |
 | Generic function/class decls with `<T>` | `fn identity<T>(x: T) T:`, `class box<T>:` ✅ |
@@ -264,13 +264,13 @@ See `docs/05-packages/registry.md` for full documentation.
 | `serialize(val)` / `deserialize<T>(str)` | Builtin global ✅ |
 | Clasis + methods | `client.get(url)` ✅ |
 | Struct literal with type args | `Container<i32> { value: 42 }` ✅ |
-| Multi-level module imports | `from http.server import ...` ✅ |
+| Multi-level module imports | `use http.server....` ✅ |
 | Package @link propagation | `@link "c"` se mergea al program automaticamente ✅ |
 | **Implicit main** | `ky run app.ky` without `fn main()` — code module ejecutado automaticamente ✅ |
 | **Closuris multi-line** | `(req, client):\n send_json(...)` with bloque indentado ✅ |
 | **Function pointers** | `handler as ptr`, llamado via `fn_ptr(args)` with CallIndirect ✅ |
 | **router HTTP alto nivel** | `app.get("/path", handler)` with `get` as metodo (keyword) ✅ |
-| **Packagis without std/** | `from http.server import ...` busca directamente en `packages/http/src/` ✅ |
+| **Packagis without std/** | `use http.server....` busca directamente en `packages/http/src/` ✅ |
 
 ### 🔜 En desarrollo
 
@@ -449,8 +449,8 @@ final class MirInst:
 Traducir `codegen.rs` (~2,400 lines Rust → Kyle):
 
 ```kyle
-from llvm import core, builder
-from mir import types, inst, function
+use llvm.{core, builder}
+use mir.{types, inst, function}
 
 fn compile_function(f: MirFunction) ptr:
  fn_type = llvm_fn_type(f.return_type, f.params)
@@ -640,19 +640,19 @@ Solo HTTP/Postgres/SQLite are packages. El resto is infraestructura base.
 Cada type package → integration nativa requiere:
 1. Type Kyle (`final class`) directamente en runtime
 2. Builtins registrados en compiler (without `extern fn` manuales)
-3. Sin `from X import Y` — disponiblis globalmente
+3. Sin `use X.Y` — disponiblis globalmente
 
 | Package current | Type nativo | Runtime status |
 |---------------|-------------|----------------|
-| `from datetime import datetime` | `date_time` | ✅ `kyc_runtime/src/datetime.rs` |
-| `from datetime import duration` | `duration` | ✅ en datetime.rs |
-| `from date import date` | `Date` | ✅ `kyc_runtime/src/date.rs` |
-| `from date import time` | `Time` | ✅ en date.rs |
-| `from bytis import bytes` | `bytes` | ✅ `kyc_runtime/src/bytes.rs` |
-| `from decimal import decimal` | `decimal` | ✅ `kyc_runtime/src/decimal.rs` |
-| `from uuid import uuid` | `uuid` | ✅ `kyc_runtime/src/uuid.rs` |
-| `from url import url` | `url` | ✅ `kyc_runtime/src/url.rs` |
-| `from regex import regex` | `regex` | ✅ `kyc_runtime/src/regex.rs` |
+| `use datetime` | `date_time` | ✅ `kyc_runtime/src/datetime.rs` |
+| `use datetime.duration` | `duration` | ✅ en datetime.rs |
+| `use date` | `Date` | ✅ `kyc_runtime/src/date.rs` |
+| `use date.time` | `Time` | ✅ en date.rs |
+| `use bytis.bytes` | `bytes` | ✅ `kyc_runtime/src/bytes.rs` |
+| `use decimal` | `decimal` | ✅ `kyc_runtime/src/decimal.rs` |
+| `use uuid` | `uuid` | ✅ `kyc_runtime/src/uuid.rs` |
+| `use url` | `url` | ✅ `kyc_runtime/src/url.rs` |
+| `use regex` | `regex` | ✅ `kyc_runtime/src/regex.rs` |
 | `ky_getenv`/`ky_setenv` | `Env` | ✅ `kyc_runtime/src/string.rs` |
 
 ### Fase 3: Typis I/O nativos

@@ -297,6 +297,34 @@ pub extern "C" fn ky_str_contains(haystack: *const u8, needle: *const u8) -> i32
     0i32
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_starts_with(s: *const u8, prefix: *const u8) -> i32 {
+    if s.is_null() || prefix.is_null() { return 0i32; }
+    let sl = ky_strlen(s) as usize;
+    let pl = ky_strlen(prefix) as usize;
+    if pl > sl { return 0i32; }
+    unsafe {
+        for i in 0..pl {
+            if *s.add(i) != *prefix.add(i) { return 0i32; }
+        }
+    }
+    1i32
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ky_str_ends_with(s: *const u8, suffix: *const u8) -> i32 {
+    if s.is_null() || suffix.is_null() { return 0i32; }
+    let sl = ky_strlen(s) as usize;
+    let pl = ky_strlen(suffix) as usize;
+    if pl > sl { return 0i32; }
+    unsafe {
+        for i in 0..pl {
+            if *s.add(sl - pl + i) != *suffix.add(i) { return 0i32; }
+        }
+    }
+    1i32
+}
+
 /// Convert string to uppercase. Returns heap-allocated string, caller must ky_free.
 #[unsafe(no_mangle)]
 pub extern "C" fn ky_str_to_upper(ptr: *const u8) -> *mut u8 {

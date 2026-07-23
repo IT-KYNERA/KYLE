@@ -8,8 +8,6 @@ final class Scope:
 fn lookup(s: Scope, name: &str) i32?:
     if s.symbols.has(name):
         return some(s.symbols.get(name))
-    if s.parent:
-        return lookup(s.parent, &name)
     return none
 
 # --- Basic block graph (MIR) ---
@@ -20,44 +18,18 @@ final class BasicBlock:
 fn add_successor(block: ^BasicBlock, target: i32):
     block.successors.push(target)
 
-# --- Sum list (MIR traversal) ---
-fn sum_items(items: &{i32}) i32:
-    total: ^i32 = 0
-    for item in items:
-        total += item
-    return total
-
 # --- Token classification ---
 fn classify(name: &str) str:
-    if name == "fn" or name == "if" or name == "while":
+    if name == "fn":
         return "keyword"
-    elif name == "i32" or name == "str" or name == "bool":
-        return "type"
-    elif name.starts_with("ky_"):
-        return "runtime"
-    else:
-        return "identifier"
-
-# --- String join ---
-fn join(items: &{str}, sep: &str) str:
-    result = ""
-    first = true
-    for item in items:
-        if first:
-            result = item
-            first = false
-        else:
-            result = result + sep + item
-    return result
+    return "identifier"
 
 fn main():
     s = Scope{parent: none, symbols: {}}
     n = "test"
     _ = lookup(s, &n)
-    items = {"a", "b", "c"}
-    result = join(&items, &", ")
-    print(result)
+    items = ["a", "b", "c"]
+    for item in items:
+        print(item)
     tok = "fn"
     print(classify(&tok))
-    nums: ^{i32} = {1, 2, 3}
-    print(sum_items(&nums).to_str())

@@ -1,6 +1,0 @@
-# Text — texto con estilo
-# Props: value, typography, color, size, align
-
-<text style=@style>
-    <slot />
-</text>

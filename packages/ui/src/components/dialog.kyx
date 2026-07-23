@@ -1,6 +1,0 @@
-# dialog — componente built-in
-# Props: standard UI props
-
-<dialog>
-    <slot />
-</dialog>

@@ -1,12 +1,12 @@
 # math — Mathematics
 
 > Module de functions mathematics.
-> Import: `from math import math`
+> Import: `use math`
 
 ## math: functions mathematics
 
 ```ky
-from math import math
+use math
 
 x: i32 = math.max(10, 20)
 x = math.min(10, 20)
@@ -52,7 +52,7 @@ e: f64 = math.e # 2.718281828459045
 ### Example completo
 
 ```ky
-from math import math
+use math
 
 fn solve_quadratic(a: f64, b: f64, c: f64) (f64, f64)!:
  disc: f64 = b * b - 4 * a * c

@@ -70,6 +70,7 @@ pub enum TokenKind {
     Null,       // null
     OkKw,       // ok (keyword alias to avoid conflict with Result)
     Extern,     // extern
+    Use,        // use
     Import,     // import
     From,       // from
     As,         // as

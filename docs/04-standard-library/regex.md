@@ -1,12 +1,12 @@
 # regex — Expresionis Regulares
 
 > Module de expresionis regulares.
-> Import: `from regex import regex`
+> Import: `use regex`
 
 ## regex: search and replace
 
 ```ky
-from regex import regex
+use regex
 
 re = regex("[0-9]+")
 println(re.is_match("abc123")) # true
@@ -33,7 +33,7 @@ println(match) # "user@host"
 ### Example
 
 ```ky
-from regex import regex
+use regex
 
 # Validar email
 email_re = regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")

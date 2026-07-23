@@ -85,7 +85,7 @@ impl Formatter {
         let mut other: Vec<&Decl> = Vec::new();
         for decl in &program.declarations {
             match decl {
-                Decl::Import(_) | Decl::FromImport(_) => imports.push(decl),
+                Decl::Use(_) | Decl::Import(_) | Decl::FromImport(_) => imports.push(decl),
                 _ => other.push(decl),
             }
         }
@@ -195,6 +195,26 @@ impl Formatter {
             AstType::Ptr { .. } => {
                 out.push_str("ptr");
             }
+            AstType::Set { inner, .. } => {
+                out.push_str("set<");
+                self.write_type(out, inner);
+                out.push('>');
+            }
+            AstType::Queue { inner, .. } => {
+                out.push_str("queue<");
+                self.write_type(out, inner);
+                out.push('>');
+            }
+            AstType::Stack { inner, .. } => {
+                out.push_str("stack<");
+                self.write_type(out, inner);
+                out.push('>');
+            }
+            AstType::List { inner, .. } => {
+                out.push('[');
+                self.write_type(out, inner);
+                out.push(']');
+            }
             AstType::Array { inner, size, .. } => {
                 out.push('[');
                 self.write_type(out, inner);
@@ -211,6 +231,7 @@ impl Formatter {
 
     fn write_decl(&mut self, out: &mut String, decl: &Decl, depth: usize) {
         match decl {
+            Decl::Use(u) => self.write_use(out, u, depth),
             Decl::Import(i) => self.write_import(out, i, depth),
             Decl::FromImport(fi) => self.write_from_import(out, fi, depth),
             Decl::Variable(v) => self.write_variable(out, v, depth),
@@ -236,6 +257,22 @@ impl Formatter {
             members: c.members.clone(),
             span: c.span,
         }
+    }
+
+    fn write_use(&mut self, out: &mut String, u: &UseDecl, depth: usize) {
+        self.indent(out, depth);
+        write!(out, "use ").unwrap();
+        if u.relative {
+            write!(out, "~").unwrap();
+        }
+        write!(out, "{}", u.path.join(".")).unwrap();
+        if let Some(names) = &u.names {
+            write!(out, ".{{{}}}", names.join(", ")).unwrap();
+        }
+        if let Some(alias) = &u.alias {
+            write!(out, " as {}", alias).unwrap();
+        }
+        writeln!(out).unwrap();
     }
 
     fn write_import(&mut self, out: &mut String, i: &Import, depth: usize) {
@@ -736,13 +773,21 @@ impl Formatter {
                 self.write_expr(out, count);
                 out.push(']');
             }
-            Expr::List { elements, .. } => {
-                out.push('{');
+            Expr::SetLiteral { elements, .. } => {
+                out.push_str("set{");
                 for (i, e) in elements.iter().enumerate() {
                     if i > 0 { out.push_str(", "); }
                     self.write_expr(out, e);
                 }
                 out.push('}');
+            }
+            Expr::List { elements, .. } => {
+                out.push('[');
+                for (i, e) in elements.iter().enumerate() {
+                    if i > 0 { out.push_str(", "); }
+                    self.write_expr(out, e);
+                }
+                out.push(']');
             }
             Expr::Dictionary { entries, .. } => {
                 out.push('{');
@@ -893,6 +938,7 @@ impl Formatter {
 /// sort before absolute imports; within each group, alphabetical by module name.
 fn import_sort_key(decl: &Decl) -> (u8, &str) {
     match decl {
+        Decl::Use(u) => (if u.relative { 0 } else { 1 }, u.path.last().map_or("", |s| s.as_str())),
         Decl::Import(i) => (if i.relative { 0 } else { 1 }, i.module_name.as_str()),
         Decl::FromImport(fi) => (if fi.relative { 0 } else { 1 }, fi.module_name.as_str()),
         _ => (2, ""),
@@ -901,6 +947,7 @@ fn import_sort_key(decl: &Decl) -> (u8, &str) {
 
 fn decl_span(decl: &Decl) -> kyc_core::span::Span {
     match decl {
+        Decl::Use(u) => u.span,
         Decl::Import(i) => i.span,
         Decl::FromImport(fi) => fi.span,
         Decl::Variable(v) => v.span,
@@ -954,6 +1001,9 @@ fn expr_span(expr: &Expr) -> kyc_core::span::Span {
         Expr::Array { span, .. } => *span,
         Expr::ArrayRepeat { span, .. } => *span,
         Expr::Dictionary { span, .. } => *span,
+        Expr::SetLiteral { span, .. } => *span,
+        Expr::List { span, .. } => *span,
+        Expr::Array { span, .. } => *span,
         Expr::Tuple { span, .. } => *span,
         Expr::Closure { span, .. } => *span,
         Expr::Await { span, .. } => *span,

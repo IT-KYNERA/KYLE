@@ -5,7 +5,7 @@
 ## API
 
 ```ky
-from sqlite import database
+use sqlite.database
 
 db = database.open("data.db")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER, name TEXT)")

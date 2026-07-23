@@ -108,7 +108,7 @@ El parser .kyx debe soportar:
 El module resolver debe buscar `.kyx` adem&aacute;s de `.ky`:
 
 ```
-from Login import view
+use Login.view
   → busca Login.ky (no existe)
   → busca Login.kyx (existe) → lo parsea
 ```
@@ -306,7 +306,7 @@ Esto implica:
 El resolver debe priorizar `.ky` sobre `.kyx` si ambos existen:
 
 ```
-from Login import view
+use Login.view
   → Login.ky existe? → usarlo (.ky tiene prioridad)
   → Login.kyx existe? → parsearlo como .kyx
   → Error: no encontrado

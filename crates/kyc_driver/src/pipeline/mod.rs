@@ -765,6 +765,20 @@ impl Pipeline {
 
         for (i, decl) in program.declarations.iter().enumerate() {
             match decl {
+                kyc_core::ast::Decl::Use(use_decl) => {
+                    let mod_path = use_decl.path.join(".");
+                    if seen_modules.insert(mod_path.clone()) {
+                        let module = resolver.resolve_import(&mod_path, use_decl.relative)?;
+                        for link in &module.program.links {
+                            if !program.links.contains(link) {
+                                program.links.push(link.clone());
+                            }
+                        }
+                        import_decls.push((i, module.program.declarations.clone()));
+                    } else {
+                        import_decls.push((i, Vec::new()));
+                    }
+                }
                 kyc_core::ast::Decl::Import(imp) => {
                     if seen_modules.insert(imp.module_name.clone()) {
                         let module = resolver.resolve_import(&imp.module_name, imp.relative)?;
@@ -1250,7 +1264,7 @@ fn rename_decl(decl: &mut kyc_core::ast::Decl, new_name: &str) {
         Decl::Enum(e) => e.name = new_name.to_string(),
         Decl::Contract(c) => c.name = new_name.to_string(),
         Decl::TypeAlias(t) => t.name = new_name.to_string(),
-        Decl::Import(_) | Decl::FromImport(_) => {}
+        Decl::Use(_) | Decl::Import(_) | Decl::FromImport(_) => {}
         Decl::Link(_, _) => {}
         Decl::Expression(_) => {}
     }

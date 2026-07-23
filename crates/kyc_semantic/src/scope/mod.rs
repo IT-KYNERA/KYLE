@@ -42,16 +42,19 @@ impl ScopeResolver {
                 }
                 return;
             }
+            Decl::Use(u) => {
+                let scope_name = u.alias.clone().unwrap_or_else(|| u.path.join("."));
+                let sym = Symbol::new(scope_name.clone(), SymKind::Module(vec![]));
+                let _ = self.symbols.insert(scope_name, sym);
+                return;
+            }
             Decl::Import(i) => {
-                // Use alias if present, otherwise module name
                 let scope_name = i.alias.clone().unwrap_or_else(|| i.module_name.clone());
                 let sym = Symbol::new(scope_name.clone(), SymKind::Module(vec![]));
                 let _ = self.symbols.insert(scope_name, sym);
                 return;
             }
             Decl::FromImport(_) => {
-                // The actual declaration is inserted into the program by the pipeline
-                // and will be registered separately as its proper type (Function, Struct, etc.)
                 return;
             }
             Decl::Variable(_) => return,
@@ -79,7 +82,7 @@ impl ScopeResolver {
                 self.resolve_class_body(&cd);
             }
             Decl::Struct(_) | Decl::Enum(_) | Decl::Contract(_) | Decl::TypeAlias(_) => {}
-            Decl::Import(_) | Decl::FromImport(_) => {}
+            Decl::Use(_) | Decl::Import(_) | Decl::FromImport(_) => {}
             Decl::Link(_, _) => {}
             Decl::Expression(_) => {}
         }
@@ -302,7 +305,7 @@ impl ScopeResolver {
                 for arg in arguments { self.resolve_expr(arg); }
             }
             Expr::PropertyAccess { object, .. } => self.resolve_expr(object),
-            Expr::List { elements, .. } => {
+            Expr::SetLiteral { elements, .. } | Expr::List { elements, .. } => {
                 for e in elements { self.resolve_expr(e); }
             }
             Expr::Array { elements, .. } => {
@@ -437,6 +440,10 @@ impl ScopeResolver {
                 self.resolve_ast_type(inner)
             }
             AstType::Ptr { .. } => Type::Ptr,
+            AstType::Set { inner, .. } => Type::Set(Box::new(self.resolve_ast_type(inner))),
+            AstType::Queue { inner, .. } => Type::Queue(Box::new(self.resolve_ast_type(inner))),
+            AstType::Stack { inner, .. } => Type::Stack(Box::new(self.resolve_ast_type(inner))),
+            AstType::List { inner, .. } => Type::List(Box::new(self.resolve_ast_type(inner))),
             AstType::Array { inner, size, .. } => Type::Array(Box::new(self.resolve_ast_type(inner)), *size),
             AstType::Slice { inner, .. } => Type::Slice(Box::new(self.resolve_ast_type(inner))),
         }

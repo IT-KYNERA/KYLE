@@ -1,125 +1,101 @@
 # Variables
 
-> Declaration y uso de variablis en Kyle.
+**Status:** [x] Documentación completa. [~] Parcialmente implementado.
 
 ## Declaration
 
-Las variablis se declaran with `name = value`. No there is `let`, `var` ni `const`.
-
 ```ky
-x: i32 = 42 # type explicito + value
-y = 10 # type inferido (i32)
-name: str = "Ana" # string
-sueldo: f64 = 3500.50 # float
-activo: bool = true # bool
+x: i32 = 42         # type explícito + value
+y = 10              # type inferido (i32)
+name: str = "Ana"
 ```
 
-## Inmutabilidad by defecto
+No hay `let`, `var` ni `const`.
 
-Por defecto, variablis are **inmutables**. No se can reallocate.
+## Inmutabilidad por defecto
 
 ```ky
 x: i32 = 10
-x = 20 # ERROR: cannot modify immutable variable 'x'
+x = 20   # ERROR
 ```
 
-### Mutabilidad with `^T`
+### Mutable con `^`
 
 ```ky
-x: ^i32 = 10 # mutable
-x = x + 1 # ✅ permitido
+x: ^i32 = 10
+x = x + 1          # ✅
 
-name: ^str = "Ana"
-name = "Pepe" # ✅ permitido
+items: ^[str] = [] # lista mutable
+items.push("a")
 ```
 
-## Typis Copy vs Move
-
-### Copy (numericos, bool, char, ptr)
+### Borrow con `&`
 
 ```ky
-x: i32 = 42
-y: i32 = x # COPY: ambos vivos
-println(x) # ✅ 42
-
-a: f64 = 3.14
-b: f64 = a # COPY
+x: &str = &"hello"
+items: &[i32] = &[1, 2, 3]
 ```
 
-### Move (str, {T}, {K:V}, [T, N], clases)
+### Mutable borrow `^&`
 
 ```ky
-s: str = "hola"
-t: str = s # MOVE: s invalido after
-println(s) # ❌ ERROR: use-after-move
-
-# Copia explicita
-t = s.clone() # ambos vivos
-println(s) # ✅ "hola"
+x: ^&str
+items: ^&[i32]
 ```
 
-## Shorthands globales
+## Option `?` y Error `!`
 
-`print()`, `println()`, `input()` are disponiblis globalmente:
+Ortogonales: funcionan en CUALQUIER tipo.
 
 ```ky
-println("hello")
-name: str = input("name? ")
+x: i32?          # Option<i32>
+x: [str]?        # lista opcional
+x: ^[i32]!       # lista mutable con error
+x: ^&{str: i32}? # dict mutable borrow opcional
+x: queue<i32>!   # queue con error
 ```
 
-## Tipado estricto
+## Copy vs Move
 
-Kyle is **fuertemente tipado**. No there is coercion implicita between typis incompatibles.
+### Copy (i32, f64, bool, char, ptr, [T, N])
 
 ```ky
-x: i32 = 42
-y: f64 = x as f64 # ✅ cast explicito
-# y = x # ❌ type mismatch
+x = 42
+y = x   # COPY: ambos vivos
 ```
 
-## Borrow con listas
+### Move (str, [T], {K:V}, set<T>, queue<T>, clases)
 
 ```ky
-# &T para borrow inmutable (solo lectura)
-fn contar_libros(biblioteca: &{str}) i64:
-    biblioteca.len()
+s = "hola"
+t = s   # MOVE: s inválido
+```
 
-# ^&T para borrow mutable (lectura + escritura)
-fn agregar_libro(biblioteca: ^&{str}, libro: str):
-    biblioteca.push(libro)
+## Globals
 
-# Move por defecto (transferencia de ownership)
-fn tomar_lista(biblioteca: {str}):
-    # biblioteca es dueña de los datos ahora
-    println(biblioteca.len())
+```ky
+print("hello")
+name = input("name? ")
+```
 
-# Uso:
-libros: ^{str} = {}
-agregar_libro(^&libros, "El Quijote")
-n = contar_libros(&libros)  # solo prestamos
-println(n.to_str())
-tomar_lista(libros)  # movemos ownership
-# libros ya no es accesible aqui (use-after-move)
+## Casting
+
+```ky
+x = 42 as f64
 ```
 
 ## Scope
 
-Las variablis pertenecen al bloque where se declaran:
-
 ```ky
-x: i32 = 1
+x = 1
 if true:
- y: i32 = 2
- x = x + y # ✅ acceso a variable exterior
-# y no accesible aqui
+    y = 2
+    x = x + y
 ```
 
 ## Destructuring
 
 ```ky
 punto: (i32, str) = (10, "hello")
-(x, y) = punto # x=10, y="hello"
-
-list: {i32} = {1, 2, 3}
-(primero, segundo) = list
+(x, y) = punto
 ```

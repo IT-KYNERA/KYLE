@@ -1,9 +1,0 @@
-src/**
-out/test/**
-scripts/**
-.gitignore
-tsconfig.json
-.vscode-test/**
-yarn.lock
-package-lock.json
-*.js.map

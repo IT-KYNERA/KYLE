@@ -1,12 +1,12 @@
 # io — Entrada / Salida
 
 > Module de input y output by console.
-> Import: `from io import console`
+> Import: `use io.console`
 
 ## console: read y write en terminal
 
 ```ky
-from io import console
+use io.console
 
 print("hello") # without newline
 println("hello") # with newline
@@ -36,7 +36,7 @@ input("> ") # input()
 ### Examples
 
 ```ky
-from io import console
+use io.console
 
 name: str = input("What is your name? ")
 println("Hola, " + name + "!")

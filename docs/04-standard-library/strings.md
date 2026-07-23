@@ -1,14 +1,14 @@
 # strings — Utilidadis de String
 
 > Module de string manipulation y type `str_builder`.
-> Import: `from strings import str, str_builder`
+> Import: `use strings.{str, str_builder}`
 
 ## str: methods del type string
 
 Los strings en Kyle are inmutables, heap-allocados y **Move semantics**.
 
 ```ky
-from strings import str
+use strings.str
 
 s: str = " Hello World "
 s2: str = s.trim()

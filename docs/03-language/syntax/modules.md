@@ -1,20 +1,28 @@
 # Modules
 
-**Status:** [x] `from X import Y`, `import X`, relative `~X` imports (with packagis installed).
+**Status:** [x] Documentación completa. [ ] Implementación en compilador.
 
 ## Module definition
 
-A module is a `.ky` file. The module name is the filename without extension.
+A module is a `.ky` file. The module name is the filename without extension. El path del archivo **es** el namespace — no hay declaración `namespace` explícita.
 
 ## Imports
 
+Solo `use`. No hay `from X import Y`.
+
 ```ky
-from math import square # import single name
-from math import * # import all public names
-from math import add, subtract # import multiple
+use std.io                          # módulo completo
+use std.io.{print, read}            # import selectivo
+use std.io as io                    # alias
+use ~utils.helpers                  # relativo (~ = desde el proyecto)
+use std.io.print                    # símbolo directo (sin prefijo)
+
+# en uso:
+io.print("hello")                   # con prefijo de módulo
+print("hello")                      # si importaste directo
 ```
 
-## Visibility
+## Visibilidad
 
 | Prefix | Scope |
 |--------|-------|
@@ -24,14 +32,12 @@ from math import add, subtract # import multiple
 
 ## Packages
 
-A package is a directory with a `ky.toml` manifest.
-
 ```
 my-project/
 ├── ky.toml
 └── src/
- ├── main.ky
- └── lib.ky
+    ├── main.ky
+    └── lib.ky
 ```
 
 ## Package manifest (ky.toml)
@@ -49,8 +55,9 @@ ky-http = "1.0"
 ## Standard library
 
 ```ky
-from std import io
-from std import json
-from std import math
-from std import time
+use std.io
+use std.json
+use std.math
+use std.time
+use std.collections.{queue, stack, deque}
 ```

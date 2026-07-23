@@ -22,6 +22,10 @@ fn types_match_ignore_span(a: &AstType, b: &AstType) -> bool {
             p1.len() == p2.len() && p1.iter().zip(p2).all(|(x, y)| types_match_ignore_span(x, y))
             && types_match_ignore_span(r1, r2)
         }
+        (AstType::Set { inner: i1, .. }, AstType::Set { inner: i2, .. }) => types_match_ignore_span(i1, i2),
+        (AstType::Queue { inner: i1, .. }, AstType::Queue { inner: i2, .. }) => types_match_ignore_span(i1, i2),
+        (AstType::Stack { inner: i1, .. }, AstType::Stack { inner: i2, .. }) => types_match_ignore_span(i1, i2),
+        (AstType::List { inner: i1, .. }, AstType::List { inner: i2, .. }) => types_match_ignore_span(i1, i2),
         (AstType::Array { inner: i1, size: s1, .. }, AstType::Array { inner: i2, size: s2, .. }) => {
             s1 == s2 && types_match_ignore_span(i1, i2)
         }

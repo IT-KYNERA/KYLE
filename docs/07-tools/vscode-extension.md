@@ -101,7 +101,7 @@ Theme
 
 1. Lex + parse the file into AST
 2. Create `ModuleResolver` with search paths
-3. Resolve `from X import Y` → fetch file, parse, cache, splice ALL declarations
+3. Resolve `use X.Y` → fetch file, parse, cache, splice ALL declarations
 4. Resolve transitive imports (recursive in cached modules)
 5. Pull contracts from cached modules (for imported classes with contract dependencies)
 6. Run `SemanticAnalyzer::analyze(&program)` (Phase 1–3)

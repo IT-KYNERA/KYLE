@@ -501,23 +501,23 @@ name = user.name ?? "anonymous"
 
 ```kyle
 # Importar símbolo específico
-from http.server import Router
+use http.server.Router
 
 # Importar múltiples
-from json import parse, stringify
+use json.{parse, stringify}
 
 # Importar todo
-from os import *
+use os
 
 # Importar con alias
-from views.home import home as home_page
+use views.home as home_page
 
 # Import relativo
-from .utils import helper
-from ..models import User
+use ~utils.helper
+use ~~models.User
 
 # Import de package
-from sqlite.connection import Connection
+use sqlite.connection.Connection
 
 # Visibilidad
 name = "KYOS"              # público (default)

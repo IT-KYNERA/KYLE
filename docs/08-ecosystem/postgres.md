@@ -10,7 +10,7 @@
 Driver PostgreSQL nativo via FFI a `libpq`. Minimum overhead, tipado fuerte, cero magia.
 
 ```kyle
-from postgris import pool, Row
+use postgris.{pool, Row}
 ```
 
 ---
@@ -18,7 +18,7 @@ from postgris import pool, Row
 ## 2. Connection
 
 ```kyle
-from postgris import pool
+use postgris.pool
 
 pool = pool.new("postgresql://user:pass@localhost:5432/mydb")
 
@@ -100,8 +100,8 @@ final class Row:
 ### Mapeo a clasis (with deserialize)
 
 ```kyle
-from postgris import pool
-from jare import deserialize
+use postgris.pool
+use jare.deserialize
 
 class User:
  id: i64
@@ -127,7 +127,7 @@ name = row.get_str("name") # "" si NULL
 ## 5. Migracionis (simple)
 
 ```kyle
-from postgris import pool
+use postgris.pool
 
 pool = pool.new(conn_string)
 

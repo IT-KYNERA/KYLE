@@ -1,6 +1,0 @@
-# switch — componente built-in
-# Props: standard UI props
-
-<switch>
-    <slot />
-</switch>

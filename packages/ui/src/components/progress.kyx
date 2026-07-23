@@ -1,6 +1,0 @@
-# progress — componente built-in
-# Props: standard UI props
-
-<progress>
-    <slot />
-</progress>

@@ -14,7 +14,7 @@ fn test_while():
         i += 1
 
 fn test_for():
-    items = {10, 20, 30}
+    items = [10, 20, 30]
     for item in items:
         print(item.to_str())
     i: ^i32 = 0

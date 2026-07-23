@@ -47,6 +47,8 @@ pub enum MirType {
     /// A dictionary/map type with key and value types.
     Dict(Box<MirType>, Box<MirType>),
     Set(Box<MirType>),
+    Queue(Box<MirType>),
+    Stack(Box<MirType>),
     /// Slice view: `&[T]` — fat pointer {ptr, len}, Copy semantics.
     Slice(Box<MirType>),
     /// Heap-allocated box: `box<T>` — owned pointer to heap T, Move semantics.
@@ -182,6 +184,7 @@ pub fn is_move_type(t: &MirType) -> bool {
         MirType::List(_) => true,
         MirType::Dict(_, _) => true,
         MirType::Set(_) => true,
+        MirType::Queue(_) | MirType::Stack(_) => true,
         MirType::Box(_) => true,
         // Array is NOT heap-allocated — value type on stack. No ky_free.
         // Struct is NOT heap-allocated — it's a value type on the stack.
@@ -244,6 +247,8 @@ impl fmt::Display for MirType {
             }
             MirType::Dict(key, val) => write!(f, "dict<{}, {}>", key, val),
             MirType::Set(inner) => write!(f, "set<{}>", inner),
+            MirType::Queue(inner) => write!(f, "queue<{}>", inner),
+            MirType::Stack(inner) => write!(f, "stack<{}>", inner),
             MirType::Slice(inner) => write!(f, "&[{}]", inner),
             MirType::Box(inner) => write!(f, "box<{}>", inner),
         }

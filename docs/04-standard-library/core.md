@@ -1,14 +1,14 @@
 # core — Typis Fundamentales
 
 > Module base with typis `option` (`T?`) y `result` (`T!`).
-> Import: `from core import option, result`
+> Import: `use core.{option, result}`
 
 ## option: `option<T>` / `T?`
 
 Representa un value opcional: `some(val: T)` o `none`.
 
 ```ky
-from core import option
+use core.option
 
 name: option<str> = option.some("Kyle")
 name = option.none
@@ -49,7 +49,7 @@ if name.is_some():
 Representa una operation que can failsr: `ok(val: T)` o `error(msg: E)`.
 
 ```ky
-from core import result
+use core.result
 
 fn divide(a: i32, b: i32) result<i32, str>:
  if b == 0:

@@ -26,6 +26,8 @@ pub enum Type {
     List(Box<Type>),
     Dict(Box<Type>, Box<Type>),
     Set(Box<Type>),
+    Queue(Box<Type>),
+    Stack(Box<Type>),
     Object(Vec<(String, Type)>),
     Tuple(Vec<Type>),
     Slice(Box<Type>),
@@ -63,6 +65,10 @@ impl Type {
             AstType::Array { inner, size, .. } => {
                 Type::Array(Box::new(Type::from_ast_type(inner)), *size)
             }
+            AstType::Set { inner, .. } => Type::Set(Box::new(Type::from_ast_type(inner))),
+            AstType::Queue { inner, .. } => Type::Queue(Box::new(Type::from_ast_type(inner))),
+            AstType::Stack { inner, .. } => Type::Stack(Box::new(Type::from_ast_type(inner))),
+            AstType::List { inner, .. } => Type::List(Box::new(Type::from_ast_type(inner))),
             AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Type::from_ast_type(inner),
             AstType::Ptr { .. } => Type::Ptr,
             AstType::Slice { inner, .. } => Type::Slice(Box::new(Type::from_ast_type(inner))),
@@ -195,6 +201,8 @@ impl fmt::Display for Type {
             Type::List(inner) => write!(f, "list<{}>", inner),
             Type::Dict(k, v) => write!(f, "dict<{}, {}>", k, v),
             Type::Set(inner) => write!(f, "Set<{}>", inner),
+            Type::Queue(inner) => write!(f, "Queue<{}>", inner),
+            Type::Stack(inner) => write!(f, "Stack<{}>", inner),
             Type::Object(fields) => {
                 write!(f, "{{")?;
                 for (i, (n, t)) in fields.iter().enumerate() {

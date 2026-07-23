@@ -15,7 +15,7 @@
 
 Kyle UI es un sistema de UI declarativo construido sobre el lenguaje Kyle.
 
-Un archivo `.kyx` representa un **componente**. Se importa explícitamente con `from X import Y` y se usa como `<Y />` en templates.
+Un archivo `.kyx` representa un **componente**. Se importa explícitamente con `use X.Y` y se usa como `<Y />` en templates.
 
 No existe JavaScript, HTML ni CSS. Todo es Kyle tipado.
 
@@ -90,16 +90,16 @@ final class tab_bar    # barra de pestañas
 final class footer     # pie de página
 ```
 
-### 2.2 Imports: `from X import Y`
+### 2.2 Imports: `use X.Y`
 
 Los componentes se importan explícitamente con la misma sintaxis que Kyle:
 
 ```kyx
 # app.kyx
-from views.home import home
-from layouts.main import main
-from components.header import header
-from components.footer import footer
+use views.home
+use layouts.main
+use components.header
+use components.footer
 ```
 
 La resolución busca en este orden:
@@ -139,7 +139,7 @@ style<text> Title:
 
 ```kyx
 # app.kyx
-from components.theme import theme  # estilos mezclados automáticamente
+use components.theme
 
 <app title="App">
     <router>
@@ -526,10 +526,10 @@ theme DarkTheme: LightTheme:
 
 ```kyx
 # app.kyx
-from views.home import home
-from views.login import login
-from views.not_found import not_found
-from layouts.main import main
+use views.home
+use views.login
+use views.not_found
+use layouts.main
 
 <app title="Mi App">
     <router>

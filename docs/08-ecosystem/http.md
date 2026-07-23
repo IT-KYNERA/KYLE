@@ -12,11 +12,11 @@ Un solo package for todo HTTP. Cliente, servidor y websocket comparten types.
 Nada de functions globales. Todo se instancia.
 
 ```kyle
-from http.client import client
-from http.server import router
-from http.websocket import ws_upgrade, ws_read_text, ws_send_text
-from http import http_status, http_method, header
-from jare import serialize, deserialize
+use http.client
+use http.server.router
+use http.websocket.{ws_upgrade, ws_read_text, ws_send_text}
+use http.{http_status, http_method, header}
+use jare.{serialize, deserialize}
 ```
 
 ---
@@ -56,7 +56,7 @@ final class header:
 ### Uso
 
 ```kyle
-from http.client import client
+use http.client
 
 client = client { timeout: 10 }
 
@@ -108,7 +108,7 @@ El servidor usa un `router` with handlers as closures, estilo Express.
 ### Uso basico
 
 ```kyle
-from http.server import router
+use http.server.router
 
 app = router()
 
@@ -226,8 +226,8 @@ app.get("/users/{id:i32}", (req, res):
 ### Example completo: API REST
 
 ```kyle
-from http.server import router
-from jare import deserialize
+use http.server.router
+use jare.deserialize
 
 class User:
  name: str
@@ -271,7 +271,7 @@ websocket se maneja as una path mas. El router does upgrade automatic.
 ### Echo server
 
 ```kyle
-from http.server import router
+use http.server.router
 
 app = router()
 
@@ -287,7 +287,7 @@ app.listen(8080)
 ### Chat server
 
 ```kyle
-from http.server import router
+use http.server.router
 
 app = router()
 

@@ -1,6 +1,0 @@
-# app_bar — componente built-in
-# Props: standard UI props
-
-<app_bar>
-    <slot />
-</app_bar>

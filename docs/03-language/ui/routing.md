@@ -71,11 +71,11 @@ Las rutas se declaran en el `<router>` con `<route>`. NO hay `view()` en los arc
 
 ```kyx
 # app.kyx — Entry point con rutas centralizadas
-from views.home import home
-from views.login import login
-from views.user_profile import user_profile
-from views.not_found import not_found
-from layouts.main import main
+use views.home
+use views.login
+use views.user_profile
+use views.not_found
+use layouts.main
 
 <app title="Mi App">
     <router>

@@ -46,13 +46,13 @@ ky build --target wasm32-unknown-unknown -O3 app.ky
 El package `web` expone APIs del navegador a Kyle compilado a WASM.
 
 ```kyle
-from web import document, console, fetch
+use web.{document, console, fetch}
 ```
 
 ### DOM
 
 ```kyle
-from web import document
+use web.document
 
 div = document.get_element_by_id("app")
 div.text_content = "Hola from Kyle!"
@@ -68,7 +68,7 @@ div.append_child(btn)
 ### Fetch (HTTP from browser)
 
 ```kyle
-from web import fetch, response
+use web.{fetch, response}
 
 ris = fetch("/api/users")
 if res.ok:
@@ -80,7 +80,7 @@ if res.ok:
 ### Console
 
 ```kyle
-from web import console
+use web.console
 
 console.log("hello from Kyle")
 console.error("something went wrong")
@@ -89,7 +89,7 @@ console.error("something went wrong")
 ### Canvas 2D
 
 ```kyle
-from web import document, canvas
+use web.{document, canvas}
 
 canvas = document.get_element_by_id("game")
 ctx = canvas.getContext("2d")

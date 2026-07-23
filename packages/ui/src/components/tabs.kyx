@@ -1,6 +1,0 @@
-# tabs — componente built-in
-# Props: standard UI props
-
-<tabs>
-    <slot />
-</tabs>

@@ -1,6 +1,0 @@
-# View — root container
-# Props: padding, margin, style, class
-
-<view>
-    <slot />
-</view>

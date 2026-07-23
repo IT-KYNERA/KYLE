@@ -1,6 +1,0 @@
-# select — componente built-in
-# Props: standard UI props
-
-<select>
-    <slot />
-</select>

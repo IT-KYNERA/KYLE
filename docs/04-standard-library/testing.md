@@ -1,12 +1,12 @@
 # testing — Testing y Aserciones
 
 > Module de testing y aserciones.
-> Import: `from testing import assert`
+> Import: `use testing.assert`
 
 ## assert: aserciones
 
 ```ky
-from testing import assert
+use testing.assert
 
 #[test]
 fn test_addition():
@@ -50,7 +50,7 @@ ky test
 ### Example completo
 
 ```ky
-from testing import assert
+use testing.assert
 
 fn sum_list(lst: {i32}) i32:
  result: ^i32 = 0

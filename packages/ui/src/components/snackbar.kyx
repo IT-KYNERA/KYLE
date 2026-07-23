@@ -1,6 +1,0 @@
-# snackbar — componente built-in
-# Props: standard UI props
-
-<snackbar>
-    <slot />
-</snackbar>

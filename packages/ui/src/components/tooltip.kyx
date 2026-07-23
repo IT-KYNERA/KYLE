@@ -1,6 +1,0 @@
-# tooltip — componente built-in
-# Props: standard UI props
-
-<tooltip>
-    <slot />
-</tooltip>

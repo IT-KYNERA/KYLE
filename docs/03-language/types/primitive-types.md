@@ -341,7 +341,7 @@ result = doubled.collect() # → {i32}
 
 ## Specialized typis (NATIVOS)
 
-> Todos estos are nativos de Kyle (no requieren `from X import Y`).
+> Todos estos are nativos de Kyle (no requieren `use X.Y`).
 > Estan disponiblis globalmente as typis built-in del language.
 
 ### date_time [x]

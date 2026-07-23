@@ -1,6 +1,0 @@
-# card — componente built-in
-# Props: standard UI props
-
-<card>
-    <slot />
-</card>

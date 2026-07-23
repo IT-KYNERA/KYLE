@@ -1,6 +1,0 @@
-# image — componente built-in
-# Props: standard UI props
-
-<image>
-    <slot />
-</image>

@@ -41,7 +41,7 @@ ky test --coverage   # cobertura
 
 ```kyle
 # tests/button_test.ky
-from .lib import test, expect, render
+use ~lib.{test, expect, render}
 
 test("Button renders with text"):
     # Renderiza el componente en aislamiento
@@ -275,7 +275,7 @@ Para tests end-to-end en browser/dispositivo:
 
 ```kyle
 # tests/e2e/login_e2e.ky
-from .lib import e2e, browser
+use ~lib.{e2e, browser}
 
 e2e("Login flow"):
     page = browser.new_page()

@@ -103,7 +103,7 @@ impl<'ctx> Codegen<'ctx> {
                 fn_value.add_attribute(AttributeLoc::Param(idx), attr);
             }
             if noalias_kind > 0 {
-                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Ptr(_) | MirType::Box(_)) {
+                if matches!(ptype, MirType::Struct(_, _) | MirType::Str | MirType::List(_) | MirType::Dict(_, _) | MirType::Set(_) | MirType::Queue(_) | MirType::Stack(_) | MirType::Ptr(_) | MirType::Box(_)) {
                     let attr = self.context.create_enum_attribute(noalias_kind, 0);
                     fn_value.add_attribute(AttributeLoc::Param(idx), attr);
                 }

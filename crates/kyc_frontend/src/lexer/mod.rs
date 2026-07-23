@@ -286,6 +286,7 @@ impl Lexer {
             "none" => TokenKind::None,
             "ok" => TokenKind::OkKw,
             "extern" => TokenKind::Extern,
+            "use" => TokenKind::Use,
             "import" => TokenKind::Import,
             "from" => TokenKind::From,
             "as" => TokenKind::As,

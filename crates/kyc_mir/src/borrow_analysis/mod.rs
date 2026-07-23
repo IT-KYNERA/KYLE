@@ -319,6 +319,19 @@ impl BorrowAnalysis {
             })
             .collect();
 
+        // Track ky_clone_str results: these are heap-allocated copies that need
+        // ky_free, but the SSA/codegen has issues freeing them across multiple
+        // return blocks. Exclude for now to avoid runtime crashes.
+        let clone_results: BTreeSet<usize> = func.basic_blocks.iter()
+            .flat_map(|b| b.insts.iter())
+            .filter_map(|inst| {
+                if let MirInst::Call { dest, name, .. } = inst {
+                    if name == "ky_clone_str" { return *dest; }
+                }
+                None
+            })
+            .collect();
+
         // Track Load source locals: when a Load creates an alias for a move-type
         // (like str), the source holds the same pointer as the alias. We must not
         // free the source if an alias still holds its pointer.
@@ -386,6 +399,7 @@ impl BorrowAnalysis {
                             && !string_literal_locals.contains(l)
                             && !field_loaded.contains(l)
                             && !list_get_results.contains(l)
+                            && !clone_results.contains(l)
                         {
                             to_insert.push((block_idx, *l));
                         }

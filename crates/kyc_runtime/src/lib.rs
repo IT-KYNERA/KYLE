@@ -15,6 +15,8 @@ pub mod datetime;
 pub mod uuid;
 pub mod bytes;
 pub mod set;
+pub mod queue;
+pub mod stack;
 pub mod date;
 pub mod decimal;
 pub mod channel;
@@ -41,6 +43,9 @@ pub use net::{ky_tcp_listen, ky_tcp_accept, ky_tcp_read, ky_tcp_write, ky_tcp_cl
 pub use datetime::{ky_datetime_now, ky_datetime_parse, ky_datetime_format, ky_datetime_year, ky_datetime_month, ky_datetime_day, ky_datetime_hour, ky_datetime_minute, ky_datetime_second, ky_datetime_add_days, ky_datetime_add_hours, ky_datetime_diff, ky_datetime_from_ymdhms};
 pub use uuid::{ky_uuid_v4, ky_uuid_parse};
 pub use bytes::{ky_bytes_new, ky_bytes_free, ky_bytes_get, ky_bytes_set, ky_bytes_to_hex, ky_bytes_from_hex, ky_bytes_to_base64};
+pub use set::{ky_set_new, ky_set_free, ky_set_add, ky_set_contains, ky_set_remove, ky_set_len};
+pub use queue::{ky_queue_new, ky_queue_free, ky_queue_push, ky_queue_pop, ky_queue_peek, ky_queue_len};
+pub use stack::{ky_stack_new, ky_stack_free, ky_stack_push, ky_stack_pop, ky_stack_peek, ky_stack_len};
 pub use date::{ky_date_today, ky_date_from_ymd, ky_date_parse, ky_date_year, ky_date_month, ky_date_day, ky_date_weekday, ky_date_add_days, ky_date_format, ky_time_from_hms, ky_time_now, ky_time_parse, ky_time_hour, ky_time_minute, ky_time_second};
 pub use decimal::{ky_decimal_from_str, ky_decimal_to_str, ky_decimal_round, ky_decimal_truncate};
 pub use url::{ky_url_scheme, ky_url_host, ky_url_port, ky_url_path, ky_url_query};

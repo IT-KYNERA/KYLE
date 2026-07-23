@@ -53,6 +53,7 @@ fn desugar_decl_with_contracts(decl: &Decl, contract_names: &std::collections::H
 
 fn desugar_decl(decl: &Decl) -> Decl {
     match decl {
+        Decl::Use(u) => Decl::Use(u.clone()),
         Decl::Import(i) => Decl::Import(i.clone()),
         Decl::FromImport(fi) => Decl::FromImport(fi.clone()),
         Decl::Variable(v) => Decl::Variable(desugar_variable_decl(v)),
@@ -245,6 +246,10 @@ fn desugar_expr(expr: &Expr) -> Expr {
         Expr::ArrayRepeat { value, count, span } => Expr::ArrayRepeat {
             value: Box::new(desugar_expr(value)),
             count: Box::new(desugar_expr(count)),
+            span: span.clone(),
+        },
+        Expr::SetLiteral { elements, span } => Expr::SetLiteral {
+            elements: elements.iter().map(desugar_expr).collect(),
             span: span.clone(),
         },
         Expr::List { elements, span } => Expr::List {

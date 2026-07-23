@@ -1478,6 +1478,10 @@ impl LanguageServer {
             AstType::FnPtr { .. } => "fn_ptr".to_string(),
             AstType::Mutable { inner, .. } | AstType::Borrow { inner, .. } => Self::ast_type_name(inner),
             AstType::Ptr { .. } => "ptr".to_string(),
+            AstType::Set { inner, .. } => format!("set<{}>", Self::ast_type_name(inner)),
+            AstType::Queue { inner, .. } => format!("queue<{}>", Self::ast_type_name(inner)),
+            AstType::Stack { inner, .. } => format!("stack<{}>", Self::ast_type_name(inner)),
+            AstType::List { inner, .. } => format!("[{}]", Self::ast_type_name(inner)),
             AstType::Array { inner, .. } => format!("[{}]", Self::ast_type_name(inner)),
             AstType::Slice { inner, .. } => format!("&[{}]", Self::ast_type_name(inner)),
         }
@@ -1721,6 +1725,10 @@ impl LanguageServer {
             AstType::Mutable { inner, .. } => format!("^{}", Self::fmt_ast_type(inner)),
             AstType::Borrow { inner, .. } => format!("&{}", Self::fmt_ast_type(inner)),
             AstType::Ptr { .. } => "ptr".to_string(),
+            AstType::Set { inner, .. } => format!("set<{}>", Self::fmt_ast_type(inner)),
+            AstType::Queue { inner, .. } => format!("queue<{}>", Self::fmt_ast_type(inner)),
+            AstType::Stack { inner, .. } => format!("stack<{}>", Self::fmt_ast_type(inner)),
+            AstType::List { inner, .. } => format!("[{}]", Self::fmt_ast_type(inner)),
             AstType::Array { inner, size, .. } => format!("[{}; {}]", Self::fmt_ast_type(inner), size),
             AstType::Slice { inner, .. } => format!("&[{}]", Self::fmt_ast_type(inner)),
         }
@@ -2598,6 +2606,18 @@ impl LanguageServer {
                 Self::walk_semantic_type(inner, tokens, symbols);
             }
             AstType::Ptr { .. } => {}
+            AstType::Set { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::Queue { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::Stack { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
+            AstType::List { inner, .. } => {
+                Self::walk_semantic_type(inner, tokens, symbols);
+            }
             AstType::Array { inner, .. } => {
                 Self::walk_semantic_type(inner, tokens, symbols);
             }
