@@ -4,127 +4,72 @@
 
 ## Requirements
 
-- **LLVM 18.1** (required to compile from source)
-- **Rust 1.80+** (required to compile from source)
-- **Git** (to clone the repository)
+**No external dependencies needed.** The `ky` binary is self-contained — it does NOT require LLVM, Rust, or any runtime libraries to run.
+
+LLVM 18 + Rust are only needed to **build** the compiler from source.
 
 ## Quick Install (one command)
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/scripts/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/install.ps1" | iex
+iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/scripts/install.ps1" | iex
 ```
 
 Both scripts:
 1. Detect OS + architecture automatically
 2. Download the correct bundle from GitHub Releases
 3. Verify SHA-256 checksum
-4. Install `ky` + `libkyc_runtime.a`
+4. Install `ky` binary
 5. Configure PATH automatically
-
----
-
-## Install LLVM 18 (for building from source)
-
-### macOS
-
-```bash
-brew install llvm@18
-export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
-```
-
-### Linux (Debian/Ubuntu)
-
-```bash
-sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
-```
-
-### Windows
-
-**Option A — Chocolatey (recommended):**
-```powershell
-choco install llvm --version=18.1.8
-$env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
-```
-
-**Option B — Manual download:**
-1. Download: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8
-2. Run `LLVM-18.1.8-win64.exe`
-3. Set environment variable:
-   ```powershell
-   $env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
-   ```
-
-**Option C — Portable (no admin):**
-```powershell
-Invoke-WebRequest -Uri "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe" -OutFile "$env:TEMP\llvm-18.exe"
-& "C:\Program Files\7-Zip\7z.exe" x "$env:TEMP\llvm-18.exe" -o"$env:USERPROFILE\llvm-18" -y
-$env:LLVM_SYS_181_PREFIX = "$env:USERPROFILE\llvm-18"
-```
-> **Note:** The official LLVM 18.1.8 release for Windows does not include a `.zip` file, only `.exe` installers.
-> Use 7-Zip to extract the NSIS installer. If 7-Zip is not available, use Option A or B.
 
 ---
 
 ## Build from Source
 
+Only needed if you want to modify the compiler. Requires **LLVM 18** and **Rust 1.81+**.
+
+### Install LLVM 18
+
+**macOS:**
+```bash
+brew install llvm@18
+export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt install llvm-18-dev libpolly-18-dev libzstd-dev
+```
+
+**Windows (PowerShell as Admin):**
+```powershell
+choco install llvm --version=18.1.8
+$env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
+```
+
+### Build
+
 ```bash
 git clone https://github.com/IT-KYNERA/KYLE.git
 cd KYLE
-
-# Build compiler + runtime
 cargo build --release --bin ky
-cargo build --release -p kyc_runtime
 
-# Binary is at:
-#   macOS/Linux: target/release/ky
-#   Windows:     target/release/ky.exe
-# Runtime:
-#   target/release/libkyc_runtime.a
+# Binary at: target/release/ky (or ky.exe on Windows)
 ```
-
-### Install locally after building
-
-```bash
-# macOS / Linux
-cp target/release/ky ~/.ky/bin/
-cp target/release/libkyc_runtime.a ~/.ky/lib/
-
-# Windows (PowerShell)
-Copy-Item target/release/ky.exe "$env:USERPROFILE\.ky\bin\"
-Copy-Item target/release/kyc_runtime.lib "$env:USERPROFILE\.ky\lib\"
-```
-
----
-
-## VS Code Extension
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.sh | sh
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -Uri "https://raw.githubusercontent.com/IT-KYNERA/KYLE/main/vscode-ky/install-extension.ps1" | iex
-```
-
-The VS Code extension provides syntax highlighting, LSP integration (diagnostics, autocomplete,
-go-to-definition, hover, rename), debugging, and a color theme.
 
 ---
 
 ## Verify Installation
 
 ```bash
-ky --version    # Should show v0.7.0
+ky --version    # Should show v0.8.4
 ky check --help # Should show help
 ky run examples/hello.ky  # Should print "Hello, World!"
 ```
@@ -133,13 +78,11 @@ ky run examples/hello.ky  # Should print "Hello, World!"
 
 ## Environment Variables
 
-| Variable | Platform | Description |
-|----------|----------|-------------|
-| `LLVM_SYS_181_PREFIX` | All | Path to LLVM 18 installation |
-| `MACOSX_DEPLOYMENT_TARGET` | macOS | Deployment target version |
-| `KL_WORKERS` | All | Thread pool workers (default: CPU count) |
-| `KY_VERSION` | All | Version to install (for install scripts) |
-| `KY_PREFIX` | All | Custom install directory |
+| Variable | Description |
+|----------|-------------|
+| `LLVM_SYS_181_PREFIX` | Path to LLVM 18 (only for building from source) |
+| `KY_VERSION` | Version to install (for install scripts) |
+| `KY_PREFIX` | Custom install directory |
 
 ---
 
@@ -148,4 +91,3 @@ ky run examples/hello.ky  # Should print "Hello, World!"
 - `first-program.md` — First program
 - `build.md` — Building projects
 - `testing.md` — Writing and running tests
-- `package-manager.md` — Package manager

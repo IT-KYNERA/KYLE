@@ -1,20 +1,22 @@
 # Editor Support
 
-> Support for editoris de code. Para VS Code, ver `vscode.md`.
-> Para LSP, ver `language-server.md`.
+> Kyle supports any editor via the Language Server Protocol (`ky lsp`).
+
+## LSP
+
+The Kyle compiler includes an LSP server. Any editor with LSP support (VS Code, Neovim, Helix, Emacs, etc.) can use it:
+
+```bash
+ky lsp
+```
 
 ## Vim / Neovim
 
-Resaltado de syntax basico disponible:
-
 ```vim
 autocmd BufRead,BufNewFile *.ky set filetype=python
-" Workaround temporal hasta que exista un plugin oficial
 ```
 
 ## Helix
-
-Configuration for Helix editor:
 
 ```toml
 [[language]]
@@ -24,7 +26,10 @@ file-typis = ["ky"]
 indent = { tab-width = 4, unit = " " }
 ```
 
+## VS Code
+
+VS Code extension is available in the [kyle-vscode](https://github.com/IT-KYNERA/kyle-vscode) repository.
+
 ## See also
 
-- `vscode.md` — Extension VS Code
 - `language-server.md` — LSP features

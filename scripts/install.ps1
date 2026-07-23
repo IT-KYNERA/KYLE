@@ -88,77 +88,17 @@ if (Test-Path "$TmpDir\libkyc_runtime.a") {
 # Clean up ky install temp
 Remove-Item -Recurse -Force $TmpDir
 
-# ─── Install LLVM 18.1.8 (runtime dependency) ──────────────
-# ky.exe dynamically links against LLVM-C.dll at runtime.
-# We download the NSIS installer and extract it with 7-Zip.
-# If 7-Zip is not available, warn the user to install LLVM manually.
-
-$LLVMDir = "$env:KY_PREFIX\llvm-18"
-$LLVMExe = "$env:TEMP\LLVM-18.1.8-win64.exe"
-$LLVMUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/LLVM-18.1.8-win64.exe"
-
-function Find-7z {
-    $paths = @(
-        "C:\Program Files\7-Zip\7z.exe",
-        "C:\Program Files (x86)\7-Zip\7z.exe",
-        "$env:ProgramFiles\7-Zip\7z.exe",
-        "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
-    )
-    foreach ($p in $paths) { if (Test-Path $p) { return $p } }
-    $cmd = Get-Command "7z" -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-    return $null
-}
-
-if (-not (Test-Path "$LLVMDir\bin\LLVM-C.dll")) {
-    $7zPath = Find-7z
-    if (-not $7zPath) {
-        Write-Host "Warning: LLVM 18.1.8 is required at runtime by ky.exe."
-        Write-Host "Install manually:"
-        Write-Host "  1. Download from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
-        Write-Host "  2. Run: LLVM-18.1.8-win64.exe"
-        Write-Host "  3. Or with Chocolatey: choco install llvm --version=18.1.8"
-        Write-Host "Then set:  `$env:LLVM_SYS_181_PREFIX = 'C:\Program Files\LLVM'"
-        Write-Host ""
-    } else {
-        Write-Host "Downloading LLVM 18.1.8 (required at runtime by ky)..."
-        try {
-            Invoke-WebRequest -Uri $LLVMUrl -OutFile $LLVMExe -UseBasicParsing
-        } catch {
-            Write-Host "Warning: failed to download LLVM. ky.exe needs LLVM-C.dll at runtime."
-            Write-Host "Install manually from: https://github.com/llvm/llvm-project/releases/tag/llvmorg-18.1.8"
-            Write-Host ""
-        }
-        if (Test-Path $LLVMExe) {
-            Write-Host "Extracting LLVM 18.1.8 with 7-Zip..."
-            New-Item -ItemType Directory -Force -Path $LLVMDir | Out-Null
-            & $7zPath x $LLVMExe -o"$LLVMDir" -y | Out-Null
-            Remove-Item $LLVMExe -Force
-            Write-Host "  LLVM installed to $LLVMDir"
-        }
-    }
-} else {
-    Write-Host "LLVM 18.1.8 already installed at $LLVMDir"
-}
-
-$LLVMBin = "$LLVMDir\bin"
-$env:LLVM_SYS_181_PREFIX = $LLVMDir
-
 # ─── Add to PATH ────────────────────────────────────────────
 
 $regPath = "HKCU:\Environment"
 $currentPath = (Get-ItemProperty -Path $regPath -Name PATH -ErrorAction SilentlyContinue).PATH
 $addedDirs = @()
 if ($currentPath -notlike "*$BinDir*") { $addedDirs += $BinDir }
-if ($currentPath -notlike "*$LLVMBin*") { $addedDirs += $LLVMBin }
 if ($addedDirs.Count -gt 0) {
     $newPath = ($addedDirs -join ';') + ";" + $currentPath
-    # Use registry directly (not [Environment]::SetEnvironmentVariable) so
-    # we can broadcast the change to all windows afterwards.
     Set-ItemProperty -Path $regPath -Name PATH -Value $newPath
     Write-Host "  Added to PATH:"
     foreach ($d in $addedDirs) { Write-Host "    $d" }
-    # Broadcast WM_SETTINGCHANGE so new terminals see the updated PATH
     try {
         $sig = '[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'
         Add-Type -MemberDefinition $sig -Name NativeMethods -Namespace Win32 -ErrorAction Stop | Out-Null
@@ -168,8 +108,7 @@ if ($addedDirs.Count -gt 0) {
 } else {
     Write-Host "  PATH already configured"
 }
-# Always update current session PATH too
-$env:PATH = "$BinDir;$LLVMBin;$env:PATH"
+$env:PATH = "$BinDir;$env:PATH"
 
 # ─── Verify ─────────────────────────────────────────────────
 
@@ -180,14 +119,6 @@ try {
         Write-Host "[OK] Kyle $Version installed successfully!"
         Write-Host ""
         Write-Host "  Binary:  $BinDir\ky.exe"
-        if (Test-Path "$LibDir\libkyc_runtime.a" -or (Test-Path "$LibDir\kyc_runtime.lib")) {
-            Write-Host "  Runtime: installed"
-        }
-        if (Test-Path "$LLVMDir\bin\LLVM-C.dll") {
-            Write-Host "  LLVM:    $LLVMDir"
-        } else {
-            Write-Host "  LLVM:    NOT INSTALLED — ky.exe needs LLVM-C.dll at runtime"
-        }
         Write-Host ""
         Write-Host "  Use now:  ky --version"
         Write-Host "  Try:      ky run examples\hello.ky"

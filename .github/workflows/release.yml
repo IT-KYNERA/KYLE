@@ -24,25 +24,6 @@ jobs:
             --notes "See commit history for changes." \
             --repo ${{ github.repository }}
 
-  package-vsix:
-    needs: create-release
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Package VSIX
-        run: |
-          cd vscode-ky
-          npm install --silent
-          npx @vscode/vsce package --out ky-extension.vsix
-      - name: Upload VSIX
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload ${{ github.ref_name }} vscode-ky/ky-extension.vsix --clobber
-
   build-linux-arm64:
     needs: create-release
     runs-on: ubuntu-24.04-arm
