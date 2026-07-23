@@ -144,17 +144,17 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
-# macOS: remove quarantine + ad-hoc sign (CI-built binaries get killed by Gatekeeper)
+# macOS: fix code signing (CI-built binaries link Homebrew libs with different Team ID)
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "  Signing binary for macOS..."
-    xattr -d com.apple.quarantine ky 2>/dev/null && echo "  Removed quarantine attr" || true
-    if codesign -f -s - --deep ky 2>/dev/null; then
-        echo "  Code signature applied"
-    else
-        echo "  Warning: could not sign binary. If 'ky' is killed by macOS, run:"
-        echo "    xattr -d com.apple.quarantine ~/.ky/bin/ky"
-        echo "    codesign -f -s - ~/.ky/bin/ky"
-    fi
+    xattr -d com.apple.quarantine ky 2>/dev/null || true
+    # Re-sign Homebrew dependencies to match ad-hoc signature of ky binary
+    for lib in /opt/homebrew/opt/zstd/lib/libzstd.1.dylib /opt/homebrew/opt/llvm@18/lib/libunwind.1.dylib; do
+        if [ -f "$lib" ]; then
+            codesign -f -s - "$lib" 2>/dev/null || true
+        fi
+    done
+    codesign -f -s - ky 2>/dev/null && echo "  Code signature applied" || echo "  Warning: code signing failed"
 fi
 
 chmod +x ky
