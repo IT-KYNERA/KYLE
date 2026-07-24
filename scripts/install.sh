@@ -181,14 +181,14 @@ if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
         if [ -f libkyc_runtime.a ]; then
             cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
-        [ -d lib ] && cp lib/*.dylib /usr/local/lib/ 2>/dev/null || true
+        [ -d lib ] && cp -f lib/*.dylib /usr/local/lib/ 2>/dev/null || true
     else
         sudo mkdir -p /usr/local/bin /usr/local/lib
         sudo cp ky /usr/local/bin/ky
         if [ -f libkyc_runtime.a ]; then
             sudo cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
-        [ -d lib ] && sudo cp lib/*.dylib /usr/local/lib/ 2>/dev/null || true
+        [ -d lib ] && sudo cp -f lib/*.dylib /usr/local/lib/ 2>/dev/null || true
     fi
     INSTALL_DIR="/usr/local/bin"
     KY_PREFIX="/usr/local"
@@ -201,7 +201,7 @@ elif [ -n "${KY_PREFIX:-}" ]; then
         cp libkyc_runtime.a "$KY_PREFIX/lib/libkyc_runtime.a"
     fi
     if [ -d lib ]; then
-        cp lib/*.dylib "$KY_PREFIX/lib/" 2>/dev/null || true
+        cp -f lib/*.dylib "$KY_PREFIX/lib/" 2>/dev/null || true
     fi
     INSTALL_DIR="$KY_PREFIX/bin"
 else
@@ -212,11 +212,10 @@ else
         cp libkyc_runtime.a "$HOME/.ky/lib/libkyc_runtime.a"
     fi
     if [ -d lib ]; then
-        cp lib/*.dylib "$HOME/.ky/lib/" 2>/dev/null || true
+        cp -f lib/*.dylib "$HOME/.ky/lib/" 2>/dev/null || true
     fi
     INSTALL_DIR="$HOME/.ky/bin"
     KY_PREFIX="$HOME/.ky"
-fi
 
 # ─── Add to PATH ─────────────────────────────────────────────
 
