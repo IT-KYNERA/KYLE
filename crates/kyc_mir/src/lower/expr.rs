@@ -1349,7 +1349,18 @@ impl super::Lowerer {
                                 let mut call_args = if is_static {
                                     Vec::new()
                                 } else {
-                                    vec![MirValue::Local(obj_local)]
+                                    // Class methods expect `this` as a POINTER to the struct.
+                                    // If obj_local is a struct value, pass its address instead.
+                                    if matches!(ctx.local_types.get(&obj_local), Some(MirType::Struct(_, _))) {
+                                        let ptr = ctx.alloc_local("_thisptr", MirType::Ptr(Box::new(MirType::Void)));
+                                        ctx.current_block.insts.push(MirInst::AddressOf {
+                                            dest: ptr,
+                                            local_id: obj_local,
+                                        });
+                                        vec![MirValue::Local(ptr)]
+                                    } else {
+                                        vec![MirValue::Local(obj_local)]
+                                    }
                                 };
                                 for arg in arguments {
                                     // Struct-typed or Move-typed identifiers: pass original local
