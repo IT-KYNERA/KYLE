@@ -144,19 +144,17 @@ if [ ! -f "libkyc_runtime.a" ]; then
     echo "Warning: libkyc_runtime.a not found in archive"
 fi
 
-# macOS: ad-hoc sign binary + bundled dylibs to avoid Gatekeeper killing
+# macOS: ad-hoc sign binary + bundled dylibs to avoid Gatekeeper kills
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "  Signing binary for macOS..."
     xattr -d com.apple.quarantine ky 2>/dev/null || true
-    # Copy bundled dylibs to current dir so install step picks them up
+    # Sign bundled dylibs (extracted from lib/ subdirectory)
     if [ -d "lib" ]; then
-        cp lib/*.dylib . 2>/dev/null || true
+        for f in lib/*.dylib; do
+            [ -f "$f" ] && codesign -f -s - "$f" 2>/dev/null || true
+        done
     fi
-    # Sign the binary and any bundled dylibs with ad-hoc signature
-    for f in ky *.dylib; do
-        [ -f "$f" ] && codesign -f -s - "$f" 2>/dev/null || true
-    done
-    echo "  Code signature applied"
+    codesign -f -s - ky 2>/dev/null && echo "  Code signature applied"
 fi
 
 chmod +x ky
@@ -183,16 +181,18 @@ if [ "$INSTALL_TO_USR" = true ] && [ "${KY_PREFIX:-}" = "" ]; then
         if [ -f libkyc_runtime.a ]; then
             cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
+        [ -d lib ] && cp lib/*.dylib /usr/local/lib/ 2>/dev/null || true
     else
         sudo mkdir -p /usr/local/bin /usr/local/lib
         sudo cp ky /usr/local/bin/ky
         if [ -f libkyc_runtime.a ]; then
             sudo cp libkyc_runtime.a /usr/local/lib/libkyc_runtime.a
         fi
-        for f in *.dylib; do [ -f "$f" ] && sudo cp "$f" /usr/local/lib/ 2>/dev/null; done
+        [ -d lib ] && sudo cp lib/*.dylib /usr/local/lib/ 2>/dev/null || true
     fi
     INSTALL_DIR="/usr/local/bin"
     KY_PREFIX="/usr/local"
+
 elif [ -n "${KY_PREFIX:-}" ]; then
     echo "Installing to $KY_PREFIX..."
     mkdir -p "$KY_PREFIX/bin" "$KY_PREFIX/lib"
@@ -200,7 +200,9 @@ elif [ -n "${KY_PREFIX:-}" ]; then
     if [ -f libkyc_runtime.a ]; then
         cp libkyc_runtime.a "$KY_PREFIX/lib/libkyc_runtime.a"
     fi
-    for f in *.dylib; do [ -f "$f" ] && cp "$f" "$KY_PREFIX/lib/" 2>/dev/null; done
+    if [ -d lib ]; then
+        cp lib/*.dylib "$KY_PREFIX/lib/" 2>/dev/null || true
+    fi
     INSTALL_DIR="$KY_PREFIX/bin"
 else
     echo "Installing to $HOME/.ky..."
@@ -209,7 +211,9 @@ else
     if [ -f libkyc_runtime.a ]; then
         cp libkyc_runtime.a "$HOME/.ky/lib/libkyc_runtime.a"
     fi
-    for f in *.dylib; do [ -f "$f" ] && cp "$f" "$HOME/.ky/lib/" 2>/dev/null; done
+    if [ -d lib ]; then
+        cp lib/*.dylib "$HOME/.ky/lib/" 2>/dev/null || true
+    fi
     INSTALL_DIR="$HOME/.ky/bin"
     KY_PREFIX="$HOME/.ky"
 fi
